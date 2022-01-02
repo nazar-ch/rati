@@ -1,0 +1,32 @@
+{
+    "name": "rati",
+    "version": "0.0.1-alpha.1",
+    "description": "TypeScript frontend framework for React & MobX",
+    "author": "Nazar Chobaniuk",
+    "license": "SEE LICENSE IN LICENSE",
+    "private": false,
+    "files": [
+        "dist"
+    ],
+    "main": "./dist/main.js",
+    "types": "./dist/main.d.ts",
+    "scripts": {
+        "clean": "rm -fr dist",
+        "build": "rushx clean && tsc",
+        "watch": "rushx clean && tsc --watch"
+    },
+    "devDependencies": {
+        "typescript": "^4.2.0",
+        "@types/react": "~17.0.3"
+    },
+    "peerDependencies": {
+        "mobx": "^6.0.4",
+        "moment-timezone": "^0.5.32",
+        "lodash": "~4.17.21",
+        "react": "^17.0.1",
+        "history": "^5.0.0"
+    },
+    "dependencies": {
+        "@types/lodash": "~4.14.171"
+    }
+}

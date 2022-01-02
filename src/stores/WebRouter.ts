@@ -1,0 +1,136 @@
+import { observable, action, makeObservable, computed, runInAction } from 'mobx';
+import { Awaited } from '../types/generic';
+import { FC } from 'react';
+import { createBrowserHistory, Location } from 'history';
+import { GlobalStore } from './GlobalStore';
+import { View } from './View';
+
+//--------------------------------------------
+
+// Sources:
+// https://twitter.com/danvdk/status/1301707026507198464
+// https://ja.nsommer.dk/articles/type-checked-url-router.html#d (with validation)
+
+export type ExtractRouteParams<T extends string> = string extends T
+    ? Record<string, string>
+    : T extends `${infer Start}:${infer Param}/${infer Rest}`
+    ? { [k in Param | keyof ExtractRouteParams<Rest>]: string }
+    : T extends `${infer Start}:${infer Param}`
+    ? { [k in Param]: string }
+    : {};
+
+export type ViewComponent<T extends InstanceType<ViewStore<any>>, ExtraParams extends {} = {}> = FC<
+    NonNullable<T['context']> & ExtraParams
+>;
+
+export type ViewComponentForClass<T extends ViewStore<any>> = ViewComponent<InstanceType<T>>;
+
+export function route<
+    Params extends ExtractRouteParams<Path>,
+    Path extends string,
+    Name extends string,
+    VS extends ViewStore<Params>,
+    VC extends ViewComponentForClass<VS>
+>(path: Path, name: Name, view: VS, component: VC) {
+    // TODO: allow regexps for the path (manually type params in this case)
+    //
+    const pathRe =
+        path === '*' ? null : new RegExp('^' + path.replace(/:(.*?)(\/|$)/g, '(?<$1>[^/]*?)$2') + '$');
+
+    return {
+        path,
+        pathRe,
+        name,
+        view,
+        component,
+    };
+}
+
+// type ViewStore = View;
+interface ViewStore<T> {
+    new (stores: any, params: T):
+        | View
+        | {
+              context: Record<string, any> | null;
+              init?: () => Promise<any>;
+          };
+}
+
+// FIXME: maybe not any? Without { component: any } this breaks WebRouter because it's params are not
+// generic enough for real routes
+type RouteType = Omit<ReturnType<typeof route>, 'component'> & { component: any };
+
+export type RoutesType<T extends RouteType[]> = T[number];
+
+type GetView = Awaited<ReturnType<WebRouter<RouteType[]>['getView']>>;
+
+type NameToRouteWrapper<K extends RouteType> = { name: K['name'] } & ExtractRouteParams<K['path']>;
+
+export type NameToRoute<T extends RouteType[]> = NameToRouteWrapper<RoutesType<T>>;
+
+export class WebRouter<T extends RouteType[]> extends GlobalStore<{}> {
+    history;
+    unlistenHistory;
+    constructor(stores: any, private routes: T) {
+        super(stores);
+        makeObservable(this);
+
+        this.history = createBrowserHistory();
+        this.unlistenHistory = this.history.listen((location) => this.setPath(location.location));
+        this.setPath(this.history.location);
+    }
+
+    getPath(args: NameToRoute<T>) {
+        const { name, ...params } = args;
+        let path: string = this.routes.find((item) => item.name === name)!.path;
+        if (params) {
+            for (const [key, value] of Object.entries(params)) {
+                // FIXME: type
+                // @ts-ignore
+                path = path.replace(`:${key}`, value);
+            }
+        }
+        return path;
+    }
+    @observable path: string = '';
+
+    @observable view: GetView | null = null;
+
+    @action.bound async setPath(location: Location) {
+        console.log('>> setPath', location.pathname);
+        this.path = location.pathname;
+
+        const view = await this.getView(this.path, this.stores as any);
+        runInAction(() => {
+            this.view = view;
+        });
+    }
+
+    async getView(path: string, stores: any) {
+        for (const { pathRe, view, name, component } of this.routes) {
+            let result;
+
+            if (pathRe) {
+                result = pathRe.exec(path) ?? pathRe.exec(path + '/');
+            } else {
+                result = {
+                    groups: {},
+                };
+            }
+
+            if (result) {
+                const viewInstance = new view(stores, result.groups as any);
+                if ('init' in viewInstance) {
+                    // TODO: add .catch()
+                    // FIXME: type
+                    // @ts-ignore
+                    viewInstance.init();
+                }
+                return { name, component, view: viewInstance };
+                // return await view(result.groups as any);
+            }
+        }
+
+        // TODO: "in transition" state (between await and context is ready)
+    }
+}
