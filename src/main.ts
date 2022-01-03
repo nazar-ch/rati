@@ -4,7 +4,7 @@ export { Data, DataFactoryType } from './stores/Data';
 
 export { GlobalStore } from './stores/GlobalStore';
 
-export { Rati } from './common/Rati';
+export { RootStore } from './common/RootStore';
 
 export { WebRouter, route, ViewComponent, NameToRoute } from './stores/WebRouter';
 

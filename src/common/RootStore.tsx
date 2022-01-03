@@ -1,7 +1,7 @@
 import { makeObservable, observable, runInAction } from 'mobx';
 import React, { FC } from 'react';
 import { sleep } from './stuff';
-export class Rati<T> {
+export class RootStore<T> {
     constructor(public stores: T) {
         makeObservable(this);
     }
