@@ -1,7 +1,7 @@
 import { makeObservable, observable, runInAction } from 'mobx';
 import React, { FC } from 'react';
 import { sleep } from './stuff';
-export class Foundation<T> {
+export class Rati<T> {
     constructor(public stores: T) {
         makeObservable(this);
     }
@@ -21,8 +21,8 @@ export class Foundation<T> {
         });
     }
 
-    useStores = (function (context) {
-        return function () {
+    useStores = (function(context) {
+        return function() {
             const stores = React.useContext(context);
             if (!stores) {
                 throw new Error('Store context is undefined. Use StoreProvider.');
@@ -31,7 +31,7 @@ export class Foundation<T> {
         };
     })(this.StoresContext);
 
-    StoresProvider = (function (StoresContext) {
+    StoresProvider = (function(StoresContext) {
         const Provider: FC<{
             // TODO: maybe type stores better
             stores?: any;
