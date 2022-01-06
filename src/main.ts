@@ -11,3 +11,6 @@ export { WebRouter, route, ViewComponent, NameToRoute } from './stores/WebRouter
 export { View } from './stores/View';
 
 export * from './types/generic';
+
+export { GenericLink } from './common/GenericLink';
+export { Redirect } from './common/Redirect';

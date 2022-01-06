@@ -23,19 +23,16 @@ export type ViewComponent<T extends InstanceType<ViewStore<any>>, ExtraParams ex
     NonNullable<T['context']> & ExtraParams
 >;
 
-export type ViewComponentForClass<T extends ViewStore<any> | undefined> =
-    T extends ViewStore<any> ?
-    ViewComponent<InstanceType<T>> :
-    // FIXME: here should be EmptyView instead of ViewStore<any>
-    ViewComponent<InstanceType<ViewStore<any>>>;
+export type ViewComponentForClass<T extends ViewStore<any> | undefined> = T extends ViewStore<any>
+    ? ViewComponent<InstanceType<T>>
+    : // FIXME: here should be EmptyView instead of ViewStore<any>
+      ViewComponent<InstanceType<ViewStore<any>>>;
 
 export class EmptyView extends View {
-
     constructor(protected globalStores: unknown, params: any) {
         super(globalStores);
     }
-    data = {
-    };
+    data = {};
 }
 
 export function route<
@@ -43,7 +40,7 @@ export function route<
     Path extends string,
     Name extends string,
     VC extends ViewComponentForClass<VS>,
-    VS extends ViewStore<Params> | undefined,
+    VS extends ViewStore<Params> | undefined
 >(path: Path, name: Name, component: VC, view?: VS) {
     // TODO: allow regexps for the path (manually type params in this case)
     const pathRe =
@@ -70,7 +67,7 @@ interface ViewStore<T> {
 
 // FIXME: maybe not any? Without { component: any } this breaks WebRouter because it's params are not
 // generic enough for real routes
-type RouteType = Omit<ReturnType<typeof route>, 'component'> & { component: any };
+export type RouteType = Omit<ReturnType<typeof route>, 'component'> & { component: any };
 
 export type RoutesType<T extends RouteType[]> = T[number];
 
@@ -80,10 +77,10 @@ type NameToRouteWrapper<K extends RouteType> = { name: K['name'] } & ExtractRout
 
 export type NameToRoute<T extends RouteType[]> = NameToRouteWrapper<RoutesType<T>>;
 
-export class WebRouter<T extends RouteType[]> extends GlobalStore<{}> {
+export class WebRouter<T extends RouteType[] = RouteType[]> extends GlobalStore<{}> {
     history;
     unlistenHistory;
-    constructor(stores: any, private routes: T) {
+    constructor(stores: any, public routes: T) {
         super(stores);
         makeObservable(this);
 

@@ -18,7 +18,7 @@
         "skipLibCheck": true,
         "allowJs": false,
         "outDir": "./dist",
-        "jsx": "react"
+        "jsx": "react-jsx"
     },
     "exclude": ["dist", "node_modules", "build", "jest"],
     "include": ["src"]
