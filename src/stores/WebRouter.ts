@@ -84,7 +84,7 @@ export class WebRouter<T extends RouteType[] = RouteType[]> extends GlobalStore<
         super(stores);
         makeObservable(this);
 
-        const listener = (location: Location) => this.setPath(location);
+        const listener = ({ location }: { location: Location }) => this.setPath(location);
 
         this.history = createBrowserHistory();
         this.unlistenHistory = this.history.listen(listener);
@@ -105,6 +105,8 @@ export class WebRouter<T extends RouteType[] = RouteType[]> extends GlobalStore<
         }
         return path;
     }
+
+    // TODO: make this readonly
     @observable path: string = '';
 
     @observable view: GetView | null = null;
