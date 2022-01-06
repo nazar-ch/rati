@@ -23,17 +23,29 @@ export type ViewComponent<T extends InstanceType<ViewStore<any>>, ExtraParams ex
     NonNullable<T['context']> & ExtraParams
 >;
 
-export type ViewComponentForClass<T extends ViewStore<any>> = ViewComponent<InstanceType<T>>;
+export type ViewComponentForClass<T extends ViewStore<any> | undefined> =
+    T extends ViewStore<any> ?
+    ViewComponent<InstanceType<T>> :
+    // FIXME: here should be EmptyView instead of ViewStore<any>
+    ViewComponent<InstanceType<ViewStore<any>>>;
+
+export class EmptyView extends View {
+
+    constructor(protected globalStores: unknown, params: any) {
+        super(globalStores);
+    }
+    data = {
+    };
+}
 
 export function route<
     Params extends ExtractRouteParams<Path>,
     Path extends string,
     Name extends string,
-    VS extends ViewStore<Params>,
-    VC extends ViewComponentForClass<VS>
->(path: Path, name: Name, view: VS, component: VC) {
+    VC extends ViewComponentForClass<VS>,
+    VS extends ViewStore<Params> | undefined,
+>(path: Path, name: Name, component: VC, view?: VS) {
     // TODO: allow regexps for the path (manually type params in this case)
-    //
     const pathRe =
         path === '*' ? null : new RegExp('^' + path.replace(/:(.*?)(\/|$)/g, '(?<$1>[^/]*?)$2') + '$');
 
@@ -41,7 +53,7 @@ export function route<
         path,
         pathRe,
         name,
-        view,
+        view: view ?? EmptyView,
         component,
     };
 }
@@ -75,8 +87,12 @@ export class WebRouter<T extends RouteType[]> extends GlobalStore<{}> {
         super(stores);
         makeObservable(this);
 
+        const listener = (location: Location) => this.setPath(location);
+
         this.history = createBrowserHistory();
-        this.unlistenHistory = this.history.listen((location) => this.setPath(location.location));
+        this.unlistenHistory = this.history.listen(listener);
+
+        // Set path where the page is opened
         this.setPath(this.history.location);
     }
 
