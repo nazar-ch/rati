@@ -38,11 +38,14 @@ const routes: any[] = [];
 // TODO: replace with FC<{ name: 'name1' } | { name: 'name2', params: { x: string }} | ...>
 type GenericLinkProps<T extends RouteType[]> = PropsWithChildren<{
     to: NameToRoute<T> | string;
+    className?: string;
+    activeClassName?: string;
+    // TODO: "exact" prop to match active path exactly or compare with startWith
     [prop: string]: unknown;
 }>;
 
 export function createLinkComponent<T extends RouteType[] = []>() {
-    function GenericLink({ to, children, ...props }: GenericLinkProps<T>) {
+    function GenericLink({ to, className, activeClassName, children, ...props }: GenericLinkProps<T>) {
         const { router } = useGenericStores();
 
         return useObserver(() => {
@@ -53,6 +56,9 @@ export function createLinkComponent<T extends RouteType[] = []>() {
                 <a
                     {...props}
                     href={`${link}`}
+                    className={
+                        (router.path === link ? activeClassName ?? 'active' : '') + ' ' + className
+                    }
                     onClick={(event) => {
                         if (allowAction(event)) {
                             event.preventDefault();
