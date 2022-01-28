@@ -30,7 +30,7 @@ export type ViewComponentForClass<T extends ViewStore<any> | undefined> = T exte
 
 export class EmptyView extends View {
     constructor(protected globalStores: unknown, params: any) {
-        super(globalStores);
+        super(globalStores, params);
     }
     data = {};
 }
@@ -112,7 +112,7 @@ export class WebRouter<T extends RouteType[] = RouteType[]> extends GlobalStore<
     @observable view: GetView | null = null;
 
     @action.bound async setPath(location: Location) {
-        console.log('>> setPath', location.pathname);
+        // console.log('>> setPath', location.pathname);÷
         this.path = location.pathname;
 
         const view = await this.getView(this.path, this.stores as any);

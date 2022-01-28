@@ -5,10 +5,12 @@ export function sleep(ms: number) {
 export async function createContext<T>(
     stores: T,
     data: Record<string, unknown>,
-    contextStores: Record<string, { (context: any): any }>
+    contextStores: Record<string, { (context: any): any }>,
+    routeParams?: unknown
 ) {
     const context = {
         stores,
+        routeParams,
     } as Record<string, any>;
 
     // Set data first

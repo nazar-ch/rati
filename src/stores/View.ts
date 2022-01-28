@@ -4,7 +4,7 @@ import { createContext } from '../common/stuff';
 import { Data } from './Data';
 
 export abstract class View {
-    constructor(protected globalStores: unknown) {
+    constructor(protected globalStores: unknown, protected params: unknown) {
         makeObservable(this);
     }
     @observable.ref context: ContextType<this> | null = null;
@@ -53,7 +53,8 @@ export abstract class View {
         const context = await createContext(
             this.globalStores,
             _.mapValues(allData, (item) => item.data),
-            this.stores ?? {}
+            this.stores ?? {},
+            this.params
         );
 
         runInAction(() => {
