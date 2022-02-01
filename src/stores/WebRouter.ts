@@ -41,7 +41,7 @@ export function route<
     Name extends string,
     VC extends ViewComponentForClass<VS>,
     VS extends ViewStore<Params> | undefined
->(path: Path, name: Name, component: VC, view?: VS) {
+>(path: Path, name: Name, component: VC, view?: VS, options?: { group?: string }) {
     // TODO: allow regexps for the path (manually type params in this case)
     const pathRe =
         path === '*' ? null : new RegExp('^' + path.replace(/:(.*?)(\/|$)/g, '(?<$1>[^/]*?)$2') + '$');
@@ -52,6 +52,11 @@ export function route<
         name,
         view: view ?? EmptyView,
         component,
+        options: {
+            group: 'default',
+            // overwrite default value if defined
+            ...options,
+        },
     };
 }
 
@@ -71,7 +76,7 @@ export type RouteType = Omit<ReturnType<typeof route>, 'component'> & { componen
 
 export type RoutesType<T extends RouteType[]> = T[number];
 
-type GetView = Awaited<ReturnType<WebRouter<RouteType[]>['getView']>>;
+type GetView = Awaited<ReturnType<WebRouter<RouteType[]>['getActiveRoute']>>;
 
 type NameToRouteWrapper<K extends RouteType> = { name: K['name'] } & ExtractRouteParams<K['path']>;
 
@@ -109,20 +114,24 @@ export class WebRouter<T extends RouteType[] = RouteType[]> extends GlobalStore<
     // TODO: make this readonly
     @observable path: string = '';
 
-    @observable view: GetView | null = null;
+    @observable activeRoute: GetView | null = null;
 
     @action.bound async setPath(location: Location) {
         // console.log('>> setPath', location.pathname);÷
         this.path = location.pathname;
 
-        const view = await this.getView(this.path, this.stores as any);
+        const activeRoute = await this.getActiveRoute(this.path, this.stores as any);
         runInAction(() => {
-            this.view = view;
+            this.activeRoute = activeRoute;
         });
     }
 
-    async getView(path: string, stores: any) {
-        for (const { pathRe, view, name, component } of this.routes) {
+    @action.bound redirect(to: string) {
+        this.history.replace(to);
+    }
+
+    async getActiveRoute(path: string, stores: any) {
+        for (const { pathRe, view, name, component, options } of this.routes) {
             let result;
 
             if (pathRe) {
@@ -141,7 +150,7 @@ export class WebRouter<T extends RouteType[] = RouteType[]> extends GlobalStore<
                     // @ts-ignore
                     viewInstance.init();
                 }
-                return { name, component, view: viewInstance };
+                return { name, component, view: viewInstance, options };
                 // return await view(result.groups as any);
             }
         }
