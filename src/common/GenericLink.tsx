@@ -40,25 +40,34 @@ type GenericLinkProps<T extends RouteType[]> = PropsWithChildren<{
     to: NameToRoute<T> | string;
     className?: string;
     activeClassName?: string;
+    content?: React.ReactNode;
+    activeContent?: React.ReactNode;
     // TODO: "exact" prop to match active path exactly or compare with startWith
     [prop: string]: unknown;
 }>;
 
 export function createLinkComponent<T extends RouteType[] = []>() {
-    function GenericLink({ to, className, activeClassName, children, ...props }: GenericLinkProps<T>) {
+    function GenericLink({
+        to,
+        className,
+        activeClassName,
+        content,
+        activeContent,
+        children,
+        ...props
+    }: GenericLinkProps<T>) {
         const { router } = useGenericStores();
 
         return useObserver(() => {
             const link = typeof to === 'string' ? to : router.getPath(to);
+            const active = router.path === link;
 
             return (
                 // TODO: memoize onClick?
                 <a
                     {...props}
                     href={`${link}`}
-                    className={
-                        (router.path === link ? activeClassName ?? 'active' : '') + ' ' + className
-                    }
+                    className={className + ' ' + (active ? activeClassName ?? 'active' : '')}
                     onClick={(event) => {
                         if (allowAction(event)) {
                             event.preventDefault();
@@ -66,7 +75,7 @@ export function createLinkComponent<T extends RouteType[] = []>() {
                         }
                     }}
                 >
-                    {children}
+                    {children || (active ? activeContent : content)}
                 </a>
             );
         });
