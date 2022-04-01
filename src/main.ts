@@ -12,5 +12,5 @@ export { View } from './stores/View';
 
 export * from './types/generic';
 
-export { GenericLink } from './common/GenericLink';
+export { createLinkComponent } from './common/GenericLink';
 export { Redirect } from './common/Redirect';

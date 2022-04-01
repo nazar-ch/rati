@@ -35,8 +35,6 @@ export class RootStore<T extends DefaultStores> {
         };
         return Provider;
     })(this.StoresContext);
-
-    Link = createLinkComponent<T['router']['routes']>();
 }
 
 export const GenericStoresContext = React.createContext<DefaultStores | null>(null);
@@ -56,5 +54,3 @@ type DefaultStores = {
 };
 
 export const useGenericStores = createUseStoresHook(GenericStoresContext);
-
-type routes = InstanceType<typeof WebRouter>['routes'];

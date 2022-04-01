@@ -28,7 +28,7 @@ SOFTWARE.
 */
 
 import { useObserver } from 'mobx-react-lite';
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, FC } from 'react';
 
 import { NameToRoute, RouteType } from '../stores/WebRouter';
 import { useGenericStores } from './RootStore';
@@ -46,7 +46,7 @@ type GenericLinkProps<T extends RouteType[]> = PropsWithChildren<{
     [prop: string]: unknown;
 }>;
 
-export function createLinkComponent<T extends RouteType[] = []>() {
+export function createLinkComponent<T extends RouteType[] = []>(componentClassName?: string) {
     function GenericLink({
         to,
         className,
@@ -67,7 +67,11 @@ export function createLinkComponent<T extends RouteType[] = []>() {
                 <a
                     {...props}
                     href={`${link}`}
-                    className={className + ' ' + (active ? activeClassName ?? 'active' : '')}
+                    className={[
+                        componentClassName,
+                        className,
+                        active && (activeClassName ?? 'active'),
+                    ].join(' ')}
                     onClick={(event) => {
                         if (allowAction(event)) {
                             event.preventDefault();
@@ -83,8 +87,6 @@ export function createLinkComponent<T extends RouteType[] = []>() {
 
     return GenericLink;
 }
-
-export const GenericLink = createLinkComponent();
 
 function allowAction(event: React.MouseEvent) {
     return (
