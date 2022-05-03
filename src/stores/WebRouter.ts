@@ -1,5 +1,4 @@
 import { observable, action, makeObservable, computed, runInAction } from 'mobx';
-import { Awaited } from '../types/generic';
 import { FC } from 'react';
 import { createBrowserHistory, Location } from 'history';
 import { GlobalStore } from './GlobalStore';
