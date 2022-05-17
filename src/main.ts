@@ -16,3 +16,5 @@ export * from './types/generic';
 
 export { createLinkComponent } from './common/GenericLink';
 export { Redirect } from './common/Redirect';
+
+export { debounce } from './common/debounce';
