@@ -18,28 +18,27 @@ export type ExtractRouteParams<T extends string> = string extends T
     ? { [k in Param]: string }
     : {};
 
-export type ViewComponent<T extends InstanceType<ViewStore<any>>, ExtraParams extends {} = {}> = FC<
-    NonNullable<T['context']> & ExtraParams
->;
+// export type ViewComponent<T extends InstanceType<ViewStore<any>>, ExtraParams extends {} = {}> = FC<
+//     NonNullable<T['context']> & ExtraParams
+// >;
 
-export type ViewComponentForClass<T extends ViewStore<any> | undefined> = T extends ViewStore<any>
-    ? ViewComponent<InstanceType<T>>
-    : // FIXME: here should be EmptyView instead of ViewStore<any>
-      ViewComponent<InstanceType<ViewStore<any>>>;
+// export type ViewComponentForClass<T extends ViewStore<any> | undefined> = T extends ViewStore<any>
+//     ? ViewComponent<InstanceType<T>>
+//     : // FIXME: here should be EmptyView instead of ViewStore<any>
+//       ViewComponent<InstanceType<ViewStore<any>>>;
 
-export class EmptyView extends View {
-    constructor(protected globalStores: unknown, params: any) {
-        super(globalStores, params);
-    }
+export class EmptyView extends View<EmptyView> {
     data = {};
+    stores = {};
 }
 
 export function route<
     Params extends ExtractRouteParams<Path>,
     Path extends string,
     Name extends string,
-    VC extends ViewComponentForClass<VS>,
-    VS extends ViewStore<Params> | undefined
+    // FIXME:
+    VC extends any, // ViewComponentForClass<VS>,
+    VS extends any // { create(): View<any, { query: Params }> } | undefined
 >(path: Path, name: Name, component: VC, view?: VS, options?: { group?: string }) {
     // TODO: allow regexps for the path (manually type params in this case)
     const pathRe =
@@ -49,7 +48,7 @@ export function route<
         path,
         pathRe,
         name,
-        view: view ?? EmptyView,
+        view,
         component,
         options: {
             group: 'default',
@@ -57,16 +56,6 @@ export function route<
             ...options,
         },
     };
-}
-
-// type ViewStore = View;
-interface ViewStore<T> {
-    new (stores: any, params: T):
-        | View
-        | {
-              context: Record<string, any> | null;
-              init?: () => Promise<any>;
-          };
 }
 
 // FIXME: maybe not any? Without { component: any } this breaks WebRouter because it's params are not
@@ -142,13 +131,10 @@ export class WebRouter<T extends RouteType[] = RouteType[]> extends GlobalStore<
             }
 
             if (result) {
-                const viewInstance = new view(stores, result.groups as any);
-                if ('init' in viewInstance) {
-                    // TODO: add .catch()
-                    // FIXME: type
-                    // @ts-ignore
-                    viewInstance.init();
-                }
+                // FIXME: types
+                const ViewClass = (view ?? EmptyView) as { create(...args: any[]): View<any, any, any> };
+                // FIXME: types
+                const viewInstance = ViewClass.create({ routeParams: (result.groups as any) ?? {} }, {});
                 return { name, component, view: viewInstance, options };
                 // return await view(result.groups as any);
             }

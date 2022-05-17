@@ -15,3 +15,7 @@ export type ExpandRecursively<T> = T extends object
         ? { [K in keyof O]: ExpandRecursively<O[K]> }
         : never
     : T;
+
+export function isNonNull<T>(value: T | null | undefined): value is T {
+    return value != null;
+}
