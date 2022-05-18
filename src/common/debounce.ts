@@ -6,6 +6,8 @@ The crucial difference from lodash is support of promises.
 
 */
 
+import { action, makeObservable, observable } from 'mobx';
+
 /*
 
 Source: https://github.com/chodorowicz/ts-debounce
@@ -43,7 +45,7 @@ export type Options<Result> = {
 export interface DebouncedFunction<Args extends any[], F extends (...args: Args) => any> {
     (this: ThisParameterType<F>, ...args: Args & Parameters<F>): Promise<ReturnType<F>>;
     cancel: (reason?: any) => void;
-    pending: () => number;
+    state: PublicState<F>;
 }
 
 interface DebouncedPromise<FunctionReturn> {
@@ -62,7 +64,7 @@ export function debounce<Args extends any[], F extends (...args: Args) => any>(
     const maxWait = options.maxWait;
     let lastInvokeTime = Date.now();
 
-    let promises: DebouncedPromise<ReturnType<F>>[] = [];
+    const state = new InternalState<F>();
 
     function nextInvokeTimeout() {
         if (maxWait !== undefined) {
@@ -85,11 +87,11 @@ export function debounce<Args extends any[], F extends (...args: Args) => any>(
                 if (!isImmediate) {
                     const result = func.apply(context, args);
                     callback && callback(result);
-                    promises.forEach(
+                    state.promises.forEach(
                         ({ resolve }, i) => resolve(result)
                         // i === promises.length - 1 ? resolve(result) : resolve(undefined)
                     );
-                    promises = [];
+                    state.clearPromises();
                 }
             };
 
@@ -106,7 +108,7 @@ export function debounce<Args extends any[], F extends (...args: Args) => any>(
                 callback && callback(result);
                 return resolve(result);
             }
-            promises.push({ resolve, reject });
+            state.pushPromise({ resolve, reject });
         });
     };
 
@@ -114,11 +116,44 @@ export function debounce<Args extends any[], F extends (...args: Args) => any>(
         if (timeoutId !== undefined) {
             clearTimeout(timeoutId);
         }
-        promises.forEach(({ reject }) => reject(reason));
-        promises = [];
+        state.promises.forEach(({ reject }) => reject(reason));
+        state.clearPromises();
     };
 
-    debouncedFunction.pending = () => promises.length;
+    debouncedFunction.state = new PublicState<F>(state);
 
     return debouncedFunction;
+}
+
+class InternalState<F extends (...args: any[]) => any> {
+    constructor() {
+        makeObservable(this);
+    }
+
+    @observable public saved: boolean = false;
+
+    @observable public promises: DebouncedPromise<ReturnType<F>>[] = [];
+
+    @action pushPromise(promise: DebouncedPromise<ReturnType<F>>) {
+        this.promises.push(promise);
+    }
+
+    @action clearPromises() {
+        this.promises = [];
+    }
+
+    // @action.bound setSaved() {
+    //     this.saved = true;
+    //     setTimeout(() => )
+    // }
+}
+
+class PublicState<F extends (...args: any[]) => any> {
+    constructor(private state: InternalState<F>) {
+        // makeObservable(this);
+    }
+
+    get pendingCount() {
+        return this.state.promises.length;
+    }
 }
