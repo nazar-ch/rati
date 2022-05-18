@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import { observable, makeObservable, computed } from 'mobx';
-import { PartialDeep } from 'type-fest';
+import { PartialDeep, ReadonlyDeep } from 'type-fest';
 import { Expand } from '../types/generic';
 import { Summon } from './Summon';
 
@@ -22,11 +22,17 @@ export abstract class ActiveData<T> {
     // This allows to access the type of `data` protected property without exposing it
     __dataType: T = null as any;
 
-    @observable protected data: T;
+    @observable public originalData: T;
+
+    @computed protected get data(): ReadonlyDeep<T> {
+        return _.merge({}, this.originalData, this.draft) as ReadonlyDeep<T>;
+    }
+
+    @observable public draft: PartialDeep<T> = {} as any;
 
     protected constructor(data: T) {
         makeObservable(this);
-        this.data = data;
+        this.originalData = data;
     }
 }
 
@@ -52,11 +58,11 @@ export abstract class ActiveSummonData<T extends Summon<unknown>> {
     @observable protected summon: T;
 
     // This filed is used in getters created by extendInstance
-    @computed protected get data(): Readonly<T['rawData']> {
-        return _.merge({}, this.summon.rawData, this.draft) as Readonly<T['rawData']>;
+    @computed protected get data(): T['rawData'] {
+        return _.merge({}, this.summon.rawData, this.draft) as T['rawData'];
     }
 
-    @observable public draft: PartialDeep<T['rawData']> = {} as any;
+    @observable public draft: PartialDeep<T['__writableRawDataType']> = {} as any;
 
     protected constructor(summon: T) {
         makeObservable(this);
