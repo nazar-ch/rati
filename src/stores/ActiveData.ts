@@ -4,6 +4,13 @@ import { PartialDeep, ReadonlyDeep } from 'type-fest';
 import { Expand } from '../types/generic';
 import { Summon } from './Summon';
 
+export function dataMergeCustomizer(objValue: unknown, srcValue: unknown) {
+    // Don't merge arrays
+    if (_.isArray(objValue)) return srcValue;
+
+    return undefined;
+}
+
 export abstract class ActiveData<T> {
     // Typescript infers only last generic. This structure with two parameters
     // is to force passing TActiveData instead of inferring it
@@ -19,13 +26,16 @@ export abstract class ActiveData<T> {
         const instance = new this(rawData);
         return extendInstance(instance, rawData);
     }
-    // This allows to access the type of `data` protected property without exposing it
+    // This allows to access the type of `data` protected property without exposing the property
     __dataType: T = null as any;
 
     @observable public originalData: T;
 
     @computed protected get data(): ReadonlyDeep<T> {
-        return _.merge({}, this.originalData, this.draft) as ReadonlyDeep<T>;
+        // TODO: consider replacing this with a shallow merge
+        // Now { a: { a: 1, b: 2 } } + draft = { a: { b: 3 } results in { a: { a: 1, b: 2 } },
+        // but { a: { b: 3 } } may be expected in this case
+        return _.mergeWith({}, this.originalData, this.draft, dataMergeCustomizer) as ReadonlyDeep<T>;
     }
 
     @observable public draft: PartialDeep<T> = {} as any;
