@@ -3,6 +3,7 @@ import { makeObservable, observable, runInAction } from 'mobx';
 import { FC } from 'react';
 import { createContext } from '../common/stuff';
 import { Expand, isNonNull } from '../types/generic';
+import { ActiveDataInstanceType } from './ActiveDataInstanceType';
 import { Data } from './Data';
 import { Summon } from './Summon';
 
@@ -32,13 +33,13 @@ export abstract class View<
     declare stores: Record<
         string,
         | { new (data: TView['data'], params: TParams, stores: TParentStores): unknown }
-        | { viewCreate(data: TView['data'], params: TParams, stores: TParentStores): unknown }
+        | { createInView(data: TView['data'], params: TParams, stores: TParentStores): unknown }
     >;
 
     // FIXME: should this become null if data disappears after refresh?
     @observable.ref props: {
         data: ViewToData<TView>;
-        stores: ViewStoresToStores<TView>;
+        stores: ViewStoresToStores<TView, unknown>;
         params: Record<string, unknown>;
     } | null = null;
 
@@ -66,8 +67,8 @@ export abstract class View<
                     store
                         ? ([
                               key,
-                              'viewCreate' in store
-                                  ? store.viewCreate(this.data, this.params, this.parentStores)
+                              'createInView' in store
+                                  ? store.createInView(this.data, this.params, this.parentStores)
                                   : new store(this.data as any, this.params, this.parentStores),
                           ] as const)
                         : null
@@ -102,9 +103,9 @@ type ViewStoresToStores<TView extends View<any>> = Expand<
         }
             ? InstanceType<TView['stores'][StoreKey]>
             : TView['stores'][StoreKey] extends {
-                  viewCreate(data: any, params: any, stores: any): unknown;
+                  createInView(data: any, params: any, stores: any): unknown;
               }
-            ? ReturnType<TView['stores'][StoreKey]['viewCreate']>
+            ? ReturnType<TView['stores'][StoreKey]['createInView']>
             : never;
     }>
 >;

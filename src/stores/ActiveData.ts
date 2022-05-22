@@ -12,18 +12,22 @@ export function dataMergeCustomizer(objValue: unknown, srcValue: unknown) {
 }
 
 export abstract class ActiveData<T> {
-    // Typescript infers only last generic. This structure with two parameters
-    // is to force passing TActiveData instead of inferring it
+    protected constructor(data: T) {
+        makeObservable(this);
+        this.originalData = data;
+    }
+
     static create<
-        TActiveDataClass extends { __dataType: object } = never,
-        TRawData extends TActiveDataClass['__dataType'] = TActiveDataClass['__dataType']
+        TActiveDataClass extends { prototype: { __dataType: object } },
+        TRawData extends TActiveDataClass['prototype']['__dataType']
     >(
-        this: any,
+        this: TActiveDataClass,
         rawData: TRawData
     ): Expand<
-        Omit<TActiveDataClass, 'data' | '__dataType'> & Readonly<Omit<TRawData, keyof TActiveDataClass>>
+        Omit<TActiveDataClass['prototype'], 'data' | '__dataType'> &
+            Readonly<Omit<TRawData, keyof TActiveDataClass>>
     > {
-        const instance = new this(rawData);
+        const instance = new (this as any)(rawData);
         return extendInstance(instance, rawData);
     }
     // This allows to access the type of `data` protected property without exposing the property
@@ -39,27 +43,25 @@ export abstract class ActiveData<T> {
     }
 
     @observable public draft: PartialDeep<T> = {} as any;
-
-    protected constructor(data: T) {
-        makeObservable(this);
-        this.originalData = data;
-    }
 }
 
 export abstract class ActiveSummonData<T extends Summon<unknown>> {
-    // Typescript infers only last generic. This structure with two parameters
-    // is to force passing TActiveData instead of inferring it
+    protected constructor(summon: T) {
+        makeObservable(this);
+        this.summon = summon;
+    }
+
     static create<
-        TActiveDataClass extends { __dataType: object } = never,
-        TSummon extends Summon<TActiveDataClass['__dataType']> = Summon<TActiveDataClass['__dataType']>
+        TActiveDataClass extends { prototype: { __dataType: object } },
+        TSummon extends Summon<TActiveDataClass['prototype']['__dataType']>
     >(
-        this: any,
+        this: TActiveDataClass,
         summon: TSummon
     ): Expand<
-        Omit<TActiveDataClass, 'data' | '__dataType'> &
+        Omit<TActiveDataClass['prototype'], 'data' | '__dataType'> &
             Readonly<Omit<TSummon['rawData'], keyof TActiveDataClass>>
     > {
-        const instance = new this(summon);
+        const instance = new (this as any)(summon);
         return extendInstance(instance, summon.rawData);
     }
     // This allows to access the type of `data` protected property without exposing it
@@ -69,15 +71,12 @@ export abstract class ActiveSummonData<T extends Summon<unknown>> {
 
     // This filed is used in getters created by extendInstance
     @computed protected get data(): T['rawData'] {
-        return _.merge({}, this.summon.rawData, this.draft) as T['rawData'];
+        return _.merge({}, this.summon.rawData, this.draft, dataMergeCustomizer) as ReadonlyDeep<
+            T['rawData']
+        >;
     }
 
     @observable public draft: PartialDeep<T['__writableRawDataType']> = {} as any;
-
-    protected constructor(summon: T) {
-        makeObservable(this);
-        this.summon = summon;
-    }
 }
 
 function extendInstance<T>(instance: any, data: T) {
