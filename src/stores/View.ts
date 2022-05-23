@@ -39,7 +39,7 @@ export abstract class View<
     // FIXME: should this become null if data disappears after refresh?
     @observable.ref props: {
         data: ViewToData<TView>;
-        stores: ViewStoresToStores<TView, unknown>;
+        stores: ViewStoresToStores<TView>;
         params: Record<string, unknown>;
     } | null = null;
 
