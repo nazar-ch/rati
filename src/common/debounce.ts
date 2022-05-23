@@ -1,16 +1,8 @@
-/*
-
-Extended with pending functionality (returns number of promises waiting to be resolved).
-
-The crucial difference from lodash is support of promises.
-
-*/
-
 import { action, makeObservable, observable } from 'mobx';
 
 /*
 
-Source: https://github.com/chodorowicz/ts-debounce
+Based on https://github.com/chodorowicz/ts-debounce
 
 MIT License
 
@@ -38,8 +30,10 @@ SOFTWARE.
 
 export type Options<Result> = {
     isImmediate?: boolean;
-    maxWait?: number;
-    callback?: (data: Result) => void;
+    debounceMaxWaitMs?: number;
+    debounceWaitMs?: number | 'INPUT';
+    spinnerTimeoutMs?: number;
+    raceGuard?: boolean;
 };
 
 export interface DebouncedFunction<Args extends any[], F extends (...args: Args) => any> {
@@ -53,15 +47,17 @@ interface DebouncedPromise<FunctionReturn> {
     reject: (reason?: any) => void;
 }
 
-export function debounce<Args extends any[], F extends (...args: Args) => any>(
+export function debounce<Args extends any[], F extends (...args: Args) => Promise<any>>(
     func: F,
-    waitMilliseconds = 50,
     options: Options<ReturnType<F>> = {}
 ): DebouncedFunction<Args, F> {
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let invokeTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    let spinnerTimeoutId: ReturnType<typeof setTimeout> | undefined;
+
     const isImmediate = options.isImmediate ?? false;
-    const callback = options.callback ?? false;
-    const maxWait = options.maxWait;
+    const maxWait = options.debounceMaxWaitMs;
+    const waitMilliseconds = options.debounceWaitMs === 'INPUT' ? 350 : options.debounceWaitMs ?? 100;
+    const spinnerTimeout = options.spinnerTimeoutMs ?? 200;
     let lastInvokeTime = Date.now();
 
     const state = new InternalState<F>();
@@ -78,44 +74,82 @@ export function debounce<Args extends any[], F extends (...args: Args) => any>(
         return waitMilliseconds;
     }
 
+    function isCurrentRequest(requestId: number) {
+        return requestId === state.requestId;
+    }
+
     const debouncedFunction = function (this: ThisParameterType<F>, ...args: Parameters<F>) {
         const context = this;
+        const localRequestId = (state.requestId += 1);
+
         return new Promise<ReturnType<F>>((resolve, reject) => {
+            state.setBusy(true);
+
             const invokeFunction = function () {
-                timeoutId = undefined;
+                invokeTimeoutId = undefined;
                 lastInvokeTime = Date.now();
                 if (!isImmediate) {
                     const result = func.apply(context, args);
-                    callback && callback(result);
-                    state.promises.forEach(
-                        ({ resolve }, i) => resolve(result)
-                        // i === promises.length - 1 ? resolve(result) : resolve(undefined)
-                    );
+
+                    state.promises.forEach(({ resolve }) => resolve(result as ReturnType<F>));
                     state.clearPromises();
                 }
             };
 
-            const shouldCallNow = isImmediate && timeoutId === undefined;
+            const shouldCallNow = isImmediate && invokeTimeoutId === undefined;
 
-            if (timeoutId !== undefined) {
-                clearTimeout(timeoutId);
+            if (invokeTimeoutId !== undefined) {
+                clearTimeout(invokeTimeoutId);
             }
 
-            timeoutId = setTimeout(invokeFunction, nextInvokeTimeout());
+            if (spinnerTimeoutId !== undefined) {
+                clearTimeout(spinnerTimeoutId);
+            }
+
+            const invokeTime = nextInvokeTimeout();
+            invokeTimeoutId = setTimeout(invokeFunction, invokeTime);
+
+            // Spinner should appear in spinnerTimeoutMs after laster interaction, but
+            // not earlier then the api call is invoked
+            spinnerTimeoutId = setTimeout(
+                state.showSpinner,
+                spinnerTimeout < invokeTime ? invokeTime : spinnerTimeout
+            );
 
             if (shouldCallNow) {
                 const result = func.apply(context, args);
-                callback && callback(result);
                 return resolve(result);
             }
             state.pushPromise({ resolve, reject });
-        });
+        })
+            .then((result) => {
+                if (isCurrentRequest(localRequestId) && state.promises.length === 0) {
+                    state.setBusy(false);
+                }
+
+                if (options.raceGuard) {
+                    return state.raceGuardedResult(result, localRequestId);
+                } else {
+                    return result;
+                }
+            })
+            .catch((error) => {
+                if (isCurrentRequest(localRequestId) && state.promises.length === 0) {
+                    state.setBusy(false);
+                }
+                throw error;
+            });
     };
 
     debouncedFunction.cancel = function (reason?: any) {
-        if (timeoutId !== undefined) {
-            clearTimeout(timeoutId);
+        if (invokeTimeoutId !== undefined) {
+            clearTimeout(invokeTimeoutId);
         }
+        if (spinnerTimeoutId !== undefined) {
+            clearTimeout(spinnerTimeoutId);
+        }
+        state.setBusy(false);
+
         state.promises.forEach(({ reject }) => reject(reason));
         state.clearPromises();
     };
@@ -130,6 +164,22 @@ class InternalState<F extends (...args: any[]) => any> {
         makeObservable(this);
     }
 
+    requestId: number = 0;
+
+    latestResult: { requestId: number; result: ReturnType<F> } | null = null;
+
+    @action raceGuardedResult(currentResult: ReturnType<F>, requestId: number) {
+        if (!this.latestResult || requestId >= this.latestResult.requestId) {
+            this.latestResult = {
+                result: currentResult,
+                requestId,
+            };
+            return currentResult;
+        } else {
+            return this.latestResult.result;
+        }
+    }
+
     @observable public saved: boolean = false;
 
     @observable public promises: DebouncedPromise<ReturnType<F>>[] = [];
@@ -142,18 +192,33 @@ class InternalState<F extends (...args: any[]) => any> {
         this.promises = [];
     }
 
-    // @action.bound setSaved() {
-    //     this.saved = true;
-    //     setTimeout(() => )
-    // }
+    @observable isBusy: boolean = false;
+    @observable isSpinner: boolean = false;
+
+    @action setBusy(value: boolean) {
+        this.isBusy = value;
+        if (!value) this.isSpinner = false;
+    }
+
+    @action.bound showSpinner() {
+        if (this.isBusy) {
+            this.isSpinner = true;
+        }
+    }
 }
 
 class PublicState<F extends (...args: any[]) => any> {
-    constructor(private state: InternalState<F>) {
-        // makeObservable(this);
+    constructor(private internalState: InternalState<F>) {}
+
+    get isReady() {
+        return this.internalState.promises.length === 0 && !this.isBusy;
     }
 
-    get pendingCount() {
-        return this.state.promises.length;
+    get isBusy() {
+        return this.internalState.isBusy;
+    }
+
+    get isVisiblyBusy() {
+        return this.internalState.isBusy && this.internalState.isSpinner;
     }
 }
