@@ -15,8 +15,6 @@ export class RootStore<T extends DefaultStores> {
     async init() {
         // TODO: hydrate stores
 
-        // FIXME: remove
-        await sleep(100);
         runInAction(() => {
             this.isReady = true;
         });

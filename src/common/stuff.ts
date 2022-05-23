@@ -29,8 +29,5 @@ export async function createContext<T>(
         // when all stores are in the context
     }
 
-    // FIXME: remove
-    // (a test to check if async context creation works correct)
-    await sleep(20);
     return context;
 }
