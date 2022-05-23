@@ -67,7 +67,7 @@ export abstract class ActiveSummonData<T extends Summon<unknown>> {
     // This allows to access the type of `data` protected property without exposing it
     __dataType: T['rawData'] = null as any;
 
-    @observable protected summon: T;
+    @observable public readonly summon: T;
 
     // This filed is used in getters created by extendInstance
     @computed protected get data(): T['rawData'] {
