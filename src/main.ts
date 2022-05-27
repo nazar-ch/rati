@@ -13,6 +13,7 @@ export { RootStore, useGenericStores } from './common/RootStore';
 export { WebRouter, route, NameToRoute } from './stores/WebRouter';
 
 export { View, ViewComponent } from './stores/View';
+export { ViewLoader, ViewLoaderComponent } from './common/ViewLoader';
 
 export * from './types/generic';
 
