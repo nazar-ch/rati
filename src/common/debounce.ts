@@ -221,4 +221,11 @@ class PublicState<F extends (...args: any[]) => any> {
     get isVisiblyBusy() {
         return this.internalState.isBusy && this.internalState.isSpinner;
     }
+
+    get buttonProps() {
+        return {
+            disabled: this.isVisiblyBusy,
+            blocked: this.isBusy,
+        };
+    }
 }
