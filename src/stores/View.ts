@@ -34,6 +34,7 @@ export abstract class View<
         string,
         | { new (data: TView['data'], params: TParams, stores: TParentStores): unknown }
         | { createInView(data: TView['data'], params: TParams, stores: TParentStores): unknown }
+        | ((data: TView['data'], params: TParams, stores: TParentStores) => unknown)
     >;
 
     // FIXME: should this become null if data disappears after refresh?
@@ -67,7 +68,9 @@ export abstract class View<
                     store
                         ? ([
                               key,
-                              'createInView' in store
+                              typeof store === 'function'
+                                  ? store(this.data, this.params, this.parentStores)
+                                  : 'createInView' in store
                                   ? store.createInView(this.data, this.params, this.parentStores)
                                   : new store(this.data as any, this.params, this.parentStores),
                           ] as const)
@@ -102,6 +105,8 @@ type ViewStoresToStores<TView extends View<any>> = Expand<
             new (data: any, params: any, stores: any): unknown;
         }
             ? InstanceType<TView['stores'][StoreKey]>
+            : TView['stores'][StoreKey] extends (data: any, params: any, stores: any) => unknown
+            ? ReturnType<TView['stores'][StoreKey]>
             : TView['stores'][StoreKey] extends {
                   createInView(data: any, params: any, stores: any): unknown;
               }
