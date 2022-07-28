@@ -36,21 +36,21 @@ export type Options<Result> = {
     raceGuard?: boolean;
 };
 
-export interface DebouncedFunction<Args extends any[], F extends (...args: Args) => any> {
+interface ApiFunction<Args extends any[], F extends (...args: Args) => any> {
     (this: ThisParameterType<F>, ...args: Args & Parameters<F>): Promise<ReturnType<F>>;
     cancel: (reason?: any) => void;
     state: PublicState<F>;
 }
 
-interface DebouncedPromise<FunctionReturn> {
+interface ApiPromise<FunctionReturn> {
     resolve: (result: FunctionReturn) => void;
     reject: (reason?: any) => void;
 }
 
-export function debounce<Args extends any[], F extends (...args: Args) => Promise<any>>(
+export function api<Args extends any[], F extends (...args: Args) => Promise<any>>(
     func: F,
     options: Options<ReturnType<F>> = {}
-): DebouncedFunction<Args, F> {
+): ApiFunction<Args, F> {
     let invokeTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let spinnerTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -78,7 +78,7 @@ export function debounce<Args extends any[], F extends (...args: Args) => Promis
         return requestId === state.requestId;
     }
 
-    const debouncedFunction = function (this: ThisParameterType<F>, ...args: Parameters<F>) {
+    const apiFunction = function (this: ThisParameterType<F>, ...args: Parameters<F>) {
         const context = this;
         const localRequestId = (state.requestId += 1);
 
@@ -141,7 +141,7 @@ export function debounce<Args extends any[], F extends (...args: Args) => Promis
             });
     };
 
-    debouncedFunction.cancel = function (reason?: any) {
+    apiFunction.cancel = function (reason?: any) {
         if (invokeTimeoutId !== undefined) {
             clearTimeout(invokeTimeoutId);
         }
@@ -154,9 +154,9 @@ export function debounce<Args extends any[], F extends (...args: Args) => Promis
         state.clearPromises();
     };
 
-    debouncedFunction.state = new PublicState<F>(state);
+    apiFunction.state = new PublicState<F>(state);
 
-    return debouncedFunction;
+    return apiFunction;
 }
 
 class InternalState<F extends (...args: any[]) => any> {
@@ -182,9 +182,9 @@ class InternalState<F extends (...args: any[]) => any> {
 
     @observable public saved: boolean = false;
 
-    @observable public promises: DebouncedPromise<ReturnType<F>>[] = [];
+    @observable public promises: ApiPromise<ReturnType<F>>[] = [];
 
-    @action pushPromise(promise: DebouncedPromise<ReturnType<F>>) {
+    @action pushPromise(promise: ApiPromise<ReturnType<F>>) {
         this.promises.push(promise);
     }
 
