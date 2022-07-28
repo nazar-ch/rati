@@ -34,7 +34,6 @@ export abstract class View<
         string,
         | { new (data: TView['data'], params: TParams, stores: TParentStores): unknown }
         | { createInView(data: TView['data'], params: TParams, stores: TParentStores): unknown }
-        | ((data: TView['data'], params: TParams, stores: TParentStores) => unknown)
     >;
 
     // FIXME: should this become null if data disappears after refresh?
@@ -62,15 +61,18 @@ export abstract class View<
             throw new Error('Not all data have been loaded');
         }
 
+        if (!this.stores) {
+            // TODO: make stores optional (it's about updating the types)
+            throw new Error('Please define stores for the view');
+        }
+
         const stores = Object.fromEntries(
             Object.entries(this.stores)
                 .map(([key, store]) =>
                     store
                         ? ([
                               key,
-                              typeof store === 'function'
-                                  ? store(this.data, this.params, this.parentStores)
-                                  : 'createInView' in store
+                              'createInView' in store
                                   ? store.createInView(this.data, this.params, this.parentStores)
                                   : new store(this.data as any, this.params, this.parentStores),
                           ] as const)
@@ -105,8 +107,6 @@ type ViewStoresToStores<TView extends View<any>> = Expand<
             new (data: any, params: any, stores: any): unknown;
         }
             ? InstanceType<TView['stores'][StoreKey]>
-            : TView['stores'][StoreKey] extends (data: any, params: any, stores: any) => unknown
-            ? ReturnType<TView['stores'][StoreKey]>
             : TView['stores'][StoreKey] extends {
                   createInView(data: any, params: any, stores: any): unknown;
               }
