@@ -36,7 +36,7 @@ export type Options<Result> = {
     raceGuard?: boolean;
 };
 
-interface ApiFunction<Args extends any[], F extends (...args: Args) => any> {
+export interface ApiFunction<Args extends any[], F extends (...args: Args) => any> {
     (this: ThisParameterType<F>, ...args: Args & Parameters<F>): Promise<ReturnType<F>>;
     cancel: (reason?: any) => void;
     state: PublicState<F>;
