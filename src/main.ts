@@ -21,3 +21,4 @@ export { createLinkComponent } from './common/GenericLink';
 export { Redirect } from './common/Redirect';
 
 export { api, ApiFunction } from './common/apiWrapper';
+export { apiGetKey } from './common/apiUtils';
