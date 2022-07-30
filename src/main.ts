@@ -3,7 +3,7 @@ export { sleep, createContext } from './common/stuff';
 export { Data, DataFactoryType } from './stores/Data';
 export { Summon } from './stores/Summon';
 
-export { ActiveData, ActiveSummonData } from './stores/ActiveData';
+export { ActiveData, ActiveSummonData, ActiveApiData } from './stores/ActiveData';
 export { ActiveDataInstanceType } from './stores/ActiveDataInstanceType';
 
 export { GlobalStore } from './stores/GlobalStore';
@@ -20,4 +20,4 @@ export * from './types/generic';
 export { createLinkComponent } from './common/GenericLink';
 export { Redirect } from './common/Redirect';
 
-export { api } from './common/apiWrapper';
+export { api, ApiFunction } from './common/apiWrapper';

@@ -28,7 +28,7 @@ SOFTWARE.
 
 */
 
-export type Options<Result> = {
+export type ApiOptions = {
     isImmediate?: boolean;
     debounceMaxWaitMs?: number;
     debounceWaitMs?: number | 'INPUT';
@@ -36,8 +36,8 @@ export type Options<Result> = {
     raceGuard?: boolean;
 };
 
-export interface ApiFunction<Args extends any[], F extends (...args: Args) => any> {
-    (this: ThisParameterType<F>, ...args: Args & Parameters<F>): Promise<ReturnType<F>>;
+export interface ApiFunction<F extends (...args: any) => any> {
+    (...args: Parameters<F>): Promise<Awaited<ReturnType<F>>>;
     cancel: (reason?: any) => void;
     state: PublicState<F>;
 }
@@ -47,10 +47,10 @@ interface ApiPromise<FunctionReturn> {
     reject: (reason?: any) => void;
 }
 
-export function api<Args extends any[], F extends (...args: Args) => Promise<any>>(
+export function api<F extends (...args: any) => Promise<any>>(
     func: F,
-    options: Options<ReturnType<F>> = {}
-): ApiFunction<Args, F> {
+    options: ApiOptions = {}
+): ApiFunction<F> {
     let invokeTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let spinnerTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -159,7 +159,7 @@ export function api<Args extends any[], F extends (...args: Args) => Promise<any
     return apiFunction;
 }
 
-class InternalState<F extends (...args: any[]) => any> {
+class InternalState<F extends (...args: any) => any> {
     constructor() {
         makeObservable(this);
     }
@@ -207,7 +207,7 @@ class InternalState<F extends (...args: any[]) => any> {
     }
 }
 
-class PublicState<F extends (...args: any[]) => any> {
+class PublicState<F extends (...args: any) => any> {
     constructor(private internalState: InternalState<F>) {}
 
     get isReady() {

@@ -3,6 +3,7 @@ import { makeObservable, observable, runInAction } from 'mobx';
 import { FC } from 'react';
 import { createContext } from '../common/stuff';
 import { Expand, isNonNull } from '../types/generic';
+import { ActiveApiData } from './ActiveData';
 import { ActiveDataInstanceType } from './ActiveDataInstanceType';
 import { Data } from './Data';
 import { Summon } from './Summon';
@@ -29,7 +30,7 @@ export abstract class View<
         return instance;
     }
 
-    declare data: Record<string, Summon<unknown>>;
+    declare data: Record<string, Summon<unknown> | Promise<unknown>>;
     declare stores: Record<
         string,
         | { new (data: TView['data'], params: TParams, stores: TParentStores): unknown }
@@ -48,14 +49,28 @@ export abstract class View<
         await Promise.all(
             Object.values(this.data)
                 .filter(isNonNull)
-                .map((item) => item.fetch())
+                .map((item) => ('fetch' in item ? item.fetch() : item))
         );
 
         const data = Object.fromEntries(
+            // @ts-ignore FIXME after removing Summon
             Object.entries(this.data)
-                .map(([key, summon]) => (summon?.rawData ? ([key, summon.rawData] as const) : null))
+                .map(([key, item]) =>
+                    item instanceof Summon ? ([key, item.rawData] as const) : [key, item]
+                )
                 .filter(isNonNull)
         );
+
+        for (const key in data) {
+            data[key] = await Promise.resolve(data[key]);
+        }
+
+        const storesData = this.data;
+
+        for (const key in storesData) {
+            // @ts-ignore
+            storesData[key] = await Promise.resolve(storesData[key]);
+        }
 
         if (Object.keys(data).length < Object.keys(this.data).length) {
             throw new Error('Not all data have been loaded');
@@ -73,8 +88,8 @@ export abstract class View<
                         ? ([
                               key,
                               'createInView' in store
-                                  ? store.createInView(this.data, this.params, this.parentStores)
-                                  : new store(this.data as any, this.params, this.parentStores),
+                                  ? store.createInView(storesData, this.params, this.parentStores)
+                                  : new store(storesData as any, this.params, this.parentStores),
                           ] as const)
                         : null
                 )
@@ -94,11 +109,12 @@ export abstract class View<
 type ExcludeNever<T> = {
     [K in keyof T as T[K] extends never ? never : K]: T[K];
 };
+
 type ViewToData<TView extends View<any>> = Expand<
     ExcludeNever<{
         [DataKey in keyof TView['data']]: TView['data'][DataKey] extends Summon<unknown>
             ? NonNullable<TView['data'][DataKey]['rawData']>
-            : never;
+            : Awaited<TView['data'][DataKey]>;
     }>
 >;
 type ViewStoresToStores<TView extends View<any>> = Expand<

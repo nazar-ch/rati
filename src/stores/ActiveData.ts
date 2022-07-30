@@ -1,6 +1,7 @@
 import _ from 'lodash';
-import { observable, makeObservable, computed } from 'mobx';
+import { observable, makeObservable, computed, runInAction } from 'mobx';
 import { PartialDeep, ReadonlyDeep } from 'type-fest';
+import { api, ApiFunction } from '../main';
 import { Expand } from '../types/generic';
 import { Summon } from './Summon';
 
@@ -78,6 +79,83 @@ export abstract class ActiveSummonData<T extends Summon<unknown>> {
 
     @observable public draft: PartialDeep<T['__writableRawDataType']> = {} as any;
 }
+
+type ApiFactory = () => (...args: any) => Promise<any>;
+
+// Graphql need only one parameter, no sense to make this more universal
+type ApiParams<T extends ApiFactory> = Parameters<ReturnType<T>>[0];
+
+type ApiResult<T extends ApiFactory> = Awaited<ReturnType<ReturnType<T>>>;
+
+/*
+    [rati] api functions hold the loading state and similar things. 
+
+    Passing it directly instead of a function that creates an api function will
+    cause having the shared state between all ActiveApiData subclass instances
+    (because it will be the same instance of an api function).
+*/
+export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
+    protected constructor(
+        rawData: ApiResult<TConstructorApiFactory>,
+        protected apiFunction: ReturnType<TConstructorApiFactory>
+    ) {
+        makeObservable(this);
+        this.rawData = rawData;
+    }
+
+    static async create<
+        SActiveDataClass extends { prototype: { __dataType: object } },
+        SApiFactory extends () => (...args: any) => Promise<SActiveDataClass['prototype']['__dataType']>
+    >(
+        this: SActiveDataClass,
+        apiFunctionFactory: SApiFactory,
+        apiParams: ApiParams<SApiFactory>
+    ): Promise<
+        Expand<
+            Omit<SActiveDataClass['prototype'], 'data' | '__dataType'> &
+                Readonly<Omit<ApiResult<SApiFactory>, keyof SActiveDataClass>>
+        >
+    > {
+        const apiFunction = apiFunctionFactory();
+
+        const data = await apiFunction(apiParams);
+
+        const instance = new (this as any)(data, apiFunction);
+        return extendInstance(instance, data);
+    }
+
+    @observable protected rawData: ApiResult<TConstructorApiFactory>;
+
+    // This allows to access the type of `data` protected property without exposing it
+    __dataType: ApiResult<TConstructorApiFactory> = null as any;
+
+    async reload(params: ApiParams<TConstructorApiFactory>) {
+        const data = await this.apiFunction(params);
+        runInAction(() => {
+            this.rawData = data;
+        });
+    }
+
+    // This filed is used in getters created by extendInstance
+    @computed protected get data(): ApiResult<TConstructorApiFactory> {
+        // @ts-expect-error FIXME
+        return _.merge({}, this.rawData, this.draft, dataMergeCustomizer) as ReadonlyDeep<ClassTData>;
+    }
+
+    @observable public draft: PartialDeep<ApiResult<TConstructorApiFactory>> = {} as any;
+}
+
+// const x = async (params: { x: string; z: any[] }) => {
+//     return { x: '5', y: 4 };
+// };
+// const xApi = () => api(x);
+
+// export class ActiveCalendarPrices extends ActiveApiData<typeof xApi> {}
+
+// async function xz() {
+//     const xx = await ActiveCalendarPrices.create(xApi, { x: '4', z: [] });
+//     xx.y;
+// }
 
 function extendInstance<T>(instance: any, data: T) {
     for (const dataKey in data) {
