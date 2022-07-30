@@ -9,6 +9,7 @@
         "noUncheckedIndexedAccess": true,
         "strict": true,
         "experimentalDecorators": true,
+        "useDefineForClassFields": true,
         "forceConsistentCasingInFileNames": true,
         "module": "esnext",
         "moduleResolution": "node",
