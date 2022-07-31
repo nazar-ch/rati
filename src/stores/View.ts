@@ -46,11 +46,11 @@ export abstract class View<
     declare stores: Record<
         string,
         | {
-              new (data: ViewToData<TView['data']>, params: TParams, stores: TParentStores): unknown;
+              new (data: ViewDataToData<TView['data']>, params: TParams, stores: TParentStores): unknown;
           }
         | {
               createInView(
-                  data: ViewToData<TView['data']>,
+                  data: ViewDataToData<TView['data']>,
                   params: TParams,
                   stores: TParentStores
               ): unknown;
@@ -59,7 +59,7 @@ export abstract class View<
 
     // FIXME: should this become null if data disappears after refresh?
     @observable.ref props: {
-        data: ViewToData<TView['data']>;
+        data: ViewDataToData<TView['data']>;
         stores: ViewStoresToStores<TView['stores']>;
         params: Record<string, unknown>;
     } | null = null;
@@ -112,7 +112,7 @@ type ExcludeNever<T> = {
     [K in keyof T as T[K] extends never ? never : K]: T[K];
 };
 
-type ViewToData<TData extends ViewData> = Expand<
+type ViewDataToData<TData extends ViewData> = Expand<
     ExcludeNever<{
         [DataKey in keyof TData]: Awaited<TData[DataKey]>;
     }>
@@ -133,7 +133,9 @@ type ViewStoresToStores<TStores extends GenericViewStores> = Expand<
 >;
 export type ViewComponent<TView extends GenericView, Props extends Record<string, unknown> = {}> = FC<
     {
-        data: ViewToData<TView['data']>;
+        data: ViewDataToData<TView['data']>;
         stores: ViewStoresToStores<TView['stores']>;
     } & Props
 >;
+
+export type ViewDataType<TView extends GenericView> = ViewDataToData<TView['data']>;
