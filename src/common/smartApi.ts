@@ -28,7 +28,7 @@ SOFTWARE.
 
 */
 
-export type ApiOptions = {
+export type SmartApiOptions = {
     isImmediate?: boolean;
     debounceMaxWaitMs?: number;
     debounceWaitMs?: number | 'INPUT';
@@ -36,21 +36,21 @@ export type ApiOptions = {
     raceGuard?: boolean;
 };
 
-export interface ApiFunction<F extends (...args: any) => any> {
+export interface SmartApiFunction<F extends (...args: any) => any> {
     (...args: Parameters<F>): Promise<Awaited<ReturnType<F>>>;
     cancel: (reason?: any) => void;
     state: PublicState<F>;
 }
 
-interface ApiPromise<FunctionReturn> {
+interface SmartApiPromise<FunctionReturn> {
     resolve: (result: FunctionReturn) => void;
     reject: (reason?: any) => void;
 }
 
-export function api<F extends (...args: any) => Promise<any>>(
+export function smartApi<F extends (...args: any) => Promise<any>>(
     func: F,
-    options: ApiOptions = {}
-): ApiFunction<F> {
+    options: SmartApiOptions = {}
+): SmartApiFunction<F> {
     let invokeTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let spinnerTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -182,9 +182,9 @@ class InternalState<F extends (...args: any) => any> {
 
     @observable public saved: boolean = false;
 
-    @observable public promises: ApiPromise<ReturnType<F>>[] = [];
+    @observable public promises: SmartApiPromise<ReturnType<F>>[] = [];
 
-    @action pushPromise(promise: ApiPromise<ReturnType<F>>) {
+    @action pushPromise(promise: SmartApiPromise<ReturnType<F>>) {
         this.promises.push(promise);
     }
 
