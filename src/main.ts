@@ -1,9 +1,8 @@
 export { sleep, createContext } from './common/stuff';
 
 export { Data, DataFactoryType } from './stores/Data';
-export { Summon } from './stores/Summon';
 
-export { ActiveData, ActiveSummonData, ActiveApiData } from './stores/ActiveData';
+export { ActiveData, ActiveApiData } from './stores/ActiveData';
 export { ActiveDataInstanceType } from './stores/ActiveDataInstanceType';
 
 export { GlobalStore } from './stores/GlobalStore';

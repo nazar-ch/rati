@@ -1,24 +1,36 @@
 import _ from 'lodash';
 import { makeObservable, observable, runInAction } from 'mobx';
 import { FC } from 'react';
-import { createContext } from '../common/stuff';
 import { Expand, isNonNull } from '../types/generic';
-import { ActiveApiData } from './ActiveData';
-import { ActiveDataInstanceType } from './ActiveDataInstanceType';
-import { Data } from './Data';
-import { Summon } from './Summon';
+
+type ViewData = Record<string, Promise<unknown>>;
+
+type GenericViewStores = Record<
+    string,
+    | {
+          new (data: any, params: any, stores: any): unknown;
+      }
+    | { createInView(data: any, params: any, stores: any): unknown }
+>;
+
+export type GenericView = {
+    data: ViewData;
+    stores: GenericViewStores;
+    // TODO: expand with a few more fields to make sure that only proper views will be passed as GenericView
+};
 
 export abstract class View<
-    TView extends View<any, any, any>,
+    TView extends GenericView,
     TParams extends Record<string, unknown> = {},
     TParentStores extends Record<string, unknown> = {}
-> {
+> implements GenericView
+{
     // TODO: try to make this constructor protected. The problem is with types in GenericViewLoaderComponent
     constructor(public params: TParams, public parentStores: TParentStores) {
         makeObservable(this);
     }
 
-    static create<TView extends View<any> = View<any>>(
+    static create<TView extends GenericView = GenericView>(
         this: any,
         params: Record<string, unknown>,
         parentStores: Record<string, unknown>
@@ -30,50 +42,40 @@ export abstract class View<
         return instance;
     }
 
-    declare data: Record<string, Summon<unknown> | Promise<unknown>>;
+    declare data: ViewData;
     declare stores: Record<
         string,
-        | { new (data: TView['data'], params: TParams, stores: TParentStores): unknown }
-        | { createInView(data: TView['data'], params: TParams, stores: TParentStores): unknown }
+        | {
+              new (data: ViewToData<TView['data']>, params: TParams, stores: TParentStores): unknown;
+          }
+        | {
+              createInView(
+                  data: ViewToData<TView['data']>,
+                  params: TParams,
+                  stores: TParentStores
+              ): unknown;
+          }
     >;
 
     // FIXME: should this become null if data disappears after refresh?
     @observable.ref props: {
-        data: ViewToData<TView>;
-        stores: ViewStoresToStores<TView>;
+        data: ViewToData<TView['data']>;
+        stores: ViewStoresToStores<TView['stores']>;
         params: Record<string, unknown>;
     } | null = null;
 
     private init = async () => {
         // Load all data
-        await Promise.all(
-            Object.values(this.data)
-                .filter(isNonNull)
-                .map((item) => ('fetch' in item ? item.fetch() : item))
-        );
+        await Promise.all(Object.values(this.data).filter(isNonNull));
 
-        const data = Object.fromEntries(
-            // @ts-ignore FIXME after removing Summon
-            Object.entries(this.data)
-                .map(([key, item]) =>
-                    item instanceof Summon ? ([key, item.rawData] as const) : [key, item]
-                )
-                .filter(isNonNull)
-        );
-
-        for (const key in data) {
-            data[key] = await Promise.resolve(data[key]);
-        }
-
-        const storesData = this.data;
-
-        for (const key in storesData) {
+        for (const key in this.data) {
+            // Promises are executed in the previous step
             // @ts-ignore
-            storesData[key] = await Promise.resolve(storesData[key]);
-        }
+            this.data[key] = await Promise.resolve(this.data[key]);
 
-        if (Object.keys(data).length < Object.keys(this.data).length) {
-            throw new Error('Not all data have been loaded');
+            if (!this.data[key]) {
+                throw new Error('Not all data have been loaded');
+            }
         }
 
         if (!this.stores) {
@@ -88,8 +90,8 @@ export abstract class View<
                         ? ([
                               key,
                               'createInView' in store
-                                  ? store.createInView(storesData, this.params, this.parentStores)
-                                  : new store(storesData as any, this.params, this.parentStores),
+                                  ? store.createInView(this.data as any, this.params, this.parentStores)
+                                  : new store(this.data as any, this.params, this.parentStores),
                           ] as const)
                         : null
                 )
@@ -98,7 +100,7 @@ export abstract class View<
 
         runInAction(() => {
             this.props = {
-                data: data as any,
+                data: this.data as any,
                 stores: stores as any,
                 params: this.params,
             };
@@ -110,32 +112,28 @@ type ExcludeNever<T> = {
     [K in keyof T as T[K] extends never ? never : K]: T[K];
 };
 
-type ViewToData<TView extends View<any>> = Expand<
+type ViewToData<TData extends ViewData> = Expand<
     ExcludeNever<{
-        [DataKey in keyof TView['data']]: TView['data'][DataKey] extends Summon<unknown>
-            ? NonNullable<TView['data'][DataKey]['rawData']>
-            : Awaited<TView['data'][DataKey]>;
+        [DataKey in keyof TData]: Awaited<TData[DataKey]>;
     }>
 >;
-type ViewStoresToStores<TView extends View<any>> = Expand<
+
+type ViewStoresToStores<TStores extends GenericViewStores> = Expand<
     ExcludeNever<{
-        [StoreKey in keyof TView['stores']]: TView['stores'][StoreKey] extends {
+        [StoreKey in keyof TStores]: TStores[StoreKey] extends {
             new (data: any, params: any, stores: any): unknown;
         }
-            ? InstanceType<TView['stores'][StoreKey]>
-            : TView['stores'][StoreKey] extends {
+            ? InstanceType<TStores[StoreKey]>
+            : TStores[StoreKey] extends {
                   createInView(data: any, params: any, stores: any): unknown;
               }
-            ? ReturnType<TView['stores'][StoreKey]['createInView']>
+            ? ReturnType<TStores[StoreKey]['createInView']>
             : never;
     }>
 >;
-export type ViewComponent<
-    TView extends View<any, any, any>,
-    Props extends Record<string, unknown> = {}
-> = FC<
+export type ViewComponent<TView extends GenericView, Props extends Record<string, unknown> = {}> = FC<
     {
-        data: ViewToData<TView>;
-        stores: ViewStoresToStores<TView>;
+        data: ViewToData<TView['data']>;
+        stores: ViewStoresToStores<TView['stores']>;
     } & Props
 >;

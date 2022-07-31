@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import { observer } from 'mobx-react-lite';
 import React, { FC, ReactElement, useEffect, useRef, useState } from 'react';
-import { View, ViewComponent } from '../stores/View';
+import { GenericView, View, ViewComponent } from '../stores/View';
 
 export const ViewLoader: GenericViewLoaderComponent<{
     Loading: FC;
@@ -27,7 +27,7 @@ export const ViewLoader: GenericViewLoaderComponent<{
 
 export type ViewLoaderComponent = GenericViewLoaderComponent<{}>;
 type GenericViewLoaderComponent<Props extends {}> = <
-    TView extends View<any, any, any>,
+    TView extends GenericView,
     TParams extends {},
     TParentStores extends {}
 >(

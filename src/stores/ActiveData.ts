@@ -1,9 +1,7 @@
 import _ from 'lodash';
 import { observable, makeObservable, computed, runInAction } from 'mobx';
 import { PartialDeep, ReadonlyDeep } from 'type-fest';
-import { api, ApiFunction } from '../main';
 import { Expand } from '../types/generic';
-import { Summon } from './Summon';
 
 export function dataMergeCustomizer(objValue: unknown, srcValue: unknown) {
     // Don't merge arrays
@@ -44,40 +42,6 @@ export abstract class ActiveData<T> {
     }
 
     @observable public draft: PartialDeep<T> = {} as any;
-}
-
-export abstract class ActiveSummonData<T extends Summon<unknown>> {
-    protected constructor(summon: T) {
-        makeObservable(this);
-        this.summon = summon;
-    }
-
-    static create<
-        TActiveDataClass extends { prototype: { __dataType: object } },
-        TSummon extends Summon<TActiveDataClass['prototype']['__dataType']>
-    >(
-        this: TActiveDataClass,
-        summon: TSummon
-    ): Expand<
-        Omit<TActiveDataClass['prototype'], 'data' | '__dataType'> &
-            Readonly<Omit<TSummon['rawData'], keyof TActiveDataClass>>
-    > {
-        const instance = new (this as any)(summon);
-        return extendInstance(instance, summon.rawData);
-    }
-    // This allows to access the type of `data` protected property without exposing it
-    __dataType: T['rawData'] = null as any;
-
-    @observable public readonly summon: T;
-
-    // This filed is used in getters created by extendInstance
-    @computed protected get data(): T['rawData'] {
-        return _.merge({}, this.summon.rawData, this.draft, dataMergeCustomizer) as ReadonlyDeep<
-            T['rawData']
-        >;
-    }
-
-    @observable public draft: PartialDeep<T['__writableRawDataType']> = {} as any;
 }
 
 type ApiFactory = () => (...args: any) => Promise<any>;
