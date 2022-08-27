@@ -42,9 +42,18 @@ export function route<
     VC extends any, // ViewComponentForClass<VS>,
     VS extends any // { create(): View<any, { query: Params }> } | undefined
 >(path: Path, name: Name, component: VC, view?: VS, options?: { group?: string }) {
-    // TODO: allow regexps for the path (manually type params in this case)
-    const pathRe =
-        path === '*' ? null : new RegExp('^' + path.replace(/:(.*?)(\/|$)/g, '(?<$1>[^/]*?)$2') + '$');
+    // TODO 2023: allow regexps for the path (manually type params in this case)
+    const pathReCore = path.replace(/:(.*?)(\/|$)/g, '(?<$1>[^/]+?)$2');
+    const pathReString =
+        '^' +
+        pathReCore +
+        (pathReCore.endsWith('/')
+            ? '$'
+            : // Optional slash in the end (match /path & /path/)
+              // TODO 2023: use redirects for this case
+              '/{0,1}$');
+
+    const pathRe = path === '*' ? null : new RegExp(pathReString);
 
     return {
         path,
