@@ -19,3 +19,10 @@ export type ExpandRecursively<T> = T extends object
 export function isNonNull<T>(value: T | null | undefined): value is T {
     return value != null;
 }
+
+// Freshly added type to type-fest that is not available via npm
+// https://github.com/sindresorhus/type-fest/blob/main/source/tuple-to-union.d.ts
+// TODO: use type-fest version when it's available
+export type TupleToUnion<ArrayType> = ArrayType extends readonly [infer Head, ...infer Rest]
+    ? Head | TupleToUnion<Rest>
+    : never;

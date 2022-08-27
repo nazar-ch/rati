@@ -3,6 +3,8 @@ import { FC } from 'react';
 import { createBrowserHistory, Location } from 'history';
 import { GlobalStore } from './GlobalStore';
 import { View } from './View';
+import { TupleToUnion } from '../types/generic';
+// import { TupleToUnion } from 'type-fest';
 
 //--------------------------------------------
 
@@ -62,15 +64,21 @@ export function route<
 // generic enough for real routes
 export type RouteType = Omit<ReturnType<typeof route>, 'component'> & { component: any };
 
-export type RoutesType<T extends RouteType[]> = T[number];
+type RoutesType<
+    T extends
+        | { name: string; path: string }[]
+        | readonly { readonly name: string; readonly path: string }[]
+> = {
+    [K in keyof T]: {
+        name: T[K]['name'];
+    } & ExtractRouteParams<T[K]['path']>;
+};
 
 type GetView = Awaited<ReturnType<WebRouter<RouteType[]>['getActiveRoute']>>;
 
-type NameToRouteWrapper<K extends RouteType> = { name: K['name'] } & ExtractRouteParams<K['path']>;
+export type NameToRoute<T extends readonly RouteType[]> = TupleToUnion<RoutesType<T>>;
 
-export type NameToRoute<T extends RouteType[]> = NameToRouteWrapper<RoutesType<T>>;
-
-export class WebRouter<T extends RouteType[] = RouteType[]> extends GlobalStore<{}> {
+export class WebRouter<T extends readonly RouteType[] = readonly RouteType[]> extends GlobalStore<{}> {
     history;
     unlistenHistory;
     constructor(stores: any, public routes: T) {

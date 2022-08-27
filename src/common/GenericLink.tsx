@@ -28,15 +28,14 @@ SOFTWARE.
 */
 
 import { useObserver } from 'mobx-react-lite';
-import { PropsWithChildren, FC } from 'react';
+import { PropsWithChildren } from 'react';
+import { ExpandRecursively } from '../main';
 
 import { NameToRoute, RouteType } from '../stores/WebRouter';
 import { useGenericStores } from './RootStore';
 
-const routes: any[] = [];
-
 // TODO: replace with FC<{ name: 'name1' } | { name: 'name2', params: { x: string }} | ...>
-type GenericLinkProps<T extends RouteType[]> = PropsWithChildren<{
+type GenericLinkProps<T extends readonly RouteType[]> = PropsWithChildren<{
     to: NameToRoute<T> | string;
     className?: string;
     activeClassName?: string;
@@ -46,7 +45,7 @@ type GenericLinkProps<T extends RouteType[]> = PropsWithChildren<{
     [prop: string]: unknown;
 }>;
 
-export function createLinkComponent<T extends RouteType[] = []>(componentClassName?: string) {
+export function createLinkComponent<T extends readonly RouteType[] = []>(componentClassName?: string) {
     function GenericLink({
         to,
         className,
@@ -59,7 +58,14 @@ export function createLinkComponent<T extends RouteType[] = []>(componentClassNa
         const { router } = useGenericStores();
 
         return useObserver(() => {
-            const link = typeof to === 'string' ? to : router.getPath(to);
+            const link =
+                typeof to === 'string'
+                    ? to
+                    : router.getPath(
+                          // We don't have this type here, it's available only on a project level
+                          // @ts-expect-error
+                          to as any
+                      );
             const active = router.path === link;
 
             return (
