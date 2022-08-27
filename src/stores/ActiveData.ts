@@ -101,7 +101,7 @@ export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
     }
 
     // This filed is used in getters created by extendInstance
-    @computed protected get data(): ApiResult<TConstructorApiFactory> {
+    @computed protected get data(): ReadonlyDeep<ApiResult<TConstructorApiFactory>> {
         // @ts-expect-error FIXME
         return _.merge({}, this.rawData, this.draft, dataMergeCustomizer) as ReadonlyDeep<ClassTData>;
     }
