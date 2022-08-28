@@ -16,10 +16,12 @@
         "build": "rushx clean && tsc",
         "watch": "rushx clean && tsc --watch"
     },
+    "dependencies": {
+        "type-fest": "^2.19.0"
+    },
     "devDependencies": {
         "@types/lodash": "~4.14.171",
         "@types/react": "~17.0.3",
-        "type-fest": "^2.19.0",
         "typescript": "^4.8.2"
     },
     "peerDependencies": {
