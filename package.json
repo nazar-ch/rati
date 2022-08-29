@@ -12,9 +12,9 @@
     "types": "./dist/main.d.ts",
     "scripts": {
         "clean": "rm -fr dist",
-        "omni-admin-build": "yarn clean && tsc",
         "build": "yarn clean && tsc",
-        "watch": "yarn clean && tsc --watch"
+        "watch": "yarn clean && tsc --watch",
+        "test": "yarn tsd"
     },
     "dependencies": {
         "type-fest": "^2.19.0"
@@ -22,6 +22,7 @@
     "devDependencies": {
         "@types/lodash": "~4.14.171",
         "@types/react": "~17.0.3",
+        "tsd": "^0.23.0",
         "typescript": "^4.8.2"
     },
     "peerDependencies": {
@@ -30,5 +31,8 @@
         "mobx": "^6.3.10",
         "moment-timezone": "^0.5.32",
         "react": "^17.0.1"
+    },
+    "tsd": {
+        "directory": "src/test-d"
     }
 }
