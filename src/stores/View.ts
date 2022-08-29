@@ -16,6 +16,7 @@ type GenericViewStores = Record<
 export type GenericView = {
     data: ViewData;
     stores: GenericViewStores;
+    params: Record<string, unknown>;
     // TODO: expand with a few more fields to make sure that only proper views will be passed as GenericView
 };
 
@@ -135,7 +136,12 @@ export type ViewComponent<TView extends GenericView, Props extends Record<string
     {
         data: ViewDataToData<TView['data']>;
         stores: ViewStoresToStores<TView['stores']>;
+        params: TView['params'];
     } & Props
 >;
 
 export type ViewDataType<TView extends GenericView> = ViewDataToData<TView['data']>;
+export type ViewClassForView<TView, TParams, TParentStores> = {
+    new (params: TParams, parentStores: TParentStores): TView;
+    create(...arg: any[]): any;
+};

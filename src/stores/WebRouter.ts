@@ -1,8 +1,8 @@
 import { observable, action, makeObservable, computed, runInAction } from 'mobx';
-import { FC } from 'react';
+import { ComponentType, FC } from 'react';
 import { createBrowserHistory, Location } from 'history';
 import { GlobalStore } from './GlobalStore';
-import { View } from './View';
+import { GenericView, View, ViewClassForView, ViewComponent } from './View';
 import { TupleToUnion } from '../types/generic';
 // import { TupleToUnion } from 'type-fest';
 
@@ -13,35 +13,37 @@ import { TupleToUnion } from '../types/generic';
 // https://ja.nsommer.dk/articles/type-checked-url-router.html#d (with validation)
 
 export type ExtractRouteParams<T extends string> = string extends T
-    ? Record<string, string>
+    ? // This matches `string` type instead of string literals. It's not
+      // possible to get the type for this case, return something generic
+      Record<string, string>
     : T extends `${infer Start}:${infer Param}/${infer Rest}`
     ? { [k in Param | keyof ExtractRouteParams<Rest>]: string }
     : T extends `${infer Start}:${infer Param}`
     ? { [k in Param]: string }
     : {};
 
-// export type ViewComponent<T extends InstanceType<ViewStore<any>>, ExtraParams extends {} = {}> = FC<
-//     NonNullable<T['context']> & ExtraParams
-// >;
+export type ViewComponentForOptionalView<
+    TView extends GenericView | undefined,
+    TParams extends {}
+> = TView extends GenericView ? ViewComponent<TView> : ViewComponent<EmptyView<TParams>>;
 
-// export type ViewComponentForClass<T extends ViewStore<any> | undefined> = T extends ViewStore<any>
-//     ? ViewComponent<InstanceType<T>>
-//     : // FIXME: here should be EmptyView instead of ViewStore<any>
-//       ViewComponent<InstanceType<ViewStore<any>>>;
-
-export class EmptyView extends View<EmptyView> {
+export class EmptyView<Params extends {} = {}> extends View<EmptyView<Params>, Params> {
     data = {};
     stores = {};
 }
 
 export function route<
-    Params extends ExtractRouteParams<Path>,
     Path extends string,
     Name extends string,
-    // FIXME:
-    VC extends any, // ViewComponentForClass<VS>,
-    VS extends any // { create(): View<any, { query: Params }> } | undefined
->(path: Path, name: Name, component: VC, view?: VS, options?: { group?: string }) {
+    ViewComponent extends ViewComponentForOptionalView<TView, { routeParams: ExtractRouteParams<Path> }>, // ViewComponentForClass<VS>,
+    TView extends GenericView | undefined
+>(
+    path: Path,
+    name: Name,
+    component: ViewComponent,
+    view?: ViewClassForView<TView, { routeParams: ExtractRouteParams<Path> }, any>, // TODO: improve any type
+    options?: { group?: string }
+) {
     // TODO 2023: allow regexps for the path (manually type params in this case)
     const pathReCore = path.replace(/:(.*?)(\/|$)/g, '(?<$1>[^/]+?)$2');
     const pathReString =
@@ -69,9 +71,14 @@ export function route<
     };
 }
 
-// FIXME: maybe not any? Without { component: any } this breaks WebRouter because it's params are not
-// generic enough for real routes
-export type RouteType = Omit<ReturnType<typeof route>, 'component'> & { component: any };
+export type GenericRouteType = {
+    name: string;
+    path: string;
+    pathRe: RegExp | null;
+    view: any;
+    component: any;
+    options: { group: string };
+};
 
 type RoutesType<
     T extends
@@ -83,11 +90,13 @@ type RoutesType<
     } & ExtractRouteParams<T[K]['path']>;
 };
 
-type GetView = Awaited<ReturnType<WebRouter<RouteType[]>['getActiveRoute']>>;
+type GetView = Awaited<ReturnType<WebRouter<GenericRouteType[]>['getActiveRoute']>>;
 
-export type NameToRoute<T extends readonly RouteType[]> = TupleToUnion<RoutesType<T>>;
+export type NameToRoute<T extends readonly GenericRouteType[]> = TupleToUnion<RoutesType<T>>;
 
-export class WebRouter<T extends readonly RouteType[] = readonly RouteType[]> extends GlobalStore<{}> {
+export class WebRouter<
+    T extends readonly GenericRouteType[] = readonly GenericRouteType[]
+> extends GlobalStore<{}> {
     history;
     unlistenHistory;
     constructor(stores: any, public routes: T) {
@@ -108,22 +117,23 @@ export class WebRouter<T extends readonly RouteType[] = readonly RouteType[]> ex
         let path: string = this.routes.find((item) => item.name === name)!.path;
         if (params) {
             for (const [key, value] of Object.entries(params)) {
-                // FIXME: type
-                // @ts-ignore
                 path = path.replace(`:${key}`, value);
             }
         }
         return path;
     }
 
-    // TODO: make this readonly
-    @observable path: string = '';
+    @computed get path() {
+        return this._path;
+    }
+
+    @observable private _path: string = '';
 
     @observable activeRoute: GetView | null = null;
 
     @action.bound async setPath(location: Location) {
         // console.log('>> setPath', location.pathname);÷
-        this.path = location.pathname;
+        this._path = location.pathname;
 
         const activeRoute = await this.getActiveRoute(this.path, this.stores as any);
         runInAction(() => {
@@ -148,9 +158,10 @@ export class WebRouter<T extends readonly RouteType[] = readonly RouteType[]> ex
             }
 
             if (result) {
-                // FIXME: types
+                // TODO: improve types
                 const ViewClass = (view ?? EmptyView) as { create(...args: any[]): View<any, any, any> };
-                // FIXME: types
+                // Empty view is used here to pass routeParams to the component
+                // TODO: improve types
                 const viewInstance = ViewClass.create({ routeParams: (result.groups as any) ?? {} }, {});
                 return { name, component, view: viewInstance, options };
                 // return await view(result.groups as any);

@@ -31,11 +31,11 @@ import { useObserver } from 'mobx-react-lite';
 import { PropsWithChildren } from 'react';
 import { ExpandRecursively } from '../main';
 
-import { NameToRoute, RouteType } from '../stores/WebRouter';
+import { NameToRoute, GenericRouteType } from '../stores/WebRouter';
 import { useGenericStores } from './RootStore';
 
 // TODO: replace with FC<{ name: 'name1' } | { name: 'name2', params: { x: string }} | ...>
-type GenericLinkProps<T extends readonly RouteType[]> = PropsWithChildren<{
+type GenericLinkProps<T extends readonly GenericRouteType[]> = PropsWithChildren<{
     to: NameToRoute<T> | string;
     className?: string;
     activeClassName?: string;
@@ -45,7 +45,9 @@ type GenericLinkProps<T extends readonly RouteType[]> = PropsWithChildren<{
     [prop: string]: unknown;
 }>;
 
-export function createLinkComponent<T extends readonly RouteType[] = []>(componentClassName?: string) {
+export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
+    componentClassName?: string
+) {
     function GenericLink({
         to,
         className,
