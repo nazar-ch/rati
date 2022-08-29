@@ -13,8 +13,8 @@
     "scripts": {
         "clean": "rm -fr dist",
         "omni-admin-build": "yarn clean && tsc",
-        "build": "rushx clean && tsc",
-        "watch": "rushx clean && tsc --watch"
+        "build": "yarn clean && tsc",
+        "watch": "yarn clean && tsc --watch"
     },
     "dependencies": {
         "type-fest": "^2.19.0"
