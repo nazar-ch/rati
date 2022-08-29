@@ -1,19 +1,19 @@
 import _ from 'lodash';
 import { observer } from 'mobx-react-lite';
-import React, { FC, ReactElement, useEffect, useRef, useState } from 'react';
-import { GenericView, View, ViewComponent } from '../stores/View';
+import React, { FC, ReactElement, useRef } from 'react';
+import { GenericView, View, ViewClassForView, ViewComponent } from '../stores/View';
 
 export const ViewLoader: GenericViewLoaderComponent<{
     Loading: FC;
     // TODO: support this with ErrorBoundary, add "retry" link in errors for some of them
     error?: FC;
-}> = observer(({ Component, view, params, stores, Loading }) => {
+}> = observer(({ Component, view: viewClass, params, stores, Loading }) => {
     const viewRef = useRef<View<any> | null>(null);
     const paramsRef = useRef<Record<string, unknown> | null>(null);
 
     if (!_.isEqual(paramsRef.current, params)) {
         paramsRef.current = params;
-        viewRef.current = view.create(params, stores);
+        viewRef.current = viewClass.create(params, stores);
     }
 
     if (viewRef.current?.props) {
@@ -32,7 +32,7 @@ type GenericViewLoaderComponent<Props extends {}> = <
     TParentStores extends {}
 >(
     props: {
-        view: { new (params: TParams, parentStores: TParentStores): TView; create(...arg: any[]): any };
+        view: ViewClassForView<TView, TParams, TParentStores>;
         params: TParams;
         stores: TParentStores;
         Component: ViewComponent<TView>;
