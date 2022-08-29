@@ -1,4 +1,4 @@
-export { sleep, createContext } from './common/stuff';
+export { sleep } from './common/stuff';
 
 export { Data, DataFactoryType } from './stores/Data';
 
