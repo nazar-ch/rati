@@ -49,15 +49,19 @@ interface SmartApiPromise<FunctionReturn> {
 
 export function smartApi<F extends (...args: any) => Promise<any>>(
     func: F,
-    options: SmartApiOptions = {}
+    {
+        isImmediate = false,
+        debounceMaxWaitMs: maxWait,
+        indicatePendingAfterTimeoutMs = 200,
+        debounceWaitMs,
+        raceGuard,
+    }: SmartApiOptions = {}
 ): SmartApiFunction<F> {
     let invokeTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let indicatePendingTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    const isImmediate = options.isImmediate ?? false;
-    const maxWait = options.debounceMaxWaitMs;
-    const waitMilliseconds = options.debounceWaitMs === 'INPUT' ? 350 : options.debounceWaitMs ?? 100;
-    const indicatePendingTimeout = options.indicatePendingAfterTimeoutMs ?? 200;
+    const waitMilliseconds = debounceWaitMs === 'INPUT' ? 350 : debounceWaitMs ?? 100;
+
     let lastInvokeTime = Date.now();
 
     const state = new InternalState<F>();
@@ -113,7 +117,7 @@ export function smartApi<F extends (...args: any) => Promise<any>>(
             // after latest debounced call, but not before the api call is invoked
             indicatePendingTimeoutId = setTimeout(
                 state.indicatePending,
-                indicatePendingTimeout < invokeTime ? invokeTime : indicatePendingTimeout
+                indicatePendingAfterTimeoutMs < invokeTime ? invokeTime : indicatePendingAfterTimeoutMs
             );
 
             if (shouldCallNow) {
@@ -127,7 +131,7 @@ export function smartApi<F extends (...args: any) => Promise<any>>(
                     state.setBusy(false);
                 }
 
-                if (options.raceGuard) {
+                if (raceGuard) {
                     return state.raceGuardedResult(result, localRequestId);
                 } else {
                     return result;
