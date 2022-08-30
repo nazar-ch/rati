@@ -28,7 +28,7 @@ SOFTWARE.
 
 */
 
-export type SmartApiOptions = {
+export type RemoteDataOptions = {
     isImmediate?: boolean;
     debounceMaxWaitMs?: number;
     debounceWaitMs?: number | 'INPUT';
@@ -36,18 +36,18 @@ export type SmartApiOptions = {
     raceGuard?: boolean;
 };
 
-export interface SmartApiFunction<F extends (...args: any) => any> {
+export interface RemoteDataFunction<F extends (...args: any) => any> {
     (...args: Parameters<F>): Promise<Awaited<ReturnType<F>>>;
     cancel: (reason?: any) => void;
     state: PublicState<F>;
 }
 
-interface SmartApiPromise<FunctionReturn> {
+interface RemoteDataPromise<FunctionReturn> {
     resolve: (result: FunctionReturn) => void;
     reject: (reason?: any) => void;
 }
 
-export function smartApi<F extends (...args: any) => Promise<any>>(
+export function remoteData<F extends (...args: any) => Promise<any>>(
     func: F,
     {
         isImmediate = false,
@@ -55,8 +55,8 @@ export function smartApi<F extends (...args: any) => Promise<any>>(
         indicatePendingAfterTimeoutMs = 200,
         debounceWaitMs,
         raceGuard,
-    }: SmartApiOptions = {}
-): SmartApiFunction<F> {
+    }: RemoteDataOptions = {}
+): RemoteDataFunction<F> {
     let invokeTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let indicatePendingTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -186,9 +186,9 @@ class InternalState<F extends (...args: any) => any> {
 
     @observable public saved: boolean = false;
 
-    @observable public promises: SmartApiPromise<ReturnType<F>>[] = [];
+    @observable public promises: RemoteDataPromise<ReturnType<F>>[] = [];
 
-    @action pushPromise(promise: SmartApiPromise<ReturnType<F>>) {
+    @action pushPromise(promise: RemoteDataPromise<ReturnType<F>>) {
         this.promises.push(promise);
     }
 

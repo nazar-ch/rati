@@ -19,5 +19,5 @@ export * from './types/generic';
 export { createLinkComponent } from './common/GenericLink';
 export { Redirect } from './common/Redirect';
 
-export { smartApi } from './common/smartApi';
-export { smartApi_Key, api_Key } from './common/apiUtils';
+export { remoteData } from './common/remoteData';
+export { remoteDataKey, responseKey } from './common/apiUtils';

@@ -1,14 +1,14 @@
-import { smartApi, SmartApiOptions } from './smartApi';
+import { remoteData, RemoteDataOptions } from './remoteData';
 
-export function smartApi_Key<
+export function remoteDataKey<
     Args extends any[],
     Result extends Record<string, unknown>,
     Key extends keyof Result
->(f: (...args: Args) => Promise<Result>, key: Key, options: SmartApiOptions = {}) {
-    return smartApi(api_Key(f, key), options);
+>(f: (...args: Args) => Promise<Result>, key: Key, options: RemoteDataOptions = {}) {
+    return remoteData(responseKey(f, key), options);
 }
 
-export function api_Key<
+export function responseKey<
     Args extends any[],
     Result extends Record<string, unknown>,
     Key extends keyof Result
@@ -24,5 +24,5 @@ export function api_Key<
 //     b: 2,
 // });
 
-// const a1 = api_Key(aaa, 'a');
+// const a1 = responseKey(aaa, 'a');
 // const aaaa1 = a1({ x: 's' });
