@@ -192,17 +192,17 @@ class InternalState<F extends (...args: any) => any> {
         this.promises = [];
     }
 
-    @observable isBusy: boolean = false;
-    @observable isSpinner: boolean = false;
+    @observable isPending: boolean = false;
+    @observable shouldIndicatePending: boolean = false;
 
     @action setBusy(value: boolean) {
-        this.isBusy = value;
-        if (!value) this.isSpinner = false;
+        this.isPending = value;
+        if (!value) this.shouldIndicatePending = false;
     }
 
     @action.bound showSpinner() {
-        if (this.isBusy) {
-            this.isSpinner = true;
+        if (this.isPending) {
+            this.shouldIndicatePending = true;
         }
     }
 }
@@ -211,21 +211,21 @@ class PublicState<F extends (...args: any) => any> {
     constructor(private internalState: InternalState<F>) {}
 
     get isReady() {
-        return this.internalState.promises.length === 0 && !this.isBusy;
+        return this.internalState.promises.length === 0 && !this.isPending;
     }
 
-    get isBusy() {
-        return this.internalState.isBusy;
+    get isPending() {
+        return this.internalState.isPending;
     }
 
-    get isVisiblyBusy() {
-        return this.internalState.isBusy && this.internalState.isSpinner;
+    get shouldIndicatePending() {
+        return this.internalState.isPending && this.internalState.shouldIndicatePending;
     }
 
     get buttonProps() {
         return {
-            disabled: this.isVisiblyBusy,
-            blocked: this.isBusy,
+            disabled: this.shouldIndicatePending,
+            blocked: this.isPending,
         };
     }
 }
