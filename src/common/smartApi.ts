@@ -32,7 +32,7 @@ export type SmartApiOptions = {
     isImmediate?: boolean;
     debounceMaxWaitMs?: number;
     debounceWaitMs?: number | 'INPUT';
-    spinnerTimeoutMs?: number;
+    indicatePendingAfterTimeoutMs?: number;
     raceGuard?: boolean;
 };
 
@@ -52,12 +52,12 @@ export function smartApi<F extends (...args: any) => Promise<any>>(
     options: SmartApiOptions = {}
 ): SmartApiFunction<F> {
     let invokeTimeoutId: ReturnType<typeof setTimeout> | undefined;
-    let spinnerTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    let indicatePendingTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const isImmediate = options.isImmediate ?? false;
     const maxWait = options.debounceMaxWaitMs;
     const waitMilliseconds = options.debounceWaitMs === 'INPUT' ? 350 : options.debounceWaitMs ?? 100;
-    const spinnerTimeout = options.spinnerTimeoutMs ?? 200;
+    const indicatePendingTimeout = options.indicatePendingAfterTimeoutMs ?? 200;
     let lastInvokeTime = Date.now();
 
     const state = new InternalState<F>();
@@ -102,18 +102,18 @@ export function smartApi<F extends (...args: any) => Promise<any>>(
                 clearTimeout(invokeTimeoutId);
             }
 
-            if (spinnerTimeoutId !== undefined) {
-                clearTimeout(spinnerTimeoutId);
+            if (indicatePendingTimeoutId !== undefined) {
+                clearTimeout(indicatePendingTimeoutId);
             }
 
             const invokeTime = nextInvokeTimeout();
             invokeTimeoutId = setTimeout(invokeFunction, invokeTime);
 
-            // Spinner should appear in spinnerTimeoutMs after laster interaction, but
-            // not earlier then the api call is invoked
-            spinnerTimeoutId = setTimeout(
-                state.showSpinner,
-                spinnerTimeout < invokeTime ? invokeTime : spinnerTimeout
+            // Visible pending state should start in indicatePendingAfterTimeoutMs
+            // after latest debounced call, but not before the api call is invoked
+            indicatePendingTimeoutId = setTimeout(
+                state.indicatePending,
+                indicatePendingTimeout < invokeTime ? invokeTime : indicatePendingTimeout
             );
 
             if (shouldCallNow) {
@@ -145,8 +145,8 @@ export function smartApi<F extends (...args: any) => Promise<any>>(
         if (invokeTimeoutId !== undefined) {
             clearTimeout(invokeTimeoutId);
         }
-        if (spinnerTimeoutId !== undefined) {
-            clearTimeout(spinnerTimeoutId);
+        if (indicatePendingTimeoutId !== undefined) {
+            clearTimeout(indicatePendingTimeoutId);
         }
         state.setBusy(false);
 
@@ -200,7 +200,7 @@ class InternalState<F extends (...args: any) => any> {
         if (!value) this.shouldIndicatePending = false;
     }
 
-    @action.bound showSpinner() {
+    @action.bound indicatePending() {
         if (this.isPending) {
             this.shouldIndicatePending = true;
         }
