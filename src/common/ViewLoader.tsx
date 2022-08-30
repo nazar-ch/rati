@@ -23,9 +23,12 @@ export const ViewLoader: GenericViewLoaderComponent<{
         return <Loading />;
     }
 });
-// Type for custom components based on ViewLoader (e. g. to have defined loading state)
 
+/**
+ * Type for custom components based on ViewLoader (e. g. to have defined loading state)
+ */
 export type ViewLoaderComponent = GenericViewLoaderComponent<{}>;
+
 type GenericViewLoaderComponent<Props extends {}> = <
     TView extends GenericView,
     TParams extends {},
