@@ -42,7 +42,7 @@ export function route<
     name: Name,
     component: ViewComponent,
     view?: ViewClassForView<TView, { routeParams: ExtractRouteParams<Path> }, any>, // TODO: improve any type
-    options?: { group?: string }
+    wrapperComponent?: ComponentType
 ) {
     // TODO 2023: allow regexps for the path (manually type params in this case)
     const pathReCore = path.replace(/:(.*?)(\/|$)/g, '(?<$1>[^/]+?)$2');
@@ -61,13 +61,10 @@ export function route<
         path,
         pathRe,
         name,
-        view,
+        // Empty view is used here to pass routeParams to the component
+        view: view ?? EmptyView,
         component,
-        options: {
-            group: 'default',
-            // overwrite default value if defined
-            ...options,
-        },
+        wrapperComponent,
     };
 }
 
@@ -77,7 +74,7 @@ export type GenericRouteType = {
     pathRe: RegExp | null;
     view: any;
     component: any;
-    options: { group: string };
+    wrapperComponent?: ComponentType;
 };
 
 type RoutesType<
@@ -129,7 +126,8 @@ export class WebRouter<
 
     @observable private _path: string = '';
 
-    @observable activeRoute: GetView | null = null;
+    // Non-shallow observable breaks view class inside this property
+    @observable.shallow activeRoute: GetView | null = null;
 
     @action.bound async setPath(location: Location) {
         // console.log('>> setPath', location.pathname);÷
@@ -145,12 +143,12 @@ export class WebRouter<
         this.history.replace(to);
     }
 
-    async getActiveRoute(path: string, stores: any) {
-        for (const { pathRe, view, name, component, options } of this.routes) {
+    async getActiveRoute(currentPath: string, stores: any) {
+        for (const { pathRe, path, view, name, component, wrapperComponent } of this.routes) {
             let result;
 
             if (pathRe) {
-                result = pathRe.exec(path) ?? pathRe.exec(path + '/');
+                result = pathRe.exec(currentPath);
             } else {
                 result = {
                     groups: {},
@@ -158,16 +156,15 @@ export class WebRouter<
             }
 
             if (result) {
-                // TODO: improve types
-                const ViewClass = (view ?? EmptyView) as { create(...args: any[]): View<any, any, any> };
-                // Empty view is used here to pass routeParams to the component
-                // TODO: improve types
-                const viewInstance = ViewClass.create({ routeParams: (result.groups as any) ?? {} }, {});
-                return { name, component, view: viewInstance, options };
-                // return await view(result.groups as any);
+                return {
+                    name,
+                    component,
+                    view,
+                    routeParams: (result.groups as any) ?? {},
+                    path,
+                    wrapperComponent,
+                };
             }
         }
-
-        // TODO: "in transition" state (between await and context is ready)
     }
 }
