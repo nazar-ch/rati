@@ -12,14 +12,24 @@ export class RootStore<T extends GlobalStores> {
 
     globalStores = this.stores;
 
-    @observable isReady: boolean = false;
+    /**
+     * Blocks the app from rendering before rehydrating the stores
+     */
+    get isReady() {
+        return this._isReady;
+    }
 
+    @observable protected _isReady: boolean = false;
+
+    /**
+     * Stores initialization and rehydration. Should be called before rendering app components
+     */
     async init() {
         // TODO: hydrate stores
         await mockHydration();
 
         runInAction(() => {
-            this.isReady = true;
+            this._isReady = true;
         });
     }
 
