@@ -16,6 +16,7 @@ export class RootStore<T extends GlobalStores> {
 
     async init() {
         // TODO: hydrate stores
+        await mockHydration();
 
         runInAction(() => {
             this.isReady = true;
@@ -35,6 +36,10 @@ export class RootStore<T extends GlobalStores> {
         };
         return Provider;
     })(this.StoresContext);
+}
+
+async function mockHydration() {
+    await sleep(5);
 }
 
 export const GenericStoresContext = React.createContext<GlobalStores | null>(null);
