@@ -1,10 +1,10 @@
 import _ from 'lodash';
 import { observer } from 'mobx-react-lite';
-import React, { FC, ReactElement, useRef } from 'react';
+import React, { ComponentType, FC, ReactElement, useRef } from 'react';
 import { GenericView, View, ViewClassForView, ViewComponent } from '../stores/View';
 
 export const ViewLoader: GenericViewLoaderComponent<{
-    Loading: FC;
+    Loading: ComponentType;
     // TODO: support this with ErrorBoundary, add "retry" link in errors for some of them
     error?: FC;
 }> = observer(({ Component, view: viewClass, params, stores, Loading }) => {
