@@ -1,7 +1,5 @@
 export { sleep } from './common/stuff';
 
-export { Data, DataFactoryType } from './stores/Data';
-
 export { ActiveData, ActiveApiData } from './stores/ActiveData';
 export { ActiveDataInstanceType } from './stores/ActiveDataInstanceType';
 
