@@ -96,6 +96,7 @@ export class WebRouter<
 > extends GlobalStore<{}> {
     history;
     unlistenHistory;
+
     constructor(stores: any, public routes: T) {
         super(stores);
         makeObservable(this);

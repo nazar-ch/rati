@@ -30,10 +30,9 @@ SOFTWARE.
 
 import { useObserver } from 'mobx-react-lite';
 import { PropsWithChildren } from 'react';
-import { ExpandRecursively } from '../main';
 
-import { NameToRoute, GenericRouteType } from '../stores/WebRouter';
-import { useGenericStores } from './RootStore';
+import { NameToRoute, GenericRouteType, WebRouter } from '../stores/WebRouter';
+import { useWebRouter } from './RootStore';
 
 // TODO: replace with FC<{ name: 'name1' } | { name: 'name2', params: { x: string }} | ...>
 type GenericLinkProps<T extends readonly GenericRouteType[]> = PropsWithChildren<{
@@ -58,18 +57,18 @@ export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
         children,
         ...props
     }: GenericLinkProps<T>) {
-        const { router } = useGenericStores();
+        const webRouter = useWebRouter();
 
         return useObserver(() => {
             const link =
                 typeof to === 'string'
                     ? to
-                    : router.getPath(
+                    : webRouter.getPath(
                           // We don't have this type here, it's available only on a project level
                           // @ts-expect-error
                           to as any
                       );
-            const active = router.path === link;
+            const active = webRouter.path === link;
 
             return (
                 // TODO: memoize onClick?
@@ -84,7 +83,7 @@ export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
                     onClick={(event) => {
                         if (allowAction(event)) {
                             event.preventDefault();
-                            router.history.push(link);
+                            webRouter.history.push(link);
                         }
                     }}
                 >

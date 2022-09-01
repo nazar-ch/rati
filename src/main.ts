@@ -5,7 +5,7 @@ export { ActiveDataInstanceType } from './stores/ActiveDataInstanceType';
 
 export { GlobalStore } from './stores/GlobalStore';
 
-export { RootStore, useGenericStores } from './common/RootStore';
+export { RootStore, useGenericStores, useWebRouter } from './common/RootStore';
 
 export { WebRouter, route, NameToRoute } from './stores/WebRouter';
 export { RouterComponent } from './common/RouterComponent';

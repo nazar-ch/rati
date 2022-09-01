@@ -1,8 +1,8 @@
 import { FC } from 'react';
-import { useGenericStores } from './RootStore';
+import { useWebRouter } from './RootStore';
 
 export const Redirect: FC<{ to: string }> = ({ to }) => {
-    const { router } = useGenericStores();
-    router.redirect(to);
+    const webRouter = useWebRouter();
+    webRouter.redirect(to);
     return null;
 };
