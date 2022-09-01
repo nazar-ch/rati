@@ -18,11 +18,3 @@ export function responseKey<
         return result[key] as Result[Key];
     };
 }
-
-// const aaa = async ({ x }: { x: string }) => ({
-//     a: 1,
-//     b: 2,
-// });
-
-// const a1 = responseKey(aaa, 'a');
-// const aaaa1 = a1({ x: 's' });
