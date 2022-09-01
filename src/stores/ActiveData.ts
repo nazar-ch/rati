@@ -61,7 +61,7 @@ type ApiResult<T extends ApiFactory> = Awaited<ReturnType<ReturnType<T>>>;
 export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
     protected constructor(
         rawData: ApiResult<TConstructorApiFactory>,
-        protected apiFunction: ReturnType<TConstructorApiFactory>
+        protected remoteDataLoader: ReturnType<TConstructorApiFactory>
     ) {
         makeObservable(this);
         this.rawData = rawData;
@@ -69,22 +69,24 @@ export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
 
     static async create<
         SActiveDataClass extends { prototype: { __dataType: object } },
-        SApiFactory extends () => (...args: any) => Promise<SActiveDataClass['prototype']['__dataType']>
+        SRemoteDataFactory extends () => (
+            ...args: any
+        ) => Promise<SActiveDataClass['prototype']['__dataType']>
     >(
         this: SActiveDataClass,
-        apiFunctionFactory: SApiFactory,
-        apiParams: ApiParams<SApiFactory>
+        remoteDataFactory: SRemoteDataFactory,
+        apiParams: ApiParams<SRemoteDataFactory>
     ): Promise<
         Expand<
             Omit<SActiveDataClass['prototype'], 'data' | '__dataType'> &
-                Readonly<Omit<ApiResult<SApiFactory>, keyof SActiveDataClass>>
+                Readonly<Omit<ApiResult<SRemoteDataFactory>, keyof SActiveDataClass>>
         >
     > {
-        const apiFunction = apiFunctionFactory();
+        const remoteDataLoader = remoteDataFactory();
 
-        const data = await apiFunction(apiParams);
+        const data = await remoteDataLoader(apiParams);
 
-        const instance = new (this as any)(data, apiFunction);
+        const instance = new (this as any)(data, remoteDataLoader);
         return extendInstance(instance, data);
     }
 
@@ -94,7 +96,7 @@ export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
     __dataType: ApiResult<TConstructorApiFactory> = null as any;
 
     async reload(params: ApiParams<TConstructorApiFactory>) {
-        const data = await this.apiFunction(params);
+        const data = await this.remoteDataLoader(params);
         runInAction(() => {
             this.rawData = data;
         });
@@ -108,6 +110,8 @@ export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
 
     @observable public draft: PartialDeep<ApiResult<TConstructorApiFactory>> = {} as any;
 }
+
+// TODO: move this to type tests
 
 // const x = async (params: { x: string; z: any[] }) => {
 //     return { x: '5', y: 4 };
