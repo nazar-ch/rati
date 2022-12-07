@@ -104,8 +104,13 @@ export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
 
     // This filed is used in getters created by extendInstance
     @computed protected get data(): ReadonlyDeep<ApiResult<TConstructorApiFactory>> {
-        // @ts-expect-error FIXME
-        return _.merge({}, this.rawData, this.draft, dataMergeCustomizer) as ReadonlyDeep<ClassTData>;
+        return _.mergeWith(
+            {},
+            this.rawData,
+            this.draft,
+            dataMergeCustomizer
+            // @ts-expect-error FIXME
+        ) as ReadonlyDeep<ClassTData>;
     }
 
     @observable public draft: PartialDeep<ApiResult<TConstructorApiFactory>> = {} as any;
