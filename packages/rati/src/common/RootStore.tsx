@@ -41,6 +41,7 @@ export class RootStore<T extends GlobalStores> {
         const Provider: FC<{
             // TODO: maybe type stores better
             stores?: any;
+            children: React.ReactNode;
         }> = ({ children, stores }) => {
             return <StoresContext.Provider value={stores}>{children}</StoresContext.Provider>;
         };

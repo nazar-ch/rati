@@ -36,4 +36,4 @@ export const RouterComponent: FC<{
     );
 });
 
-export const EmptyWrapper: FC = ({ children }) => <>{children}</>;
+export const EmptyWrapper: FC<{ children: React.ReactNode }> = ({ children }) => <>{children}</>;

@@ -65,7 +65,6 @@ export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
                     ? to
                     : webRouter.getPath(
                           // We don't have this type here, it's available only on a project level
-                          // @ts-expect-error
                           to as any
                       );
             const active = webRouter.path === link;

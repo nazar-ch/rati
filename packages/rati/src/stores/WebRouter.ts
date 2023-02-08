@@ -115,7 +115,7 @@ export class WebRouter<
         let path: string = this.routes.find((item) => item.name === name)!.path;
         if (params) {
             for (const [key, value] of Object.entries(params)) {
-                path = path.replace(`:${key}`, value);
+                path = path.replace(`:${key}`, value as string);
             }
         }
         return path;
