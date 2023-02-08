@@ -38,7 +38,12 @@ export abstract class ActiveData<T> {
         // TODO: consider replacing this with a shallow merge
         // Now { a: { a: 1, b: 2 } } + draft = { a: { b: 3 } results in { a: { a: 1, b: 2 } },
         // but { a: { b: 3 } } may be expected in this case
-        return _.mergeWith({}, this.originalData, this.draft, dataMergeCustomizer) as ReadonlyDeep<T>;
+        return _.mergeWith(
+            {},
+            this.originalData,
+            this.draft,
+            dataMergeCustomizer
+        ) as ReadonlyDeep<T>;
     }
 
     @observable public draft: PartialDeep<T> = {} as any;

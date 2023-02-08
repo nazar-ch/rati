@@ -47,7 +47,11 @@ export abstract class View<
     declare stores: Record<
         string,
         | {
-              new (data: ViewDataToData<TView['data']>, params: TParams, stores: TParentStores): unknown;
+              new (
+                  data: ViewDataToData<TView['data']>,
+                  params: TParams,
+                  stores: TParentStores
+              ): unknown;
           }
         | {
               createInView(
@@ -91,7 +95,11 @@ export abstract class View<
                         ? ([
                               key,
                               'createInView' in store
-                                  ? store.createInView(this.data as any, this.params, this.parentStores)
+                                  ? store.createInView(
+                                        this.data as any,
+                                        this.params,
+                                        this.parentStores
+                                    )
                                   : new store(this.data as any, this.params, this.parentStores),
                           ] as const)
                         : null
@@ -132,7 +140,10 @@ type ViewStoresToStores<TStores extends GenericViewStores> = Expand<
             : never;
     }>
 >;
-export type ViewComponent<TView extends GenericView, Props extends Record<string, unknown> = {}> = FC<
+export type ViewComponent<
+    TView extends GenericView,
+    Props extends Record<string, unknown> = {}
+> = FC<
     {
         data: ViewDataToData<TView['data']>;
         stores: ViewStoresToStores<TView['stores']>;

@@ -35,7 +35,10 @@ export class EmptyView<Params extends {} = {}> extends View<EmptyView<Params>, P
 export function route<
     Path extends string,
     Name extends string,
-    ViewComponent extends ViewComponentForOptionalView<TView, { routeParams: ExtractRouteParams<Path> }>, // ViewComponentForClass<VS>,
+    ViewComponent extends ViewComponentForOptionalView<
+        TView,
+        { routeParams: ExtractRouteParams<Path> }
+    >, // ViewComponentForClass<VS>,
     TView extends GenericView | undefined
 >(
     path: Path,

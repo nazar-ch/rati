@@ -1,5 +1,5 @@
-import { sleep } from "rati";
-import "./App.css";
+import { sleep } from 'rati';
+import './App.css';
 
 export function App() {
     return (
@@ -10,7 +10,7 @@ export function App() {
             <button
                 onClick={async () => {
                     await sleep(2000);
-                    alert("ok");
+                    alert('ok');
                 }}
             >
                 test rati

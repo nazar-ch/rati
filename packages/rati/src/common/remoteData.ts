@@ -117,7 +117,9 @@ export function remoteData<F extends (...args: any) => Promise<any>>(
             // after latest debounced call, but not before the api call is invoked
             indicatePendingTimeoutId = setTimeout(
                 state.indicatePending,
-                indicatePendingAfterTimeoutMs < invokeTime ? invokeTime : indicatePendingAfterTimeoutMs
+                indicatePendingAfterTimeoutMs < invokeTime
+                    ? invokeTime
+                    : indicatePendingAfterTimeoutMs
             );
 
             if (shouldCallNow) {
