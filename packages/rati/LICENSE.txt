@@ -1,5 +1,4 @@
 Copyright (c) 2021-2022 Nazar Chobaniuk
-Copyright (c) 2022 Inside Labs AG
 
 Unauthorized use of this software (the "Software") is strictly prohibited.
 
