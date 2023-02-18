@@ -1,16 +1,14 @@
 {
     "private": true,
-    "workspaces": {
-        "packages": [
-            "packages/*",
-            "examples/*"
-        ]
-    },
+    "workspaces": [
+        "packages/*",
+        "examples/*"
+    ],
     "scripts": {
         "upgrade": "yarn upgrade-interactive",
         "format": "npx prettier --write ."
     },
-    "packageManager": "yarn@3.2.4",
+    "packageManager": "yarn@3.4.1",
     "devDependencies": {
         "prettier": "^2.8.3"
     },

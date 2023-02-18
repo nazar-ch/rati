@@ -12,8 +12,8 @@
     "types": "./dist/main.d.ts",
     "scripts": {
         "clean": "rm -fr dist",
-        "build": "yarn clean && tsc",
-        "watch": "yarn clean && tsc --watch",
+        "build": "yarn clean && yarn -T run tsc",
+        "watch": "yarn -T run tsc --watch",
         "test": "yarn tsd"
     },
     "dependencies": {
