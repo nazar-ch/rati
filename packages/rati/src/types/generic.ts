@@ -26,3 +26,7 @@ export function isNonNull<T>(value: T | null | undefined): value is T {
 export type TupleToUnion<ArrayType> = ArrayType extends readonly unknown[]
     ? ArrayType[number]
     : never;
+
+export type ExcludeNever<T> = {
+    [K in keyof T as T[K] extends never ? never : K]: T[K];
+};
