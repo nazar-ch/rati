@@ -1,20 +1,14 @@
-import { sleep } from 'rati';
 import './App.css';
+import { rootStore } from './globalStores';
+import { RouterComponent } from 'rati';
 
 export function App() {
     return (
-        <div className="App">
-            Test
-            <br />
-            <br />
-            <button
-                onClick={async () => {
-                    await sleep(2000);
-                    alert('ok');
-                }}
-            >
-                test rati
-            </button>
-        </div>
+        <rootStore.StoresProvider stores={rootStore.stores}>
+            <RouterComponent
+                // DefaultWrapper={AuthGuardedContentWrapper}
+                router={rootStore.stores.webRouter}
+            />
+        </rootStore.StoresProvider>
     );
 }
