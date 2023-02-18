@@ -4,7 +4,6 @@
     "description": "TypeScript frontend framework for React & MobX",
     "author": "Nazar Chobaniuk",
     "license": "MIT",
-    "private": false,
     "files": [
         "dist"
     ],
@@ -17,6 +16,7 @@
         "test": "yarn tsd"
     },
     "dependencies": {
+        "@sindresorhus/is": "^5.3.0",
         "type-fest": "^2.19.0"
     },
     "devDependencies": {
