@@ -2,8 +2,8 @@ import { observable, action, makeObservable, computed, runInAction } from 'mobx'
 import { ComponentType, FC } from 'react';
 import { createBrowserHistory, Location } from 'history';
 import { GlobalStore } from './GlobalStore';
-import { GenericView, View, ViewClassForView, ViewComponent } from './View';
 import { TupleToUnion } from '../types/generic';
+import { CreateView, ViewComponent } from '../common/view';
 // import { TupleToUnion } from 'type-fest';
 
 //--------------------------------------------
@@ -22,17 +22,21 @@ export type ExtractRouteParams<T extends string> = string extends T
     ? { [k in Param]: string }
     : {};
 
+/*
 export type ViewComponentForOptionalView<
     TView extends GenericView | undefined,
     TParams extends {}
-> = TView extends GenericView ? ViewComponent<TView> : ViewComponent<EmptyView<TParams>>;
+> = TView extends GenericView
+    ? LegacyViewComponent<TView>
+    : LegacyViewComponent<EmptyView<TParams>>;
+
 
 export class EmptyView<Params extends {} = {}> extends View<EmptyView<Params>, Params> {
     data = {};
     stores = {};
 }
 
-export function route<
+export function routeLegacy<
     Path extends string,
     Name extends string,
     ViewComponent extends ViewComponentForOptionalView<
@@ -66,6 +70,48 @@ export function route<
         name,
         // Empty view is used here to pass routeParams to the component
         view: view ?? EmptyView,
+        component,
+        wrapperComponent,
+    };
+}
+*/
+
+export type ViewComponentForOptionalView<
+    View extends CreateView<any> | undefined,
+    Params extends {}
+> = View extends CreateView<any> ? ViewComponent<View> : FC<Params>;
+
+export function route<
+    Path extends string,
+    Name extends string,
+    TViewComponent extends ViewComponentForOptionalView<TView, ExtractRouteParams<Path>>, // ViewComponentForClass<VS>,
+    TView extends CreateView<any> | undefined
+>(
+    path: Path,
+    name: Name,
+    component: TViewComponent,
+    view?: TView extends CreateView<any> ? TView : undefined,
+    wrapperComponent?: ComponentType
+) {
+    // TODO 2023: allow regexps for the path (manually type params in this case)
+    const pathReCore = path.replace(/:(.*?)(\/|$)/g, '(?<$1>[^/]+?)$2');
+    const pathReString =
+        '^' +
+        pathReCore +
+        (pathReCore.endsWith('/')
+            ? '$'
+            : // Optional slash in the end (match /path & /path/)
+              // TODO 2023: use redirects for this case
+              '/{0,1}$');
+
+    const pathRe = path === '*' ? null : new RegExp(pathReString);
+
+    return {
+        path,
+        pathRe,
+        name,
+        // Empty view is used here to pass routeParams to the component
+        view,
         component,
         wrapperComponent,
     };

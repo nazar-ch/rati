@@ -140,7 +140,7 @@ type ViewStoresToStores<TStores extends GenericViewStores> = Expand<
             : never;
     }>
 >;
-export type ViewComponent<
+export type LegacyViewComponent<
     TView extends GenericView,
     Props extends Record<string, unknown> = {}
 > = FC<

@@ -10,7 +10,6 @@ export { RootStore, useGenericStores, useWebRouter } from './common/RootStore';
 export { WebRouter, route, NameToRoute } from './stores/WebRouter';
 export { RouterComponent } from './common/RouterComponent';
 
-export { View, ViewComponent, ViewDataType } from './stores/View';
 export { ViewLoader, ViewLoaderComponent } from './common/ViewLoader';
 
 export * from './types/generic';
@@ -20,3 +19,5 @@ export { Redirect } from './common/Redirect';
 
 export { remoteData } from './common/remoteData';
 export { remoteDataKey, responseKey } from './common/apiUtils';
+
+export { createView, resolveView, ViewComponent, viewParam } from './common/view';

@@ -1,9 +1,12 @@
 import _ from 'lodash';
 import { observer } from 'mobx-react-lite';
-import React, { ComponentType, FC, ReactElement, useRef } from 'react';
-import { GenericView, View, ViewClassForView, ViewComponent } from '../stores/View';
+import React, { ComponentType, FC, ReactElement, useEffect, useRef, useState } from 'react';
+import { resolveView, ViewComponent, CreateView, RequiredViewParams } from './view';
 
-export const ViewLoader: GenericViewLoaderComponent<{
+/* 
+Previous version with Refs for reference
+
+const LegacyViewLoader: LegacyGenericViewLoaderComponent<{
     Loading: ComponentType;
     // TODO: support this with ErrorBoundary, add "retry" link in errors for some of them
     error?: FC;
@@ -24,12 +27,10 @@ export const ViewLoader: GenericViewLoaderComponent<{
     }
 });
 
-/**
- * Type for custom components based on ViewLoader (e. g. to have defined loading state)
- */
-export type ViewLoaderComponent = GenericViewLoaderComponent<{}>;
 
-type GenericViewLoaderComponent<Props extends {}> = <
+type LegacyViewLoaderComponent = LegacyGenericViewLoaderComponent<{}>;
+
+type LegacyGenericViewLoaderComponent<Props extends {}> = <
     TView extends GenericView,
     TParams extends {},
     TParentStores extends {}
@@ -41,3 +42,54 @@ type GenericViewLoaderComponent<Props extends {}> = <
         Component: ViewComponent<TView>;
     } & Props
 ) => ReactElement<any, any> | null;
+*/
+
+type GenericViewLoaderComponent<Props extends {}> = <TView extends CreateView<any>>(
+    props: {
+        view: TView;
+        params: RequiredViewParams<TView>;
+        Component: ViewComponent<TView>;
+    } & Props
+) => ReactElement<any, any> | null;
+
+function usePrevious<T>(value: T) {
+    const ref = useRef<T>();
+    useEffect(() => {
+        ref.current = value;
+    });
+    return ref.current;
+}
+
+export const ViewLoader: GenericViewLoaderComponent<{
+    Loading: ComponentType;
+    // TODO: support this with ErrorBoundary, add "retry" link in errors for some of them
+    error?: FC;
+}> = observer(({ Component, view, params, Loading }) => {
+    const [viewProps, setViewProps] = useState<Record<string, any> | null>(null);
+
+    const prevParams = usePrevious(params);
+
+    useEffect(() => {
+        // Use shallow comparison
+        // `params` may include object like stores and no need to resolve the view again is something changes
+        // inside them
+        if (!_.isEqual(params, prevParams)) {
+            (async () => {
+                const res = await resolveView(view, params);
+                setViewProps(res);
+            })();
+        }
+    });
+
+    if (viewProps) {
+        return <Component {...(viewProps as any)} />;
+    } else {
+        // TODO: display this only after delay?
+        return <Loading />;
+    }
+});
+
+/**
+ * Type for custom components based on ViewLoader (e. g. to have defined loading state)
+ */
+export type ViewLoaderComponent = GenericViewLoaderComponent<{}>;

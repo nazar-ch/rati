@@ -1,7 +1,7 @@
 import React, { ComponentType, FC } from 'react';
 import { observer } from 'mobx-react-lite';
 import { WebRouter } from '../stores/WebRouter';
-import { ViewLoader as GenericViewLoader } from './ViewLoader';
+import { ViewLoader as GenericViewLoader, ViewLoader } from './ViewLoader';
 
 export const RouterComponent: FC<{
     router: WebRouter<any[] | readonly any[]>;
@@ -19,15 +19,24 @@ export const RouterComponent: FC<{
 
     const Wrapper = activeRoute.wrapperComponent ?? DefaultWrapper;
 
+    if (!activeRoute.view) {
+        return (
+            <Wrapper>
+                <activeRoute.component
+                    {...activeRoute.routeParams}
+                    // Rerender when the route changes
+                    key={activeRoute.path}
+                />
+            </Wrapper>
+        );
+    }
+
     return (
         <Wrapper>
             <ViewLoader
                 Component={activeRoute.component}
                 view={activeRoute.view}
-                params={{
-                    routeParams: activeRoute.routeParams,
-                }}
-                stores={{}}
+                params={activeRoute.routeParams}
                 Loading={Loading}
                 // Rerender when the route changes
                 key={activeRoute.path}
