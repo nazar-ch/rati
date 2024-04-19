@@ -27,7 +27,7 @@ SOFTWARE.
 
 */
 
-import { useObserver } from 'mobx-react-lite';
+import { observer, useObserver } from 'mobx-react-lite';
 import { PropsWithChildren } from 'react';
 
 import { NameToRoute, GenericRouteType, WebRouterStore } from '../stores/WebRouterStore';
@@ -47,7 +47,7 @@ type GenericLinkProps<T extends readonly GenericRouteType[]> = PropsWithChildren
 export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
     componentClassName?: string
 ) {
-    function GenericLink({
+    return observer(function GenericLink({
         to,
         className,
         activeClassName,
@@ -58,40 +58,36 @@ export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
     }: GenericLinkProps<T>) {
         const webRouter = useWebRouter();
 
-        return useObserver(() => {
-            const link =
-                typeof to === 'string'
-                    ? to
-                    : webRouter.getPath(
-                          // We don't have this type here, it's available only on a project level
-                          to as any
-                      );
-            const active = webRouter.path === link;
+        const link =
+            typeof to === 'string'
+                ? to
+                : webRouter.getPath(
+                      // We don't have this type here, it's available only on a project level
+                      to as any
+                  );
+        const active = webRouter.path === link;
 
-            return (
-                // TODO: memoize onClick?
-                <a
-                    {...props}
-                    href={`${link}`}
-                    className={[
-                        componentClassName,
-                        className,
-                        active && (activeClassName ?? 'active'),
-                    ].join(' ')}
-                    onClick={(event) => {
-                        if (allowAction(event)) {
-                            event.preventDefault();
-                            webRouter.history.push(link);
-                        }
-                    }}
-                >
-                    {children || (active ? activeContent : content)}
-                </a>
-            );
-        });
-    }
-
-    return GenericLink;
+        return (
+            // TODO: memoize onClick?
+            <a
+                {...props}
+                href={`${link}`}
+                className={[
+                    componentClassName,
+                    className,
+                    active && (activeClassName ?? 'active'),
+                ].join(' ')}
+                onClick={(event) => {
+                    if (allowAction(event)) {
+                        event.preventDefault();
+                        webRouter.history.push(link);
+                    }
+                }}
+            >
+                {children || (active ? activeContent : content)}
+            </a>
+        );
+    });
 }
 
 function allowAction(event: React.MouseEvent) {
