@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "target": "es2020",
+        "target": "es2022",
         "lib": ["dom", "dom.iterable", "esnext"],
         "alwaysStrict": true,
         "strictNullChecks": true,
@@ -8,7 +8,6 @@
         "allowSyntheticDefaultImports": true,
         "noUncheckedIndexedAccess": true,
         "strict": true,
-        "experimentalDecorators": true,
         "useDefineForClassFields": true,
         "forceConsistentCasingInFileNames": true,
         "module": "esnext",

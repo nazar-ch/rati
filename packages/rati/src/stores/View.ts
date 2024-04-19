@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { makeObservable, observable, runInAction } from 'mobx';
+import {  observable, runInAction } from 'mobx';
 import { FC } from 'react';
 import { Expand, isNonNull } from '../types/generic';
 
@@ -28,7 +28,6 @@ export abstract class View<
 {
     // TODO: try to make this constructor protected. The problem is with types in GenericViewLoaderComponent
     constructor(public params: TParams, public parentStores: TParentStores) {
-        makeObservable(this);
     }
 
     static create<TView extends GenericView = GenericView>(
@@ -63,7 +62,7 @@ export abstract class View<
     >;
 
     // FIXME: should this become null if data disappears after refresh?
-    @observable.ref props: {
+    @observable.ref accessor props: {
         data: ViewDataToData<TView['data']>;
         stores: ViewStoresToStores<TView['stores']>;
         params: Record<string, unknown>;

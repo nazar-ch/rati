@@ -1,9 +1,9 @@
-import { observable, action, makeObservable, computed, runInAction } from 'mobx';
+import { observable, action, computed, runInAction } from 'mobx';
 import { ComponentType, FC } from 'react';
 import { createBrowserHistory, Location } from 'history';
-import { GlobalStore } from './GlobalStore';
 import { TupleToUnion } from '../types/generic';
 import { CreateView, ViewComponent } from '../common/view';
+import { GlobalStore } from '../stores/GlobalStore';
 // import { TupleToUnion } from 'type-fest';
 
 //--------------------------------------------
@@ -123,7 +123,7 @@ export type GenericRouteType = {
     pathRe: RegExp | null;
     view: any;
     component: any;
-    wrapperComponent?: ComponentType;
+    wrapperComponent?: ComponentType | undefined;
 };
 
 type RoutesType<
@@ -136,19 +136,18 @@ type RoutesType<
     } & ExtractRouteParams<T[K]['path']>;
 };
 
-type GetView = Awaited<ReturnType<WebRouter<GenericRouteType[]>['getActiveRoute']>>;
+type GetView = Awaited<ReturnType<WebRouterStore<GenericRouteType[]>['getActiveRoute']>>;
 
 export type NameToRoute<T extends readonly GenericRouteType[]> = TupleToUnion<RoutesType<T>>;
 
-export class WebRouter<
+export class WebRouterStore<
     T extends readonly GenericRouteType[] = readonly GenericRouteType[]
-> extends GlobalStore<{}> {
+> extends GlobalStore<any> {
     history;
     unlistenHistory;
 
     constructor(stores: any, public routes: T) {
         super(stores);
-        makeObservable(this);
 
         const listener = ({ location }: { location: Location }) => this.setPath(location);
 
@@ -174,10 +173,10 @@ export class WebRouter<
         return this._path;
     }
 
-    @observable private _path: string = '';
+    @observable private accessor _path: string = '';
 
     // Non-shallow observable breaks view class inside this property
-    @observable.shallow activeRoute: GetView | null = null;
+    @observable.shallow accessor activeRoute: GetView | null = null;
 
     @action.bound async setPath(location: Location) {
         // console.log('>> setPath', location.pathname);÷

@@ -160,6 +160,8 @@ export async function resolveView<View extends CreateView<GenericViewDefinition>
             values.push(new value(prevViewResolvedProps));
         } else if (is.function_(value)) {
             // call the function with the params from the previous views
+            // FIXME: error after mobx upgrade
+            // @ts-expect-error
             values.push(value(prevViewResolvedProps));
         } else {
             values.push(value);

@@ -1,4 +1,4 @@
-import { action, makeObservable, observable } from 'mobx';
+import { action, observable } from 'mobx';
 
 /*
 
@@ -166,10 +166,6 @@ export function remoteData<F extends (...args: any) => Promise<any>>(
 }
 
 class InternalState<F extends (...args: any) => any> {
-    constructor() {
-        makeObservable(this);
-    }
-
     requestId: number = 0;
 
     latestResult: { requestId: number; result: ReturnType<F> } | null = null;
@@ -186,9 +182,9 @@ class InternalState<F extends (...args: any) => any> {
         }
     }
 
-    @observable public saved: boolean = false;
+    @observable public accessor saved: boolean = false;
 
-    @observable public promises: RemoteDataPromise<ReturnType<F>>[] = [];
+    @observable public accessor promises: RemoteDataPromise<ReturnType<F>>[] = [];
 
     @action pushPromise(promise: RemoteDataPromise<ReturnType<F>>) {
         this.promises.push(promise);
@@ -198,8 +194,8 @@ class InternalState<F extends (...args: any) => any> {
         this.promises = [];
     }
 
-    @observable isPending: boolean = false;
-    @observable shouldIndicatePending: boolean = false;
+    @observable accessor isPending: boolean = false;
+    @observable accessor shouldIndicatePending: boolean = false;
 
     @action setBusy(value: boolean) {
         this.isPending = value;

@@ -30,8 +30,8 @@ SOFTWARE.
 import { useObserver } from 'mobx-react-lite';
 import { PropsWithChildren } from 'react';
 
-import { NameToRoute, GenericRouteType, WebRouter } from '../stores/WebRouter';
-import { useWebRouter } from './RootStore';
+import { NameToRoute, GenericRouteType, WebRouterStore } from '../stores/WebRouterStore';
+import { useWebRouter } from '../stores/RootStore';
 
 // TODO: replace with FC<{ name: 'name1' } | { name: 'name2', params: { x: string }} | ...>
 type GenericLinkProps<T extends readonly GenericRouteType[]> = PropsWithChildren<{

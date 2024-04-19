@@ -10,9 +10,7 @@
     },
     "packageManager": "yarn@3.4.1",
     "devDependencies": {
-        "prettier": "^2.8.3"
-    },
-    "dependencies": {
-        "typescript": "^4.9.5"
+        "prettier": "^3.2.5",
+        "typescript": "^5.4.5"
     }
 }

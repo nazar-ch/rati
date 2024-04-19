@@ -1,16 +1,19 @@
 import React, { ComponentType, FC } from 'react';
 import { observer } from 'mobx-react-lite';
-import { WebRouter } from '../stores/WebRouter';
-import { ViewLoader as GenericViewLoader, ViewLoader } from './ViewLoader';
+import { ViewLoader as GenericViewLoader } from './ViewLoader';
+import { useWebRouter } from '../stores/RootStore';
 
-export const RouterComponent: FC<{
-    router: WebRouter<any[] | readonly any[]>;
+export const Router: FC<{
+    // router: WebRouterStore<any[] | readonly any[]>;
     DefaultWrapper?: ComponentType;
     ViewLoader?: typeof GenericViewLoader;
     Loading?: ComponentType;
 }> = observer(({ DefaultWrapper = EmptyWrapper, ViewLoader = GenericViewLoader, Loading = () => <>
             loading...
-        </>, router }) => {
+</> }) => {
+    // TODO: make this work with react native router too
+    const router = useWebRouter();
+
     const { activeRoute } = router;
 
     if (!activeRoute) {

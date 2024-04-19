@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { observable, makeObservable, computed, runInAction } from 'mobx';
+import { observable, computed, runInAction } from 'mobx';
 import { PartialDeep, ReadonlyDeep } from 'type-fest';
 import { Expand } from '../types/generic';
 
@@ -12,7 +12,6 @@ export function dataMergeCustomizer(objValue: unknown, srcValue: unknown) {
 
 export abstract class ActiveData<T> {
     protected constructor(data: T) {
-        makeObservable(this);
         this.originalData = data;
     }
 
@@ -32,7 +31,7 @@ export abstract class ActiveData<T> {
     // This allows to access the type of `data` protected property without exposing the property
     __dataType: T = null as any;
 
-    @observable public originalData: T;
+    @observable public accessor originalData: T;
 
     @computed protected get data(): ReadonlyDeep<T> {
         // TODO: consider replacing this with a shallow merge
@@ -46,7 +45,7 @@ export abstract class ActiveData<T> {
         ) as ReadonlyDeep<T>;
     }
 
-    @observable public draft: PartialDeep<T> = {} as any;
+    @observable public accessor draft: PartialDeep<T> = {} as any;
 }
 
 type ApiFactory = () => (...args: any) => Promise<any>;
@@ -68,7 +67,6 @@ export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
         rawData: ApiResult<TConstructorApiFactory>,
         protected remoteDataLoader: ReturnType<TConstructorApiFactory>
     ) {
-        makeObservable(this);
         this.rawData = rawData;
     }
 
@@ -95,7 +93,7 @@ export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
         return extendInstance(instance, data);
     }
 
-    @observable protected rawData: ApiResult<TConstructorApiFactory>;
+    @observable protected accessor rawData: ApiResult<TConstructorApiFactory>;
 
     // This allows to access the type of `data` protected property without exposing it
     __dataType: ApiResult<TConstructorApiFactory> = null as any;
@@ -118,7 +116,7 @@ export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
         ) as ReadonlyDeep<ClassTData>;
     }
 
-    @observable public draft: PartialDeep<ApiResult<TConstructorApiFactory>> = {} as any;
+    @observable public accessor draft: PartialDeep<ApiResult<TConstructorApiFactory>> = {} as any;
 }
 
 // TODO: move this to type tests
