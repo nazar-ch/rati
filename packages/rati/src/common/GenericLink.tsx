@@ -28,7 +28,7 @@ SOFTWARE.
 */
 
 import { observer, useObserver } from 'mobx-react-lite';
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, useCallback } from 'react';
 
 import { NameToRoute, GenericRouteType, WebRouterStore } from '../stores/WebRouterStore';
 import { useWebRouter } from '../stores/RootStore';
@@ -41,8 +41,11 @@ type GenericLinkProps<T extends readonly GenericRouteType[]> = PropsWithChildren
     content?: React.ReactNode;
     activeContent?: React.ReactNode;
     // TODO: "exact" prop to match active path exactly or compare with startWith
-    [prop: string]: unknown;
-}>;
+}> &
+    Omit<
+        React.DetailedHTMLProps<React.AnchorHTMLAttributes<HTMLAnchorElement>, HTMLAnchorElement>,
+        'href'
+    >;
 
 export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
     componentClassName?: string
@@ -67,22 +70,28 @@ export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
                   );
         const active = webRouter.path === link;
 
+        const handleOnClick = useCallback(
+            (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
+                if (allowAction(event)) {
+                    event.preventDefault();
+                    webRouter.history.push(link);
+                }
+            },
+            [link]
+        );
+
         return (
-            // TODO: memoize onClick?
             <a
                 {...props}
                 href={`${link}`}
                 className={[
-                    componentClassName,
-                    className,
-                    active && (activeClassName ?? 'active'),
-                ].join(' ')}
-                onClick={(event) => {
-                    if (allowAction(event)) {
-                        event.preventDefault();
-                        webRouter.history.push(link);
-                    }
-                }}
+                    componentClassName || null,
+                    className || null,
+                    active ? activeClassName ?? 'active' : null,
+                ]
+                    .filter((item) => item)
+                    .join(' ')}
+                onClick={handleOnClick}
             >
                 {children || (active ? activeContent : content)}
             </a>
