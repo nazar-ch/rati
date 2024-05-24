@@ -17,10 +17,10 @@ export type ExtractRouteParams<T extends string> = string extends T
       // possible to get the type for this case, return something generic
       Record<string, string>
     : T extends `${infer Start}:${infer Param}/${infer Rest}`
-    ? { [k in Param | keyof ExtractRouteParams<Rest>]: string }
-    : T extends `${infer Start}:${infer Param}`
-    ? { [k in Param]: string }
-    : {};
+      ? { [k in Param | keyof ExtractRouteParams<Rest>]: string }
+      : T extends `${infer Start}:${infer Param}`
+        ? { [k in Param]: string }
+        : {};
 
 /*
 export type ViewComponentForOptionalView<
@@ -78,14 +78,14 @@ export function routeLegacy<
 
 export type ViewComponentForOptionalView<
     View extends CreateView<any> | undefined,
-    Params extends {}
+    Params extends {},
 > = View extends CreateView<any> ? ViewComponent<View> : FC<Params>;
 
 export function route<
     Path extends string,
     Name extends string,
     TViewComponent extends ViewComponentForOptionalView<TView, ExtractRouteParams<Path>>, // ViewComponentForClass<VS>,
-    TView extends CreateView<any> | undefined
+    TView extends CreateView<any> | undefined,
 >(
     path: Path,
     name: Name,
@@ -129,7 +129,7 @@ export type GenericRouteType = {
 type RoutesType<
     T extends
         | { name: string; path: string }[]
-        | readonly { readonly name: string; readonly path: string }[]
+        | readonly { readonly name: string; readonly path: string }[],
 > = {
     [K in keyof T]: {
         name: T[K]['name'];
@@ -141,12 +141,15 @@ type GetView = Awaited<ReturnType<WebRouterStore<GenericRouteType[]>['getActiveR
 export type NameToRoute<T extends readonly GenericRouteType[]> = TupleToUnion<RoutesType<T>>;
 
 export class WebRouterStore<
-    T extends readonly GenericRouteType[] = readonly GenericRouteType[]
+    T extends readonly GenericRouteType[] = readonly GenericRouteType[],
 > extends GlobalStore<any> {
     history;
     unlistenHistory;
 
-    constructor(stores: any, public routes: T) {
+    constructor(
+        stores: any,
+        public routes: T
+    ) {
         super(stores);
 
         const listener = ({ location }: { location: Location }) => this.setPath(location);
@@ -188,8 +191,15 @@ export class WebRouterStore<
         });
     }
 
-    @action.bound redirect(to: string) {
-        this.history.replace(to);
+    @action.bound redirect(to: NameToRoute<T> | string) {
+        let path: string;
+        if (typeof to === 'string') {
+            path = to;
+        } else {
+            path = this.getPath(to);
+        }
+
+        this.history.replace(path);
     }
 
     async getActiveRoute(currentPath: string, stores: any) {
