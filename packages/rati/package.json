@@ -9,6 +9,12 @@
     ],
     "main": "./dist/main.js",
     "types": "./dist/main.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/main.d.ts",
+            "require": "./dist/main.js"
+        }
+    },
     "scripts": {
         "clean": "rm -fr dist",
         "build": "yarn clean && yarn -T run tsc",
