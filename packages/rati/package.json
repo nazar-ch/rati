@@ -1,19 +1,22 @@
 {
     "name": "rati",
-    "version": "0.2.0-alpha",
+    "version": "0.2.0-alpha.6",
     "description": "TypeScript frontend framework for React & MobX",
     "author": "Nazar Chobaniuk",
     "license": "MIT",
+    "type": "module",
     "files": [
         "dist"
     ],
-    "main": "./dist/main.js",
-    "types": "./dist/main.d.ts",
+    "main": "dist/main.js",
+    "types": "dist/main.d.ts",
     "exports": {
         ".": {
             "types": "./dist/main.d.ts",
-            "require": "./dist/main.js"
-        }
+            "import": "./dist/main.js",
+            "source": "./src/main.ts"
+        },
+        "./package.json": "./package.json"
     },
     "scripts": {
         "clean": "rm -fr dist",
