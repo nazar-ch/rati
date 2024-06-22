@@ -182,8 +182,23 @@ export class WebRouterStore<
     @observable.shallow accessor activeRoute: GetView | null = null;
 
     @action.bound async setPath(location: Location) {
-        // console.log('>> setPath', location.pathname);÷
-        this._path = location.pathname;
+        const { state, pathname } = location;
+
+        // Don't reload the current page
+        // It happens after calling `replace` and navigation to the same path after
+        if (this._path === pathname) {
+            return;
+        }
+
+        this._path = pathname;
+
+        // Skip rendering the route if it was set by `replace`
+        if (typeof state === 'object' && state && 'skip' in state && state['skip'] === true) {
+            // Don't skip on the initial page load. Browsers retain the state after page reloads
+            if (this.activeRoute) {
+                return;
+            }
+        }
 
         const activeRoute = await this.getActiveRoute(this.path, this.stores as any);
         runInAction(() => {
@@ -200,6 +215,17 @@ export class WebRouterStore<
         }
 
         this.history.replace(path);
+    }
+
+    @action.bound replace(to: NameToRoute<T> | string) {
+        let path: string;
+        if (typeof to === 'string') {
+            path = to;
+        } else {
+            path = this.getPath(to);
+        }
+
+        this.history.replace(path, { skip: true });
     }
 
     async getActiveRoute(currentPath: string, stores: any) {
