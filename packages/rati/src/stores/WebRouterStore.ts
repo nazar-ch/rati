@@ -181,6 +181,8 @@ export class WebRouterStore<
     // Non-shallow observable breaks view class inside this property
     @observable.shallow accessor activeRoute: GetView | null = null;
 
+    private pathCounter: number = 0;
+    private readonly sessionId = self.crypto.randomUUID();
     @action.bound async setPath(location: Location) {
         const { state, pathname } = location;
 
@@ -193,12 +195,16 @@ export class WebRouterStore<
         this._path = pathname;
 
         // Skip rendering the route if it was set by `replace`
-        if (typeof state === 'object' && state && 'skip' in state && state['skip'] === true) {
-            // Don't skip on the initial page load. Browsers retain the state after page reloads
-            if (this.activeRoute) {
-                return;
-            }
+        if (
+            typeof state === 'object' &&
+            state &&
+            'skip' in state &&
+            state['skip'] === `${this.pathCounter}/${this.sessionId}`
+        ) {
+            return;
         }
+
+        this.pathCounter++;
 
         const activeRoute = await this.getActiveRoute(this.path, this.stores as any);
         runInAction(() => {
@@ -225,7 +231,7 @@ export class WebRouterStore<
             path = this.getPath(to);
         }
 
-        this.history.replace(path, { skip: true });
+        this.history.replace(path, { skip: `${this.pathCounter}/${this.sessionId}` });
     }
 
     async getActiveRoute(currentPath: string, stores: any) {
