@@ -185,6 +185,7 @@ export class WebRouterStore<
     private readonly sessionId = self.crypto.randomUUID();
     @action.bound async setPath(location: Location) {
         const { state, pathname } = location;
+        const currentPathCounter = this.pathCounter++;
 
         // Don't reload the current page
         // It happens after calling `replace` and navigation to the same path after
@@ -199,14 +200,18 @@ export class WebRouterStore<
             typeof state === 'object' &&
             state &&
             'skip' in state &&
-            state['skip'] === `${this.pathCounter}/${this.sessionId}`
+            state['skip'] === `${currentPathCounter}/${this.sessionId}`
         ) {
             return;
         }
 
-        this.pathCounter++;
-
-        const activeRoute = await this.getActiveRoute(this.path, this.stores as any);
+        const activeRoute = await this.getActiveRoute(
+            this.path,
+            this.stores as any,
+            // Using this number as `key` ensures that the route that was not
+            // skipped above will be rerendered
+            this.pathCounter
+        );
         runInAction(() => {
             this.activeRoute = activeRoute;
         });
@@ -234,7 +239,7 @@ export class WebRouterStore<
         this.history.replace(path, { skip: `${this.pathCounter}/${this.sessionId}` });
     }
 
-    async getActiveRoute(currentPath: string, stores: any) {
+    async getActiveRoute(currentPath: string, stores: any, pathCounter: number) {
         for (const { pathRe, path, view, name, component, wrapperComponent } of this.routes) {
             let result;
 
@@ -254,6 +259,7 @@ export class WebRouterStore<
                     routeParams: (result.groups as any) ?? {},
                     path,
                     wrapperComponent,
+                    pathCounter,
                 };
             }
         }

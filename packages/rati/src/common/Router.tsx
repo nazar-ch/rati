@@ -10,7 +10,7 @@ export const Router: FC<{
     Loading?: ComponentType;
 }> = observer(({ DefaultWrapper = EmptyWrapper, ViewLoader = GenericViewLoader, Loading = () => <>
             loading...
-</> }) => {
+        </> }) => {
     // TODO: make this work with react native router too
     const router = useWebRouter();
 
@@ -28,7 +28,7 @@ export const Router: FC<{
                 <activeRoute.component
                     {...activeRoute.routeParams}
                     // Rerender when the route changes
-                    key={activeRoute.path}
+                    key={activeRoute.pathCounter}
                 />
             </Wrapper>
         );
@@ -42,7 +42,7 @@ export const Router: FC<{
                 params={activeRoute.routeParams}
                 Loading={Loading}
                 // Rerender when the route changes
-                key={activeRoute.path}
+                key={activeRoute.pathCounter}
             />
         </Wrapper>
     );
