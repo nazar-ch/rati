@@ -182,7 +182,10 @@ export class WebRouterStore<
     @observable.shallow accessor activeRoute: GetView | null = null;
 
     private pathCounter: number = 0;
-    private readonly sessionId = self.crypto.randomUUID();
+    private readonly sessionId = self.crypto.randomUUID
+        ? self.crypto.randomUUID()
+        : // for local development
+          `${Math.random()}-${Math.random()}`;
     @action.bound async setPath(location: Location) {
         const { state, pathname } = location;
         const currentPathCounter = this.pathCounter++;
