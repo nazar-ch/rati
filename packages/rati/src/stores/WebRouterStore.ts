@@ -161,7 +161,9 @@ export class WebRouterStore<
         this.setPath(this.history.location);
     }
 
-    getPath(args: NameToRoute<T>) {
+    getPath(args: NameToRoute<T> | string) {
+        if (typeof args === 'string') return args;
+
         const { name, ...params } = args;
         let path: string = this.routes.find((item) => item.name === name)!.path;
         if (params) {
@@ -174,6 +176,10 @@ export class WebRouterStore<
 
     @computed get path() {
         return this._path;
+    }
+
+    isPath(path: string) {
+        return path === this.path;
     }
 
     @observable private accessor _path: string = '';

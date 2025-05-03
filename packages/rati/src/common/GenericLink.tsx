@@ -27,76 +27,122 @@ SOFTWARE.
 
 */
 
-import { observer, useObserver } from 'mobx-react-lite';
-import { PropsWithChildren, useCallback } from 'react';
+import { observer } from 'mobx-react-lite';
+import { createContext, memo, PropsWithChildren, useCallback, useContext } from 'react';
 
 import { NameToRoute, GenericRouteType, WebRouterStore } from '../stores/WebRouterStore';
 import { useWebRouter } from '../stores/RootStore';
+import { computed } from 'mobx';
+
+type GenericAnchorProps = Omit<
+    React.DetailedHTMLProps<React.AnchorHTMLAttributes<HTMLAnchorElement>, HTMLAnchorElement>,
+    'href'
+>;
 
 // TODO: replace with FC<{ name: 'name1' } | { name: 'name2', params: { x: string }} | ...>
-type GenericLinkProps<T extends readonly GenericRouteType[]> = PropsWithChildren<{
-    to: NameToRoute<T> | string;
+type RatiLinkBaseProps = {
     className?: string;
     activeClassName?: string;
-    content?: React.ReactNode;
-    activeContent?: React.ReactNode;
+    content?: { normal: React.ReactNode; active: React.ReactNode };
     // TODO: "exact" prop to match active path exactly or compare with startWith
-}> &
-    Omit<
-        React.DetailedHTMLProps<React.AnchorHTMLAttributes<HTMLAnchorElement>, HTMLAnchorElement>,
-        'href'
-    >;
+};
+
+type RatiLinkToProps<T extends readonly GenericRouteType[]> = {
+    to: NameToRoute<T> | string;
+};
+
+type RatiGenericAnchorProps = RatiLinkBaseProps &
+    GenericAnchorProps & { href: string; isActive: boolean };
+
+type RatiRegularAnchorProps<T extends readonly GenericRouteType[]> = RatiLinkBaseProps &
+    GenericAnchorProps &
+    RatiLinkToProps<T>;
 
 export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
     componentClassName?: string
 ) {
-    return observer(function GenericLink({
-        to,
+    const GenericAnchor = observer(function GenericAnchor({
         className,
         activeClassName,
         content,
-        activeContent,
+        isActive,
+        href,
         children,
         ...props
-    }: GenericLinkProps<T>) {
+    }: PropsWithChildren<RatiGenericAnchorProps>) {
         const webRouter = useWebRouter();
-
-        const link =
-            typeof to === 'string'
-                ? to
-                : webRouter.getPath(
-                      // We don't have this type here, it's available only on a project level
-                      to as any
-                  );
-        const active = webRouter.path === link;
 
         const handleOnClick = useCallback(
             (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
                 if (allowAction(event)) {
                     event.preventDefault();
-                    webRouter.history.push(link);
+                    webRouter.history.push(href);
                 }
             },
-            [link]
+            [href]
         );
 
         return (
             <a
                 {...props}
-                href={`${link}`}
+                href={`${href}`}
                 className={[
                     componentClassName || null,
                     className || null,
-                    active ? activeClassName ?? 'active' : null,
+                    isActive ? activeClassName ?? 'active' : null,
                 ]
                     .filter((item) => item)
                     .join(' ')}
                 onClick={handleOnClick}
             >
-                {children || (active ? activeContent : content)}
+                {children || (content && (isActive ? content.active : content.normal))}
             </a>
         );
     });
+
+    const RegularAnchor = observer(function RegularAnchor<T extends readonly GenericRouteType[]>({
+        to,
+        ...props
+    }: PropsWithChildren<RatiRegularAnchorProps<T>>) {
+        const webRouter = useWebRouter();
+
+        const href = webRouter.getPath(to);
+        const isActive = webRouter.isPath(href);
+
+        return <GenericAnchor {...props} {...{ isActive, href }} />;
+    });
+
+    const LinkContextProvider = memo(function LinkContextProvider<
+        T extends readonly GenericRouteType[],
+    >({ children, to }: { children: React.ReactNode; to: NameToRoute<T> | string }) {
+        const webRouter = useWebRouter();
+
+        return (
+            <LinkContext.Provider value={new LinkContextStore(webRouter, to)}>
+                {children}
+            </LinkContext.Provider>
+        );
+    });
+
+    const ContextualAnchor = observer(function ContextualAnchor({
+        ...props
+    }: PropsWithChildren<RatiLinkBaseProps & GenericAnchorProps>) {
+        const linkContext = useLinkContext();
+
+        return (
+            <GenericAnchor
+                {...props}
+                {...{ isActive: linkContext.isActive, href: linkContext.href }}
+            />
+        );
+    });
+
+    return {
+        Link: RegularAnchor,
+        ContextualLink: ContextualAnchor,
+        LinkContextProvider,
+        useLinkContext,
+    };
 }
 
 function allowAction(event: React.MouseEvent) {
@@ -111,4 +157,29 @@ function allowAction(event: React.MouseEvent) {
 
 function isModifiedEvent(event: React.MouseEvent) {
     return !!(event.metaKey || event.altKey || event.ctrlKey || event.shiftKey);
+}
+
+const LinkContext = createContext<LinkContextStore<any> | null>(null);
+
+class LinkContextStore<T extends readonly GenericRouteType[]> {
+    constructor(
+        private webRouter: WebRouterStore<readonly GenericRouteType[]>,
+        private to: NameToRoute<T> | string
+    ) {}
+
+    @computed get isActive() {
+        return this.webRouter.isPath(this.href);
+    }
+
+    @computed get href() {
+        return this.webRouter.getPath(this.to);
+    }
+}
+
+export function useLinkContext() {
+    const context = useContext(LinkContext);
+    if (!context) {
+        throw new Error('Link context is not enabled. Add missing `LinkContextProvider` component');
+    }
+    return context;
 }
