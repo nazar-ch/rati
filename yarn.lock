@@ -632,13 +632,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/react@npm:^18.2.79":
-  version: 18.2.79
-  resolution: "@types/react@npm:18.2.79"
+"@types/react@npm:^19.0.0":
+  version: 19.1.13
+  resolution: "@types/react@npm:19.1.13"
   dependencies:
-    "@types/prop-types": "*"
     csstype: ^3.0.2
-  checksum: 85aa96e0e88725c84d8fc5f04f10a4da6a1f507dde33557ac9cc211414756867721264bfefd9e02bae1288ce2905351d949b652b931e734ea24519ee5c625138
+  checksum: def174cf34e8450ea326d02e3b3a9378e51aaa71e6dd25e5f6750ddc5f3eda5099bf1b5c415cb911d91bec354b9ef25c99e55a1deedf483b93ed698da0e20ab4
   languageName: node
   linkType: hard
 
@@ -2227,20 +2226,20 @@ __metadata:
   dependencies:
     "@sindresorhus/is": ^5.3.0
     "@types/lodash": ~4.14.171
-    "@types/react": ^18.2.79
+    "@types/react": ^19.0.0
     history: ^5.0.0
     lodash: ~4.17.21
     mobx: ^6.12.3
     mobx-react-lite: ^4.0.7
-    react: ^18.2.0
+    react: ^19.0.0
     tsd: ^0.23.0
     type-fest: ^2.19.0
   peerDependencies:
     history: ^5.0.0
     lodash: ~4.17.21
     mobx: ^6.3.10
-    mobx-react-lite: ^3.4.0
-    react: ^18.2.0
+    mobx-react-lite: ^4.0.7
+    react: ^19.0.0
   languageName: unknown
   linkType: soft
 
@@ -2269,6 +2268,13 @@ __metadata:
   dependencies:
     loose-envify: ^1.1.0
   checksum: 88e38092da8839b830cda6feef2e8505dec8ace60579e46aa5490fc3dc9bba0bd50336507dc166f43e3afc1c42939c09fe33b25fae889d6f402721dcd78fca1b
+  languageName: node
+  linkType: hard
+
+"react@npm:^19.0.0":
+  version: 19.1.1
+  resolution: "react@npm:19.1.1"
+  checksum: f2f18fea5deac87b1167365bd5160bcba64d383c26a37afa905b714ca424f423ef97d8daf53f041ab9ac25a06357fafcf0b5d3b6b84c9d1eace0e621bfeae629
   languageName: node
   linkType: hard
 
