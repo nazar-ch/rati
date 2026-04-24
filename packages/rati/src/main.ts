@@ -6,8 +6,19 @@ export { ActiveDataInstanceType } from './stores/ActiveDataInstanceType';
 export { RootStore, GlobalStores, useGenericStores, useWebRouter } from './stores/RootStore';
 export { GlobalStore } from './stores/GlobalStore';
 
-export { WebRouterStore, route, NameToRoute } from './stores/WebRouterStore';
+export { WebRouterStore, route, NameToRoute, WebRouterStoreOptions } from './stores/WebRouterStore';
 export { Router } from './common/Router';
+export {
+    createHistory,
+    createBrowserHistory,
+    createHashHistory,
+    History,
+    HistoryType,
+    Location as HistoryLocation,
+    HistoryListener,
+    HistoryUpdate,
+    Action as HistoryAction,
+} from './common/history';
 
 export { ViewLoader, ViewLoaderComponent } from './common/ViewLoader';
 

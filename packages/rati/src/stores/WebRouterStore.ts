@@ -1,6 +1,6 @@
 import { observable, action, computed, runInAction } from 'mobx';
 import { ComponentType, FC } from 'react';
-import { createBrowserHistory, Location } from 'history';
+import { createHistory, History, HistoryType, Location } from '../common/history';
 import { TupleToUnion } from '../types/generic';
 import { CreateView, ViewComponent } from '../common/view';
 import { GlobalStore } from '../stores/GlobalStore';
@@ -140,21 +140,30 @@ type GetView = Awaited<ReturnType<WebRouterStore<GenericRouteType[]>['getActiveR
 
 export type NameToRoute<T extends readonly GenericRouteType[]> = TupleToUnion<RoutesType<T>>;
 
+export interface WebRouterStoreOptions {
+    /**
+     * Choose history mode. Defaults to auto-detect: `file:` protocol → `hash`
+     * (Electron-friendly), otherwise `browser`.
+     */
+    historyType?: HistoryType;
+}
+
 export class WebRouterStore<
     T extends readonly GenericRouteType[] = readonly GenericRouteType[],
 > extends GlobalStore<any> {
-    history;
-    unlistenHistory;
+    history: History;
+    unlistenHistory: () => void;
 
     constructor(
         stores: any,
-        public routes: T
+        public routes: T,
+        options: WebRouterStoreOptions = {}
     ) {
         super(stores);
 
         const listener = ({ location }: { location: Location }) => this.setPath(location);
 
-        this.history = createBrowserHistory();
+        this.history = createHistory({ type: options.historyType });
         this.unlistenHistory = this.history.listen(listener);
 
         // Set path where the page is opened
