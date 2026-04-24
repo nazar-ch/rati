@@ -73,3 +73,6 @@ dist
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Claude
+.claude/settings.local.json
