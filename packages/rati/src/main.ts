@@ -35,6 +35,7 @@ export * from './types/generic';
 export { createLinkComponent } from './common/GenericLink';
 export { lazy, PreloadableLazyComponent } from './common/lazy';
 export { Redirect } from './common/Redirect';
+export { prepareRoute, PreparedRoute } from './common/prepareRoute';
 
 export { remoteData } from './common/remoteData';
 export { remoteDataKey, responseKey } from './common/apiUtils';

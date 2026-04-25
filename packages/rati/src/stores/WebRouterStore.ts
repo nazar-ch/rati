@@ -236,6 +236,13 @@ export class WebRouterStore<
     readonly hasNavigationApi: boolean;
     /** Normalized basename — empty string when none was configured. */
     readonly basename: string;
+    /**
+     * Resolves once the most recent `setPath` (initial or navigation-triggered)
+     * has finished updating `activeRoute`. Server entries can `await` this
+     * before reading the route to avoid the async gap between constructor and
+     * the first matched route.
+     */
+    pendingNavigation: Promise<void> = Promise.resolve();
     private readonly historyType: 'browser' | 'hash';
     private uninstallNavigationInterceptor: () => void = () => {};
     private uninstallScrollRestoration: () => void = () => {};
@@ -249,7 +256,9 @@ export class WebRouterStore<
 
         this.basename = normalizeBasename(options.basename);
 
-        const listener = ({ location }: { location: Location }) => this.setPath(location);
+        const listener = ({ location }: { location: Location }) => {
+            this.pendingNavigation = this.setPath(location);
+        };
 
         if (options.history) {
             // Caller-supplied history (e.g. createMemoryHistory for SSR).
@@ -295,7 +304,7 @@ export class WebRouterStore<
             this.seedFromHydratedState(options.hydratedState);
         } else {
             // Set path where the page is opened
-            this.setPath(this.history.location);
+            this.pendingNavigation = this.setPath(this.history.location);
         }
     }
 
