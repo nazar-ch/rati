@@ -26,6 +26,7 @@ export { ViewLoader, ViewLoaderComponent } from './common/ViewLoader';
 export * from './types/generic';
 
 export { createLinkComponent } from './common/GenericLink';
+export { lazy, PreloadableLazyComponent } from './common/lazy';
 export { Redirect } from './common/Redirect';
 
 export { remoteData } from './common/remoteData';
