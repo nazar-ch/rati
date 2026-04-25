@@ -34,6 +34,13 @@ export interface History {
     push(to: string, state?: unknown): void;
     replace(to: string, state?: unknown): void;
     listen(listener: HistoryListener): () => void;
+    /**
+     * Manually fan out a history update to all listeners. For external
+     * navigations (e.g. the Navigation API intercepting a click) where the URL
+     * is updated outside our `push`/`replace`, callers can use this to keep
+     * subscribers like scroll restoration in sync.
+     */
+    notify(action: Action): void;
 }
 
 export type HistoryType = 'browser' | 'hash';
@@ -96,6 +103,7 @@ export function createBrowserHistory(): History {
                 listeners.delete(listener);
             };
         },
+        notify: emit,
     };
 }
 
@@ -151,6 +159,7 @@ export function createHashHistory(): History {
                 listeners.delete(listener);
             };
         },
+        notify: emit,
     };
 }
 

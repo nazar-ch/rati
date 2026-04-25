@@ -223,15 +223,12 @@ export class WebRouterStore<
         // click handler stays the only path in hash mode.
         this.hasNavigationApi = this.historyType === 'browser' && isNavigationApiAvailable();
         if (this.hasNavigationApi) {
-            this.uninstallNavigationInterceptor = interceptNavigations(({ url }) =>
-                this.setPath({
-                    pathname: url.pathname,
-                    search: url.search,
-                    hash: url.hash,
-                    state: this.history.location.state,
-                    key: this.history.location.key,
-                })
-            );
+            this.uninstallNavigationInterceptor = interceptNavigations(() => {
+                // The Navigation API has already updated window.location and
+                // window.history.state; broadcast so all listeners (route
+                // matching, scroll restoration) see the new entry.
+                this.history.notify('PUSH');
+            });
         }
 
         if (options.scrollRestoration !== false) {
@@ -272,6 +269,25 @@ export class WebRouterStore<
         return this._path;
     }
 
+    /** The raw `?…` portion of the current URL, including the leading `?`. */
+    @computed get search() {
+        return this._search;
+    }
+
+    /**
+     * Parsed query string. The returned object is a fresh `URLSearchParams`
+     * each time the underlying search changes — treat it as immutable. To
+     * change params, use {@link setSearchParams}.
+     */
+    @computed get searchParams() {
+        return new URLSearchParams(this._search);
+    }
+
+    /** The `#…` portion of the current URL, including the leading `#`. */
+    @computed get hash() {
+        return this._hash;
+    }
+
     isPath(path: string) {
         // `path` here is a URL path (the value returned by getPath, used in href
         // attributes), so strip the basename before comparing against the
@@ -280,6 +296,8 @@ export class WebRouterStore<
     }
 
     @observable private accessor _path: string = '';
+    @observable private accessor _search: string = '';
+    @observable private accessor _hash: string = '';
 
     // Non-shallow observable breaks view class inside this property
     @observable.shallow accessor activeRoute: GetView | null = null;
@@ -293,6 +311,11 @@ export class WebRouterStore<
         const { state } = location;
         const pathname = stripBasename(location.pathname, this.basename);
         const currentPathCounter = this.pathCounter++;
+
+        // Search and hash always update so observers see them, even on
+        // hash-only or query-only navigations that leave the route unchanged.
+        this._search = location.search;
+        this._hash = location.hash;
 
         // Don't reload the current page
         // It happens after calling `replace` and navigation to the same path after
@@ -322,6 +345,28 @@ export class WebRouterStore<
         runInAction(() => {
             this.activeRoute = activeRoute;
         });
+    }
+
+    /**
+     * Update the query string on the current URL. Defaults to `replace` so
+     * tweaking filters/pagination doesn't grow the back stack; pass
+     * `{ mode: 'push' }` to add a history entry instead.
+     *
+     * Accepts anything `URLSearchParams` accepts (object, string, entries).
+     */
+    @action.bound setSearchParams(
+        init: ConstructorParameters<typeof URLSearchParams>[0] | URLSearchParams,
+        options: { mode?: 'push' | 'replace' } = {}
+    ) {
+        const params =
+            init instanceof URLSearchParams ? init : new URLSearchParams(init as string);
+        const search = params.toString();
+        const url = this.basename + this._path + (search ? '?' + search : '') + this._hash;
+        if (options.mode === 'push') {
+            this.history.push(url);
+        } else {
+            this.history.replace(url);
+        }
     }
 
     @action.bound redirect(to: NameToRoute<T> | string) {
