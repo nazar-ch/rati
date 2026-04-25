@@ -140,7 +140,34 @@ type RoutesType<
 
 type GetView = Awaited<ReturnType<WebRouterStore<GenericRouteType[]>['getActiveRoute']>>;
 
+/** Activated route shape, with an optional hydration-only payload. */
+type ActiveRoute = NonNullable<GetView> & {
+    /**
+     * View props pre-resolved on the server. Present only on the very first
+     * `activeRoute` after client-side hydration; subsequent navigations leave
+     * this `undefined` and ViewLoader resolves on its own.
+     */
+    hydratedViewProps?: Record<string, unknown>;
+};
+
 export type NameToRoute<T extends readonly GenericRouteType[]> = TupleToUnion<RoutesType<T>>;
+
+/**
+ * Snapshot used to seed a router on the client after server rendering.
+ * Mirrors what the server entry serialized into the HTML response — the
+ * client passes it back so the first paint reads the same active route
+ * and view props as the server, with no async resolution gap.
+ */
+export interface WebRouterHydratedState {
+    path: string;
+    search: string;
+    hash: string;
+    /** `name` of the route definition that was matched on the server. */
+    activeRouteName: string;
+    routeParams: Record<string, string>;
+    /** Resolved view props (output of `resolveView`), if the route had a view. */
+    viewProps?: Record<string, unknown>;
+}
 
 export interface WebRouterStoreOptions {
     /**
@@ -169,6 +196,13 @@ export interface WebRouterStoreOptions {
      * definitions stay rooted at `/`. Must start with `/` and not end with `/`.
      */
     basename?: string;
+    /**
+     * Pre-resolved router state from a server render. When provided, the store
+     * seeds `path`, `search`, `hash`, and `activeRoute` synchronously from this
+     * snapshot and skips the initial `setPath`/`getActiveRoute` async work, so
+     * the first client render matches the server HTML byte-for-byte.
+     */
+    hydratedState?: WebRouterHydratedState;
 }
 
 function normalizeBasename(basename: string | undefined): string {
@@ -254,8 +288,46 @@ export class WebRouterStore<
             );
         }
 
-        // Set path where the page is opened
-        this.setPath(this.history.location);
+        if (options.hydratedState) {
+            // Server-rendered snapshot — seed observables synchronously so the
+            // first client render matches the server HTML. Skip the initial
+            // async setPath; the route is already resolved.
+            this.seedFromHydratedState(options.hydratedState);
+        } else {
+            // Set path where the page is opened
+            this.setPath(this.history.location);
+        }
+    }
+
+    @action.bound private seedFromHydratedState(state: WebRouterHydratedState) {
+        const matched = this.routes.find((r) => r.name === state.activeRouteName);
+        if (!matched) {
+            // The hydrated route name doesn't exist in this client's route table
+            // (e.g. server and client routes drifted). Fall back to running the
+            // normal matcher against the URL so we at least render *something*.
+            // Don't seed _path here so setPath's same-path early-return doesn't
+            // skip the resolve.
+            this.setPath(this.history.location);
+            return;
+        }
+
+        this._path = state.path;
+        this._search = state.search;
+        this._hash = state.hash;
+        // Match setPath's convention: bump the counter and use the new value
+        // as the activeRoute key, so subsequent navigations always get a
+        // different value and React remounts the route component.
+        this.pathCounter++;
+        this.activeRoute = {
+            name: matched.name,
+            component: matched.component,
+            view: matched.view,
+            wrapperComponent: matched.wrapperComponent,
+            path: matched.path,
+            routeParams: state.routeParams,
+            pathCounter: this.pathCounter,
+            hydratedViewProps: state.viewProps,
+        };
     }
 
     dispose() {
@@ -338,7 +410,7 @@ export class WebRouterStore<
     @observable private accessor _hash: string = '';
 
     // Non-shallow observable breaks view class inside this property
-    @observable.shallow accessor activeRoute: GetView | null = null;
+    @observable.shallow accessor activeRoute: ActiveRoute | null = null;
 
     private pathCounter: number = 0;
     private readonly sessionId = globalThis.crypto?.randomUUID
@@ -381,7 +453,7 @@ export class WebRouterStore<
             this.pathCounter
         );
         runInAction(() => {
-            this.activeRoute = activeRoute;
+            this.activeRoute = activeRoute ?? null;
         });
     }
 

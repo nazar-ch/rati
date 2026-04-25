@@ -51,6 +51,7 @@ export const Router: FC<{
                     view={activeRoute.view}
                     params={activeRoute.routeParams}
                     Loading={Loading}
+                    initialViewProps={activeRoute.hydratedViewProps}
                     // Rerender when the route changes
                     key={activeRoute.pathCounter}
                 />

@@ -64,12 +64,36 @@ export const ViewLoader: GenericViewLoaderComponent<{
     Loading: ComponentType;
     // TODO: support this with ErrorBoundary, add "retry" link in errors for some of them
     error?: FC;
-}> = observer(({ Component, view, params, Loading }) => {
-    const [viewProps, setViewProps] = useState<Record<string, any> | null>(null);
+    /**
+     * Pre-resolved view props from server hydration. When provided, the first
+     * render uses these props directly and skips the initial async resolve, so
+     * the client renders the same content as the SSR HTML on first paint.
+     * Ignored on subsequent param changes — those go through `resolveView`
+     * normally.
+     */
+    initialViewProps?: Record<string, any>;
+}> = observer(({ Component, view, params, Loading, initialViewProps }) => {
+    const [viewProps, setViewProps] = useState<Record<string, any> | null>(
+        initialViewProps ?? null
+    );
 
     const prevParams = usePrevious(params);
+    // Track the params we hydrated against so the first effect can skip its
+    // async resolve. If params change later the effect falls through to the
+    // normal diff/resolve path.
+    const hydratedParamsRef = useRef<typeof params | null>(
+        initialViewProps ? params : null
+    );
 
     useEffect(() => {
+        if (
+            hydratedParamsRef.current &&
+            _.isEqual(params, hydratedParamsRef.current)
+        ) {
+            // First mount with hydrated props — already have data.
+            hydratedParamsRef.current = null;
+            return;
+        }
         // Use shallow comparison
         // `params` may include object like stores and no need to resolve the view again is something changes
         // inside them

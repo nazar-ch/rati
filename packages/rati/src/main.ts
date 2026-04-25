@@ -6,7 +6,13 @@ export { ActiveDataInstanceType } from './stores/ActiveDataInstanceType';
 export { RootStore, GlobalStores, useGenericStores, useWebRouter } from './stores/RootStore';
 export { GlobalStore } from './stores/GlobalStore';
 
-export { WebRouterStore, route, NameToRoute, WebRouterStoreOptions } from './stores/WebRouterStore';
+export {
+    WebRouterStore,
+    route,
+    NameToRoute,
+    WebRouterStoreOptions,
+    WebRouterHydratedState,
+} from './stores/WebRouterStore';
 export { Router } from './common/Router';
 export {
     createHistory,
