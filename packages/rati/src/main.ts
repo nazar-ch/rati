@@ -3,7 +3,13 @@ export { sleep } from './common/stuff';
 export { ActiveData, ActiveApiData } from './stores/ActiveData';
 export { ActiveDataInstanceType } from './stores/ActiveDataInstanceType';
 
-export { RootStore, GlobalStores, useGenericStores, useWebRouter } from './stores/RootStore';
+export {
+    RootStore,
+    RootStoreOptions,
+    GlobalStores,
+    useGenericStores,
+    useWebRouter,
+} from './stores/RootStore';
 export { GlobalStore } from './stores/GlobalStore';
 
 export {

@@ -5,8 +5,21 @@ import { createLinkComponent } from '../common/GenericLink';
 import { sleep } from '../common/stuff';
 import { observer } from 'mobx-react-lite';
 
+export interface RootStoreOptions {
+    /**
+     * Skip the initial async hydration step and render children immediately.
+     * Used by server rendering, where stores are constructed fresh per request
+     * and there is nothing to rehydrate, and by the SSR client entry, where
+     * the rendered HTML is already in place and `init()` running asynchronously
+     * would cause a hydration mismatch.
+     */
+    isReady?: boolean;
+}
+
 export class RootStore<T extends GlobalStores> {
-    constructor(public stores: T) {}
+    constructor(public stores: T, options: RootStoreOptions = {}) {
+        if (options.isReady) this._isReady = true;
+    }
 
     get globalStores() {
         return this.stores;
@@ -39,6 +52,7 @@ export class RootStore<T extends GlobalStores> {
 
     StoresProvider = observer(({ children }: { children: React.ReactNode }) => {
         useEffect(() => {
+            if (this._isReady) return;
             this.init().catch(console.error);
         }, []);
 

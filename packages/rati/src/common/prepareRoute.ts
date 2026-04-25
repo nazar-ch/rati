@@ -1,3 +1,4 @@
+import { runInAction } from 'mobx';
 import { resolveView } from './view';
 import type { WebRouterStore, WebRouterHydratedState } from '../stores/WebRouterStore';
 
@@ -47,6 +48,12 @@ export async function prepareRoute(
             string,
             unknown
         >;
+        // Stash on the active route so the same Router → ViewLoader path that
+        // handles client hydration also picks up the resolved props during
+        // the server render.
+        runInAction(() => {
+            router.activeRoute = { ...route, hydratedViewProps: viewProps };
+        });
     }
 
     return {
