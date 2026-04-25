@@ -22,7 +22,8 @@
         "clean": "rm -fr dist",
         "build": "yarn clean && yarn -T run tsc",
         "watch": "yarn -T run tsc --watch",
-        "test": "yarn tsd"
+        "test": "vitest run --typecheck",
+        "test:watch": "vitest --typecheck"
     },
     "dependencies": {
         "@sindresorhus/is": "^5.3.0",
@@ -31,11 +32,12 @@
     "devDependencies": {
         "@types/lodash": "~4.14.171",
         "@types/react": "^19.0.0",
+        "jsdom": "^25.0.0",
         "lodash": "~4.17.21",
         "mobx": "^6.12.3",
         "mobx-react-lite": "^4.0.7",
         "react": "^19.0.0",
-        "tsd": "^0.23.0"
+        "vitest": "^2.1.0"
     },
     "peerDependencies": {
         "lodash": "~4.17.21",
@@ -43,7 +45,7 @@
         "mobx-react-lite": "^4.0.7",
         "react": "^19.0.0"
     },
-    "tsd": {
-        "directory": "src/test-d"
+    "engines": {
+        "node": ">=18"
     }
 }
