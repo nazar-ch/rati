@@ -158,7 +158,7 @@ export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
  * URL, etc.). Mirrors the checks the Navigation API does natively, for
  * browsers that don't have it.
  */
-function shouldHandleLinkClick(event: React.MouseEvent<HTMLAnchorElement>): boolean {
+export function shouldHandleLinkClick(event: React.MouseEvent<HTMLAnchorElement>): boolean {
     if (event.defaultPrevented) return false;
     if (event.button !== 0) return false; // ignore middle/right clicks
     if (event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return false;
