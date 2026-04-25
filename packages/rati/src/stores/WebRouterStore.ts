@@ -155,6 +155,29 @@ export interface WebRouterStoreOptions {
      * `window.scrollTo(0, 0)` on PUSH/REPLACE.
      */
     scrollRestoration?: false | ScrollRestorationOptions;
+    /**
+     * URL prefix the app is mounted under, e.g. `/admin`. Stripped before route
+     * matching and prepended when generating link `href` values, so route
+     * definitions stay rooted at `/`. Must start with `/` and not end with `/`.
+     */
+    basename?: string;
+}
+
+function normalizeBasename(basename: string | undefined): string {
+    if (!basename) return '';
+    if (!basename.startsWith('/')) {
+        throw new Error(`basename must start with "/", got "${basename}"`);
+    }
+    return basename.endsWith('/') ? basename.slice(0, -1) : basename;
+}
+
+function stripBasename(pathname: string, basename: string): string {
+    if (!basename) return pathname;
+    if (pathname === basename) return '/';
+    if (pathname.startsWith(basename + '/')) return pathname.slice(basename.length);
+    // Pathname doesn't live under basename — return as-is so the route matcher
+    // gets a chance to fall through to a 404 catch-all if one is defined.
+    return pathname;
 }
 
 export class WebRouterStore<
@@ -169,6 +192,8 @@ export class WebRouterStore<
      * cross-origin checks, etc.).
      */
     readonly hasNavigationApi: boolean;
+    /** Normalized basename — empty string when none was configured. */
+    readonly basename: string;
     private readonly historyType: 'browser' | 'hash';
     private uninstallNavigationInterceptor: () => void = () => {};
     private uninstallScrollRestoration: () => void = () => {};
@@ -179,6 +204,8 @@ export class WebRouterStore<
         options: WebRouterStoreOptions = {}
     ) {
         super(stores);
+
+        this.basename = normalizeBasename(options.basename);
 
         const listener = ({ location }: { location: Location }) => this.setPath(location);
 
@@ -225,7 +252,11 @@ export class WebRouterStore<
     }
 
     getPath(args: NameToRoute<T> | string) {
-        if (typeof args === 'string') return args;
+        if (typeof args === 'string') {
+            // String paths are passed through verbatim (basename is the caller's
+            // responsibility here — they may already have the full URL).
+            return args;
+        }
 
         const { name, ...params } = args;
         let path: string = this.routes.find((item) => item.name === name)!.path;
@@ -234,7 +265,7 @@ export class WebRouterStore<
                 path = path.replace(`:${key}`, value as string);
             }
         }
-        return path;
+        return this.basename + path;
     }
 
     @computed get path() {
@@ -242,7 +273,10 @@ export class WebRouterStore<
     }
 
     isPath(path: string) {
-        return path === this.path;
+        // `path` here is a URL path (the value returned by getPath, used in href
+        // attributes), so strip the basename before comparing against the
+        // route-internal `path`.
+        return stripBasename(path, this.basename) === this.path;
     }
 
     @observable private accessor _path: string = '';
@@ -256,7 +290,8 @@ export class WebRouterStore<
         : // for local development
           `${Math.random()}-${Math.random()}`;
     @action.bound async setPath(location: Location) {
-        const { state, pathname } = location;
+        const { state } = location;
+        const pathname = stripBasename(location.pathname, this.basename);
         const currentPathCounter = this.pathCounter++;
 
         // Don't reload the current page
