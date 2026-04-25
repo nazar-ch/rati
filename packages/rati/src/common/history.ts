@@ -167,3 +167,52 @@ export function createHistory(opts: { type?: HistoryType } = {}): History {
     const type = opts.type ?? (window.location.protocol === 'file:' ? 'hash' : 'browser');
     return type === 'hash' ? createHashHistory() : createBrowserHistory();
 }
+
+/**
+ * In-memory history for environments without a DOM (server rendering, tests,
+ * non-browser hosts). Mirrors the {@link History} surface but holds the
+ * current location in a closure variable instead of `window.history`. No
+ * `popstate` listeners; back/forward navigation is not modeled.
+ */
+export function createMemoryHistory(opts: { url?: string } = {}): History {
+    const listeners = new Set<HistoryListener>();
+
+    function parse(url: string, state: unknown, key: string): Location {
+        // Placeholder origin lets us reuse the URL parser for relative inputs.
+        const parsed = new URL(url, 'http://_');
+        return {
+            pathname: parsed.pathname,
+            search: parsed.search,
+            hash: parsed.hash,
+            state,
+            key,
+        };
+    }
+
+    let current = parse(opts.url ?? '/', null, newKey());
+
+    function emit(action: Action) {
+        for (const l of listeners) l({ location: current, action });
+    }
+
+    return {
+        get location() {
+            return current;
+        },
+        push(to, state = null) {
+            current = parse(to, state, newKey());
+            emit('PUSH');
+        },
+        replace(to, state = null) {
+            current = parse(to, state, newKey());
+            emit('REPLACE');
+        },
+        listen(listener) {
+            listeners.add(listener);
+            return () => {
+                listeners.delete(listener);
+            };
+        },
+        notify: emit,
+    };
+}

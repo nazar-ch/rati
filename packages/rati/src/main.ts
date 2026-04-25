@@ -12,6 +12,7 @@ export {
     createHistory,
     createBrowserHistory,
     createHashHistory,
+    createMemoryHistory,
     History,
     HistoryType,
     Location as HistoryLocation,
