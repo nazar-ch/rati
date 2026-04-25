@@ -53,7 +53,7 @@ type GenericViewLoaderComponent<Props extends {}> = <TView extends CreateView<an
 ) => ReactElement<any, any> | null;
 
 function usePrevious<T>(value: T) {
-    const ref = useRef<T>();
+    const ref = useRef<T | undefined>(undefined);
     useEffect(() => {
         ref.current = value;
     });

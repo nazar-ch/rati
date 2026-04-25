@@ -1,4 +1,4 @@
-import React, { ComponentType, FC } from 'react';
+import React, { ComponentType, FC, Suspense } from 'react';
 import { observer } from 'mobx-react-lite';
 import { ViewLoader as GenericViewLoader } from './ViewLoader';
 import { useWebRouter } from '../stores/RootStore';
@@ -8,9 +8,7 @@ export const Router: FC<{
     DefaultWrapper?: ComponentType;
     ViewLoader?: typeof GenericViewLoader;
     Loading?: ComponentType;
-}> = observer(({ DefaultWrapper = EmptyWrapper, ViewLoader = GenericViewLoader, Loading = () => <>
-            loading...
-        </> }) => {
+}> = observer(({ DefaultWrapper = EmptyWrapper, ViewLoader = GenericViewLoader, Loading = DefaultLoading }) => {
     // TODO: make this work with react native router too
     const router = useWebRouter();
 
@@ -25,27 +23,38 @@ export const Router: FC<{
     if (!activeRoute.view) {
         return (
             <Wrapper>
-                <activeRoute.component
-                    {...activeRoute.routeParams}
-                    // Rerender when the route changes
-                    key={activeRoute.pathCounter}
-                />
+                {/*
+                  Suspense lets `route()` accept React.lazy components: while
+                  the chunk imports, the Loading fallback renders. Eager
+                  components never suspend, so this is a no-op for them.
+                */}
+                <Suspense fallback={<Loading />}>
+                    <activeRoute.component
+                        {...activeRoute.routeParams}
+                        // Rerender when the route changes
+                        key={activeRoute.pathCounter}
+                    />
+                </Suspense>
             </Wrapper>
         );
     }
 
     return (
         <Wrapper>
-            <ViewLoader
-                Component={activeRoute.component}
-                view={activeRoute.view}
-                params={activeRoute.routeParams}
-                Loading={Loading}
-                // Rerender when the route changes
-                key={activeRoute.pathCounter}
-            />
+            <Suspense fallback={<Loading />}>
+                <ViewLoader
+                    Component={activeRoute.component}
+                    view={activeRoute.view}
+                    params={activeRoute.routeParams}
+                    Loading={Loading}
+                    // Rerender when the route changes
+                    key={activeRoute.pathCounter}
+                />
+            </Suspense>
         </Wrapper>
     );
 });
+
+const DefaultLoading: FC = () => <>loading...</>;
 
 export const EmptyWrapper: FC<{ children: React.ReactNode }> = ({ children }) => <>{children}</>;

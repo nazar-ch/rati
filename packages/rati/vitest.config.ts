@@ -10,7 +10,7 @@ export default defineConfig({
                 url: 'http://localhost/',
             },
         },
-        include: ['src/__tests__/**/*.test.ts'],
+        include: ['src/__tests__/**/*.test.{ts,tsx}'],
         typecheck: {
             enabled: true,
             include: ['src/__tests__/**/*.test-d.ts'],
