@@ -145,9 +145,17 @@ export type NameToRoute<T extends readonly GenericRouteType[]> = TupleToUnion<Ro
 export interface WebRouterStoreOptions {
     /**
      * Choose history mode. Defaults to auto-detect: `file:` protocol → `hash`
-     * (Electron-friendly), otherwise `browser`.
+     * (Electron-friendly), otherwise `browser`. Ignored when {@link history}
+     * is provided — the caller has already decided.
      */
     historyType?: HistoryType;
+    /**
+     * Inject a {@link History} instance instead of letting the store create
+     * one. Pair with `createMemoryHistory({ url })` for server rendering or
+     * any other host that doesn't have a DOM. When set, `historyType` is
+     * ignored. Defaults to `createHistory()` (auto-detected browser/hash).
+     */
+    history?: History;
     /**
      * Configure or disable SPA scroll restoration. Set to `false` to opt out
      * (e.g. if the host app already manages its own scroll). Pass an object
@@ -209,12 +217,20 @@ export class WebRouterStore<
 
         const listener = ({ location }: { location: Location }) => this.setPath(location);
 
-        this.historyType =
-            options.historyType ??
-            (typeof window !== 'undefined' && window.location.protocol === 'file:'
-                ? 'hash'
-                : 'browser');
-        this.history = createHistory({ type: this.historyType });
+        if (options.history) {
+            // Caller-supplied history (e.g. createMemoryHistory for SSR).
+            // historyType is unused for routing — it only gates the Navigation
+            // API wiring below — so default to 'browser' for that purpose.
+            this.history = options.history;
+            this.historyType = options.historyType ?? 'browser';
+        } else {
+            this.historyType =
+                options.historyType ??
+                (typeof window !== 'undefined' && window.location.protocol === 'file:'
+                    ? 'hash'
+                    : 'browser');
+            this.history = createHistory({ type: this.historyType });
+        }
         this.unlistenHistory = this.history.listen(listener);
 
         // Hash mode bypasses the Navigation API: a click on `<a href="#/foo">`
