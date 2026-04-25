@@ -325,9 +325,9 @@ export class WebRouterStore<
     @observable.shallow accessor activeRoute: GetView | null = null;
 
     private pathCounter: number = 0;
-    private readonly sessionId = self.crypto.randomUUID
-        ? self.crypto.randomUUID()
-        : // for local development
+    private readonly sessionId = globalThis.crypto?.randomUUID
+        ? globalThis.crypto.randomUUID()
+        : // for local development, and Node < 19 where globalThis.crypto is absent
           `${Math.random()}-${Math.random()}`;
     @action.bound async setPath(location: Location) {
         const { state } = location;
