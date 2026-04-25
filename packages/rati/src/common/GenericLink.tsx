@@ -44,6 +44,11 @@ type RatiLinkBaseProps = {
     className?: string;
     activeClassName?: string;
     content?: { normal: React.ReactNode; active: React.ReactNode };
+    /**
+     * When true, start loading the destination route's chunk on hover/touch.
+     * No-op for routes whose component isn't a `lazy()` component.
+     */
+    prefetch?: boolean;
     // TODO: "exact" prop to match active path exactly or compare with startWith
 };
 
@@ -67,8 +72,11 @@ export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
         content,
         isActive,
         href,
+        prefetch,
         children,
         onClick: userOnClick,
+        onMouseEnter: userOnMouseEnter,
+        onTouchStart: userOnTouchStart,
         ...props
     }: PropsWithChildren<RatiGenericAnchorProps>) {
         const webRouter = useWebRouter();
@@ -88,6 +96,22 @@ export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
             [href, userOnClick, webRouter]
         );
 
+        const handleMouseEnter = useCallback(
+            (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
+                if (userOnMouseEnter) userOnMouseEnter(event);
+                if (prefetch) webRouter.preloadRoute(href);
+            },
+            [href, prefetch, userOnMouseEnter, webRouter]
+        );
+
+        const handleTouchStart = useCallback(
+            (event: React.TouchEvent<HTMLAnchorElement>) => {
+                if (userOnTouchStart) userOnTouchStart(event);
+                if (prefetch) webRouter.preloadRoute(href);
+            },
+            [href, prefetch, userOnTouchStart, webRouter]
+        );
+
         return (
             <a
                 {...props}
@@ -101,6 +125,8 @@ export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
                     .filter((item) => item)
                     .join(' ')}
                 onClick={handleOnClick}
+                onMouseEnter={handleMouseEnter}
+                onTouchStart={handleTouchStart}
             >
                 {children || (content && (isActive ? content.active : content.normal))}
             </a>

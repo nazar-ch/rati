@@ -295,6 +295,28 @@ export class WebRouterStore<
         return stripBasename(path, this.basename) === this.path;
     }
 
+    /**
+     * Begin loading the chunk for the route that matches `path`, without
+     * navigating. No-op if the matched route's component is not a
+     * preload-capable lazy component (see {@link lazy}). Safe to call
+     * repeatedly — the underlying factory dedupes.
+     *
+     * Used by `<Link prefetch>` to start the import on hover/touch.
+     */
+    preloadRoute(path: string): Promise<unknown> | undefined {
+        const stripped = stripBasename(path, this.basename);
+        // Drop query and hash before matching — the regex only looks at pathname.
+        const pathname = stripped.split('?')[0]!.split('#')[0]!;
+        for (const r of this.routes) {
+            const matches = r.pathRe ? r.pathRe.test(pathname) : true;
+            if (matches) {
+                const preload = (r.component as { preload?: () => Promise<unknown> }).preload;
+                return typeof preload === 'function' ? preload() : undefined;
+            }
+        }
+        return undefined;
+    }
+
     @observable private accessor _path: string = '';
     @observable private accessor _search: string = '';
     @observable private accessor _hash: string = '';
