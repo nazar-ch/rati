@@ -1,4 +1,4 @@
-import React, { ComponentType, FC, Suspense } from 'react';
+import React, { ComponentType, FC, Suspense, useDeferredValue } from 'react';
 import { observer } from 'mobx-react-lite';
 import { ViewLoader as GenericViewLoader } from './ViewLoader';
 import { useWebRouter } from '../stores/RootStore';
@@ -12,7 +12,11 @@ export const Router: FC<{
     // TODO: make this work with react native router too
     const router = useWebRouter();
 
-    const { activeRoute } = router;
+    // Defer the active route so that a navigation to a still-loading lazy
+    // route keeps showing the previous page instead of flashing the Suspense
+    // fallback. mobx-react-lite reads via useSyncExternalStore, so
+    // startTransition wouldn't take effect here — useDeferredValue does.
+    const activeRoute = useDeferredValue(router.activeRoute);
 
     if (!activeRoute) {
         return null;

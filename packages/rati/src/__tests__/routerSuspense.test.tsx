@@ -73,44 +73,39 @@ describe('Router + Suspense', () => {
         router.dispose();
     });
 
-    test('shows fallback again on navigation to a different lazy route', async () => {
-        let resolveA!: (mod: { default: FC }) => void;
+    test('keeps showing the previous page while the next lazy route loads (no fallback flash)', async () => {
+        // Pre-resolve at construction so the factory captures the resolver
+        // before being invoked. (Defining it inside the factory closure
+        // would lose the ref once useDeferredValue defers the render.)
         let resolveB!: (mod: { default: FC }) => void;
-        const LazyA = lazy(
-            () =>
-                new Promise<{ default: FC }>((resolve) => {
-                    resolveA = resolve;
-                })
-        );
-        const LazyB = lazy(
-            () =>
-                new Promise<{ default: FC }>((resolve) => {
-                    resolveB = resolve;
-                })
-        );
+        const importB = new Promise<{ default: FC }>((resolve) => {
+            resolveB = resolve;
+        });
+        const LazyB = lazy(() => importB);
 
-        const routes = [route('/', 'a', LazyA), route('/b', 'b', LazyB)];
+        const routes = [route('/', 'home', HomePage), route('/b', 'b', LazyB)];
         const { router } = renderWithRouter({ routes });
         await act(async () => {
             await Promise.resolve();
-            resolveA({ default: () => <div data-testid="a">A</div> });
-            await Promise.resolve();
         });
+        expect(screen.getByTestId('home')).toBeDefined();
 
-        expect(screen.getByTestId('a')).toBeDefined();
-
-        // Navigate to /b — its import is still pending, so Loading appears.
+        // Navigate to /b. Its chunk is still pending — useDeferredValue keeps
+        // the home page on screen instead of switching to the Suspense
+        // fallback.
         await act(async () => {
             router.history.push('/b');
             await Promise.resolve();
         });
-        expect(screen.getByTestId('loading')).toBeDefined();
+        expect(screen.getByTestId('home')).toBeDefined();
+        expect(screen.queryByTestId('loading')).toBeNull();
 
         await act(async () => {
             resolveB({ default: () => <div data-testid="b">B</div> });
             await Promise.resolve();
         });
         expect(screen.getByTestId('b')).toBeDefined();
+        expect(screen.queryByTestId('home')).toBeNull();
         router.dispose();
     });
 });
