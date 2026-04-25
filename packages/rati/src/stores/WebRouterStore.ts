@@ -2,6 +2,7 @@ import { observable, action, computed, runInAction } from 'mobx';
 import { ComponentType, FC } from 'react';
 import { createHistory, History, HistoryType, Location } from '../common/history';
 import { interceptNavigations, isNavigationApiAvailable } from '../common/navigationInterceptor';
+import { installScrollRestoration, ScrollRestorationOptions } from '../common/scrollRestoration';
 import { TupleToUnion } from '../types/generic';
 import { CreateView, ViewComponent } from '../common/view';
 import { GlobalStore } from '../stores/GlobalStore';
@@ -147,6 +148,13 @@ export interface WebRouterStoreOptions {
      * (Electron-friendly), otherwise `browser`.
      */
     historyType?: HistoryType;
+    /**
+     * Configure or disable SPA scroll restoration. Set to `false` to opt out
+     * (e.g. if the host app already manages its own scroll). Pass an object
+     * to customize the "scroll to top" behavior. Defaults to enabled with
+     * `window.scrollTo(0, 0)` on PUSH/REPLACE.
+     */
+    scrollRestoration?: false | ScrollRestorationOptions;
 }
 
 export class WebRouterStore<
@@ -163,6 +171,7 @@ export class WebRouterStore<
     readonly hasNavigationApi: boolean;
     private readonly historyType: 'browser' | 'hash';
     private uninstallNavigationInterceptor: () => void = () => {};
+    private uninstallScrollRestoration: () => void = () => {};
 
     constructor(
         stores: any,
@@ -198,6 +207,13 @@ export class WebRouterStore<
             );
         }
 
+        if (options.scrollRestoration !== false) {
+            this.uninstallScrollRestoration = installScrollRestoration(
+                this.history,
+                options.scrollRestoration ?? {}
+            );
+        }
+
         // Set path where the page is opened
         this.setPath(this.history.location);
     }
@@ -205,6 +221,7 @@ export class WebRouterStore<
     dispose() {
         this.unlistenHistory();
         this.uninstallNavigationInterceptor();
+        this.uninstallScrollRestoration();
     }
 
     getPath(args: NameToRoute<T> | string) {

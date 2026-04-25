@@ -19,6 +19,7 @@ export {
     HistoryUpdate,
     Action as HistoryAction,
 } from './common/history';
+export { installScrollRestoration, ScrollRestorationOptions } from './common/scrollRestoration';
 
 export { ViewLoader, ViewLoaderComponent } from './common/ViewLoader';
 
