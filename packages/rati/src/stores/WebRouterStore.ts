@@ -1,6 +1,7 @@
 import { observable, action, computed, runInAction } from 'mobx';
 import { ComponentType, FC } from 'react';
 import { createHistory, History, HistoryType, Location } from '../common/history';
+import { interceptNavigations, isNavigationApiAvailable } from '../common/navigationInterceptor';
 import { TupleToUnion } from '../types/generic';
 import { CreateView, ViewComponent } from '../common/view';
 import { GlobalStore } from '../stores/GlobalStore';
@@ -153,6 +154,15 @@ export class WebRouterStore<
 > extends GlobalStore<any> {
     history: History;
     unlistenHistory: () => void;
+    /**
+     * True when `window.navigation` is available and we registered an
+     * interceptor for it. Components like `<Link>` use this to skip work the
+     * platform now does for us (modifier-key checks, target/download handling,
+     * cross-origin checks, etc.).
+     */
+    readonly hasNavigationApi: boolean;
+    private readonly historyType: 'browser' | 'hash';
+    private uninstallNavigationInterceptor: () => void = () => {};
 
     constructor(
         stores: any,
@@ -163,11 +173,38 @@ export class WebRouterStore<
 
         const listener = ({ location }: { location: Location }) => this.setPath(location);
 
-        this.history = createHistory({ type: options.historyType });
+        this.historyType =
+            options.historyType ??
+            (typeof window !== 'undefined' && window.location.protocol === 'file:'
+                ? 'hash'
+                : 'browser');
+        this.history = createHistory({ type: this.historyType });
         this.unlistenHistory = this.history.listen(listener);
+
+        // Hash mode bypasses the Navigation API: a click on `<a href="#/foo">`
+        // is a same-document hash change, which the API surfaces as
+        // `event.hashChange = true` and we deliberately skip. So the per-Link
+        // click handler stays the only path in hash mode.
+        this.hasNavigationApi = this.historyType === 'browser' && isNavigationApiAvailable();
+        if (this.hasNavigationApi) {
+            this.uninstallNavigationInterceptor = interceptNavigations(({ url }) =>
+                this.setPath({
+                    pathname: url.pathname,
+                    search: url.search,
+                    hash: url.hash,
+                    state: this.history.location.state,
+                    key: this.history.location.key,
+                })
+            );
+        }
 
         // Set path where the page is opened
         this.setPath(this.history.location);
+    }
+
+    dispose() {
+        this.unlistenHistory();
+        this.uninstallNavigationInterceptor();
     }
 
     getPath(args: NameToRoute<T> | string) {

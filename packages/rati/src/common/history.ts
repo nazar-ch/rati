@@ -67,18 +67,18 @@ export function createBrowserHistory(): History {
         return { pathname, search, hash, state: usr, key };
     }
 
-    let current = readLocation();
-
     function emit(action: Action) {
-        current = readLocation();
-        for (const l of listeners) l({ location: current, action });
+        const location = readLocation();
+        for (const l of listeners) l({ location, action });
     }
 
     window.addEventListener('popstate', () => emit('POP'));
 
     return {
+        // Read fresh on every access so Navigation API interceptions and other
+        // out-of-band URL updates are reflected without us having to be told.
         get location() {
-            return current;
+            return readLocation();
         },
         push(to, state = null) {
             const internal: InternalState = { usr: state, key: newKey() };
@@ -117,11 +117,9 @@ export function createHashHistory(): History {
         };
     }
 
-    let current = readLocation();
-
     function emit(action: Action) {
-        current = readLocation();
-        for (const l of listeners) l({ location: current, action });
+        const location = readLocation();
+        for (const l of listeners) l({ location, action });
     }
 
     // Back/forward — covers both browser navigation and external hash changes.
@@ -135,7 +133,7 @@ export function createHashHistory(): History {
 
     return {
         get location() {
-            return current;
+            return readLocation();
         },
         push(to, state = null) {
             const internal: InternalState = { usr: state, key: newKey() };

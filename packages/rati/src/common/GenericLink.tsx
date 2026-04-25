@@ -68,24 +68,31 @@ export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
         isActive,
         href,
         children,
+        onClick: userOnClick,
         ...props
     }: PropsWithChildren<RatiGenericAnchorProps>) {
         const webRouter = useWebRouter();
 
         const handleOnClick = useCallback(
             (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
-                if (allowAction(event)) {
-                    event.preventDefault();
-                    webRouter.history.push(href);
-                }
+                if (userOnClick) userOnClick(event);
+                // When the Navigation API is wired up at the store level, the
+                // browser will fire `navigate` for this click and run our
+                // interceptor — handling modifiers, target, download, and
+                // cross-origin without us. Doing it here too would double-fire.
+                if (webRouter.hasNavigationApi) return;
+                if (!shouldHandleLinkClick(event)) return;
+                event.preventDefault();
+                webRouter.history.push(href);
             },
-            [href]
+            [href, userOnClick, webRouter]
         );
 
         return (
             <a
                 {...props}
                 href={`${href}`}
+                aria-current={isActive ? 'page' : undefined}
                 className={[
                     componentClassName || null,
                     className || null,
@@ -145,18 +152,27 @@ export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
     };
 }
 
-function allowAction(event: React.MouseEvent) {
-    return (
-        !event.defaultPrevented && // onClick prevented default
-        event.button === 0 && // ignore everything but left clicks
-        // FIXME:
-        // (!target || target === "_self") && // let browser handle "target=_blank" etc.
-        !isModifiedEvent(event) // ignore clicks with modifier keys
-    );
-}
+/**
+ * Decide whether to intercept this link click for SPA navigation, or let the
+ * browser do its default thing (open in new tab, download, follow external
+ * URL, etc.). Mirrors the checks the Navigation API does natively, for
+ * browsers that don't have it.
+ */
+function shouldHandleLinkClick(event: React.MouseEvent<HTMLAnchorElement>): boolean {
+    if (event.defaultPrevented) return false;
+    if (event.button !== 0) return false; // ignore middle/right clicks
+    if (event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return false;
 
-function isModifiedEvent(event: React.MouseEvent) {
-    return !!(event.metaKey || event.altKey || event.ctrlKey || event.shiftKey);
+    const anchor = event.currentTarget;
+    const target = anchor.getAttribute('target');
+    if (target && target !== '_self') return false;
+    if (anchor.hasAttribute('download')) return false;
+
+    // Cross-origin links go to the browser. `anchor.href` is the resolved URL.
+    const url = new URL(anchor.href, window.location.href);
+    if (url.origin !== window.location.origin) return false;
+
+    return true;
 }
 
 const LinkContext = createContext<LinkContextStore<any> | null>(null);
