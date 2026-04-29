@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import {  observable, runInAction } from 'mobx';
+import { observable, runInAction } from 'mobx';
 import { FC } from 'react';
 import { Expand, isNonNull } from '../types/generic';
 
@@ -23,12 +23,13 @@ export type GenericView = {
 export abstract class View<
     TView extends GenericView,
     TParams extends Record<string, unknown> = {},
-    TParentStores extends Record<string, unknown> = {}
-> implements GenericView
-{
+    TParentStores extends Record<string, unknown> = {},
+> implements GenericView {
     // TODO: try to make this constructor protected. The problem is with types in GenericViewLoaderComponent
-    constructor(public params: TParams, public parentStores: TParentStores) {
-    }
+    constructor(
+        public params: TParams,
+        public parentStores: TParentStores
+    ) {}
 
     static create<TView extends GenericView = GenericView>(
         this: any,
@@ -133,15 +134,15 @@ type ViewStoresToStores<TStores extends GenericViewStores> = Expand<
         }
             ? InstanceType<TStores[StoreKey]>
             : TStores[StoreKey] extends {
-                  createInView(data: any, params: any, stores: any): unknown;
-              }
-            ? ReturnType<TStores[StoreKey]['createInView']>
-            : never;
+                    createInView(data: any, params: any, stores: any): unknown;
+                }
+              ? ReturnType<TStores[StoreKey]['createInView']>
+              : never;
     }>
 >;
 export type LegacyViewComponent<
     TView extends GenericView,
-    Props extends Record<string, unknown> = {}
+    Props extends Record<string, unknown> = {},
 > = FC<
     {
         data: ViewDataToData<TView['data']>;

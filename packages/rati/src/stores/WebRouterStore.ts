@@ -477,8 +477,7 @@ export class WebRouterStore<
         init: ConstructorParameters<typeof URLSearchParams>[0] | URLSearchParams,
         options: { mode?: 'push' | 'replace' } = {}
     ) {
-        const params =
-            init instanceof URLSearchParams ? init : new URLSearchParams(init as string);
+        const params = init instanceof URLSearchParams ? init : new URLSearchParams(init as string);
         const search = params.toString();
         const url = this.basename + this._path + (search ? '?' + search : '') + this._hash;
         if (options.mode === 'push') {

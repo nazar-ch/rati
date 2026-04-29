@@ -66,7 +66,11 @@ describe('installScrollRestoration', () => {
 
         // Pretend the user scrolled down on the initial entry.
         Object.defineProperty(window, 'scrollX', { value: 0, writable: true, configurable: true });
-        Object.defineProperty(window, 'scrollY', { value: 600, writable: true, configurable: true });
+        Object.defineProperty(window, 'scrollY', {
+            value: 600,
+            writable: true,
+            configurable: true,
+        });
 
         // Navigate away — scroll restoration should snapshot (0, 600) for the
         // outgoing entry.

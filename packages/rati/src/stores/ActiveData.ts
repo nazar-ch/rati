@@ -17,7 +17,7 @@ export abstract class ActiveData<T> {
 
     static create<
         TActiveDataClass extends { prototype: { __dataType: object } },
-        TRawData extends TActiveDataClass['prototype']['__dataType']
+        TRawData extends TActiveDataClass['prototype']['__dataType'],
     >(
         this: TActiveDataClass,
         rawData: TRawData
@@ -74,7 +74,7 @@ export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
         SActiveDataClass extends { prototype: { __dataType: object } },
         SRemoteDataFactory extends () => (
             ...args: any
-        ) => Promise<SActiveDataClass['prototype']['__dataType']>
+        ) => Promise<SActiveDataClass['prototype']['__dataType']>,
     >(
         this: SActiveDataClass,
         remoteDataFactory: SRemoteDataFactory,

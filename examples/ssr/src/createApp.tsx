@@ -1,10 +1,4 @@
-import {
-    History,
-    RootStore,
-    Router,
-    WebRouterHydratedState,
-    WebRouterStore,
-} from 'rati';
+import { type History, RootStore, Router, type WebRouterHydratedState, WebRouterStore } from 'rati';
 import { routes } from './routes';
 
 export interface CreateAppOptions {

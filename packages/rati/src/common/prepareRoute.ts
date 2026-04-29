@@ -29,9 +29,7 @@ export interface PreparedRoute {
  * wildcard catch-all). Callers can treat that as a 404 and render their own
  * not-found response.
  */
-export async function prepareRoute(
-    router: WebRouterStore<any>
-): Promise<PreparedRoute | null> {
+export async function prepareRoute(router: WebRouterStore<any>): Promise<PreparedRoute | null> {
     await router.pendingNavigation;
 
     const route = router.activeRoute;

@@ -118,7 +118,7 @@ export function createLinkComponent(componentClassName?: string) {
                 className={[
                     componentClassName || null,
                     className || null,
-                    isActive ? activeClassName ?? 'active' : null,
+                    isActive ? (activeClassName ?? 'active') : null,
                 ]
                     .filter((item) => item)
                     .join(' ')}

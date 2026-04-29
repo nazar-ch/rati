@@ -17,7 +17,7 @@ type GenericViewDefinition = Record<string, ViewProp>;
 
 export type CreateView<
     VD extends GenericViewDefinition,
-    PrevView extends GenericViewDefinition = any
+    PrevView extends GenericViewDefinition = any,
 > = {
     definition: VD;
     prevView?: CreateView<PrevView> | undefined;
@@ -28,12 +28,12 @@ type ResolveViewDefinition<VD extends GenericViewDefinition> = {
     [K in keyof VD]: VD[K] extends Promise<any>
         ? Awaited<VD[K]>
         : VD[K] extends ViewParam<any>
-        ? VD[K]['value']
-        : VD[K] extends (...args: any) => any
-        ? Awaited<ReturnType<VD[K]>>
-        : VD[K] extends { new (...args: any): any }
-        ? InstanceType<VD[K]>
-        : VD[K];
+          ? VD[K]['value']
+          : VD[K] extends (...args: any) => any
+            ? Awaited<ReturnType<VD[K]>>
+            : VD[K] extends { new (...args: any): any }
+              ? InstanceType<VD[K]>
+              : VD[K];
 };
 
 // Limits the recursion depth to prevent "Type instantiation is excessively deep
@@ -81,7 +81,7 @@ type CreateViewFunc = {
 
     <
         PrevView extends CreateView<GenericViewDefinition>,
-        Def extends RecursiveViewDefinition<PrevView>
+        Def extends RecursiveViewDefinition<PrevView>,
     >(
         prevView: PrevView,
         viewDefinition: Def
@@ -96,7 +96,7 @@ type CreateViewFunc = {
 
 export const createView: CreateViewFunc = <
     PrevView extends CreateView<GenericViewDefinition> | undefined,
-    Def extends RecursiveViewDefinition<PrevView>
+    Def extends RecursiveViewDefinition<PrevView>,
 >(
     definitionOrPrevView: PrevView,
     maybeViewDefinition?: Def
@@ -120,7 +120,7 @@ const viewChainHead = <Def extends RecursiveViewDefinition<undefined>>(vd: Def) 
 
 export function createViewChain<
     PrevView extends CreateView<GenericViewDefinition> | undefined,
-    Def extends RecursiveViewDefinition<PrevView>
+    Def extends RecursiveViewDefinition<PrevView>,
 >(viewDefinition: Def, prevView: PrevView) {
     const view = { definition: viewDefinition as Def, prevView, [ViewSymbol]: true as const };
 
@@ -193,5 +193,5 @@ export function viewParam<T>() {
 
 export type ViewComponent<
     View extends CreateView<any>,
-    Props extends Record<string, unknown> = {}
+    Props extends Record<string, unknown> = {},
 > = FC<ResolveView<View> & Props>;

@@ -60,7 +60,7 @@ export function remoteData<F extends (...args: any) => Promise<any>>(
     let invokeTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let indicatePendingTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    const waitMilliseconds = debounceWaitMs === 'INPUT' ? 350 : debounceWaitMs ?? 100;
+    const waitMilliseconds = debounceWaitMs === 'INPUT' ? 350 : (debounceWaitMs ?? 100);
 
     let lastInvokeTime = Date.now();
 

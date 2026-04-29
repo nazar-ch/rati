@@ -75,15 +75,11 @@ describe('shouldHandleLinkClick', () => {
     });
 
     test('returns false for target="_top"', () => {
-        expect(shouldHandleLinkClick(fakeClickEvent({ href: '/foo', target: '_top' }))).toBe(
-            false
-        );
+        expect(shouldHandleLinkClick(fakeClickEvent({ href: '/foo', target: '_top' }))).toBe(false);
     });
 
     test('returns true for explicit target="_self"', () => {
-        expect(shouldHandleLinkClick(fakeClickEvent({ href: '/foo', target: '_self' }))).toBe(
-            true
-        );
+        expect(shouldHandleLinkClick(fakeClickEvent({ href: '/foo', target: '_self' }))).toBe(true);
     });
 
     test('returns false for download links', () => {
