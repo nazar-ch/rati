@@ -6,11 +6,9 @@
         "forceConsistentCasingInFileNames": true,
         "module": "ESNext",
         "moduleResolution": "bundler",
-        "declaration": true,
-        "declarationMap": true,
         "rootDir": "./src",
-        "outDir": "./dist",
-        "jsx": "react-jsx"
+        "jsx": "react-jsx",
+        "noEmit": true
     },
     "exclude": ["dist", "node_modules", "build", "src/__tests__"],
     "include": ["src", "vite.config.ts"]

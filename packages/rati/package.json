@@ -12,15 +12,16 @@
     "types": "dist/main.d.ts",
     "exports": {
         ".": {
+            "rati-dev": "./src/main.ts",
             "types": "./dist/main.d.ts",
             "import": "./dist/main.js",
             "source": "./src/main.ts"
         },
         "./package.json": "./package.json"
     },
+    "sideEffects": false,
     "scripts": {
-        "clean": "rm -fr dist",
-        "build": "yarn clean && yarn -T run tsc",
+        "build": "vite build && yarn -T run tsc -p tsconfig.build.json",
         "watch": "yarn -T run tsc --watch",
         "test": "vitest run --typecheck",
         "test:watch": "vitest --typecheck"

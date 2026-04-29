@@ -4,6 +4,9 @@ import babel from '@rolldown/plugin-babel';
 import { analyzer } from 'vite-bundle-analyzer';
 
 const debugBundleContent = false;
+const debugBundlePreserveModules = false;
+
+const bundleWhitelist: string[] = [];
 
 export default defineConfig({
     plugins: [
@@ -12,6 +15,7 @@ export default defineConfig({
         debugBundleContent && analyzer(),
     ],
     build: {
+        emptyOutDir: true,
         lib: {
             entry: 'src/main.ts',
             // the proper extensions will be added
@@ -19,9 +23,24 @@ export default defineConfig({
             formats: ['es'],
         },
         rolldownOptions: {
-            // make sure to externalize deps that shouldn't be bundled
-            // into your library
-            external: [],
+            output: debugBundlePreserveModules
+                ? {
+                      preserveModules: true,
+                      preserveModulesRoot: 'src',
+                      entryFileNames: '[name].js',
+                      chunkFileNames: '[name].js',
+                  }
+                : {},
+            external: (id) => {
+                // always bundle relative & absolute imports (your own source)
+                if (id.startsWith('.') || id.startsWith('/')) return false;
+                // bundle whitelisted packages (and their subpaths)
+                if (bundleWhitelist.some((pkg) => id === pkg || id.startsWith(pkg + '/'))) {
+                    return false;
+                }
+                // externalize everything else
+                return true;
+            },
         },
     },
 });

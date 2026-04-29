@@ -4,7 +4,8 @@
         "composite": true,
         "module": "nodenext",
         "moduleResolution": "nodenext",
-        "allowSyntheticDefaultImports": true
+        "allowSyntheticDefaultImports": true,
+        "jsx": "react-jsx"
     },
     "include": ["server.ts", "vite.config.ts"]
 }
