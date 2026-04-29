@@ -8,17 +8,25 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
 import { existsSync, createReadStream } from 'node:fs';
 import type { ViteDevServer } from 'vite';
-import type { RenderResult } from './src/entry-server';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const isProd = process.env.NODE_ENV === 'production';
-const port = Number(process.env.PORT) || 3000;
+const isProd = process.env['NODE_ENV'] === 'production';
+const port = Number(process.env['PORT']) || 3000;
 
 interface Loader {
     resolveTemplate(url: string): Promise<string>;
     loadServerEntry(): Promise<{ render: (url: string) => Promise<RenderResult> }>;
     middleware: ViteDevServer['middlewares'] | null;
     fixStack(err: unknown): unknown;
+}
+
+// FIXME: deduplicate
+export interface RenderResult {
+    html: string;
+    /** Snapshot to embed in the HTML so the client can hydrate without re-fetching. */
+    state: unknown;
+    /** 200 for matched routes, 404 when no route (including the catch-all) matches. */
+    status: 200 | 404;
 }
 
 // `</script>` and `<!--` would break the inline script tag, and U+2028 /

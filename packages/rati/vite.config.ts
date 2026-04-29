@@ -1,22 +1,27 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 import babel from '@rolldown/plugin-babel';
+import { analyzer } from 'vite-bundle-analyzer';
+
+const debugBundleContent = false;
 
 export default defineConfig({
-    plugins: [babel({ presets: [decoratorPreset({ version: '2023-11' })] })],
-    test: {
-        environment: 'jsdom',
-        environmentOptions: {
-            jsdom: {
-                // Without this, jsdom starts at about:blank and rejects any
-                // history.pushState/replaceState as cross-origin.
-                url: 'http://localhost/',
-            },
+    plugins: [
+        react(),
+        babel({ presets: [decoratorPreset({ version: '2023-11' })] }),
+        debugBundleContent && analyzer(),
+    ],
+    build: {
+        lib: {
+            entry: 'src/main.ts',
+            // the proper extensions will be added
+            fileName: 'main',
+            formats: ['es'],
         },
-        include: ['src/__tests__/**/*.test.{ts,tsx}'],
-        typecheck: {
-            enabled: true,
-            include: ['src/__tests__/**/*.test-d.ts'],
-            tsconfig: './tsconfig.test.json',
+        rolldownOptions: {
+            // make sure to externalize deps that shouldn't be bundled
+            // into your library
+            external: [],
         },
     },
 });

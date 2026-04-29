@@ -7,6 +7,7 @@ import { Router } from '../common/Router';
 import { createBrowserHistory, createMemoryHistory } from '../common/history';
 import { prepareRoute } from '../common/prepareRoute';
 import { createView } from '../common/view';
+import { act } from '@testing-library/react';
 
 function Home() {
     return <div data-testid="home">welcome home</div>;

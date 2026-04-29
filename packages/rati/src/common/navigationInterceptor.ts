@@ -12,8 +12,6 @@
  * skip work that the platform will do.
  */
 
-import type { History } from './history';
-
 export interface NavigationInterception {
     /** A native URL the link clicked, or programmatic navigation target. */
     url: URL;

@@ -2,7 +2,9 @@
     "extends": ["@tsconfig/strictest/tsconfig.json"],
     "compilerOptions": {
         "types": ["vitest/globals"],
-        "jsx": "react-jsx"
+        "jsx": "react-jsx",
+        "module": "ESNext",
+        "moduleResolution": "bundler"
     },
     "include": ["src/__tests__"],
     "exclude": ["dist", "node_modules", "build"]
