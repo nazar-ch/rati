@@ -1,7 +1,6 @@
 import { observable, runInAction } from 'mobx';
-import React, { FC, Context, PropsWithChildren, useEffect } from 'react';
+import React, { Context, useEffect } from 'react';
 import { WebRouterStore } from './WebRouterStore';
-import { createLinkComponent } from '../common/GenericLink';
 import { sleep } from '../common/stuff';
 import { observer } from 'mobx-react-lite';
 
@@ -17,7 +16,10 @@ export interface RootStoreOptions {
 }
 
 export class RootStore<T extends GlobalStores> {
-    constructor(public stores: T, options: RootStoreOptions = {}) {
+    constructor(
+        public stores: T,
+        options: RootStoreOptions = {}
+    ) {
         if (options.isReady) this._isReady = true;
     }
 

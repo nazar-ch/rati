@@ -18,9 +18,9 @@ export type ExtractRouteParams<T extends string> = string extends T
     ? // This matches `string` type instead of string literals. It's not
       // possible to get the type for this case, return something generic
       Record<string, string>
-    : T extends `${infer Start}:${infer Param}/${infer Rest}`
+    : T extends `${infer _Start}:${infer Param}/${infer Rest}`
       ? { [k in Param | keyof ExtractRouteParams<Rest>]: string }
-      : T extends `${infer Start}:${infer Param}`
+      : T extends `${infer _Start}:${infer Param}`
         ? { [k in Param]: string }
         : {};
 
@@ -147,7 +147,7 @@ type ActiveRoute = NonNullable<GetView> & {
      * `activeRoute` after client-side hydration; subsequent navigations leave
      * this `undefined` and ViewLoader resolves on its own.
      */
-    hydratedViewProps?: Record<string, unknown>;
+    hydratedViewProps?: Record<string, unknown> | undefined;
 };
 
 export type NameToRoute<T extends readonly GenericRouteType[]> = TupleToUnion<RoutesType<T>>;
@@ -166,7 +166,7 @@ export interface WebRouterHydratedState {
     activeRouteName: string;
     routeParams: Record<string, string>;
     /** Resolved view props (output of `resolveView`), if the route had a view. */
-    viewProps?: Record<string, unknown>;
+    viewProps?: Record<string, unknown> | undefined;
 }
 
 export interface WebRouterStoreOptions {
@@ -510,7 +510,7 @@ export class WebRouterStore<
         this.history.replace(path, { skip: `${this.pathCounter}/${this.sessionId}` });
     }
 
-    async getActiveRoute(currentPath: string, stores: any, pathCounter: number) {
+    async getActiveRoute(currentPath: string, _stores: any, pathCounter: number) {
         for (const { pathRe, path, view, name, component, wrapperComponent } of this.routes) {
             let result;
 
@@ -534,5 +534,6 @@ export class WebRouterStore<
                 };
             }
         }
+        return undefined;
     }
 }

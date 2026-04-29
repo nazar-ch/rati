@@ -1,4 +1,3 @@
-import React, { act } from 'react';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { hydrateRoot } from 'react-dom/client';
@@ -17,10 +16,7 @@ function User(props: { userId: string }) {
     return <div data-testid="user">user {props.userId}</div>;
 }
 
-const baseRoutes = [
-    route('/', 'home', Home),
-    route('/users/:userId', 'user', User),
-] as const;
+const baseRoutes = [route('/', 'home', Home), route('/users/:userId', 'user', User)] as const;
 
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
@@ -110,9 +106,7 @@ describe('SSR + hydration', () => {
         const view = createView({
             greeting: async () => 'hello from server',
         });
-        const routesWithView = [
-            route('/', 'home', Greeting as any, view as any),
-        ] as const;
+        const routesWithView = [route('/', 'home', Greeting as any, view as any)] as const;
 
         const { html, prepared, cleanup } = await ssrThenHydrate('/', routesWithView);
 

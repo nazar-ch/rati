@@ -1,7 +1,7 @@
 import { describe, test, expectTypeOf } from 'vitest';
 import { responseKey } from '../common/apiUtils';
 
-const apiCall = async ({ x }: { x: string }) => ({
+const apiCall = async (_v: { x: string }) => ({
     a: '1',
     b: { k: 2 },
 });

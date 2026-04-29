@@ -63,9 +63,7 @@ type RatiRegularAnchorProps<T extends readonly GenericRouteType[]> = RatiLinkBas
     GenericAnchorProps &
     RatiLinkToProps<T>;
 
-export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
-    componentClassName?: string
-) {
+export function createLinkComponent(componentClassName?: string) {
     const GenericAnchor = observer(function GenericAnchor({
         className,
         activeClassName,

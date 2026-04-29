@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, test, expect } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { WebRouterStore, route } from '../stores/WebRouterStore';

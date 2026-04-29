@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import { observer } from 'mobx-react-lite';
-import React, { ComponentType, FC, ReactElement, useEffect, useRef, useState } from 'react';
+import { ComponentType, FC, ReactElement, useEffect, useRef, useState } from 'react';
 import { resolveView, ViewComponent, CreateView, RequiredViewParams } from './view';
 
 /* 
@@ -71,7 +71,7 @@ export const ViewLoader: GenericViewLoaderComponent<{
      * Ignored on subsequent param changes — those go through `resolveView`
      * normally.
      */
-    initialViewProps?: Record<string, any>;
+    initialViewProps?: Record<string, any> | undefined;
 }> = observer(({ Component, view, params, Loading, initialViewProps }) => {
     const [viewProps, setViewProps] = useState<Record<string, any> | null>(
         initialViewProps ?? null
@@ -81,15 +81,10 @@ export const ViewLoader: GenericViewLoaderComponent<{
     // Track the params we hydrated against so the first effect can skip its
     // async resolve. If params change later the effect falls through to the
     // normal diff/resolve path.
-    const hydratedParamsRef = useRef<typeof params | null>(
-        initialViewProps ? params : null
-    );
+    const hydratedParamsRef = useRef<typeof params | null>(initialViewProps ? params : null);
 
     useEffect(() => {
-        if (
-            hydratedParamsRef.current &&
-            _.isEqual(params, hydratedParamsRef.current)
-        ) {
+        if (hydratedParamsRef.current && _.isEqual(params, hydratedParamsRef.current)) {
             // First mount with hydrated props — already have data.
             hydratedParamsRef.current = null;
             return;

@@ -1,5 +1,5 @@
 import is from '@sindresorhus/is';
-import { Merge, Simplify } from 'type-fest';
+import { Simplify } from 'type-fest';
 import _ from 'lodash';
 import { FC } from 'react';
 import { ExcludeNever } from '../types/generic';
@@ -20,7 +20,7 @@ export type CreateView<
     PrevView extends GenericViewDefinition = any
 > = {
     definition: VD;
-    prevView?: CreateView<PrevView>;
+    prevView?: CreateView<PrevView> | undefined;
     [ViewSymbol]: true;
 };
 

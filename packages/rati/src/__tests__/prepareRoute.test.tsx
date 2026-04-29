@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, test, expect, vi } from 'vitest';
 import { WebRouterStore, route } from '../stores/WebRouterStore';
 import { createMemoryHistory } from '../common/history';
@@ -62,10 +61,7 @@ describe('prepareRoute', () => {
     test('falls through to a wildcard route when nothing else matches', async () => {
         const router = new WebRouterStore(
             {},
-            [
-                route('/', 'home', HomeComponent),
-                route('*', 'notFound', NoopComponent),
-            ] as const,
+            [route('/', 'home', HomeComponent), route('*', 'notFound', NoopComponent)] as const,
             {
                 history: createMemoryHistory({ url: '/missing' }),
             }
@@ -81,13 +77,9 @@ describe('prepareRoute', () => {
         const factory = vi.fn(async () => ({ default: HomeComponent }));
         const LazyComponent = lazy(factory);
 
-        const router = new WebRouterStore(
-            {},
-            [route('/', 'home', LazyComponent as any)] as const,
-            {
-                history: createMemoryHistory({ url: '/' }),
-            }
-        );
+        const router = new WebRouterStore({}, [route('/', 'home', LazyComponent as any)] as const, {
+            history: createMemoryHistory({ url: '/' }),
+        });
 
         await prepareRoute(router);
 
