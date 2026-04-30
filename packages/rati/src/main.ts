@@ -60,3 +60,8 @@ export {
     ParamSymbol,
     ViewSymbol,
 } from './common/view';
+
+if (import.meta.env.DEV) {
+    const pkg = await import('../package.json');
+    console.log(`*********************** 🦜 rati @${pkg.version} LOCAL ***********************`);
+}

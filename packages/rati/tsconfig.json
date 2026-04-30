@@ -9,7 +9,8 @@
         "moduleResolution": "bundler",
         "rootDir": "./src",
         "jsx": "react-jsx",
-        "noEmit": true
+        "noEmit": true,
+        "types": ["vite/client"]
     },
     "exclude": ["dist", "node_modules", "build", "src/__tests__"],
     "include": ["src"]
