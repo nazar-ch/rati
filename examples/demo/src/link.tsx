@@ -3,8 +3,9 @@ import { createLinkComponent } from 'rati';
 // This import is only to get correct types, any runtime usage will not
 // work because of the circular dependency (components from the routes
 // use components from this file)
-// import { type routes } from './routes';
+import { type routes } from './routes';
 
 // export const Link = createLinkComponent<typeof routes>();
 
-export const { Link, ContextualLink, LinkContextProvider, useLinkContext } = createLinkComponent();
+export const { Link, ContextualLink, LinkContextProvider, useLinkContext } =
+    createLinkComponent<typeof routes>();

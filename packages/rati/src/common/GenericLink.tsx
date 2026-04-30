@@ -52,9 +52,12 @@ type RatiLinkBaseProps = {
     // TODO: "exact" prop to match active path exactly or compare with startWith
 };
 
-type RatiLinkToProps<T extends readonly GenericRouteType[]> = {
-    to: NameToRoute<T> | string;
-};
+type RatiLinkToProps<T extends readonly GenericRouteType[]> =
+    | {
+          to: NameToRoute<T>;
+          href?: undefined;
+      }
+    | { href: string; to?: undefined };
 
 type RatiGenericAnchorProps = RatiLinkBaseProps &
     GenericAnchorProps & { href: string; isActive: boolean };
@@ -63,7 +66,9 @@ type RatiRegularAnchorProps<T extends readonly GenericRouteType[]> = RatiLinkBas
     GenericAnchorProps &
     RatiLinkToProps<T>;
 
-export function createLinkComponent(componentClassName?: string) {
+export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
+    componentClassName?: string
+) {
     const GenericAnchor = observer(function GenericAnchor({
         className,
         activeClassName,
@@ -131,21 +136,26 @@ export function createLinkComponent(componentClassName?: string) {
         );
     });
 
-    const RegularAnchor = observer(function RegularAnchor<T extends readonly GenericRouteType[]>({
+    const RegularAnchor = observer(function RegularAnchor({
         to,
+        href,
         ...props
     }: PropsWithChildren<RatiRegularAnchorProps<T>>) {
         const webRouter = useWebRouter();
 
-        const href = webRouter.getPath(to);
-        const isActive = webRouter.isPath(href);
+        const resolvedHref = to ? webRouter.getPath(to) : href!;
+        const isActive = webRouter.isPath(resolvedHref);
 
-        return <GenericAnchor {...props} {...{ isActive, href }} />;
+        return <GenericAnchor {...props} {...{ isActive, href: resolvedHref }} />;
     });
 
-    const LinkContextProvider = memo(function LinkContextProvider<
-        T extends readonly GenericRouteType[],
-    >({ children, to }: { children: React.ReactNode; to: NameToRoute<T> | string }) {
+    const LinkContextProvider = memo(function LinkContextProvider({
+        children,
+        to,
+    }: {
+        children: React.ReactNode;
+        to: NameToRoute<T> | string;
+    }) {
         const webRouter = useWebRouter();
 
         return (
