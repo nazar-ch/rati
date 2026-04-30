@@ -1,5 +1,4 @@
-import { route } from 'rati';
-import { FC } from 'react';
+import { route, type GenericRouteType } from 'rati';
 import { Index } from './Index';
 import {
     complexTestView,
@@ -10,7 +9,7 @@ import {
     TestRouteParamsWithoutView,
 } from './TestView';
 
-const NotFound: FC = () => {
+const NotFound = () => {
     return <div>- Not found -</div>;
 };
 
@@ -22,4 +21,4 @@ export const routes = [
     route('/test/complex/:productName/', 'complex-view', ComplexTestWithView, complexTestView),
 
     route('*', '404', NotFound),
-] as const;
+] as const satisfies GenericRouteType[];

@@ -9,8 +9,9 @@
         "moduleResolution": "bundler",
         "isolatedModules": true,
         "noEmit": true,
-        "jsx": "react-jsx"
+        "jsx": "react-jsx",
+        "customConditions": ["rati-dev"],
+        "erasableSyntaxOnly": false
     },
-    "include": ["src"],
-    "references": [{ "path": "./tsconfig.node.json" }]
+    "include": ["src"]
 }

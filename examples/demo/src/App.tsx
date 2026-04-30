@@ -1,14 +1,11 @@
 import './App.css';
 import { rootStore } from './globalStores';
-import { RouterComponent } from 'rati';
+import { Router as RatiRouter } from 'rati';
 
 export function App() {
     return (
-        <rootStore.StoresProvider stores={rootStore.stores}>
-            <RouterComponent
-                // DefaultWrapper={AuthGuardedContentWrapper}
-                router={rootStore.stores.webRouter}
-            />
+        <rootStore.StoresProvider>
+            <RatiRouter />
         </rootStore.StoresProvider>
     );
 }

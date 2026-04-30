@@ -1,5 +1,5 @@
-import { FC } from 'react';
-import { createView, resolveView, sleep, ViewComponent, viewParam } from 'rati';
+import { type FC } from 'react';
+import { createView, resolveView, sleep, type ViewComponent, viewParam } from 'rati';
 
 class XClass {
     constructor(params: { whyNot: string; first: string }) {
@@ -17,13 +17,14 @@ const vvv = createView({
 const vvvvv = createView(vvv, {
     first: '1',
     productId: viewParam<number>(),
-    one: async (params) => {},
+    one: async (_params) => {},
 });
 
+// @ts-expect-error not used
 const xcxcx = vvvvv['prevView'];
 
 const heyView = createView(vvvvv, {
-    name: (async (params) => {
+    name: (async (_params) => {
         await sleep(1000);
         return 'Alina';
     })(),
@@ -31,6 +32,7 @@ const heyView = createView(vvvvv, {
     productName: viewParam<string>(),
 });
 
+// @ts-expect-error not used
 const xcxcx223 = heyView['prevView'];
 
 const helloView = createView(heyView, {
@@ -46,6 +48,7 @@ const helloView = createView(heyView, {
     xStore: XClass,
 });
 
+// @ts-expect-error not used
 async function test() {
     const res = await resolveView(helloView, {
         productId: 12,
@@ -104,13 +107,14 @@ export const complexTestView = createView
         xStore: SimpleTextViewClass,
     });
 
+// @ts-expect-error not used
 const rrrrrr = createView
     .chain({
         productIdX: viewParam<number>(),
         xx: async () => 'x',
     })
     .chain({
-        name2: async (params) => {
+        name2: async (_params) => {
             await sleep(1000);
             return 'Alina';
         },
@@ -120,7 +124,7 @@ const rrrrrr = createView
     .chain({
         first: '1',
         productId: viewParam<number>(),
-        one: async (params) => {},
+        one: async (_params) => {},
     })
     .chain({
         hello: async (params) => {

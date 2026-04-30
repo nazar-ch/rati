@@ -1,4 +1,4 @@
-import { remoteData, RemoteDataOptions } from './remoteData';
+import { remoteData, type RemoteDataOptions } from './remoteData';
 
 export function remoteDataKey<
     Args extends any[],

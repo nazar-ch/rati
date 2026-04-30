@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import { observable, runInAction } from 'mobx';
-import { FC } from 'react';
-import { Expand, isNonNull } from '../types/generic';
+import type { FC } from 'react';
+import { type Expand, isNonNull } from '../types/generic';
 
 type ViewData = Record<string, Promise<unknown>>;
 
@@ -24,7 +24,8 @@ export abstract class View<
     TView extends GenericView,
     TParams extends Record<string, unknown> = {},
     TParentStores extends Record<string, unknown> = {},
-> implements GenericView {
+> implements GenericView
+{
     // TODO: try to make this constructor protected. The problem is with types in GenericViewLoaderComponent
     constructor(
         public params: TParams,

@@ -1,4 +1,4 @@
-import { lazy as reactLazy, ComponentType, LazyExoticComponent } from 'react';
+import { lazy as reactLazy, type ComponentType, type LazyExoticComponent } from 'react';
 
 /**
  * A `React.lazy` component that also exposes a `preload()` method to fetch

@@ -1,4 +1,4 @@
-import React, { ComponentType, FC, Suspense, useDeferredValue } from 'react';
+import React, { type ComponentType, type FC, Suspense, useDeferredValue } from 'react';
 import { observer } from 'mobx-react-lite';
 import { ViewLoader as GenericViewLoader } from './ViewLoader';
 import { useWebRouter } from '../stores/RootStore';

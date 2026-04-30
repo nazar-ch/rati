@@ -1,10 +1,13 @@
 import { observable, action, computed, runInAction } from 'mobx';
-import { ComponentType, FC } from 'react';
-import { createHistory, History, HistoryType, Location } from '../common/history';
+import type { ComponentType, FC } from 'react';
+import { createHistory, type History, type HistoryType, type Location } from '../common/history';
 import { interceptNavigations, isNavigationApiAvailable } from '../common/navigationInterceptor';
-import { installScrollRestoration, ScrollRestorationOptions } from '../common/scrollRestoration';
-import { TupleToUnion } from '../types/generic';
-import { CreateView, ViewComponent } from '../common/view';
+import {
+    installScrollRestoration,
+    type ScrollRestorationOptions,
+} from '../common/scrollRestoration';
+import type { TupleToUnion } from '../types/generic';
+import type { CreateView, ViewComponent } from '../common/view';
 import { GlobalStore } from '../stores/GlobalStore';
 // import { TupleToUnion } from 'type-fest';
 

@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import { observer } from 'mobx-react-lite';
-import { ComponentType, FC, ReactElement, useEffect, useRef, useState } from 'react';
-import { resolveView, ViewComponent, CreateView, RequiredViewParams } from './view';
+import { type ComponentType, type FC, type ReactElement, useEffect, useRef, useState } from 'react';
+import { resolveView, type ViewComponent, type CreateView, type RequiredViewParams } from './view';
 
 /* 
 Previous version with Refs for reference

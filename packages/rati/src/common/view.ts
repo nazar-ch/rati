@@ -1,10 +1,10 @@
 import is from '@sindresorhus/is';
-import { Simplify } from 'type-fest';
+import type { Simplify } from 'type-fest';
 import _ from 'lodash';
-import { FC } from 'react';
-import { ExcludeNever } from '../types/generic';
+import type { FC } from 'react';
+import type { ExcludeNever } from '../types/generic';
 
-const ViewSymbol = Symbol();
+export const ViewSymbol = Symbol();
 
 type ViewProp =
     | ((...args: any) => any | Promise<any>)

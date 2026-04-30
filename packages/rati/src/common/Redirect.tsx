@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import type { FC } from 'react';
 import { useWebRouter } from '../stores/RootStore';
 
 export const Redirect: FC<{ to: string }> = ({ to }) => {

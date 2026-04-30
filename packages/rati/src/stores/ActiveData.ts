@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import { observable, computed, runInAction } from 'mobx';
-import { PartialDeep, ReadonlyDeep } from 'type-fest';
-import { Expand } from '../types/generic';
+import type { PartialDeep, ReadonlyDeep } from 'type-fest';
+import type { Expand } from '../types/generic';
 
 export function dataMergeCustomizer(objValue: unknown, srcValue: unknown) {
     // Don't merge arrays

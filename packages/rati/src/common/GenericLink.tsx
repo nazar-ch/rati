@@ -28,9 +28,9 @@ SOFTWARE.
 */
 
 import { observer } from 'mobx-react-lite';
-import { createContext, memo, PropsWithChildren, useCallback, useContext } from 'react';
+import { createContext, memo, type PropsWithChildren, useCallback, useContext } from 'react';
 
-import { NameToRoute, GenericRouteType, WebRouterStore } from '../stores/WebRouterStore';
+import { type NameToRoute, type GenericRouteType, WebRouterStore } from '../stores/WebRouterStore';
 import { useWebRouter } from '../stores/RootStore';
 import { computed } from 'mobx';
 
@@ -118,7 +118,7 @@ export function createLinkComponent(componentClassName?: string) {
                 className={[
                     componentClassName || null,
                     className || null,
-                    isActive ? (activeClassName ?? 'active') : null,
+                    isActive ? activeClassName ?? 'active' : null,
                 ]
                     .filter((item) => item)
                     .join(' ')}
