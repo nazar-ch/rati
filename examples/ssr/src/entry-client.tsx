@@ -1,5 +1,5 @@
 import { hydrateRoot } from 'react-dom/client';
-import { createBrowserHistory, WebRouterHydratedState } from 'rati';
+import { createBrowserHistory, type WebRouterHydratedState } from 'rati';
 import { createApp } from './createApp';
 
 declare global {

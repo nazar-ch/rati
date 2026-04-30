@@ -1,15 +1,22 @@
-import { type History, RootStore, Router, type WebRouterHydratedState, WebRouterStore } from 'rati';
+import {
+    type History,
+    RootStore,
+    RootStoreProvider,
+    Router,
+    type WebRouterHydratedState,
+    WebRouterStore,
+} from 'rati';
 import { routes } from './routes';
 
 export interface CreateAppOptions {
     history: History;
-    hydratedState?: WebRouterHydratedState;
+    hydratedState?: WebRouterHydratedState | undefined;
 }
 
 export interface CreatedApp {
     router: WebRouterStore<typeof routes>;
     root: RootStore<{ router: WebRouterStore<typeof routes> }>;
-    App: () => JSX.Element;
+    App: () => React.ReactElement;
 }
 
 /**
@@ -23,9 +30,9 @@ export function createApp({ history, hydratedState }: CreateAppOptions): Created
 
     function App() {
         return (
-            <root.StoresProvider>
+            <RootStoreProvider rootStore={root}>
                 <Router />
-            </root.StoresProvider>
+            </RootStoreProvider>
         );
     }
 

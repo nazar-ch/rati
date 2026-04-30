@@ -1,5 +1,6 @@
 import { type FC } from 'react';
 import { createView, resolveView, sleep, type ViewComponent, viewParam } from 'rati';
+import { useStores } from './globalStores';
 
 class XClass {
     constructor(params: { whyNot: string; first: string }) {
@@ -59,7 +60,8 @@ async function test() {
 }
 
 export const SimpleTest: FC<{}> = () => {
-    return <div>simple test view</div>;
+    const { router } = useStores();
+    return <div>simple test view - {router.path}</div>;
 };
 
 export const TestRouteParamsWithoutView: FC<{ productId: string }> = ({ productId }) => {

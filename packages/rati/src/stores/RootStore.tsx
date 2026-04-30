@@ -23,10 +23,6 @@ export class RootStore<T extends GlobalStores> {
         if (options.isReady) this._isReady = true;
     }
 
-    get globalStores() {
-        return this.stores;
-    }
-
     /**
      * Blocks the app from rendering before rehydrating the stores
      */
@@ -47,26 +43,28 @@ export class RootStore<T extends GlobalStores> {
             this._isReady = true;
         });
     }
-
-    StoresContext = GenericStoresContext as Context<typeof this.stores | null>;
-
-    useStores = createUseStoresHook(this.StoresContext);
-
-    StoresProvider = observer(({ children }: { children: React.ReactNode }) => {
-        useEffect(() => {
-            if (this._isReady) return;
-            this.init().catch(console.error);
-        }, []);
-
-        if (!this._isReady) return null;
-
-        return (
-            <this.StoresContext.Provider value={this.stores}>
-                {children}
-            </this.StoresContext.Provider>
-        );
-    });
 }
+
+export const RootStoreProvider = observer(function RootStoreProvider({
+    rootStore,
+    children,
+}: {
+    rootStore: RootStore<any>;
+    children: React.ReactNode;
+}) {
+    useEffect(() => {
+        if (rootStore.isReady) return;
+        rootStore.init().catch(console.error);
+    }, []);
+
+    if (!rootStore.isReady) return null;
+
+    return (
+        <GenericStoresContext.Provider value={rootStore.stores}>
+            {children}
+        </GenericStoresContext.Provider>
+    );
+});
 
 async function mockHydration() {
     await sleep(5);
@@ -74,9 +72,9 @@ async function mockHydration() {
 
 export const GenericStoresContext = React.createContext<GlobalStores | null>(null);
 
-function createUseStoresHook<T extends unknown>(context: Context<T | null>) {
+export function createUseStoresHook<T extends GlobalStores = never>() {
     return function () {
-        const stores = React.useContext(context);
+        const stores = React.useContext(GenericStoresContext as Context<T | null>);
         if (!stores) {
             throw new Error('Store context is undefined. Use StoreProvider.');
         }
@@ -88,8 +86,10 @@ export interface GlobalStores {
     router?: WebRouterStore;
 }
 
-export const useGenericStores = createUseStoresHook(GenericStoresContext);
+/** @internal */
+export const useGenericStores = createUseStoresHook<GlobalStores>();
 
+/** @internal */
 export function useWebRouter() {
     const { router } = useGenericStores();
 

@@ -205,7 +205,7 @@ export interface WebRouterStoreOptions {
      * snapshot and skips the initial `setPath`/`getActiveRoute` async work, so
      * the first client render matches the server HTML byte-for-byte.
      */
-    hydratedState?: WebRouterHydratedState;
+    hydratedState?: WebRouterHydratedState | undefined;
 }
 
 function normalizeBasename(basename: string | undefined): string {
