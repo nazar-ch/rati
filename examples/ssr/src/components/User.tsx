@@ -1,4 +1,4 @@
-import { Link } from '../link';
+import { Link } from 'rati';
 
 export function User(props: { userId: string }) {
     return (

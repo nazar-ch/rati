@@ -9,6 +9,12 @@ import {
     TestRouteParamsWithoutView,
 } from './TestView';
 
+declare module 'rati' {
+    interface RatiUserTypes {
+        routes: typeof routes;
+    }
+}
+
 const NotFound = () => {
     return <div>- Not found -</div>;
 };

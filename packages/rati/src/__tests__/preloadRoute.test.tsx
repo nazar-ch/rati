@@ -3,11 +3,10 @@ import { FC } from 'react';
 import { act, render, fireEvent, cleanup } from '@testing-library/react';
 import { WebRouterStore, route } from '../stores/WebRouterStore';
 import { lazy } from '../common/lazy';
-import { createLinkComponent } from '../common/GenericLink';
+import { Link } from '../common/GenericLink';
 import { GenericStoresContext } from '../stores/RootStore';
 
 const NoopComponent: FC = () => null;
-const { Link } = createLinkComponent();
 
 beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');

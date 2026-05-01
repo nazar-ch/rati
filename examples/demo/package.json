@@ -4,12 +4,12 @@
     "version": "0.0.0",
     "type": "module",
     "scripts": {
-        "start": "vite",
+        "dev": "vite",
         "build": "tsc && vite build",
         "preview": "vite preview"
     },
     "dependencies": {
-        "rati": "^0.4.0-alpha.2",
+        "rati": "workspace:*",
         "react": "^19.2.5",
         "react-dom": "^19.2.5"
     },
@@ -19,6 +19,7 @@
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^6.0.1",
-        "vite": "^8.0.10"
+        "vite": "^8.0.10",
+        "vite-plugin-checker": "^0.13.0"
     }
 }

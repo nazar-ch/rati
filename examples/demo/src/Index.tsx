@@ -1,5 +1,4 @@
-import { sleep } from 'rati';
-import { Link } from './link';
+import { sleep, Link } from 'rati';
 
 export function Index() {
     return (
@@ -19,7 +18,6 @@ export function Index() {
             <br />
             <Link to={{ name: 'test' }}>test page</Link> {' | '}
             <Link href="/test/">test page (href)</Link>
-            {/* <Link to={} /> */}
             <br />
             <br />
             <Link to={{ name: 'test-route-params-without-view', productId: '23' }}>

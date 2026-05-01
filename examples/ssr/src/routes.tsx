@@ -3,6 +3,13 @@ import { Home } from './components/Home';
 import { User } from './components/User';
 import { About } from './components/About';
 import { NotFound } from './components/NotFound';
+import type { GenericRouteType } from 'rati';
+
+declare module 'rati' {
+    interface RatiUserTypes {
+        routes: typeof routes;
+    }
+}
 
 const aboutView = createView({
     serverTime: () => new Date().toISOString(),
@@ -24,4 +31,4 @@ export const routes = [
     route('/about', 'about', About, aboutView),
     route('/users/:userId', 'user', User),
     route('*', 'notFound', NotFound),
-] as const;
+] as const satisfies GenericRouteType[];

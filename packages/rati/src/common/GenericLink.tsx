@@ -1,36 +1,12 @@
-/*
-
-Based on https://github.com/ReactTraining/react-router/blob/master/packages/react-router-dom/modules/Link.js
-
-MIT License
-
-Copyright (c) React Training 2016-2018
-Copyright (c) Nazar Chobaniuk 2021-2022
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-*/
-
 import { observer } from 'mobx-react-lite';
 import { createContext, memo, type PropsWithChildren, useCallback, useContext } from 'react';
 
-import { type NameToRoute, type GenericRouteType, WebRouterStore } from '../stores/WebRouterStore';
+import {
+    type NameToRoute,
+    type GenericRouteType,
+    WebRouterStore,
+    type UserRoutes,
+} from '../stores/WebRouterStore';
 import { useWebRouter } from '../stores/RootStore';
 import { computed } from 'mobx';
 
@@ -66,125 +42,107 @@ type RatiRegularAnchorProps<T extends readonly GenericRouteType[]> = RatiLinkBas
     GenericAnchorProps &
     RatiLinkToProps<T>;
 
-export function createLinkComponent<T extends readonly GenericRouteType[] = []>(
-    componentClassName?: string
+const GenericAnchor = observer(function GenericAnchor({
+    className,
+    activeClassName,
+    content,
+    isActive,
+    href,
+    prefetch,
+    children,
+    onClick: userOnClick,
+    onMouseEnter: userOnMouseEnter,
+    onTouchStart: userOnTouchStart,
+    ...props
+}: PropsWithChildren<RatiGenericAnchorProps>) {
+    const webRouter = useWebRouter();
+
+    const handleOnClick = useCallback(
+        (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
+            if (userOnClick) userOnClick(event);
+            // When the Navigation API is wired up at the store level, the
+            // browser will fire `navigate` for this click and run our
+            // interceptor — handling modifiers, target, download, and
+            // cross-origin without us. Doing it here too would double-fire.
+            if (webRouter.hasNavigationApi) return;
+            if (!shouldHandleLinkClick(event)) return;
+            event.preventDefault();
+            webRouter.history.push(href);
+        },
+        [href, userOnClick, webRouter]
+    );
+
+    const handleMouseEnter = useCallback(
+        (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
+            if (userOnMouseEnter) userOnMouseEnter(event);
+            if (prefetch) webRouter.preloadRoute(href);
+        },
+        [href, prefetch, userOnMouseEnter, webRouter]
+    );
+
+    const handleTouchStart = useCallback(
+        (event: React.TouchEvent<HTMLAnchorElement>) => {
+            if (userOnTouchStart) userOnTouchStart(event);
+            if (prefetch) webRouter.preloadRoute(href);
+        },
+        [href, prefetch, userOnTouchStart, webRouter]
+    );
+
+    return (
+        <a
+            {...props}
+            href={`${href}`}
+            aria-current={isActive ? 'page' : undefined}
+            className={[className || null, isActive ? activeClassName ?? 'active' : null]
+                .filter((item) => item)
+                .join(' ')}
+            onClick={handleOnClick}
+            onMouseEnter={handleMouseEnter}
+            onTouchStart={handleTouchStart}
+        >
+            {children || (content && (isActive ? content.active : content.normal))}
+        </a>
+    );
+});
+
+export const Link = observer(function Link({
+    to,
+    href,
+    ...props
+}: PropsWithChildren<RatiRegularAnchorProps<UserRoutes>>) {
+    const webRouter = useWebRouter();
+
+    const resolvedHref = to ? webRouter.getPath(to) : href!;
+    const isActive = webRouter.isPath(resolvedHref);
+
+    return <GenericAnchor {...props} {...{ isActive, href: resolvedHref }} />;
+});
+
+export const LinkContextProvider = memo(function LinkContextProvider({
+    children,
+    to,
+}: {
+    children: React.ReactNode;
+    to: NameToRoute<UserRoutes> | string;
+}) {
+    const webRouter = useWebRouter();
+
+    return (
+        <LinkContext.Provider value={new LinkContextStore(webRouter, to)}>
+            {children}
+        </LinkContext.Provider>
+    );
+});
+
+export const ContextualLink = observer(function ContextualAnchor(
+    props: PropsWithChildren<RatiLinkBaseProps & GenericAnchorProps>
 ) {
-    const GenericAnchor = observer(function GenericAnchor({
-        className,
-        activeClassName,
-        content,
-        isActive,
-        href,
-        prefetch,
-        children,
-        onClick: userOnClick,
-        onMouseEnter: userOnMouseEnter,
-        onTouchStart: userOnTouchStart,
-        ...props
-    }: PropsWithChildren<RatiGenericAnchorProps>) {
-        const webRouter = useWebRouter();
+    const linkContext = useLinkContext();
 
-        const handleOnClick = useCallback(
-            (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
-                if (userOnClick) userOnClick(event);
-                // When the Navigation API is wired up at the store level, the
-                // browser will fire `navigate` for this click and run our
-                // interceptor — handling modifiers, target, download, and
-                // cross-origin without us. Doing it here too would double-fire.
-                if (webRouter.hasNavigationApi) return;
-                if (!shouldHandleLinkClick(event)) return;
-                event.preventDefault();
-                webRouter.history.push(href);
-            },
-            [href, userOnClick, webRouter]
-        );
-
-        const handleMouseEnter = useCallback(
-            (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
-                if (userOnMouseEnter) userOnMouseEnter(event);
-                if (prefetch) webRouter.preloadRoute(href);
-            },
-            [href, prefetch, userOnMouseEnter, webRouter]
-        );
-
-        const handleTouchStart = useCallback(
-            (event: React.TouchEvent<HTMLAnchorElement>) => {
-                if (userOnTouchStart) userOnTouchStart(event);
-                if (prefetch) webRouter.preloadRoute(href);
-            },
-            [href, prefetch, userOnTouchStart, webRouter]
-        );
-
-        return (
-            <a
-                {...props}
-                href={`${href}`}
-                aria-current={isActive ? 'page' : undefined}
-                className={[
-                    componentClassName || null,
-                    className || null,
-                    isActive ? activeClassName ?? 'active' : null,
-                ]
-                    .filter((item) => item)
-                    .join(' ')}
-                onClick={handleOnClick}
-                onMouseEnter={handleMouseEnter}
-                onTouchStart={handleTouchStart}
-            >
-                {children || (content && (isActive ? content.active : content.normal))}
-            </a>
-        );
-    });
-
-    const RegularAnchor = observer(function RegularAnchor({
-        to,
-        href,
-        ...props
-    }: PropsWithChildren<RatiRegularAnchorProps<T>>) {
-        const webRouter = useWebRouter();
-
-        const resolvedHref = to ? webRouter.getPath(to) : href!;
-        const isActive = webRouter.isPath(resolvedHref);
-
-        return <GenericAnchor {...props} {...{ isActive, href: resolvedHref }} />;
-    });
-
-    const LinkContextProvider = memo(function LinkContextProvider({
-        children,
-        to,
-    }: {
-        children: React.ReactNode;
-        to: NameToRoute<T> | string;
-    }) {
-        const webRouter = useWebRouter();
-
-        return (
-            <LinkContext.Provider value={new LinkContextStore(webRouter, to)}>
-                {children}
-            </LinkContext.Provider>
-        );
-    });
-
-    const ContextualAnchor = observer(function ContextualAnchor({
-        ...props
-    }: PropsWithChildren<RatiLinkBaseProps & GenericAnchorProps>) {
-        const linkContext = useLinkContext();
-
-        return (
-            <GenericAnchor
-                {...props}
-                {...{ isActive: linkContext.isActive, href: linkContext.href }}
-            />
-        );
-    });
-
-    return {
-        Link: RegularAnchor,
-        ContextualLink: ContextualAnchor,
-        LinkContextProvider,
-        useLinkContext,
-    };
-}
+    return (
+        <GenericAnchor {...props} {...{ isActive: linkContext.isActive, href: linkContext.href }} />
+    );
+});
 
 /**
  * Decide whether to intercept this link click for SPA navigation, or let the

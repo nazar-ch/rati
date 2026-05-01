@@ -23,6 +23,7 @@ export {
     type WebRouterHydratedState,
     type ExtractRouteParams,
     type GenericRouteType,
+    type RatiUserTypes,
 } from './stores/WebRouterStore';
 export { Router } from './common/Router';
 export {
@@ -46,7 +47,7 @@ export { ViewLoader, type ViewLoaderComponent } from './common/ViewLoader';
 
 export * from './types/generic';
 
-export { createLinkComponent, useLinkContext } from './common/GenericLink';
+export { Link, ContextualLink, LinkContextProvider, useLinkContext } from './common/GenericLink';
 export { lazy, type PreloadableLazyComponent } from './common/lazy';
 export { Redirect } from './common/Redirect';
 export { prepareRoute, type PreparedRoute } from './common/prepareRoute';

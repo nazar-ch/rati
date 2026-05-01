@@ -81,6 +81,16 @@ export function routeLegacy<
 }
 */
 
+// -------------------------------------------------------------
+
+export interface RatiUserTypes {
+    // routes: GenericRouteType[];
+}
+
+export type UserRoutes = RatiUserTypes extends { routes: infer R } ? R : never;
+
+// -------------------------------------------------------------
+
 export type ViewComponentForOptionalView<
     View extends CreateView<any> | undefined,
     Params extends {},
