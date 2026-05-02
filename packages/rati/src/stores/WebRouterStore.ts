@@ -1,4 +1,4 @@
-import { observable, action, computed, runInAction } from 'mobx';
+import { observable, action, computed } from 'mobx';
 import type { ComponentType, FC } from 'react';
 import { createHistory, type History, type HistoryType, type Location } from '../common/history';
 import { interceptNavigations, isNavigationApiAvailable } from '../common/navigationInterceptor';
@@ -151,7 +151,7 @@ type RoutesType<
     } & ExtractRouteParams<T[K]['path']>;
 };
 
-type GetView = Awaited<ReturnType<WebRouterStore<GenericRouteType[]>['getActiveRoute']>>;
+type GetView = ReturnType<WebRouterStore<GenericRouteType[]>['getActiveRoute']>;
 
 /** Activated route shape, with an optional hydration-only payload. */
 type ActiveRoute = NonNullable<GetView> & {
@@ -250,10 +250,10 @@ export class WebRouterStore<
     /** Normalized basename — empty string when none was configured. */
     readonly basename: string;
     /**
-     * Resolves once the most recent `setPath` (initial or navigation-triggered)
-     * has finished updating `activeRoute`. Server entries can `await` this
-     * before reading the route to avoid the async gap between constructor and
-     * the first matched route.
+     * Always-resolved sentinel kept for backwards compatibility with server
+     * entries that `await` it before reading `activeRoute`. Navigation is now
+     * synchronous, so `activeRoute` is populated by the time the constructor
+     * returns and awaiting this is a no-op.
      */
     pendingNavigation: Promise<void> = Promise.resolve();
     private readonly historyType: 'browser' | 'hash';
@@ -270,7 +270,7 @@ export class WebRouterStore<
         this.basename = normalizeBasename(options.basename);
 
         const listener = ({ location }: { location: Location }) => {
-            this.pendingNavigation = this.setPath(location);
+            this.setPath(location);
         };
 
         if (options.history) {
@@ -311,13 +311,12 @@ export class WebRouterStore<
         }
 
         if (options.hydratedState) {
-            // Server-rendered snapshot — seed observables synchronously so the
-            // first client render matches the server HTML. Skip the initial
-            // async setPath; the route is already resolved.
+            // Server-rendered snapshot — seed observables so the first client
+            // render matches the server HTML. The route is already resolved.
             this.seedFromHydratedState(options.hydratedState);
         } else {
             // Set path where the page is opened
-            this.pendingNavigation = this.setPath(this.history.location);
+            this.setPath(this.history.location);
         }
     }
 
@@ -439,7 +438,7 @@ export class WebRouterStore<
         ? globalThis.crypto.randomUUID()
         : // for local development, and Node < 19 where globalThis.crypto is absent
           `${Math.random()}-${Math.random()}`;
-    @action.bound async setPath(location: Location) {
+    @action.bound setPath(location: Location) {
         const { state } = location;
         const pathname = stripBasename(location.pathname, this.basename);
         const currentPathCounter = this.pathCounter++;
@@ -449,9 +448,11 @@ export class WebRouterStore<
         this._search = location.search;
         this._hash = location.hash;
 
-        // Don't reload the current page
-        // It happens after calling `replace` and navigation to the same path after
-        if (this._path === pathname) {
+        // Skip resolution only when the URL didn't change AND we already have
+        // a resolved route. Otherwise we'd skip on the initial mount race or
+        // on StrictMode re-fires where _path was set but activeRoute wasn't
+        // yet committed.
+        if (this._path === pathname && this.activeRoute) {
             return;
         }
 
@@ -467,16 +468,14 @@ export class WebRouterStore<
             return;
         }
 
-        const activeRoute = await this.getActiveRoute(
-            this.path,
-            this.stores as any,
-            // Using this number as `key` ensures that the route that was not
-            // skipped above will be rerendered
-            this.pathCounter
-        );
-        runInAction(() => {
-            this.activeRoute = activeRoute ?? null;
-        });
+        this.activeRoute =
+            this.getActiveRoute(
+                this.path,
+                this.stores as any,
+                // Using this number as `key` ensures that the route that was not
+                // skipped above will be rerendered
+                this.pathCounter
+            ) ?? null;
     }
 
     /**
@@ -522,7 +521,7 @@ export class WebRouterStore<
         this.history.replace(path, { skip: `${this.pathCounter}/${this.sessionId}` });
     }
 
-    async getActiveRoute(currentPath: string, _stores: any, pathCounter: number) {
+    getActiveRoute(currentPath: string, _stores: any, pathCounter: number) {
         for (const { pathRe, path, view, name, component, wrapperComponent } of this.routes) {
             let result;
 
