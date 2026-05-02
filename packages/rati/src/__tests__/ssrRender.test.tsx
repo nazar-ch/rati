@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { WebRouterStore, route } from '../stores/WebRouterStore';
-import { RootStore } from '../stores/RootStore';
+import { RootStore, RootStoreProvider } from '../stores/RootStore';
 import { Router } from '../common/Router';
 import { createMemoryHistory } from '../common/history';
 import { prepareRoute } from '../common/prepareRoute';
@@ -31,9 +31,9 @@ function buildAppFor(url: string) {
     });
     const root = new RootStore({ router }, { isReady: true });
     const App = () => (
-        <root.StoresProvider>
+        <RootStoreProvider rootStore={root}>
             <Router />
-        </root.StoresProvider>
+        </RootStoreProvider>
     );
     return { router, root, App };
 }
@@ -89,9 +89,9 @@ describe('renderToString with WebRouterStore + memory history', () => {
         await prepareRoute(router);
 
         const html = renderToString(
-            <root.StoresProvider>
+            <RootStoreProvider rootStore={root}>
                 <Router />
-            </root.StoresProvider>
+            </RootStoreProvider>
         );
 
         expect(html).toContain('hello from server');

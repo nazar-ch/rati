@@ -83,7 +83,7 @@ describe('<Link prefetch>', () => {
         const stores = { router };
         const utils = render(
             <GenericStoresContext.Provider value={stores}>
-                <Link to={opts.href} prefetch={opts.prefetch}>
+                <Link href={opts.href} prefetch={opts.prefetch}>
                     go
                 </Link>
             </GenericStoresContext.Provider>

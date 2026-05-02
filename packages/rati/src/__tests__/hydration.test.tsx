@@ -2,7 +2,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { hydrateRoot } from 'react-dom/client';
 import { WebRouterStore, route } from '../stores/WebRouterStore';
-import { RootStore } from '../stores/RootStore';
+import { RootStore, RootStoreProvider } from '../stores/RootStore';
 import { Router } from '../common/Router';
 import { createBrowserHistory, createMemoryHistory } from '../common/history';
 import { prepareRoute } from '../common/prepareRoute';
@@ -39,9 +39,9 @@ async function ssrThenHydrate(url: string, routes: any) {
     const prepared = await prepareRoute(serverRouter);
 
     const ServerApp = () => (
-        <serverRoot.StoresProvider>
+        <RootStoreProvider rootStore={serverRoot}>
             <Router />
-        </serverRoot.StoresProvider>
+        </RootStoreProvider>
     );
     const html = renderToString(<ServerApp />);
     serverRouter.dispose();
@@ -59,9 +59,9 @@ async function ssrThenHydrate(url: string, routes: any) {
     const clientRoot = new RootStore({ router: clientRouter }, { isReady: true });
 
     const ClientApp = () => (
-        <clientRoot.StoresProvider>
+        <RootStoreProvider rootStore={clientRoot}>
             <Router />
-        </clientRoot.StoresProvider>
+        </RootStoreProvider>
     );
 
     let root: ReturnType<typeof hydrateRoot>;
