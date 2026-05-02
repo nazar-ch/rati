@@ -1,6 +1,6 @@
 import { observable, action, computed } from 'mobx';
 import type { ComponentType, FC } from 'react';
-import { createHistory, type History, type HistoryType, type Location } from '../common/history';
+import { createBrowserHistory, type History, type Location } from '../common/history';
 import {
     installScrollRestoration,
     type ScrollRestorationOptions,
@@ -183,16 +183,9 @@ export interface WebRouterHydratedState {
 
 export interface WebRouterStoreOptions {
     /**
-     * Choose history mode. Defaults to auto-detect: `file:` protocol → `hash`
-     * (Electron-friendly), otherwise `browser`. Ignored when {@link history}
-     * is provided — the caller has already decided.
-     */
-    historyType?: HistoryType;
-    /**
      * Inject a {@link History} instance instead of letting the store create
      * one. Pair with `createMemoryHistory({ url })` for server rendering or
-     * any other host that doesn't have a DOM. When set, `historyType` is
-     * ignored. Defaults to `createHistory()` (auto-detected browser/hash).
+     * any other host that doesn't have a DOM.
      */
     history?: History;
     /**
@@ -267,9 +260,7 @@ export class WebRouterStore<
         if (options.history) {
             this.history = options.history;
         } else {
-            this.history = options.historyType
-                ? createHistory({ type: options.historyType })
-                : createHistory();
+            this.history = createBrowserHistory();
         }
         this.unlistenHistory = this.history.listen(listener);
 

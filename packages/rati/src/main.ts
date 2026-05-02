@@ -27,12 +27,9 @@ export {
 } from './stores/WebRouterStore';
 export { Router } from './common/Router';
 export {
-    createHistory,
     createBrowserHistory,
-    createHashHistory,
     createMemoryHistory,
     type History,
-    type HistoryType,
     type Location as HistoryLocation,
     type HistoryListener,
     type HistoryUpdate,

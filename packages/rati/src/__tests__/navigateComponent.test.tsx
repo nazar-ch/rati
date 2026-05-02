@@ -5,15 +5,12 @@ import { WebRouterStore, route } from '../stores/WebRouterStore';
 import { Router } from '../common/Router';
 import { Navigate } from '../common/Navigate';
 import { GenericStoresContext } from '../stores/RootStore';
-import { createHashHistory, createBrowserHistory } from '../common/history';
+import { createBrowserHistory } from '../common/history';
 
 const Home: FC = () => <Navigate to="/dashboard" />;
 const Dashboard: FC = () => <div data-testid="dashboard">dashboard</div>;
 
-const routes = [
-    route('/', 'home', Home),
-    route('/dashboard', 'dashboard', Dashboard),
-] as const;
+const routes = [route('/', 'home', Home), route('/dashboard', 'dashboard', Dashboard)] as const;
 
 beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');
@@ -34,22 +31,6 @@ function renderApp(router: WebRouterStore<any>) {
 }
 
 describe('<Navigate>', () => {
-    test('navigates to the target route under hash history + StrictMode', async () => {
-        window.history.replaceState(null, '', 'http://localhost/#/');
-        const history = createHashHistory();
-        const router = new WebRouterStore({}, routes, { history });
-        renderApp(router);
-
-        await act(async () => {
-            await Promise.resolve();
-        });
-
-        expect(screen.getByTestId('dashboard')).toBeDefined();
-        expect(window.location.hash).toBe('#/dashboard');
-        expect(router.path).toBe('/dashboard');
-        router.dispose();
-    });
-
     test('navigates to the target route under browser history + StrictMode', async () => {
         const history = createBrowserHistory();
         const router = new WebRouterStore({}, routes, { history });

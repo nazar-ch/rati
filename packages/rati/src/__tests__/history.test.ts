@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest';
-import { createBrowserHistory, createHashHistory, createHistory } from '../common/history';
+import { createBrowserHistory } from '../common/history';
 
 beforeEach(() => {
     // jsdom persists URL state across tests; reset to a known starting point.
@@ -80,62 +80,4 @@ describe('createBrowserHistory', () => {
         expect(listener).toHaveBeenCalledOnce();
         expect(listener.mock.calls[0]![0].action).toBe('POP');
     });
-});
-
-describe('createHashHistory', () => {
-    test('reads the route from location.hash', () => {
-        window.history.replaceState(null, '', '/index.html#/dashboard?tab=users');
-        const history = createHashHistory();
-        expect(history.location.pathname).toBe('/dashboard');
-        expect(history.location.search).toBe('?tab=users');
-    });
-
-    test('defaults to "/" when there is no hash', () => {
-        window.history.replaceState(null, '', '/index.html');
-        const history = createHashHistory();
-        expect(history.location.pathname).toBe('/');
-    });
-
-    test('push() encodes the route into the hash', () => {
-        window.history.replaceState(null, '', '/index.html');
-        const history = createHashHistory();
-        const listener = vi.fn();
-        history.listen(listener);
-
-        history.push('/foo');
-
-        expect(window.location.hash).toBe('#/foo');
-        expect(history.location.pathname).toBe('/foo');
-        expect(listener.mock.calls[0]![0].action).toBe('PUSH');
-    });
-
-    test('replace() updates the hash without growing history', () => {
-        window.history.replaceState(null, '', '/index.html#/a');
-        const history = createHashHistory();
-        history.replace('/b');
-
-        expect(window.location.hash).toBe('#/b');
-        expect(history.location.pathname).toBe('/b');
-    });
-});
-
-describe('createHistory', () => {
-    test('uses browser history under http://', () => {
-        window.history.replaceState(null, '', '/some/path');
-        const history = createHistory();
-        expect(history.location.pathname).toBe('/some/path');
-    });
-
-    test('honors an explicit type override', () => {
-        window.history.replaceState(null, '', '/some/path');
-        const history = createHistory({ type: 'hash' });
-        // With hash mode forced, pathname comes from the hash (which is empty → "/").
-        expect(history.location.pathname).toBe('/');
-    });
-
-    // Auto-detection of `file:` → hash mode is one line of code; jsdom makes
-    // window.location.protocol non-configurable so we can't mock it without
-    // rebuilding the whole environment. Covered indirectly: the file:// path
-    // returns createHashHistory(), which is exercised by the createHashHistory
-    // suite above.
 });

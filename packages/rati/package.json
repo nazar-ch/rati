@@ -1,6 +1,6 @@
 {
     "name": "rati",
-    "version": "0.4.4-alpha.1",
+    "version": "0.4.6-alpha.1",
     "description": "TypeScript frontend framework for React & MobX",
     "author": "Nazar Chobaniuk",
     "license": "MIT",
@@ -25,7 +25,7 @@
         "watch": "yarn -T run tsc --watch",
         "test": "vitest run --typecheck",
         "test:watch": "vitest --typecheck",
-        "publish": "yarn build && npm publish --tag latest"
+        "pub": "yarn build && npm publish --tag latest"
     },
     "dependencies": {
         "@sindresorhus/is": "^5.3.0",
