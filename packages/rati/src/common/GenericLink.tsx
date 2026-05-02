@@ -60,11 +60,6 @@ const GenericAnchor = observer(function GenericAnchor({
     const handleOnClick = useCallback(
         (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
             if (userOnClick) userOnClick(event);
-            // When the Navigation API is wired up at the store level, the
-            // browser will fire `navigate` for this click and run our
-            // interceptor — handling modifiers, target, download, and
-            // cross-origin without us. Doing it here too would double-fire.
-            if (webRouter.hasNavigationApi) return;
             if (!shouldHandleLinkClick(event)) return;
             event.preventDefault();
             webRouter.navigate(href);

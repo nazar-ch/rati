@@ -1,7 +1,6 @@
 import { observable, action, computed } from 'mobx';
 import type { ComponentType, FC } from 'react';
 import { createHistory, type History, type HistoryType, type Location } from '../common/history';
-import { interceptNavigations, isNavigationApiAvailable } from '../common/navigationInterceptor';
 import {
     installScrollRestoration,
     type ScrollRestorationOptions,
@@ -239,14 +238,8 @@ export class WebRouterStore<
     T extends readonly GenericRouteType[] = readonly GenericRouteType[],
 > extends GlobalStore<any> {
     history: History;
+
     unlistenHistory: () => void;
-    /**
-     * True when `window.navigation` is available and we registered an
-     * interceptor for it. Components like `<Link>` use this to skip work the
-     * platform now does for us (modifier-key checks, target/download handling,
-     * cross-origin checks, etc.).
-     */
-    readonly hasNavigationApi: boolean;
     /** Normalized basename — empty string when none was configured. */
     readonly basename: string;
     /**
@@ -256,8 +249,6 @@ export class WebRouterStore<
      * returns and awaiting this is a no-op.
      */
     pendingNavigation: Promise<void> = Promise.resolve();
-    private readonly historyType: 'browser' | 'hash';
-    private uninstallNavigationInterceptor: () => void = () => {};
     private uninstallScrollRestoration: () => void = () => {};
 
     constructor(
@@ -274,34 +265,13 @@ export class WebRouterStore<
         };
 
         if (options.history) {
-            // Caller-supplied history (e.g. createMemoryHistory for SSR).
-            // historyType is unused for routing — it only gates the Navigation
-            // API wiring below — so default to 'browser' for that purpose.
             this.history = options.history;
-            this.historyType = options.historyType ?? 'browser';
         } else {
-            this.historyType =
-                options.historyType ??
-                (typeof window !== 'undefined' && window.location.protocol === 'file:'
-                    ? 'hash'
-                    : 'browser');
-            this.history = createHistory({ type: this.historyType });
+            this.history = options.historyType
+                ? createHistory({ type: options.historyType })
+                : createHistory();
         }
         this.unlistenHistory = this.history.listen(listener);
-
-        // Hash mode bypasses the Navigation API: a click on `<a href="#/foo">`
-        // is a same-document hash change, which the API surfaces as
-        // `event.hashChange = true` and we deliberately skip. So the per-Link
-        // click handler stays the only path in hash mode.
-        this.hasNavigationApi = this.historyType === 'browser' && isNavigationApiAvailable();
-        if (this.hasNavigationApi) {
-            this.uninstallNavigationInterceptor = interceptNavigations(() => {
-                // The Navigation API has already updated window.location and
-                // window.history.state; broadcast so all listeners (route
-                // matching, scroll restoration) see the new entry.
-                this.history.notify('PUSH');
-            });
-        }
 
         if (options.scrollRestoration !== false) {
             this.uninstallScrollRestoration = installScrollRestoration(
@@ -353,7 +323,6 @@ export class WebRouterStore<
 
     dispose() {
         this.unlistenHistory();
-        this.uninstallNavigationInterceptor();
         this.uninstallScrollRestoration();
     }
 

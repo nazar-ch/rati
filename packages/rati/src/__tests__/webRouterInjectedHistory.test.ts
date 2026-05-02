@@ -36,16 +36,6 @@ describe('WebRouterStore with injected history', () => {
         router.dispose();
     });
 
-    test('reports hasNavigationApi=false when running without window.navigation', () => {
-        const history = createMemoryHistory({ url: '/' });
-        const router = new WebRouterStore({}, routes, { history });
-        // jsdom does not implement window.navigation, and a memory history
-        // wouldn't be wired to it anyway. Either way, this must be false so
-        // the per-Link click handler stays the navigation path.
-        expect(router.hasNavigationApi).toBe(false);
-        router.dispose();
-    });
-
     test('can match wildcard routes through injected history', async () => {
         const history = createMemoryHistory({ url: '/no/such/route' });
         const router = new WebRouterStore({}, routes, { history });
