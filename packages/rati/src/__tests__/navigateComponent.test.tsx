@@ -3,11 +3,11 @@ import { StrictMode, type FC } from 'react';
 import { act, render, screen, cleanup } from '@testing-library/react';
 import { WebRouterStore, route } from '../stores/WebRouterStore';
 import { Router } from '../common/Router';
-import { Redirect } from '../common/Redirect';
+import { Navigate } from '../common/Navigate';
 import { GenericStoresContext } from '../stores/RootStore';
 import { createHashHistory, createBrowserHistory } from '../common/history';
 
-const Home: FC = () => <Redirect to="/dashboard" />;
+const Home: FC = () => <Navigate to="/dashboard" />;
 const Dashboard: FC = () => <div data-testid="dashboard">dashboard</div>;
 
 const routes = [
@@ -33,7 +33,7 @@ function renderApp(router: WebRouterStore<any>) {
     );
 }
 
-describe('<Redirect>', () => {
+describe('<Navigate>', () => {
     test('navigates to the target route under hash history + StrictMode', async () => {
         window.history.replaceState(null, '', 'http://localhost/#/');
         const history = createHashHistory();

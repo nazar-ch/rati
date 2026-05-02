@@ -458,7 +458,7 @@ export class WebRouterStore<
 
         this._path = pathname;
 
-        // Skip rendering the route if it was set by `replace`
+        // Skip rendering the route if it was set by `replace({ keepCurrentRoute: true })`
         if (
             typeof state === 'object' &&
             state &&
@@ -499,26 +499,44 @@ export class WebRouterStore<
         }
     }
 
-    @action.bound redirect(to: NameToRoute<T> | string) {
-        let path: string;
-        if (typeof to === 'string') {
-            path = to;
-        } else {
-            path = this.getPath(to);
-        }
-
-        this.history.replace(path);
+    /**
+     * Navigate to `to` by pushing a new history entry. The route re-resolves
+     * and re-renders; browser back returns to the previous URL.
+     *
+     * Use for ordinary user-initiated navigation. `<Link>` calls this under
+     * the hood. For programmatic redirects where the previous URL must not be
+     * reachable via back (post-login, auth-gate, canonicalization), use
+     * `replace()`.
+     */
+    @action.bound navigate(to: NameToRoute<T> | string) {
+        const path = typeof to === 'string' ? to : this.getPath(to);
+        this.history.push(path);
     }
 
-    @action.bound replace(to: NameToRoute<T> | string) {
-        let path: string;
-        if (typeof to === 'string') {
-            path = to;
-        } else {
-            path = this.getPath(to);
-        }
-
-        this.history.replace(path, { skip: `${this.pathCounter}/${this.sessionId}` });
+    /**
+     * Navigate to `to` by replacing the current history entry. The route
+     * re-resolves and re-renders, but browser back skips the previous URL.
+     *
+     * Use when the *previous* URL should not be reachable via back: post-login
+     * redirects, auth-gate bounces, URL canonicalization (e.g. `/users` →
+     * `/users/1`), navigation after a destructive action.
+     *
+     * Pass `{ keepCurrentRoute: true }` to update the URL without re-resolving
+     * the route — the currently mounted route component stays mounted. Useful
+     * when the same route owns sub-state reflected in the URL (an editor
+     * swapping files via tabs, a media player changing tracks). Always pairs
+     * with replace semantics by design — a "shallow" change isn't a real
+     * navigation, so it shouldn't grow the back stack either.
+     */
+    @action.bound replace(
+        to: NameToRoute<T> | string,
+        options: { keepCurrentRoute?: boolean } = {}
+    ) {
+        const path = typeof to === 'string' ? to : this.getPath(to);
+        const state = options.keepCurrentRoute
+            ? { skip: `${this.pathCounter}/${this.sessionId}` }
+            : null;
+        this.history.replace(path, state);
     }
 
     getActiveRoute(currentPath: string, _stores: any, pathCounter: number) {

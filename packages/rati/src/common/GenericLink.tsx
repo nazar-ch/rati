@@ -67,7 +67,7 @@ const GenericAnchor = observer(function GenericAnchor({
             if (webRouter.hasNavigationApi) return;
             if (!shouldHandleLinkClick(event)) return;
             event.preventDefault();
-            webRouter.history.push(href);
+            webRouter.navigate(href);
         },
         [href, userOnClick, webRouter]
     );

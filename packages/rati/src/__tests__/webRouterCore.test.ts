@@ -111,12 +111,28 @@ describe('WebRouterStore.isPath', () => {
 });
 
 describe('WebRouterStore navigation', () => {
-    test('redirect() updates the URL via history.replace', async () => {
+    test('navigate() pushes a new history entry and resolves the route', async () => {
         const router = new WebRouterStore({}, routes);
         await Promise.resolve();
         const startLength = window.history.length;
 
-        router.redirect({ name: 'user', userId: '7' });
+        router.navigate({ name: 'user', userId: '7' });
+        await Promise.resolve();
+
+        expect(window.location.pathname).toBe('/users/7');
+        expect(router.path).toBe('/users/7');
+        expect(router.activeRoute?.name).toBe('user');
+        // push grows the back stack
+        expect(window.history.length).toBe(startLength + 1);
+        router.dispose();
+    });
+
+    test('replace() updates the URL via history.replace', async () => {
+        const router = new WebRouterStore({}, routes);
+        await Promise.resolve();
+        const startLength = window.history.length;
+
+        router.replace({ name: 'user', userId: '7' });
         await Promise.resolve();
 
         expect(window.location.pathname).toBe('/users/7');
@@ -127,28 +143,28 @@ describe('WebRouterStore navigation', () => {
         router.dispose();
     });
 
-    test('redirect() accepts a string URL', async () => {
+    test('replace() accepts a string URL', async () => {
         const router = new WebRouterStore({}, routes);
         await Promise.resolve();
-        router.redirect('/dashboard');
+        router.replace('/dashboard');
         await Promise.resolve();
         expect(router.path).toBe('/dashboard');
         router.dispose();
     });
 
-    test('replace() updates the URL but skips re-rendering the route', async () => {
+    test('replace({ keepCurrentRoute: true }) updates the URL but keeps the current route mounted', async () => {
         window.history.replaceState(null, '', '/dashboard');
         const router = new WebRouterStore({}, routes);
         await Promise.resolve();
         const before = router.activeRoute;
 
-        router.replace({ name: 'user', userId: '1' });
+        router.replace({ name: 'user', userId: '1' }, { keepCurrentRoute: true });
         await Promise.resolve();
 
         expect(window.location.pathname).toBe('/users/1');
         // Path observable updates even though the route itself was skipped.
         expect(router.path).toBe('/users/1');
-        // Route object is the previous one (replace flagged this as skip).
+        // Route object is the previous one (keepCurrentRoute flagged this as skip).
         expect(router.activeRoute).toBe(before);
         router.dispose();
     });

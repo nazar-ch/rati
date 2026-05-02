@@ -49,7 +49,7 @@ export * from './types/generic';
 
 export { Link, ContextualLink, LinkContextProvider, useLinkContext } from './common/GenericLink';
 export { lazy, type PreloadableLazyComponent } from './common/lazy';
-export { Redirect } from './common/Redirect';
+export { Navigate } from './common/Navigate';
 export { prepareRoute, type PreparedRoute } from './common/prepareRoute';
 
 export { remoteData } from './common/remoteData';
