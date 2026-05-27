@@ -1,7 +1,7 @@
-import _ from 'lodash';
 import { observer } from 'mobx-react-lite';
 import { type ComponentType, type FC, type ReactElement, useEffect, useRef, useState } from 'react';
 import { resolveView, type ViewComponent, type CreateView, type RequiredViewParams } from './view';
+import { deepEqual } from './utils';
 
 /* 
 Previous version with Refs for reference
@@ -14,7 +14,7 @@ const LegacyViewLoader: LegacyGenericViewLoaderComponent<{
     const viewRef = useRef<View<any> | null>(null);
     const paramsRef = useRef<Record<string, unknown> | null>(null);
 
-    if (!_.isEqual(paramsRef.current, params)) {
+    if (!deepEqual(paramsRef.current, params)) {
         paramsRef.current = params;
         viewRef.current = viewClass.create(params, stores);
     }
@@ -84,7 +84,7 @@ export const ViewLoader: GenericViewLoaderComponent<{
     const hydratedParamsRef = useRef<typeof params | null>(initialViewProps ? params : null);
 
     useEffect(() => {
-        if (hydratedParamsRef.current && _.isEqual(params, hydratedParamsRef.current)) {
+        if (hydratedParamsRef.current && deepEqual(params, hydratedParamsRef.current)) {
             // First mount with hydrated props — already have data.
             hydratedParamsRef.current = null;
             return;
@@ -92,7 +92,7 @@ export const ViewLoader: GenericViewLoaderComponent<{
         // Use shallow comparison
         // `params` may include object like stores and no need to resolve the view again is something changes
         // inside them
-        if (!_.isEqual(params, prevParams)) {
+        if (!deepEqual(params, prevParams)) {
             (async () => {
                 const res = await resolveView(view, params);
                 setViewProps(res);

@@ -1,14 +1,7 @@
-import _ from 'lodash';
 import { observable, computed, runInAction } from 'mobx';
 import type { PartialDeep, ReadonlyDeep } from 'type-fest';
 import type { Expand } from '../types/generic';
-
-export function dataMergeCustomizer(objValue: unknown, srcValue: unknown) {
-    // Don't merge arrays
-    if (_.isArray(objValue)) return srcValue;
-
-    return undefined;
-}
+import { deepMergeReplaceArrays } from '../common/utils';
 
 export abstract class ActiveData<T> {
     protected constructor(data: T) {
@@ -37,11 +30,10 @@ export abstract class ActiveData<T> {
         // TODO: consider replacing this with a shallow merge
         // Now { a: { a: 1, b: 2 } } + draft = { a: { b: 3 } results in { a: { a: 1, b: 2 } },
         // but { a: { b: 3 } } may be expected in this case
-        return _.mergeWith(
-            {},
+        return deepMergeReplaceArrays(
+            {} as T,
             this.originalData,
-            this.draft,
-            dataMergeCustomizer
+            this.draft as Partial<T>
         ) as ReadonlyDeep<T>;
     }
 
@@ -107,11 +99,10 @@ export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
 
     // This filed is used in getters created by extendInstance
     @computed protected get data(): ReadonlyDeep<ApiResult<TConstructorApiFactory>> {
-        return _.mergeWith(
-            {},
+        return deepMergeReplaceArrays(
+            {} as ApiResult<TConstructorApiFactory>,
             this.rawData,
-            this.draft,
-            dataMergeCustomizer
+            this.draft as Partial<ApiResult<TConstructorApiFactory>>
             // @ts-expect-error FIXME
         ) as ReadonlyDeep<ClassTData>;
     }

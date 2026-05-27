@@ -53,8 +53,10 @@ export const RootStoreProvider = observer(function RootStoreProvider({
     children: React.ReactNode;
 }) {
     useEffect(() => {
-        if (rootStore.isReady) return;
-        rootStore.init().catch(console.error);
+        runInAction(() => {
+            if (rootStore.isReady) return;
+            rootStore.init().catch(console.error);
+        });
     }, []);
 
     if (!rootStore.isReady) return null;

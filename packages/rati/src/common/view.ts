@@ -1,8 +1,7 @@
-import is from '@sindresorhus/is';
 import type { Simplify } from 'type-fest';
-import _ from 'lodash';
 import type { FC } from 'react';
 import type { ExcludeNever } from '../types/generic';
+import { is } from './utils';
 
 export const ViewSymbol = Symbol();
 
@@ -155,13 +154,11 @@ export async function resolveView<View extends CreateView<GenericViewDefinition>
             values.push((params as any)[key]);
         } else if (is.promise(value)) {
             values.push(value);
-        } else if (is.class_(value)) {
+        } else if (is.class(value)) {
             // create the class instance with the params from the previous views
             values.push(new value(prevViewResolvedProps));
-        } else if (is.function_(value)) {
+        } else if (is.function(value)) {
             // call the function with the params from the previous views
-            // FIXME: error after mobx upgrade
-            // @ts-expect-error
             values.push(value(prevViewResolvedProps));
         } else {
             values.push(value);
@@ -170,7 +167,10 @@ export async function resolveView<View extends CreateView<GenericViewDefinition>
 
     const resolvedValues = await Promise.all(values);
 
-    return { ...prevViewResolvedProps, ..._.zipObject(keys, resolvedValues) } as any;
+    return {
+        ...prevViewResolvedProps,
+        ...Object.fromEntries(keys.map((k, i) => [k, resolvedValues[i]])),
+    } as any;
 }
 
 // ----------------------

@@ -670,13 +670,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@sindresorhus/is@npm:^5.3.0":
-  version: 5.3.0
-  resolution: "@sindresorhus/is@npm:5.3.0"
-  checksum: 10/79f4cdba0af1d30d2562f7df88052fd2074713cac54775da3b8042c190d1e95aba6198cd4d05d8c1163f12a8f6031da0f5ff750559ac2ac5f39659cce5864568
-  languageName: node
-  linkType: hard
-
 "@standard-schema/spec@npm:^1.1.0":
   version: 1.1.0
   resolution: "@standard-schema/spec@npm:1.1.0"
@@ -819,13 +812,6 @@ __metadata:
   version: 1.0.8
   resolution: "@types/estree@npm:1.0.8"
   checksum: 10/25a4c16a6752538ffde2826c2cc0c6491d90e69cd6187bef4a006dd2c3c45469f049e643d7e516c515f21484dc3d48fd5c870be158a5beb72f5baf3dc43e4099
-  languageName: node
-  linkType: hard
-
-"@types/lodash@npm:~4.14.171":
-  version: 4.14.191
-  resolution: "@types/lodash@npm:4.14.191"
-  checksum: 10/ab8cd8eeb941f0fb89248cd5d520b942b841e936e4fcb093370f76d137a8b6f6be0de7f38fc259d56d3cc45b1b50ed69d15c9b94922545166e3ef1f0218be2f2
   languageName: node
   linkType: hard
 
@@ -1801,13 +1787,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lodash@npm:~4.17.21":
-  version: 4.17.21
-  resolution: "lodash@npm:4.17.21"
-  checksum: 10/c08619c038846ea6ac754abd6dd29d2568aa705feb69339e836dfa8d8b09abbb2f859371e86863eda41848221f9af43714491467b5b0299122431e202bb0c532
-  languageName: node
-  linkType: hard
-
 "lru-cache@npm:^11.3.5":
   version: 11.3.5
   resolution: "lru-cache@npm:11.3.5"
@@ -2249,16 +2228,13 @@ __metadata:
     "@babel/core": "npm:^7.29.0"
     "@babel/plugin-proposal-decorators": "npm:^7.29.0"
     "@rolldown/plugin-babel": "npm:^0.2.3"
-    "@sindresorhus/is": "npm:^5.3.0"
     "@testing-library/dom": "npm:^10.4.1"
     "@testing-library/react": "npm:^16.3.2"
     "@tsconfig/strictest": "npm:^2.0.8"
     "@types/babel__core": "npm:^7"
-    "@types/lodash": "npm:~4.14.171"
     "@types/react": "npm:^19.2.14"
     "@types/react-dom": "npm:~19.2.3"
     jsdom: "npm:^29.1.0"
-    lodash: "npm:~4.17.21"
     mobx: "npm:^6.15.0"
     mobx-react-lite: "npm:^4.1.1"
     react: "npm:^19.2.5"
