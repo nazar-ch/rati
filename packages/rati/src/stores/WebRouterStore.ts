@@ -357,6 +357,16 @@ export class WebRouterStore<
         return this._hash;
     }
 
+    /**
+     * User state attached to the current history entry via `navigate`/`replace`
+     * `{ state }`, or `null`. The browser persists it per entry, so it survives
+     * back/forward. Use it to carry view-local context that shouldn't live in the
+     * URL itself — e.g. which panel a navigation targets.
+     */
+    @computed get state(): unknown {
+        return this._state;
+    }
+
     isPath(path: string) {
         // `path` here is a URL path (the value returned by getPath, used in href
         // attributes), so strip the basename before comparing against the
@@ -389,6 +399,7 @@ export class WebRouterStore<
     @observable private accessor _path: string = '';
     @observable private accessor _search: string = '';
     @observable private accessor _hash: string = '';
+    @observable.ref private accessor _state: unknown = null;
 
     // Non-shallow observable breaks view class inside this property
     @observable.shallow accessor activeRoute: ActiveRoute | null = null;
@@ -403,10 +414,12 @@ export class WebRouterStore<
         const pathname = stripBasename(location.pathname, this.basename);
         const currentPathCounter = this.pathCounter++;
 
-        // Search and hash always update so observers see them, even on
-        // hash-only or query-only navigations that leave the route unchanged.
+        // Search, hash and state always update so observers see them, even on
+        // hash-only or query-only navigations (or skipped shallow replaces) that
+        // leave the route unchanged.
         this._search = location.search;
         this._hash = location.hash;
+        this._state = state ?? null;
 
         // Skip resolution only when the URL didn't change AND we already have
         // a resolved route. Otherwise we'd skip on the initial mount race or
@@ -468,9 +481,12 @@ export class WebRouterStore<
      * reachable via back (post-login, auth-gate, canonicalization), use
      * `replace()`.
      */
-    @action.bound navigate(to: NameToRoute<T> | string) {
+    @action.bound navigate(
+        to: NameToRoute<T> | string,
+        options: { state?: Record<string, unknown> } = {}
+    ) {
         const path = typeof to === 'string' ? to : this.getPath(to);
-        this.history.push(path);
+        this.history.push(path, options.state ?? null);
     }
 
     /**
@@ -487,15 +503,20 @@ export class WebRouterStore<
      * swapping files via tabs, a media player changing tracks). Always pairs
      * with replace semantics by design — a "shallow" change isn't a real
      * navigation, so it shouldn't grow the back stack either.
+     *
+     * Pass `{ state }` to attach user state to the entry (readable via `state`,
+     * survives back/forward). Coexists with `keepCurrentRoute`'s internal skip
+     * marker.
      */
     @action.bound replace(
         to: NameToRoute<T> | string,
-        options: { keepCurrentRoute?: boolean } = {}
+        options: { keepCurrentRoute?: boolean; state?: Record<string, unknown> } = {}
     ) {
         const path = typeof to === 'string' ? to : this.getPath(to);
-        const state = options.keepCurrentRoute
+        const skip = options.keepCurrentRoute
             ? { skip: `${this.pathCounter}/${this.sessionId}` }
-            : null;
+            : undefined;
+        const state = skip || options.state ? { ...skip, ...options.state } : null;
         this.history.replace(path, state);
     }
 
