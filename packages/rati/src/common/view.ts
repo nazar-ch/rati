@@ -5,6 +5,10 @@ import { is } from './utils';
 
 export const ViewSymbol = Symbol();
 
+// Type-level only, never present at runtime: carries the merged definition of
+// the whole view chain, so resolving a view never has to walk prevView types
+export const ViewDefinitionsSymbol = Symbol();
+
 type ViewProp =
     | ((...args: any) => any | Promise<any>)
     | { new (...args: any): any }
@@ -14,13 +18,11 @@ type ViewProp =
 
 type GenericViewDefinition = Record<string, ViewProp>;
 
-export type CreateView<
-    VD extends GenericViewDefinition,
-    PrevView extends GenericViewDefinition = any,
-> = {
-    definition: VD;
-    prevView?: CreateView<PrevView> | undefined;
+export type CreateView<VD extends GenericViewDefinition = GenericViewDefinition> = {
+    definition: GenericViewDefinition;
+    prevView?: CreateView | undefined;
     [ViewSymbol]: true;
+    [ViewDefinitionsSymbol]?: VD;
 };
 
 type ResolveViewDefinition<VD extends GenericViewDefinition> = {
@@ -35,35 +37,27 @@ type ResolveViewDefinition<VD extends GenericViewDefinition> = {
               : VD[K];
 };
 
-// Limits the recursion depth to prevent "Type instantiation is excessively deep
-// and possibly infinite" Typescript's error
-// https://stackoverflow.com/questions/65527030/how-to-abort-early-with-type-instantiation-is-excessively-deep-and-possibly-infi
-type Depth = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-
-type MergeViewDefinitions<View extends CreateView<any>, D extends number = 9> = [D] extends [0]
-    ? never
-    : View['definition'] &
-          (View['prevView'] extends CreateView<any>
-              ? MergeViewDefinitions<View['prevView'], Depth[D]>
-              : {});
-
-export type ResolveView<View extends CreateView<any>> = Simplify<
-    ResolveViewDefinition<MergeViewDefinitions<View>>
+type ViewDefinitions<View extends CreateView<any>> = NonNullable<
+    View[typeof ViewDefinitionsSymbol]
 >;
 
-type RecursiveViewDefinition<PrevView extends CreateView<GenericViewDefinition> | undefined> = {
+export type ResolveView<View extends CreateView<any>> = Simplify<
+    ResolveViewDefinition<ViewDefinitions<View>>
+>;
+
+type ViewDefinition<PrevDefs extends GenericViewDefinition> = {
     [key: string]:
         | ViewParam<any>
-        | ((params: PrevView extends {} ? ResolveView<PrevView> : {}) => any | Promise<any>)
+        | ((params: Simplify<ResolveViewDefinition<PrevDefs>>) => any | Promise<any>)
         | Promise<any>
-        | { new (params: PrevView extends {} ? ResolveView<PrevView> : {}): any }
+        | { new (params: Simplify<ResolveViewDefinition<PrevDefs>>): any }
         | string;
 };
 
-export type RequiredViewParams<View extends CreateView<{}>> = Simplify<
+export type RequiredViewParams<View extends CreateView<any>> = Simplify<
     ExcludeNever<{
-        [K in keyof MergeViewDefinitions<View>]: MergeViewDefinitions<View>[K] extends ViewParam<any>
-            ? MergeViewDefinitions<View>[K]['value']
+        [K in keyof ViewDefinitions<View>]: ViewDefinitions<View>[K] extends ViewParam<any>
+            ? ViewDefinitions<View>[K]['value']
             : never;
     }>
 >;
@@ -71,33 +65,21 @@ export type RequiredViewParams<View extends CreateView<{}>> = Simplify<
 // ---------------------------------------------------------------------------------------
 
 type CreateViewFunc = {
-    <PrevView extends undefined, Def extends RecursiveViewDefinition<PrevView>>(
-        viewDefinition: Def
-    ): {
-        definition: Def;
-        [ViewSymbol]: true;
-    };
+    <Def extends ViewDefinition<{}>>(viewDefinition: Def): CreateView<Def>;
 
-    <
-        PrevView extends CreateView<GenericViewDefinition>,
-        Def extends RecursiveViewDefinition<PrevView>,
-    >(
-        prevView: PrevView,
+    <PrevDefs extends GenericViewDefinition, Def extends ViewDefinition<PrevDefs>>(
+        prevView: CreateView<PrevDefs>,
         viewDefinition: Def
-    ): {
-        definition: Def;
-        prevView: PrevView;
-        [ViewSymbol]: true;
-    };
+    ): CreateView<Simplify<PrevDefs & Def>>;
 
     chain: typeof viewChainHead;
 };
 
 export const createView: CreateViewFunc = <
-    PrevView extends CreateView<GenericViewDefinition> | undefined,
-    Def extends RecursiveViewDefinition<PrevView>,
+    PrevDefs extends GenericViewDefinition,
+    Def extends ViewDefinition<PrevDefs>,
 >(
-    definitionOrPrevView: PrevView,
+    definitionOrPrevView: CreateView<PrevDefs> | Def,
     maybeViewDefinition?: Def
 ) => {
     const viewDefinition = maybeViewDefinition ?? definitionOrPrevView;
@@ -106,28 +88,25 @@ export const createView: CreateViewFunc = <
     return { prevView, definition: viewDefinition, [ViewSymbol]: true as const };
 };
 
-const viewChainHead = <Def extends RecursiveViewDefinition<undefined>>(vd: Def) =>
-    createViewChain(
-        vd,
-        // Give an empty view to not support undefined in createViewChain's type definition
-        {
-            [ViewSymbol]: true,
-            definition: {},
-            prevView: undefined,
-        }
-    );
+export type ChainableView<VD extends GenericViewDefinition> = CreateView<VD> & {
+    chain<NextDef extends ViewDefinition<VD>>(
+        nextViewDefinition: NextDef
+    ): ChainableView<Simplify<VD & NextDef>>;
+};
 
-export function createViewChain<
-    PrevView extends CreateView<GenericViewDefinition> | undefined,
-    Def extends RecursiveViewDefinition<PrevView>,
->(viewDefinition: Def, prevView: PrevView) {
-    const view = { definition: viewDefinition as Def, prevView, [ViewSymbol]: true as const };
+const viewChainHead = <Def extends ViewDefinition<{}>>(viewDefinition: Def) =>
+    createViewChain<Def>(viewDefinition, undefined);
+
+function createViewChain<VD extends GenericViewDefinition>(
+    viewDefinition: GenericViewDefinition,
+    prevView: CreateView | undefined
+): ChainableView<VD> {
+    const view: CreateView<VD> = { definition: viewDefinition, prevView, [ViewSymbol]: true };
 
     return {
         ...view,
-        chain: <NextDef extends RecursiveViewDefinition<typeof view>>(
-            nextViewDefinition: NextDef
-        ) => createViewChain(nextViewDefinition, view),
+        chain: <NextDef extends ViewDefinition<VD>>(nextViewDefinition: NextDef) =>
+            createViewChain<Simplify<VD & NextDef>>(nextViewDefinition, view),
     };
 }
 
@@ -135,7 +114,7 @@ createView.chain = viewChainHead;
 
 // ---------------------------------------------------------------------------------------
 
-export async function resolveView<View extends CreateView<GenericViewDefinition>>(
+export async function resolveView<View extends CreateView>(
     view: View,
     params: RequiredViewParams<View>
 ): Promise<ResolveView<View>> {
@@ -177,14 +156,14 @@ export async function resolveView<View extends CreateView<GenericViewDefinition>
 
 export const ParamSymbol = Symbol();
 
-type ViewParam<T> = {
+export type ViewParam<T> = {
     value: T;
     [ParamSymbol]: true;
 };
 
-export function viewParam<T>() {
+export function viewParam<T>(): ViewParam<T> {
     return {
-        [ParamSymbol]: true as const,
+        [ParamSymbol]: true,
         value: null as T,
     };
 }

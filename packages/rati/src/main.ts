@@ -53,13 +53,18 @@ export { remoteData } from './common/remoteData';
 export { remoteDataKey, responseKey } from './common/apiUtils';
 
 export {
+    type ChainableView,
     type CreateView,
     createView,
     resolveView,
+    type ResolveView,
+    type RequiredViewParams,
     type ViewComponent,
+    type ViewParam,
     viewParam,
     ParamSymbol,
     ViewSymbol,
+    ViewDefinitionsSymbol,
 } from './common/view';
 
 if (import.meta.env.DEV) {
