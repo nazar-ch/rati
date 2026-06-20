@@ -2,6 +2,9 @@
     // https://github.com/tsconfig/bases/blob/main/bases/strictest.json
     "extends": ["@tsconfig/strictest/tsconfig.json"],
     "compilerOptions": {
+        // ESNext lib for Symbol.dispose / Disposable (explicit resource management),
+        // used by the experimental island disposal contract
+        "lib": ["ESNext", "DOM", "DOM.Iterable"],
         "useDefineForClassFields": true,
         "verbatimModuleSyntax": true,
         "forceConsistentCasingInFileNames": true,

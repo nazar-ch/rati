@@ -1,6 +1,8 @@
 {
     "extends": ["@tsconfig/strictest/tsconfig.json"],
     "compilerOptions": {
+        // Keep in sync with tsconfig.json: Symbol.dispose / Disposable support
+        "lib": ["ESNext", "DOM", "DOM.Iterable"],
         "types": ["vitest/globals"],
         "jsx": "react-jsx",
         "module": "ESNext",

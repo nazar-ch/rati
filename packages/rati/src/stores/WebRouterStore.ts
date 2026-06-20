@@ -95,6 +95,21 @@ export type ViewComponentForOptionalView<
     Params extends {},
 > = View extends CreateView<any> ? ViewComponent<View> : FC<Params>;
 
+function buildPathRe(path: string): RegExp | null {
+    // TODO 2023: allow regexps for the path (manually type params in this case)
+    const pathReCore = path.replace(/:(.*?)(\/|$)/g, '(?<$1>[^/]+?)$2');
+    const pathReString =
+        '^' +
+        pathReCore +
+        (pathReCore.endsWith('/')
+            ? '$'
+            : // Optional slash in the end (match /path & /path/)
+              // TODO 2023: use redirects for this case
+              '/{0,1}$');
+
+    return path === '*' ? null : new RegExp(pathReString);
+}
+
 export function route<
     Path extends string,
     Name extends string,
@@ -107,27 +122,51 @@ export function route<
     view?: TView extends CreateView<any> ? TView : undefined,
     wrapperComponent?: ComponentType
 ) {
-    // TODO 2023: allow regexps for the path (manually type params in this case)
-    const pathReCore = path.replace(/:(.*?)(\/|$)/g, '(?<$1>[^/]+?)$2');
-    const pathReString =
-        '^' +
-        pathReCore +
-        (pathReCore.endsWith('/')
-            ? '$'
-            : // Optional slash in the end (match /path & /path/)
-              // TODO 2023: use redirects for this case
-              '/{0,1}$');
-
-    const pathRe = path === '*' ? null : new RegExp(pathReString);
-
     return {
         path,
-        pathRe,
+        pathRe: buildPathRe(path),
         name,
         // Empty view is used here to pass routeParams to the component
         view,
         component,
         wrapperComponent,
+    };
+}
+
+export type RouteOptions<TView extends CreateView<any> | undefined> = {
+    /**
+     * View resolved before the component renders (via ViewLoader; participates
+     * in SSR through prepareRoute). The component receives the resolved props.
+     */
+    view?: TView extends CreateView<any> ? TView : undefined;
+    /** Route-level wrapper rendered around the component. */
+    wrapper?: ComponentType | undefined;
+};
+
+/**
+ * Alternative `route` shape: view and wrapper move into an options object.
+ * Produces the same route record as `route`, so matching, rendering, SSR and
+ * hydration behave identically.
+ *
+ * Islands need no option here — a component created by `createIsland` is a
+ * plain component whose props are the view's params, so the route's path
+ * params feed it directly:
+ *
+ *     route2('/spaces/:spaceId/pages/:pageId', 'page', PageIsland)
+ */
+export function route2<
+    Path extends string,
+    Name extends string,
+    TViewComponent extends ViewComponentForOptionalView<TView, ExtractRouteParams<Path>>,
+    TView extends CreateView<any> | undefined = undefined,
+>(path: Path, name: Name, component: TViewComponent, options: RouteOptions<TView> = {}) {
+    return {
+        path,
+        pathRe: buildPathRe(path),
+        name,
+        view: options.view,
+        component,
+        wrapperComponent: options.wrapper,
     };
 }
 

@@ -18,6 +18,8 @@ export { GlobalStore } from './stores/GlobalStore';
 export {
     WebRouterStore,
     route,
+    route2,
+    type RouteOptions,
     type NameToRoute,
     type WebRouterStoreOptions,
     type WebRouterHydratedState,
@@ -66,6 +68,16 @@ export {
     ViewSymbol,
     ViewDefinitionsSymbol,
 } from './common/view';
+
+export {
+    createIsland,
+    disposeViewProps,
+    NotAvailableError,
+    useIslandProps,
+    IslandSymbol,
+    type IslandComponent,
+    type IslandConfig,
+} from './experimental/island';
 
 if (import.meta.env.DEV) {
     const pkg = await import('../package.json');
