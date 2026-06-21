@@ -1,13 +1,164 @@
-# Data views & islands — architecture (first draft — frozen)
+# Data views & islands — working plan
 
-> **Frozen — do not edit.** Kept as-is as the first-draft record. Active planning
-> moved to [`data-views.plan.md`](./data-views.plan.md), which supersedes this file
-> where they disagree. (The get-based-dispose and island-type-helper edits already
-> in this file belong to the frozen record — fine to leave.)
+> **Living document.** Successor to the frozen first draft
+> [`data-views.md`](./data-views.md). Edit *this* file. Where the two disagree, this
+> one wins. The sections under "Direction" / "Source state machines" / "Open
+> questions" / "Issues" are new; everything below the divider is inherited from the
+> first draft and will be revised as the plan firms up.
 
-Status: **draft / experiment** (June 2026). The "Experimental implementation" section describes
-code that exists in `packages/rati/src/experimental/`; everything else is design space.
-Naming is intentionally provisional — see [Discussion](#discussion).
+Status: **planning** (June 2026). Builds on the experiment in
+`packages/rati/src/experimental/`.
+
+## Direction — set 2026-06-22
+
+Two calls from the project lead; the rest of this doc is read in their light.
+
+1. **Islands absorb views; views get dropped.** Island functionality is extended to cover
+   everything views do (the data chain, routing, SSR), then views are removed. Corollary:
+   **stop growing the shared view/island surface** — the shared core is temporary, not an
+   investment. This is the "upward lift" the first draft's Discussion gestured at, now committed.
+2. **Decouple islands from the resource layer.** Islands must not know about `ResourceContainer`
+   / grab / release / `Symbol.dispose`. They reach data only through one reactive *source*
+   interface; CRDT resources are one implementation of it.
+
+(Flagged as upcoming, not designed here: **auto-context creation** is a near-future step — the
+island will hand its data to the subtree without manual providers.)
+
+## Source state machines (the new resolved-prop model)
+
+An island stops resolving promises and instead **observes sources**. A source is a MobX state
+machine:
+
+```
+pending | ready(value) | error(reason)
+```
+
+- **Live, never final** — a source may transition at any time (reconnect, availability flip,
+  refetch), not only once.
+- **Island aggregation** over its sources:
+  - all `ready` → render the **main** component, fed each source's `value`;
+  - any `error` → render the **error** component;
+  - otherwise → **pending**.
+- **One error state.** not-available / forbidden / failed / timeout / … collapse into `error`,
+  because the island's *behavior* is identical; a `code`/`reason` carried on the error lets the
+  error component render the right thing. (Replaces the first draft's separate `notAvailable`
+  slot — the 404-vs-500 distinction moves from the framework into the app's error component,
+  switching on `code`.)
+- **Sources implement an interface; the island only knows the interface.** CRDT resources
+  implement it; tier-1 keyed data and `remoteData` should too. That interface *is* the
+  island↔data boundary — the decoupling itself.
+
+> **Note — your message trailed off at "In the same way ___".** Please finish it so I capture
+> the intended parallel (auto-context? non-CRDT sources implementing the same interface? a
+> value accessor?). I assumed "other data sources implement the same interface" below.
+
+## What this model buys
+
+- **Both first-draft "stretch" items fall out for free:**
+  - *Reactive availability (absent → ready):* the source flips `pending → ready` and the island
+    follows — no terminal not-available, no forced re-navigation.
+  - *Safe in-place re-resolve:* there is no promise to cancel and no grab-proxy to dispose
+    mid-render, so the `key={pageId}` remount on `PagePanel` stops being load-bearing.
+- **Retires the disposal contract:** no `Symbol.dispose` probing, no `has`-trap impedance
+  mismatch (the thing just removed). Lifetime moves to observe/attach — see Q2.
+- **Sets up auto-context:** the island already holds the ready sources to hand down.
+
+## Open questions — answer before refactoring
+
+Each carries my current lean; correct where wrong.
+
+1. **Dependencies / the waterfall.** Today `chain` levels are sequential and a level's functions
+   receive prior *resolved values* (`spaceId` → load `tree` → load `pageDoc`). In a machine
+   world, how is "B needs A's ready value" expressed?
+   - *Lean:* keep the `chain` shape; a dependent level constructs its source **lazily**, only
+     once the prior source is `ready`, reading the prior `value`. Preserves the visible
+     waterfall; the unit changes promise→source. Alternative: a reactive graph where sources
+     hold each other's observable values (more powerful, fuzzier ordering). Which?
+   - Sub-question: if A is live and flips `ready → pending` again, does B tear down and rebuild
+     (cascading invalidation)?
+
+2. **Lifetime / ref-counting.** "Decoupled" still needs *something* to bound a resource's life
+   to the island's. Two shapes:
+   - (a) **Implicit via MobX** `onBecomeObserved`/`onBecomeUnobserved`: the island just reads
+     `source.state`; observation drives load/teardown, ref-counted inside the resource. Fully
+     decoupled — no grab/release in the island. Risk: unobserved fires in render gaps → needs a
+     keep-alive/debounce.
+   - (b) **Explicit** `attach(): () => void` the island calls on mount / drops on
+     unmount/param-change. Predictable; slightly more contract.
+   - *Lean:* (a) if the timing proves robust, else (b). This shapes the interface — need your call.
+
+3. **ready → pending re-entry policy.** A source that was `ready` returns to `pending` (resync).
+   Does the island (i) drop to the pending slot (flicker, subtree state lost) or (ii) keep the
+   last ready render while the source refreshes?
+   - Related: value *updates within* `ready` flow reactively to an `observer` main component —
+     the island swaps slots only on **phase** change, not on every value change. For CRDT the
+     `value` is a live store, so passing it and observing is natural.
+   - *Lean:* distinguish *initial* pending from *refresh*; keep-previous on refresh; slot swaps
+     on phase only.
+
+4. **Error shape.** You said it's open. Proposed minimum:
+   ```ts
+   type SourceError = { code: string; message?: string; cause?: unknown; retryable?: boolean };
+   ```
+   `code` an open string (`'not-available' | 'forbidden' | 'failed' | …`) the error component
+   switches on. Retry: island-level `retry()` rebuilds sources; a live source may also self-clear
+   (reconnect) → island auto-recovers. Good, or do you want a closed union / richer reasons?
+
+5. **Plain values & promises.** Keep accepting them, auto-wrapped (value = instant-ready;
+   promise = pending→ready/error), so non-resource props need no ceremony? *Lean: yes —
+   "everything is a source," promises/values are degenerate sources.*
+
+6. **SSR — the big one.** Dropping views drops rati's only SSR-complete path
+   (`prepareRoute` → `resolveView` → hydrate). A live machine has no natural server snapshot. The
+   interface likely needs an awaitable settle, e.g. `whenSettled(): Promise<void>` (resolves at
+   first `ready`/`error`), so the server can `await` all sources, then snapshot values for
+   hydration. Is SSR **in scope for the new island now**, or explicitly **deferred** (accepting a
+   temporary regression until islands ship a settle-and-hydrate path)? This gates the interface.
+
+7. **The interface, concretely.** Strawman to react to:
+   ```ts
+   interface Source<T> {
+     readonly state:
+       | { status: 'pending' }
+       | { status: 'ready'; value: T }
+       | { status: 'error'; error: SourceError };
+     attach?(): () => void;          // Q2 — present iff explicit lifetime
+     whenSettled?(): Promise<void>;  // Q6 — present iff SSR/prefetch
+     retry?(): void;                 // Q4
+   }
+   ```
+   Is `state` a single observable discriminated union (clean to aggregate), or separate
+   `status`/`value`/`error` fields?
+
+8. **Sequencing.** Prototype the `Source` interface + the aggregating resolver behind
+   `experimental/`, migrate `PageIsland` as the proving ground, then generalize — vs a wider
+   rewrite up front? *Lean: prototype + PageIsland first.* And: do the `tree`/`pageDoc` CRDT
+   stores implement `Source` directly, or via a thin adapter over the existing loader state
+   (which already exposes `loading | ready | not-available | error` in `YDocLoader.state`)? The
+   adapter looks nearly free.
+
+## Issues & risks
+
+- **SSR regression (highest).** See Q6. Views are SSR-mature; the new island is client-only
+  today. Don't drop views until the island has a settle-and-hydrate path — or consciously accept
+  the gap.
+- **Lifetime isn't eliminated, only relocated.** "Decoupled" holds at the *type* boundary (island
+  sees only `Source`), but resource liveness must still track island presence — Q2 is where the
+  old grab/release reappears, hopefully as observation.
+- **Flicker / lost subtree state on ready → pending** if the policy is "drop to pending" (Q3).
+  Bites on CRDT reconnects.
+- **All-or-nothing aggregation forecloses progressive rendering** (one slow/errored source blocks
+  the whole island). Matches your spec; confirming progressive/partial props stays out.
+- **Aggregation granularity.** The island must read every source's `state` inside a reaction
+  (`observer`) and pass *live* values (not snapshots), so in-`ready` updates reach components
+  without a slot swap.
+- **`error` collapse keeps a machine-readable `code`.** Routing/SSR may still need to map
+  `code: 'not-available'` to HTTP 404 even though the UI behavior is unified — so `code` must stay
+  machine-readable, not just display text.
+
+---
+
+*Below: inherited from the first draft, kept for reference; will be revised as the plan firms up.*
 
 ## Philosophy
 
