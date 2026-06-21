@@ -1,8 +1,10 @@
 import { describe, test, expect, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
+import { observable, runInAction } from 'mobx';
 import type { FC } from 'react';
 import { createView, viewParam } from '../common/view';
-import { createIsland, disposeViewProps, NotAvailableError } from '../experimental/island';
+import { NotAvailableError, SourceSymbol, type Source, type SourceState } from '../common/source';
+import { createIsland } from '../experimental/island';
 
 type TestEnv = { prefix: string };
 
@@ -10,48 +12,33 @@ const Loading: FC = () => <div>loading...</div>;
 
 afterEach(cleanup);
 
-function disposable(id: string, log: string[]) {
+// A hand-rolled source the test drives, logging attach/detach so lifetime is
+// observable. Mirrors what a CRDT/REST adapter implements.
+type TestSource<T> = Source<T> & {
+    ready: (value: T) => void;
+    fail: (code: string) => void;
+    pend: () => void;
+};
+
+function testSource<T>(log: string[], id: string): TestSource<T> {
+    const box = observable.box<SourceState<T>>({ status: 'pending' }, { deep: false });
     return {
-        id,
-        [Symbol.dispose]: () => log.push(`disposed:${id}`),
+        [SourceSymbol]: true,
+        get state() {
+            return box.get();
+        },
+        attach() {
+            log.push(`attach:${id}`);
+            return () => log.push(`detach:${id}`);
+        },
+        ready: (value) => act(() => runInAction(() => box.set({ status: 'ready', value }))),
+        fail: (code) => act(() => runInAction(() => box.set({ status: 'error', error: { code } }))),
+        pend: () => act(() => runInAction(() => box.set({ status: 'pending' }))),
     };
 }
 
-function deferred<T>() {
-    let resolve!: (value: T) => void;
-    const promise = new Promise<T>((r) => {
-        resolve = r;
-    });
-    return { promise, resolve };
-}
-
-describe('disposeViewProps', () => {
-    test('disposes a prop whose Symbol.dispose is synthesized on get, not an own key', () => {
-        const log: string[] = [];
-
-        // Mirrors a ref-counted grab handle: dispose exists only via the `get`
-        // trap, and there is deliberately no `has` trap — so `Symbol.dispose in
-        // proxy` is false. The old `in`-based detection would skip it.
-        const grabbed = new Proxy(
-            { id: 'p1' },
-            {
-                get(target, prop, receiver) {
-                    if (prop === Symbol.dispose) return () => log.push('disposed:p1');
-                    return Reflect.get(target, prop, receiver);
-                },
-            }
-        );
-
-        expect(Symbol.dispose in grabbed).toBe(false);
-
-        disposeViewProps({ res: grabbed, plain: { not: 'disposable' } });
-
-        expect(log).toEqual(['disposed:p1']);
-    });
-});
-
 describe('createIsland', () => {
-    test('shows loading, then the component with waterfall-resolved props', async () => {
+    test('shows loading, then the component with waterfall-resolved values', async () => {
         const Island = createIsland({
             useEnv: () => ({ prefix: 'env' }) as TestEnv,
             view: (env) =>
@@ -69,30 +56,23 @@ describe('createIsland', () => {
         expect(await screen.findByText('ready [env:a1]')).toBeTruthy();
     });
 
-    test('routes NotAvailableError to the notAvailable slot and disposes earlier levels', async () => {
-        const log: string[] = [];
-
+    test('routes a failed source to the error slot with the unified code', async () => {
         const Island = createIsland({
             useEnv: () => ({ prefix: 'env' }) as TestEnv,
             view: () =>
-                createView
-                    .chain({ id: viewParam<string>() })
-                    .chain({ res: async ({ id }) => disposable(id, log) })
-                    .chain({
-                        page: async (): Promise<string> => {
-                            throw new NotAvailableError('no such page', { code: '404' });
-                        },
-                    }),
+                createView.chain({ id: viewParam<string>() }).chain({
+                    page: async (): Promise<string> => {
+                        throw new NotAvailableError('no such page', { code: 'not-available' });
+                    },
+                }),
             component: () => <div>ready</div>,
             loading: Loading,
-            notAvailable: ({ error }) => <div>not available: {error.code}</div>,
+            error: ({ error }) => <div>error: {error.code}</div>,
         });
 
         render(<Island id="a1" />);
 
-        expect(await screen.findByText('not available: 404')).toBeTruthy();
-        // The grabbed resource from the level before the failure was released
-        expect(log).toEqual(['disposed:a1']);
+        expect(await screen.findByText('error: not-available')).toBeTruthy();
     });
 
     test('renders the error slot and retries successfully', async () => {
@@ -126,89 +106,105 @@ describe('createIsland', () => {
         expect(await screen.findByText('ready data:a1')).toBeTruthy();
     });
 
-    test('disposes owned props on unmount', async () => {
+    test('attaches sources and detaches them on unmount', async () => {
         const log: string[] = [];
+        const res = testSource<{ id: string }>(log, 'res');
 
         const Island = createIsland({
             useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            view: () =>
-                createView
-                    .chain({ id: viewParam<string>() })
-                    .chain({ res: async ({ id }) => disposable(id, log) }),
-            component: ({ res }) => <div>ready {res.id}</div>,
+            view: () => createView.chain({ id: viewParam<string>() }).chain({ res: () => res }),
+            component: ({ res: r }) => <div>ready {r.id}</div>,
             loading: Loading,
         });
 
         const { unmount } = render(<Island id="a1" />);
+        expect(log).toContain('attach:res');
+
+        res.ready({ id: 'a1' });
         await screen.findByText('ready a1');
-        expect(log).toEqual([]);
 
         unmount();
-        expect(log).toEqual(['disposed:a1']);
+        expect(log).toContain('detach:res');
     });
 
-    test('disposes previous props and re-resolves when params change', async () => {
+    test('builds a dependent level only once the prior source is ready', async () => {
         const log: string[] = [];
+        const space = testSource<string>(log, 'space');
+        const page = testSource<{ id: string }>(log, 'page');
 
         const Island = createIsland({
             useEnv: () => ({ prefix: 'env' }) as TestEnv,
             view: () =>
                 createView
                     .chain({ id: viewParam<string>() })
-                    .chain({ res: async ({ id }) => disposable(id, log) }),
-            component: ({ res }) => <div>ready {res.id}</div>,
+                    .chain({ space: () => space })
+                    .chain({ page: () => page }),
+            component: ({ page: p }) => <div>ready {p.id}</div>,
             loading: Loading,
         });
 
-        const { rerender } = render(<Island id="a1" />);
-        await screen.findByText('ready a1');
+        render(<Island id="a1" />);
 
-        rerender(<Island id="a2" />);
-        expect(screen.getByText('loading...')).toBeTruthy();
-        expect(log).toEqual(['disposed:a1']);
+        // The page level must not be built until `space` is ready.
+        expect(log).toContain('attach:space');
+        expect(log).not.toContain('attach:page');
 
-        expect(await screen.findByText('ready a2')).toBeTruthy();
+        space.ready('s1');
+        expect(log).toContain('attach:page');
+
+        page.ready({ id: 'p1' });
+        expect(await screen.findByText('ready p1')).toBeTruthy();
     });
 
-    test('a superseded in-flight resolve never renders and its props are disposed', async () => {
+    test('a ready source returning to pending drops back to loading', async () => {
         const log: string[] = [];
-        const gates = new Map<string, ReturnType<typeof deferred<void>>>();
-        const gateFor = (id: string) => {
-            let gate = gates.get(id);
-            if (!gate) {
-                gate = deferred<void>();
-                gates.set(id, gate);
+        const res = testSource<{ id: string }>(log, 'res');
+
+        const Island = createIsland({
+            useEnv: () => ({ prefix: 'env' }) as TestEnv,
+            view: () => createView.chain({ id: viewParam<string>() }).chain({ res: () => res }),
+            component: ({ res: r }) => <div>ready {r.id}</div>,
+            loading: Loading,
+        });
+
+        render(<Island id="a1" />);
+        res.ready({ id: 'a1' });
+        await screen.findByText('ready a1');
+
+        res.pend();
+        expect(await screen.findByText('loading...')).toBeTruthy();
+    });
+
+    test('detaches the previous run and re-resolves when params change', async () => {
+        const log: string[] = [];
+        const sources = new Map<string, TestSource<{ id: string }>>();
+        const sourceFor = (id: string) => {
+            let source = sources.get(id);
+            if (!source) {
+                source = testSource<{ id: string }>(log, id);
+                sources.set(id, source);
             }
-            return gate;
+            return source;
         };
 
         const Island = createIsland({
             useEnv: () => ({ prefix: 'env' }) as TestEnv,
             view: () =>
-                createView.chain({ id: viewParam<string>() }).chain({
-                    res: async ({ id }) => {
-                        await gateFor(id).promise;
-                        return disposable(id, log);
-                    },
-                }),
+                createView
+                    .chain({ id: viewParam<string>() })
+                    .chain({ res: ({ id }) => sourceFor(id) }),
             component: ({ res }) => <div>ready {res.id}</div>,
             loading: Loading,
         });
 
         const { rerender } = render(<Island id="a1" />);
-        // Wait until the a1 resolve is inside the level that grabs the resource
-        // (cancellation between levels would skip the grab entirely)
-        await waitFor(() => expect(gates.has('a1')).toBe(true));
+        sourceFor('a1').ready({ id: 'a1' });
+        await screen.findByText('ready a1');
+
         rerender(<Island id="a2" />);
+        expect(log).toContain('detach:a1');
 
-        // The newer resolve lands first
-        gateFor('a2').resolve();
+        sourceFor('a2').ready({ id: 'a2' });
         expect(await screen.findByText('ready a2')).toBeTruthy();
-
-        // The stale resolve lands later: dropped and released, a2 stays on screen
-        gateFor('a1').resolve();
-        await waitFor(() => expect(log).toContain('disposed:a1'));
-        expect(screen.getByText('ready a2')).toBeTruthy();
-        expect(log).toEqual(['disposed:a1']);
     });
 });

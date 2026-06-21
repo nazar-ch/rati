@@ -5,6 +5,7 @@ import { WebRouterStore, route2, type GenericRouteType } from '../stores/WebRout
 import { Router } from '../common/Router';
 import { GenericStoresContext } from '../stores/RootStore';
 import { createView, viewParam, type ViewComponent } from '../common/view';
+import { SourceSymbol, type Source } from '../common/source';
 import { createIsland, useIslandProps } from '../experimental/island';
 
 beforeEach(() => {
@@ -52,16 +53,20 @@ describe('route2 + islands', () => {
         router.dispose();
     });
 
-    test('navigating away from an island route disposes its resources', async () => {
+    test('navigating away from an island route detaches its sources', async () => {
         const log: string[] = [];
 
         const Product = createIsland({
             useEnv: () => ({ tag: 'env' }) as TestEnv,
             view: () =>
                 createView.chain({ productId: viewParam<string>() }).chain({
-                    res: async ({ productId }) => ({
-                        productId,
-                        [Symbol.dispose]: () => log.push(`disposed:${productId}`),
+                    res: ({ productId }): Source<{ productId: string }> => ({
+                        [SourceSymbol]: true,
+                        state: { status: 'ready', value: { productId } },
+                        attach() {
+                            log.push(`attach:${productId}`);
+                            return () => log.push(`detach:${productId}`);
+                        },
                     }),
                 }),
             component: ({ res }) => <div>product {res.productId}</div>,
@@ -75,14 +80,14 @@ describe('route2 + islands', () => {
         ]);
 
         await screen.findByText('product 42');
-        expect(log).toEqual([]);
+        expect(log).toEqual(['attach:42']);
 
         act(() => {
             router.navigate('/');
         });
 
         expect(await screen.findByText('home')).toBeTruthy();
-        expect(log).toEqual(['disposed:42']);
+        expect(log).toEqual(['attach:42', 'detach:42']);
         router.dispose();
     });
 

@@ -1,5 +1,6 @@
 import { describe, test, expectTypeOf } from 'vitest';
 import { createView, viewParam, type ResolveView } from '../common/view';
+import { type Source } from '../common/source';
 import { type IslandParams, type IslandProps, type IslandViewOf } from '../experimental/island';
 
 type Env = { prefix: string };
@@ -37,5 +38,17 @@ describe('island type helpers', () => {
     test('IslandProps matches deriving from the view by hand (no ReturnType step)', () => {
         type ByHand = IslandViewOf<typeof pageView>;
         expectTypeOf<IslandProps<typeof pageView>>().toEqualTypeOf<ResolveView<ByHand>>();
+    });
+
+    test('IslandProps unwraps a Source<T> prop to its ready value T', () => {
+        const liveView = (_env: Env) =>
+            createView
+                .chain({ id: viewParam<string>() })
+                .chain({ live: (): Source<number> => undefined as unknown as Source<number> });
+
+        expectTypeOf<IslandProps<typeof liveView>>().toEqualTypeOf<{
+            id: string;
+            live: number;
+        }>();
     });
 });

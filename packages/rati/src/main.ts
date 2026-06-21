@@ -70,9 +70,20 @@ export {
 } from './common/view';
 
 export {
-    createIsland,
-    disposeViewProps,
     NotAvailableError,
+    SourceSymbol,
+    isSource,
+    readySource,
+    promiseSource,
+    toSource,
+    toSourceError,
+    type Source,
+    type SourceState,
+    type SourceError,
+} from './common/source';
+
+export {
+    createIsland,
     useIslandProps,
     IslandSymbol,
     type IslandComponent,

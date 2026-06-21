@@ -1,6 +1,7 @@
 import type { Simplify } from 'type-fest';
 import type { FC } from 'react';
 import type { ExcludeNever } from '../types/generic';
+import type { Source } from './source';
 import { is } from './utils';
 
 export const ViewSymbol = Symbol();
@@ -13,10 +14,15 @@ type ViewProp =
     | ((...args: any) => any | Promise<any>)
     | { new (...args: any): any }
     | Promise<any>
+    | Source<any>
     | ViewParam<any>
     | string;
 
 type GenericViewDefinition = Record<string, ViewProp>;
+
+// A view function/value may yield a Source<T>; the island observes it and hands
+// the component its ready `value`, so the resolved prop type is the unwrapped T.
+type UnwrapSource<T> = T extends Source<infer U> ? U : T;
 
 export type CreateView<VD extends GenericViewDefinition = GenericViewDefinition> = {
     definition: GenericViewDefinition;
@@ -26,15 +32,17 @@ export type CreateView<VD extends GenericViewDefinition = GenericViewDefinition>
 };
 
 type ResolveViewDefinition<VD extends GenericViewDefinition> = {
-    [K in keyof VD]: VD[K] extends Promise<any>
-        ? Awaited<VD[K]>
-        : VD[K] extends ViewParam<any>
-          ? VD[K]['value']
+    [K in keyof VD]: VD[K] extends ViewParam<any>
+        ? VD[K]['value']
+        : VD[K] extends Promise<any>
+          ? UnwrapSource<Awaited<VD[K]>>
           : VD[K] extends (...args: any) => any
-            ? Awaited<ReturnType<VD[K]>>
+            ? UnwrapSource<Awaited<ReturnType<VD[K]>>>
             : VD[K] extends { new (...args: any): any }
               ? InstanceType<VD[K]>
-              : VD[K];
+              : VD[K] extends Source<infer U>
+                ? U
+                : VD[K];
 };
 
 type ViewDefinitions<View extends CreateView<any>> = NonNullable<
@@ -50,6 +58,7 @@ type ViewDefinition<PrevDefs extends GenericViewDefinition> = {
         | ViewParam<any>
         | ((params: Simplify<ResolveViewDefinition<PrevDefs>>) => any | Promise<any>)
         | Promise<any>
+        | Source<any>
         | { new (params: Simplify<ResolveViewDefinition<PrevDefs>>): any }
         | string;
 };
