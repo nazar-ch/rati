@@ -46,18 +46,30 @@ class ResolveCancelledError extends Error {
 
 /**
  * Disposes every resolved prop that opted into explicit resource management
- * (has a `[Symbol.dispose]` method) — e.g. grabbed ref-counted resources.
- * Dispose errors are reported, not rethrown: one failing resource must not
- * leak the others.
+ * (responds to `[Symbol.dispose]` with a callable) — e.g. grabbed ref-counted
+ * resources. Dispose errors are reported, not rethrown: one failing resource
+ * must not leak the others.
+ *
+ * Disposability is detected by *reading* the disposer, not by probing
+ * `Symbol.dispose in value`. A resolved prop may synthesize its disposer on
+ * access rather than expose it as an own/inherited key — e.g. a ref-counted
+ * resource handed out behind a `Proxy` whose `Symbol.dispose` comes from the
+ * `get` trap. An `in`/`has` probe wouldn't see that, so such resources used to
+ * need a `has` trap added purely to satisfy this feature-detection. Treating a
+ * callable get-result as the contract removes that impedance mismatch: the
+ * resource implements only the standard `Disposable` get, nothing rati-specific.
  */
 export function disposeViewProps(props: Record<string, unknown>) {
     for (const [key, value] of Object.entries(props)) {
-        if (is.object(value) && Symbol.dispose in value) {
-            try {
-                (value as Disposable)[Symbol.dispose]();
-            } catch (error) {
-                console.error(`Failed to dispose view prop '${key}'`, error);
-            }
+        if (!is.object(value)) continue;
+
+        const dispose = (value as Partial<Disposable>)[Symbol.dispose];
+        if (typeof dispose !== 'function') continue;
+
+        try {
+            dispose.call(value);
+        } catch (error) {
+            console.error(`Failed to dispose view prop '${key}'`, error);
         }
     }
 }
@@ -181,6 +193,45 @@ export type IslandComponent<View extends CreateView<any>> = FC<RequiredViewParam
     /** Type-level only: carries the view type for useIslandProps inference. */
     [IslandSymbol]?: View;
 };
+
+// ---------------------------------------------------------------------------------------
+
+/*
+    Island type helpers — the island-side counterparts of `ResolveView` /
+    `RequiredViewParams` / `ViewComponent`. Because an island's view is an
+    env→view *factory* (the `view` field of IslandConfig), reading its prop and
+    param types meant deriving them by hand at the definition site:
+
+        type View = ReturnType<typeof pageView>;
+        type Props = ResolveView<View>;
+        type Params = RequiredViewParams<View>;
+
+    These collapse that to `IslandProps<typeof pageView>` /
+    `IslandParams<typeof pageView>`, so the component and loading/failure slots
+    type themselves straight off the factory — no manual `ReturnType` step.
+*/
+
+/** The env→view factory shape an island is configured with (`IslandConfig.view`). */
+export type IslandViewFactory<View extends CreateView<any> = CreateView<any>> = (
+    env: any
+) => View;
+
+/** The view a `createIsland` factory produces — the input to the view helpers. */
+export type IslandViewOf<Factory extends IslandViewFactory> = ReturnType<Factory>;
+
+/**
+ * Clean, fully-resolved props an island's `component` receives — the island
+ * analogue of `ResolveView`, read from the view factory.
+ */
+export type IslandProps<Factory extends IslandViewFactory> = ResolveView<ReturnType<Factory>>;
+
+/**
+ * The params an island accepts as props (URL/host inputs) and that its slots
+ * receive as `params` — the island analogue of `RequiredViewParams`.
+ */
+export type IslandParams<Factory extends IslandViewFactory> = RequiredViewParams<
+    ReturnType<Factory>
+>;
 
 // Resolved-props context per island component, for useIslandProps
 const islandContexts = new WeakMap<object, Context<Record<string, unknown> | null>>();

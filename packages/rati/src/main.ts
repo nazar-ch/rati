@@ -77,6 +77,10 @@ export {
     IslandSymbol,
     type IslandComponent,
     type IslandConfig,
+    type IslandViewFactory,
+    type IslandViewOf,
+    type IslandProps,
+    type IslandParams,
 } from './experimental/island';
 
 if (import.meta.env.DEV) {

@@ -2,7 +2,7 @@ import { describe, test, expect, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import type { FC } from 'react';
 import { createView, viewParam } from '../common/view';
-import { createIsland, NotAvailableError } from '../experimental/island';
+import { createIsland, disposeViewProps, NotAvailableError } from '../experimental/island';
 
 type TestEnv = { prefix: string };
 
@@ -24,6 +24,31 @@ function deferred<T>() {
     });
     return { promise, resolve };
 }
+
+describe('disposeViewProps', () => {
+    test('disposes a prop whose Symbol.dispose is synthesized on get, not an own key', () => {
+        const log: string[] = [];
+
+        // Mirrors a ref-counted grab handle: dispose exists only via the `get`
+        // trap, and there is deliberately no `has` trap — so `Symbol.dispose in
+        // proxy` is false. The old `in`-based detection would skip it.
+        const grabbed = new Proxy(
+            { id: 'p1' },
+            {
+                get(target, prop, receiver) {
+                    if (prop === Symbol.dispose) return () => log.push('disposed:p1');
+                    return Reflect.get(target, prop, receiver);
+                },
+            }
+        );
+
+        expect(Symbol.dispose in grabbed).toBe(false);
+
+        disposeViewProps({ res: grabbed, plain: { not: 'disposable' } });
+
+        expect(log).toEqual(['disposed:p1']);
+    });
+});
 
 describe('createIsland', () => {
     test('shows loading, then the component with waterfall-resolved props', async () => {

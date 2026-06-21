@@ -152,9 +152,13 @@ Exceptions also compose through helper functions for free.
 
 The keystone rule: **the island owns what the view resolves**.
 
-- Any resolved prop with a `[Symbol.dispose]` method is disposed when the island unmounts,
-  when params/env change (before the next resolve starts), or when its resolve turns out to be
-  superseded or failed.
+- Any resolved prop that **responds to `[Symbol.dispose]` with a callable** is disposed when the
+  island unmounts, when params/env change (before the next resolve starts), or when its resolve
+  turns out to be superseded or failed. Disposability is detected by *reading* the disposer, not
+  by probing `Symbol.dispose in prop` — a resource may synthesize its disposer on access (e.g. a
+  ref-counted handle behind a `Proxy` whose dispose comes from the `get` trap, which an `in`
+  probe wouldn't see). The standard `Disposable` get is the whole contract; resources need
+  nothing rati-specific (no `has` trap to satisfy feature-detection).
 - A failed waterfall disposes the levels that *did* resolve before the failure — a grabbed
   space tree is released when the page level throws.
 - A superseded resolve runs to its next cancellation checkpoint (between levels and at the
@@ -286,6 +290,11 @@ Included:
   dispose-on-failure, dispose-on-supersede, dispose-on-unmount/param-change.
 - Typed failure routing with `retry`; rethrow to `ErrorBoundary` when no `error` slot.
 - Param diffing by `deepEqual`, env diffing by shallow equality.
+- Island type helpers — `IslandProps<typeof viewFactory>` / `IslandParams<typeof viewFactory>`
+  (and `IslandViewOf`), the factory-aware counterparts of `ResolveView` / `RequiredViewParams`.
+  The island's view is an env→view factory, so the component and loading/failure slots can type
+  themselves straight off it instead of deriving `ResolveView<ReturnType<typeof viewFactory>>`
+  by hand.
 - Opt-in auto-context: `provideContext: true` + `useIslandProps(Island)`.
 - Router integration: islands as route components (existing `route` or `route2`); `route2`
   with `options: { view?, wrapper? }` producing the same record as `route`.
@@ -333,10 +342,12 @@ const pageView = (env: PageEnv) =>
         });
 ```
 
-The component becomes purely presentational + reactive concerns:
+The component becomes purely presentational + reactive concerns. Its props (and the slots'
+`params`) come from the view factory via the island helpers — `IslandProps<typeof pageView>` /
+`IslandParams<typeof pageView>` — so nothing is derived by hand:
 
 ```tsx
-const PageBody: ViewComponent<...> = observer(({ spaceId, pageId, tree, pageDoc }) => {
+const PageBody = observer(({ spaceId, pageId, tree, pageDoc }: IslandProps<typeof pageView>) => {
     // Reactive concerns stay in the component: document title, URL sync autorun
     useDocumentTitle(tree.getPageTitle(pageId) || 'Untitled');
     usePanelUrlSync(spaceId, pageId, tree);
