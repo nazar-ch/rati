@@ -39,6 +39,14 @@ island will hand its data to the subtree without manual providers.)
 - **ready → pending: drop to pending** (Q3 → drop), *for now*. Next step combines both: keep the
   ready render as **stale** for *n* seconds, then fall back to pending. Design the phase model so
   "stale" is expressible from the start — don't hard-code an immediate drop.
+  - **Where this actually fires (dormant today):** jnana's CRDT page/tree sources never go
+    `ready → pending` — `YDocLoader.#materialization` is monotonic to a terminal (`pending →
+    ready | error`, then the meta observer detaches), so `ready` is final and live edits stream
+    through the grabbed store without touching load state. The drop-to-pending path is exercised
+    only by a source that *chooses* to regress: a REST/keyed-data source revalidating, or a
+    future loader that surfaces reconnect/offline as a non-ready state. What *does* happen today
+    is the reverse upgrade — `not-available → ready` (a doc created elsewhere): the island doesn't
+    detach on error, so the source stays attached and auto-upgrades out of the error slot.
 - **Still open:** error value shape (Q4), promises/values auto-wrapped as sources (Q5), the exact
   observable `state` shape (Q7), sequencing + the loader-state adapter (Q8).
 
@@ -267,7 +275,8 @@ Each carries my current lean; correct where wrong.
   sees only `Source`), but resource liveness must still track island presence — Q2 is where the
   old grab/release reappears, hopefully as observation.
 - **Flicker / lost subtree state on ready → pending** if the policy is "drop to pending" (Q3).
-  Bites on CRDT reconnects.
+  Dormant for jnana's CRDT sources (their `ready` is terminal — see Decisions); it would bite a
+  source that revalidates (REST) or surfaces reconnect as non-ready. Not a live regression today.
 - **All-or-nothing aggregation forecloses progressive rendering** (one slow/errored source blocks
   the whole island). Matches your spec; confirming progressive/partial props stays out.
 - **Aggregation granularity.** The island must read every source's `state` inside a reaction
