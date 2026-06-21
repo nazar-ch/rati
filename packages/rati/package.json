@@ -1,6 +1,6 @@
 {
     "name": "rati",
-    "version": "0.4.8-alpha.1",
+    "version": "0.4.9-alpha.1",
     "description": "TypeScript frontend framework for React & MobX",
     "author": "Nazar Chobaniuk",
     "license": "MIT",
@@ -24,8 +24,7 @@
         "build": "vite build && yarn -T run tsc -p tsconfig.build.json",
         "watch": "yarn -T run tsc --watch",
         "test": "vitest run --typecheck",
-        "test:watch": "vitest --typecheck",
-        "pub": "yarn build && npm publish --tag latest"
+        "test:watch": "vitest --typecheck"
     },
     "dependencies": {
         "type-fest": "^5.6.0"
