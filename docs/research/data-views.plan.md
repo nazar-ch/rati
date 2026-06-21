@@ -24,6 +24,24 @@ Two calls from the project lead; the rest of this doc is read in their light.
 (Flagged as upcoming, not designed here: **auto-context creation** is a near-future step — the
 island will hand its data to the subtree without manual providers.)
 
+## Decisions — 2026-06-22
+
+- **Scope: islands only; do not touch views yet.** SSR is out of focus for now (Q6 → deferred).
+  Revisit before views are actually removed.
+- **The source interface is source-agnostic.** CRDT resources implement it; **REST-API loaders may
+  implement the same interface.** The island never knows what is behind a source — that *is* the
+  decoupling. (Resolves the "In the same way…" note.)
+- **Lifetime: explicit `attach()` / `detach()`** (Q2 → b). The island attaches each source on
+  mount / param set and detaches on unmount / param change. No implicit observation-driven teardown.
+- **Dependencies: keep the chain** (Q1 → keep). Levels stay; a dependent level builds its source
+  from prior ready values. The free dependency-graph generalization is researched below — its
+  types are the interesting part.
+- **ready → pending: drop to pending** (Q3 → drop), *for now*. Next step combines both: keep the
+  ready render as **stale** for *n* seconds, then fall back to pending. Design the phase model so
+  "stale" is expressible from the start — don't hard-code an immediate drop.
+- **Still open:** error value shape (Q4), promises/values auto-wrapped as sources (Q5), the exact
+  observable `state` shape (Q7), sequencing + the loader-state adapter (Q8).
+
 ## Source state machines (the new resolved-prop model)
 
 An island stops resolving promises and instead **observes sources**. A source is a MobX state
@@ -63,7 +81,110 @@ pending | ready(value) | error(reason)
   mismatch (the thing just removed). Lifetime moves to observe/attach — see Q2.
 - **Sets up auto-context:** the island already holds the ready sources to hand down.
 
+## Research: the dependency graph, and its types
+
+The chain we're keeping is one shape of a more general idea — a **reactive dataflow graph** of
+sources. Worth pinning down the general form, because the prop types fall out of it and it frames
+later moves (auto-context, the eventual "stale" phase, possible partial rendering).
+
+### Two ways to wire dependencies
+
+**G1 — sources as first-class values (combinator style).** A source is `Source<T>`; dependents
+are built by a combinator over upstream *ready values*:
+
+```ts
+const spaceId = resolveSpace(slug);                          // Source<Uuid>
+const tree    = derive([spaceId], ([id]) => loadTree(id));   // Source<Tree>
+const pageDoc = derive([spaceId, pageId], ([id, pid]) => loadPage(id, pid)); // Source<Doc>
+```
+
+```ts
+type SourceValue<S> = S extends Source<infer T> ? T : never;
+
+function derive<Deps extends readonly Source<any>[], T>(
+    deps: Deps,
+    fn: (values: { [K in keyof Deps]: SourceValue<Deps[K]> }) => T | Promise<T> | Source<T>
+): Source<T>;
+```
+
+The combinator owns propagation: any dep `pending` → result `pending`; any dep `error` → result
+`error` (forwarded); all `ready` → run `fn`. So **`fn` is total over ready values** — it never
+sees pending/error. Types are clean and *compose*: each `derive` is its own inference boundary,
+deps are already-typed `Source` values, `SourceValue` pulls out `T`, nothing self-referential.
+
+**G2 — flat declarative record (deps inferred from what each function reads).**
+
+```ts
+const graph = sources({
+    space:   param<string>(),
+    pageId:  param<Uuid>(),
+    spaceId: ({ space })           => resolveSpace(space),
+    tree:    ({ spaceId })         => loadTree(spaceId),
+    pageDoc: ({ spaceId, pageId }) => loadPage(spaceId, pageId),
+});
+```
+
+Reads best — pure declaration, dependency = which sibling keys a function destructures, framework
+topologically sorts. But the types fight back:
+
+```ts
+type Resolved<G> = {
+    [K in keyof G]: G[K] extends Param<infer T>     ? T
+                  : G[K] extends (d: any) => infer R ? Awaited<UnwrapSource<R>>
+                  : G[K] extends Source<infer T>     ? T
+                  : G[K];
+};
+
+type GraphDef<G> = {
+    [K in keyof G]:
+        | Param<any>
+        | ((deps: Omit<Resolved<G>, K>) => any | Promise<any> | Source<any>) // can't depend on self
+        | Source<any>;
+};
+```
+
+`Omit<Resolved<G>, K>` neatly forbids the trivial self-cycle, but **`Resolved<G>` references `G`
+while `G` is still being inferred from the object literal** — self-referential contextual typing.
+TS can sometimes resolve it, but this is exactly the fragile case `.chain()` was built to avoid:
+each `.chain()` slices the graph so a level's input type is `ResolveViewDefinition<PrevDefs>` — a
+*closed, already-known* type, never self-referential. And the type system can't express "depend
+only on your topological predecessors" beyond `Omit<…, K>` (no transitive-cycle prevention).
+
+### Conclusion: the chain is the graph's typeable normal form
+
+A `.chain()` is a **depth-layering** of the DAG (longest-path layers); props within one level
+resolve in parallel, so the chain already expresses fan-out and diamonds: `{A}` → `{B, C}` →
+`{D}`. What a *free* graph buys over depth-layering is finer scheduling — if `B` is slow and `D`
+needs only `C`, a free graph starts `D` as soon as `C` is ready, while the chain's level-3 waits
+for all of level-2. For UI waterfalls that's rarely worth the typing cost. So: **keep the chain**,
+and treat G1's `derive` as an **escape hatch** for the odd cross-level dependency that doesn't
+justify a whole new level.
+
+### What this does to the prop types
+
+Almost nothing — that's the point. Keeping the chain, absorbing sources needs **one extra unwrap**
+in `ResolveViewDefinition`: `Source<T> → T` (and a function returning `Source<T>` resolves to `T`).
+The component still receives plain `T`s.
+
+Crucially, **because errors are unified and handled at the island level (all-or-nothing), they
+never enter the prop types** — no `Result<T, E>` leaks to components. The day we add
+progressive/partial rendering is the day per-prop `SourceState<T>` would have to surface in the
+props and components would branch; the all-or-nothing decision is exactly what keeps props as
+clean `T`s. (So "drop to pending / later stale" stays an island-level phase concern, never a
+per-prop type.)
+
+### MobX is already the graph engine
+
+If each source is a MobX observable/computed and dependents read upstream `.value` inside
+reactions, MobX handles invalidation and recompute — the "graph" *is* the MobX dependency graph,
+and `chain` is typed sugar over it. Value-flow (MobX) and resource-lifetime (explicit
+`attach`/`detach`) are orthogonal, so this composes with the lifetime decision. The framework's
+job then shrinks to three things: the typed façade (`Source<T> → T`), the attach/detach lifetime,
+and the `pending | ready | error` **aggregation → slot** mapping.
+
 ## Open questions — answer before refactoring
+
+> Q1, Q2, Q3, Q6 are resolved in **Decisions** above; Q4/Q5/Q7/Q8 remain. Kept here for rationale.
 
 Each carries my current lean; correct where wrong.
 
