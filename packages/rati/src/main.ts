@@ -64,9 +64,11 @@ export {
     type ViewComponent,
     type ViewParam,
     viewParam,
+    type ViewContextDef,
     ParamSymbol,
     ViewSymbol,
     ViewDefinitionsSymbol,
+    ViewContextSymbol,
 } from './common/view';
 
 export {
@@ -85,6 +87,7 @@ export {
 export {
     createIsland,
     useIslandProps,
+    useIslandContext,
     IslandSymbol,
     type IslandComponent,
     type IslandConfig,

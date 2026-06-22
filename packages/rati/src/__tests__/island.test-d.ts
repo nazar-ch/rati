@@ -1,7 +1,13 @@
 import { describe, test, expectTypeOf } from 'vitest';
 import { createView, viewParam, type ResolveView } from '../common/view';
 import { type Source } from '../common/source';
-import { type IslandParams, type IslandProps, type IslandViewOf } from '../experimental/island';
+import {
+    createIsland,
+    useIslandContext,
+    type IslandParams,
+    type IslandProps,
+    type IslandViewOf,
+} from '../experimental/island';
 
 type Env = { prefix: string };
 
@@ -50,5 +56,40 @@ describe('island type helpers', () => {
             id: string;
             live: number;
         }>();
+    });
+
+    test('.context() factory receives the fully resolved chain, typed', () => {
+        (_env: Env) =>
+            createView
+                .chain({ id: viewParam<string>(), revision: viewParam<number>() })
+                .chain({ name: async ({ id }) => `${id}` })
+                .context((resolved) => {
+                    expectTypeOf(resolved).toEqualTypeOf<{
+                        id: string;
+                        revision: number;
+                        name: string;
+                    }>();
+                    return { heading: resolved.name };
+                });
+    });
+
+    test('useIslandContext returns the .context() value type; .context() is not a prop', () => {
+        const ctxView = (env: Env) =>
+            createView
+                .chain({ id: viewParam<string>() })
+                .chain({ name: async ({ id }) => `${env.prefix}:${id}` })
+                .context(({ name }) => ({ heading: name.toUpperCase() }));
+
+        const Island = createIsland({
+            useEnv: () => ({ prefix: 'p' }) as Env,
+            view: ctxView,
+            component: () => null,
+            loading: () => null,
+        });
+
+        expectTypeOf(useIslandContext(Island)).toEqualTypeOf<{ heading: string }>();
+
+        // The context value stays out of the component's resolved props.
+        expectTypeOf<IslandProps<typeof ctxView>>().toEqualTypeOf<{ id: string; name: string }>();
     });
 });

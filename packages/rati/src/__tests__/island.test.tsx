@@ -4,7 +4,7 @@ import { observable, runInAction } from 'mobx';
 import type { FC } from 'react';
 import { createView, viewParam } from '../common/view';
 import { NotAvailableError, SourceSymbol, type Source, type SourceState } from '../common/source';
-import { createIsland } from '../experimental/island';
+import { createIsland, useIslandContext } from '../experimental/island';
 
 type TestEnv = { prefix: string };
 
@@ -206,5 +206,103 @@ describe('createIsland', () => {
 
         sourceFor('a2').ready({ id: 'a2' });
         expect(await screen.findByText('ready a2')).toBeTruthy();
+    });
+
+    test('builds the .context() value from the resolved chain and provides it to the subtree', async () => {
+        const Island = createIsland({
+            useEnv: () => ({ prefix: 'env' }) as TestEnv,
+            view: (env) =>
+                createView
+                    .chain({ id: viewParam<string>() })
+                    .chain({ name: async ({ id }) => `${env.prefix}:${id}` })
+                    .context(({ name }) => ({ label: `<${name}>` })),
+            component: () => <Consumer />,
+            loading: Loading,
+        });
+
+        function Consumer() {
+            const ctx = useIslandContext(Island);
+            return <div>ctx {ctx.label}</div>;
+        }
+
+        render(<Island id="a1" />);
+        expect(await screen.findByText('ctx <env:a1>')).toBeTruthy();
+    });
+
+    test('disposes the context before detaching the sources it was built from', async () => {
+        const log: string[] = [];
+        const res = testSource<{ id: string }>(log, 'res');
+
+        const Island = createIsland({
+            useEnv: () => ({ prefix: 'env' }) as TestEnv,
+            view: () =>
+                createView
+                    .chain({ id: viewParam<string>() })
+                    .chain({ res: () => res })
+                    .context(({ res: r }) => ({ id: r.id }), {
+                        mount: () => {
+                            log.push('context-mount');
+                            return () => log.push('context-dispose');
+                        },
+                    }),
+            component: () => <Mounted />,
+            loading: Loading,
+        });
+
+        function Mounted() {
+            const ctx = useIslandContext(Island);
+            return <div>ctx {ctx.id}</div>;
+        }
+
+        const { unmount } = render(<Island id="a1" />);
+        res.ready({ id: 'a1' });
+        await screen.findByText('ctx a1');
+        expect(log).toContain('context-mount');
+
+        unmount();
+        // The context teardown must run while the grab is still live — i.e. before
+        // the source it was built from detaches.
+        expect(log.indexOf('context-dispose')).toBeLessThan(log.indexOf('detach:res'));
+    });
+
+    test('rebuilds the context on param change, disposing the previous one first', async () => {
+        const log: string[] = [];
+        const sources = new Map<string, TestSource<{ id: string }>>();
+        const sourceFor = (id: string) => {
+            let source = sources.get(id);
+            if (!source) {
+                source = testSource<{ id: string }>(log, id);
+                sources.set(id, source);
+            }
+            return source;
+        };
+
+        const Island = createIsland({
+            useEnv: () => ({ prefix: 'env' }) as TestEnv,
+            view: () =>
+                createView
+                    .chain({ id: viewParam<string>() })
+                    .chain({ res: ({ id }) => sourceFor(id) })
+                    .context(({ res }) => ({ id: res.id }), {
+                        mount: (ctx) => {
+                            log.push(`context-mount:${ctx.id}`);
+                            return () => log.push(`context-dispose:${ctx.id}`);
+                        },
+                    }),
+            component: ({ res }) => <div>ready {res.id}</div>,
+            loading: Loading,
+        });
+
+        const { rerender } = render(<Island id="a1" />);
+        sourceFor('a1').ready({ id: 'a1' });
+        await screen.findByText('ready a1');
+        expect(log).toContain('context-mount:a1');
+
+        rerender(<Island id="a2" />);
+        expect(log.indexOf('context-dispose:a1')).toBeLessThan(log.indexOf('detach:a1'));
+
+        sourceFor('a2').ready({ id: 'a2' });
+        await screen.findByText('ready a2');
+        expect(log).toContain('context-mount:a2');
     });
 });

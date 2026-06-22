@@ -7,6 +7,7 @@ import {
     type CreateView,
     type RequiredViewParams,
     type ResolveView,
+    type ViewContextDef,
 } from '../common/view';
 import {
     isSource,
@@ -87,9 +88,12 @@ function entryToSource(
 
 type AttachedLevel = Record<string, { source: Source<unknown>; detach: () => void }>;
 
+// A built `.context()` value plus the teardown its `mount` returned (if any).
+type BuiltContext = { value: unknown; cleanup: (() => void) | undefined };
+
 type RunPhase =
     | { phase: 'pending' }
-    | { phase: 'ready'; props: Record<string, unknown> }
+    | { phase: 'ready'; props: Record<string, unknown>; context?: unknown }
     | { phase: 'error'; error: SourceError };
 
 /*
@@ -106,9 +110,16 @@ class IslandRun {
     #disposeProgression: () => void;
     #disposed = false;
 
+    // Island-owned context (`.context()`): built once every level is ready and
+    // disposed before the sources detach. `undefined` until built / when absent.
+    #contextDef: ViewContextDef | undefined;
+    #context = observable.box<BuiltContext | undefined>(undefined, { deep: false });
+    #disposeContextBuild: (() => void) | undefined;
+
     constructor(view: CreateView, params: Record<string, unknown>) {
         this.#params = params;
         this.#levels = flattenLevels(view);
+        this.#contextDef = view.contextDef;
 
         this.#buildLevel(0, {});
 
@@ -119,6 +130,19 @@ class IslandRun {
             },
             { fireImmediately: true }
         );
+
+        // Build the context as soon as every level is built and ready. Kept off the
+        // render path (a reaction, not the phase getter) so the factory / mount side
+        // effects never run during render or double-run under StrictMode.
+        if (this.#contextDef) {
+            this.#disposeContextBuild = reaction(
+                () => this.#built.length === this.#levels.length && this.#allReady(),
+                (ready) => {
+                    if (ready && !this.#disposed) this.#buildContext();
+                },
+                { fireImmediately: true }
+            );
+        }
     }
 
     get phase(): RunPhase {
@@ -127,19 +151,42 @@ class IslandRun {
         if (this.#built.length < this.#levels.length || !this.#allReady()) {
             return { phase: 'pending' };
         }
-        return { phase: 'ready', props: this.#mergedReady(this.#built.length) };
+        // Sources are ready; if a context is declared, hold pending until it is
+        // built so the subtree never observes a missing context on the first ready
+        // render (the context reaction fills it in the same tick).
+        const context = this.#context.get();
+        if (this.#contextDef && !context) return { phase: 'pending' };
+        return {
+            phase: 'ready',
+            props: this.#mergedReady(this.#built.length),
+            context: context?.value,
+        };
     }
 
     detach() {
         if (this.#disposed) return;
         this.#disposed = true;
         this.#disposeProgression();
+        this.#disposeContextBuild?.();
         // detach() runs from the unmount effect / a rebuild, not a reaction, so
         // iterating the observable level array goes through an action to keep
         // dev-only `observableRequiresReaction` quiet.
         runInAction(() => {
-            for (const level of this.#built) {
-                for (const { detach } of Object.values(level)) {
+            // Dispose the context first: its teardown (e.g. deactivate) still reads
+            // through the grabbed resource the chain resolved, which the source
+            // detach below then releases — so this order is load-bearing.
+            const context = this.#context.get();
+            if (context?.cleanup) {
+                try {
+                    context.cleanup();
+                } catch (error) {
+                    console.error('Island context dispose failed', error);
+                }
+            }
+            this.#context.set(undefined);
+            // Detach levels in reverse: a later level may depend on an earlier one.
+            for (let i = this.#built.length - 1; i >= 0; i--) {
+                for (const { detach } of Object.values(this.#built[i]!)) {
                     try {
                         detach();
                     } catch (error) {
@@ -148,6 +195,21 @@ class IslandRun {
                 }
             }
             this.#built.clear();
+        });
+    }
+
+    // Build the context value from the fully resolved chain and run its mount. The
+    // reads + side effects run inside an action because this fires from a reaction
+    // effect (untracked), where bare observable reads would trip the dev-only
+    // observableRequiresReaction warning.
+    #buildContext() {
+        if (!this.#contextDef || this.#context.get() || this.#disposed) return;
+        const contextDef = this.#contextDef;
+        runInAction(() => {
+            const resolved = this.#mergedReady(this.#built.length);
+            const value = contextDef.factory(resolved);
+            const cleanup = contextDef.mount?.(value) ?? undefined;
+            this.#context.set({ value, cleanup });
         });
     }
 
@@ -316,10 +378,51 @@ export function useIslandProps<View extends CreateView<any>>(
     return props as ResolveView<View>;
 }
 
+// ---------------------------------------------------------------------------------------
+
+// Island-owned context value (`.context()`) per island component, for
+// useIslandContext. Keyed by the island component like useIslandProps; the sentinel
+// distinguishes "no provider above" from a context whose value is nullish.
+const ISLAND_CONTEXT_MISSING = Symbol('rati.island-context-missing');
+const islandContextChannels = new WeakMap<object, Context<unknown>>();
+const noIslandContext = createContext<unknown>(ISLAND_CONTEXT_MISSING);
+
+// The context value type a view carries via `.context()` (CreateView's second
+// param), read back off the island for useIslandContext's return type.
+type ViewContextOf<View extends CreateView<any, any>> =
+    View extends CreateView<any, infer Ctx> ? Ctx : never;
+
+/**
+ * Read the island-owned context declared by the view's `.context()` step — the
+ * lifecycle-managed counterpart of `useIslandProps`. The value is created and torn
+ * down by the island in lockstep with its sources (built when the chain is ready,
+ * disposed before the sources detach), so a store built over a grabbed resource
+ * never outlives that grab. Nearest island instance wins.
+ */
+export function useIslandContext<View extends CreateView<any, any>>(
+    island: IslandComponent<View>
+): ViewContextOf<View> {
+    const channel = islandContextChannels.get(island);
+    const value = useContext(channel ?? noIslandContext);
+
+    if (!channel) {
+        throw new Error('useIslandContext expects a component created by createIsland');
+    }
+    if (value === ISLAND_CONTEXT_MISSING) {
+        throw new Error(
+            'No island context found. Render this component under the island whose view ' +
+                'ends in a `.context()` step.'
+        );
+    }
+
+    return value as ViewContextOf<View>;
+}
+
 export function createIsland<Env, View extends CreateView<any>>(
     config: IslandConfig<Env, View>
 ): IslandComponent<View> {
     const PropsContext = createContext<Record<string, unknown> | null>(null);
+    const ContextChannel = createContext<unknown>(ISLAND_CONTEXT_MISSING);
 
     const Island = observer(function Island(params: RequiredViewParams<View>) {
         const env = config.useEnv();
@@ -370,13 +473,17 @@ export function createIsland<Env, View extends CreateView<any>>(
 
         if (phase.phase === 'ready') {
             const Component = config.component;
-            const content = <Component {...(phase.props as ResolveView<View>)} />;
+            let content: React.ReactNode = <Component {...(phase.props as ResolveView<View>)} />;
 
-            return config.provideContext ? (
-                <PropsContext.Provider value={phase.props}>{content}</PropsContext.Provider>
-            ) : (
-                content
-            );
+            if (config.provideContext) {
+                content = <PropsContext.Provider value={phase.props}>{content}</PropsContext.Provider>;
+            }
+            // Provide the `.context()` value (when the view declares one). A context
+            // factory is expected to return a non-nullish value (a store/object).
+            if (phase.context !== undefined) {
+                content = <ContextChannel.Provider value={phase.context}>{content}</ContextChannel.Provider>;
+            }
+            return content;
         }
 
         if (phase.phase === 'error') {
@@ -396,6 +503,7 @@ export function createIsland<Env, View extends CreateView<any>>(
     Island.displayName = `Island(${componentName || 'Component'})`;
 
     islandContexts.set(Island, PropsContext);
+    islandContextChannels.set(Island, ContextChannel);
 
     return Island;
 }

@@ -10,6 +10,11 @@ export const ViewSymbol = Symbol();
 // the whole view chain, so resolving a view never has to walk prevView types
 export const ViewDefinitionsSymbol = Symbol();
 
+// Type-level only: carries the island-owned context value type declared by
+// `.context()`, so `useIslandContext` reads it straight off the view instead of
+// re-deriving it from the factory.
+export const ViewContextSymbol = Symbol();
+
 type ViewProp =
     | ((...args: any) => any | Promise<any>)
     | { new (...args: any): any }
@@ -24,11 +29,29 @@ type GenericViewDefinition = Record<string, ViewProp>;
 // the component its ready `value`, so the resolved prop type is the unwrapped T.
 type UnwrapSource<T> = T extends Source<infer U> ? U : T;
 
-export type CreateView<VD extends GenericViewDefinition = GenericViewDefinition> = {
+// Runtime shape of a `.context()` declaration. The factory builds the context
+// value from the fully resolved chain; `mount` (optional) runs side effects and
+// returns a teardown the island calls before detaching the chain's sources.
+export type ViewContextDef = {
+    factory: (resolved: Record<string, unknown>) => unknown;
+    mount?: ((value: unknown) => (() => void) | void) | undefined;
+};
+
+// `Ctx` defaults to `unknown` so the many `CreateView<any>` constraint sites keep
+// accepting context-bearing views (a `PageContextStore` context is assignable to
+// `unknown`); a view without `.context()` carries `unknown` here.
+export type CreateView<
+    VD extends GenericViewDefinition = GenericViewDefinition,
+    Ctx = unknown,
+> = {
     definition: GenericViewDefinition;
     prevView?: CreateView | undefined;
+    // Present only when the chain ends in `.context()`. Named `contextDef` (not
+    // `context`) so it never collides with ChainableView's `.context()` method.
+    contextDef?: ViewContextDef | undefined;
     [ViewSymbol]: true;
     [ViewDefinitionsSymbol]?: VD;
+    [ViewContextSymbol]?: Ctx;
 };
 
 type ResolveViewDefinition<VD extends GenericViewDefinition> = {
@@ -101,6 +124,20 @@ export type ChainableView<VD extends GenericViewDefinition> = CreateView<VD> & {
     chain<NextDef extends ViewDefinition<VD>>(
         nextViewDefinition: NextDef
     ): ChainableView<Simplify<VD & NextDef>>;
+
+    /**
+     * Declare an island-owned context value derived from the fully resolved chain.
+     * The factory runs once every level is ready; the value is handed to the
+     * subtree (read with `useIslandContext(Island)`) and, if `mount` is given,
+     * mounted at the same point — its returned cleanup runs on island teardown
+     * *before* the chain's sources detach, so a context built over a grabbed
+     * resource is torn down while that grab is still live (fixing the decoupled
+     * "accessed after releasing" race). Terminal: `.context()` ends the chain.
+     */
+    context<C>(
+        factory: (resolved: Simplify<ResolveViewDefinition<VD>>) => C,
+        options?: { mount?: (value: C) => (() => void) | void }
+    ): CreateView<VD, C>;
 };
 
 const viewChainHead = <Def extends ViewDefinition<{}>>(viewDefinition: Def) =>
@@ -116,6 +153,22 @@ function createViewChain<VD extends GenericViewDefinition>(
         ...view,
         chain: <NextDef extends ViewDefinition<VD>>(nextViewDefinition: NextDef) =>
             createViewChain<Simplify<VD & NextDef>>(nextViewDefinition, view),
+        // `.context()` adds no level — it stamps the context factory onto this same
+        // node (same definition/prevView), so flattenLevels still sees the chain
+        // unchanged and the island reads the factory off `view.context`.
+        context: <C>(
+            factory: (resolved: Simplify<ResolveViewDefinition<VD>>) => C,
+            options?: { mount?: (value: C) => (() => void) | void }
+        ): CreateView<VD, C> =>
+            // The [ViewContextSymbol] carrier is type-only (never present at
+            // runtime), so cast to stamp the C onto the otherwise-unchanged node.
+            ({
+                ...view,
+                contextDef: {
+                    factory: factory as ViewContextDef['factory'],
+                    mount: options?.mount as ViewContextDef['mount'],
+                },
+            }) as CreateView<VD, C>,
     };
 }
 
