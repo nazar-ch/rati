@@ -158,6 +158,37 @@ export type RouteOptions<TView extends CreateView<any> | undefined> = {
     error?: TView extends CreateView<any> ? IslandConfig<{}, TView>['error'] : undefined;
 };
 
+// The required (non-optional) keys of an object type.
+type RequiredKeys<T> = {
+    [K in keyof T]-?: {} extends Pick<T, K> ? never : K;
+}[keyof T];
+
+// Surfaced when a route2 component requires props the path can't supply.
+type MissingRouteParams<Missing extends PropertyKey> = {
+    'route2: component needs props not present in the path': Missing;
+};
+
+/*
+    Validates the (inferred) route2 component, intersected onto its type so the
+    argument must satisfy it. With a `view`, the component is checked against the
+    view. Otherwise it's checked by param *name*: its required props must all be
+    path params. Values are intentionally not pinned to the path's plain `string`
+    — a component (typically an island) brands a URL segment via
+    `viewParam<Base64Uuid>()`, the same refinement the legacy `view` path encodes,
+    so a branded prop like `pageId: Base64Uuid` is accepted by name.
+*/
+type RouteComponentGuard<
+    Path extends string,
+    TView extends CreateView<any> | undefined,
+    Component,
+> = [TView] extends [CreateView<any>]
+    ? ViewComponent<TView>
+    : Component extends (props: infer P) => any
+      ? [RequiredKeys<P>] extends [keyof ExtractRouteParams<Path>]
+          ? unknown
+          : MissingRouteParams<Exclude<RequiredKeys<P>, keyof ExtractRouteParams<Path>>>
+      : unknown;
+
 /**
  * Location-coupled twin of `createIsland`: a route2 *is* an island, specialized
  * to a URL. The non-route-specific inputs (`view`, `loading`, `error`) are the
@@ -181,9 +212,14 @@ export type RouteOptions<TView extends CreateView<any> | undefined> = {
 export function route2<
     Path extends string,
     Name extends string,
-    TViewComponent extends ViewComponentForOptionalView<TView, ExtractRouteParams<Path>>,
+    Component extends ComponentType<any>,
     TView extends CreateView<any> | undefined = undefined,
->(path: Path, name: Name, component: TViewComponent, options: RouteOptions<TView> = {}) {
+>(
+    path: Path,
+    name: Name,
+    component: Component & RouteComponentGuard<Path, TView, Component>,
+    options: RouteOptions<TView> = {}
+) {
     const view = options.view;
 
     // route2 = createIsland, coupled to a location. A supplied view is folded

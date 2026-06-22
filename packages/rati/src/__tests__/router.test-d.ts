@@ -50,6 +50,19 @@ describe('route2()', () => {
         route2('/shop/:productId', 'product', ProductIsland);
     });
 
+    test('feeds an island whose params are branded (URL string refined by viewParam)', () => {
+        type PageId = string & { readonly __brand: 'PageId' };
+        const BrandedIsland = createIsland({
+            useEnv: () => ({}),
+            view: () => createView.chain({ pageId: viewParam<PageId>() }),
+            component: () => null,
+            loading: () => null,
+        });
+        // The path yields a plain string; the island brands it via viewParam, so
+        // it's accepted by param name even though `pageId` is a branded string.
+        route2('/pages/:pageId', 'page', BrandedIsland);
+    });
+
     test('rejects an island whose params are not present in the path', () => {
         // @ts-expect-error - "/" has no :productId param
         route2('/', 'home', ProductIsland);
