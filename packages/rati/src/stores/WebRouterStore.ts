@@ -134,28 +134,37 @@ export function route<
     };
 }
 
-export type RouteOptions<TView extends CreateView<any> | undefined> = {
+export type RouteOptions<Env, TView extends CreateView<any> | undefined> = {
     /**
      * Data the route resolves before the component renders. When present,
      * `route2` folds it together with the component into an island (see below),
      * so resolution runs on the source-based island engine — loading/error
      * slots, attach-on-build / detach-on-navigate — not the legacy ViewLoader.
      * The component receives the resolved props.
+     *
+     * Either a plain view (env-less) or an env→view factory, exactly like
+     * `createIsland`'s `view`. Pair a factory with `useEnv` to supply per-root
+     * services (stores, api clients) the view functions need.
      */
-    view?: TView extends CreateView<any> ? TView : undefined;
+    view?: TView extends CreateView<any> ? TView | ((env: Env) => TView) : undefined;
+    /**
+     * Builds the environment a factory `view` receives — the island's `useEnv`
+     * hook. Defaults to an empty env; only needed when `view` is a factory.
+     */
+    useEnv?: () => Env;
     /** Route-level wrapper rendered around the component. */
     wrapper?: ComponentType | undefined;
     /**
      * Slot shown while the view resolves — the island's `loading`. Defaults to
      * rendering nothing. Only meaningful alongside `view`.
      */
-    loading?: TView extends CreateView<any> ? IslandConfig<{}, TView>['loading'] : undefined;
+    loading?: TView extends CreateView<any> ? IslandConfig<Env, TView>['loading'] : undefined;
     /**
      * Slot shown on resolution failure — the island's `error` (switch on
      * `error.code`). When omitted, the error throws to the nearest ErrorBoundary.
      * Only meaningful alongside `view`.
      */
-    error?: TView extends CreateView<any> ? IslandConfig<{}, TView>['error'] : undefined;
+    error?: TView extends CreateView<any> ? IslandConfig<Env, TView>['error'] : undefined;
 };
 
 // The required (non-optional) keys of an object type.
@@ -196,29 +205,37 @@ type RouteComponentGuard<
  * (path, name, wrapper) and feeds the path-matched params in as the island's
  * props.
  *
- * When `options.view` is given, route2 wraps the component + view into a
- * `createIsland` (env-less) and stores that island as the route's component, so
- * resolution goes through the same source-based engine as a standalone island
- * instead of the legacy `route`/ViewLoader/resolveView path. The record's `view`
- * is therefore always undefined — the Router renders the (island) component
- * directly, handing it the route params.
+ * When `options.view` is given, route2 wraps the component + view (+ `useEnv`,
+ * `loading`, `error` — the same inputs as `createIsland`) into an island and
+ * stores it as the route's component, so resolution goes through the same
+ * source-based engine as a standalone island instead of the legacy
+ * `route`/ViewLoader/resolveView path. The record's `view` is therefore always
+ * undefined — the Router renders the (island) component directly, handing it the
+ * route params. So a route declares its island inline — no separate
+ * `createIsland` module needed:
  *
- * A component built with `createIsland` up front needs no `view` here — it's
- * already an island whose props are its view's params, so the path params feed
- * it directly:
+ *     route2('/spaces/:spaceId/pages/:pageId', 'page', PageBody, {
+ *         view: pageView,
+ *         useEnv: usePageEnv,
+ *         loading: PageLoading,
+ *         error: PageError,
+ *     })
  *
- *     route2('/spaces/:spaceId/pages/:pageId', 'page', PageIsland)
+ * A component built with `createIsland` up front also works as-is with no `view`
+ * — it's already an island whose props are its view's params, so the path params
+ * feed it directly: `route2('/spaces/:spaceId/pages/:pageId', 'page', PageIsland)`.
  */
 export function route2<
     Path extends string,
     Name extends string,
     Component extends ComponentType<any>,
+    Env = {},
     TView extends CreateView<any> | undefined = undefined,
 >(
     path: Path,
     name: Name,
     component: Component & RouteComponentGuard<Path, TView, Component>,
-    options: RouteOptions<TView> = {}
+    options: RouteOptions<Env, TView> = {}
 ) {
     const view = options.view;
 
@@ -229,10 +246,13 @@ export function route2<
     const routeComponent =
         view !== undefined
             ? createIsland({
-                  view: () => view as CreateView<any>,
-                  // Routes carry no per-root env (env-bearing views are authored
-                  // as islands up front and passed as `component`).
-                  useEnv: () => ({}),
+                  // `view` is either a plain view or an env→view factory; normalize
+                  // to the factory shape createIsland expects.
+                  view:
+                      typeof view === 'function'
+                          ? (view as (env: Env) => CreateView<any>)
+                          : () => view as CreateView<any>,
+                  useEnv: options.useEnv ?? (() => ({}) as Env),
                   component: component as ComponentType<any>,
                   loading: options.loading ?? (() => null),
                   ...(options.error ? { error: options.error } : {}),
