@@ -22,7 +22,8 @@ Two calls from the project lead; the rest of this doc is read in their light.
    interface; CRDT resources are one implementation of it.
 
 (Flagged as upcoming, not designed here: **auto-context creation** is a near-future step — the
-island will hand its data to the subtree without manual providers.)
+island will hand its data to the subtree without manual providers.) — **Done**, see
+"Island-owned context (`.context()`)" below.
 
 ## Decisions — 2026-06-22
 
@@ -539,6 +540,49 @@ const { tree, pageDoc } = useIslandProps(Page);
 - A view-keyed variant (`useViewProps(pageView)`) stays on the table for when views become
   stable values (env-in-types, option B above).
 
+## Island-owned context (`.context()`) — implemented 2026-06-22
+
+The auto-context step. Where `provideContext`/`useIslandProps` hand the subtree the *raw
+resolved props*, `.context()` declares a **derived, lifecycle-managed** value (typically a store)
+the island owns:
+
+```ts
+const pageView = (env: PageEnv) =>
+    createView
+        .chain({ space: viewParam<string>(), pageId: viewParam<Base64Uuid>() })
+        .chain({ spaceId: ({ space }) => resolveSpaceId(env.spacesStore, space) })
+        .chain({ tree: ({ spaceId }) => env.…trees.source(…), pageDoc: ({ … }) => env.…pages.source(…) })
+        .context(
+            ({ pageDoc }) => new PageContextStore(pageDoc, env.resourcesStore, env.uiStore),
+            { mount: (ctx) => ctx.mount(), provideTo: PageContext },
+        );
+
+// anywhere under the island, typed off the view's new second param:
+const ctx = useIslandContext(PageIsland);
+```
+
+- **Terminal chain step.** `.context(factory, options?)` stamps the factory onto the view (adds no
+  level). `factory` receives the fully resolved chain; its return type becomes `CreateView`'s new
+  second type parameter `Ctx`, read back by `useIslandContext(Island): Ctx`.
+- **Lifecycle owned by the island, not React.** The value is built off the render path (a reaction)
+  once every level is ready — so factory/`mount` side effects never run during render or
+  double-run under StrictMode — and the phase holds `pending` until it exists. On teardown the
+  island runs `mount`'s cleanup **before** detaching the sources the value was built from, and
+  detaches levels in reverse. That ordering is the whole point: a store built over a grabbed
+  resource is disposed (e.g. `deactivate`) while the grab is still live.
+- **Why this beats a child provider.** jnana's `PageContextProvider` held the store in `useState`
+  keyed by `pageId` and mounted it in an effect — a lifecycle decoupled from the island. When the
+  island superseded and regrabbed the page doc without a remount, that store kept pointing at the
+  released grab → "accessed after releasing". Island ownership closes the race.
+- **`provideTo` bridges into an app context.** `useIslandContext(Island)` is keyed by the island
+  component, so a reader inside the island's own subtree must import the island — a cycle (the
+  subtree is what the island imports), which `import/no-cycle` rejects. `provideTo: AppContext`
+  (an app-owned `Context<C | null>`) also publishes the value there, so app code reads it through
+  its own context with no island import. jnana uses this: `PageContext` + `usePageContext` are
+  unchanged for the 12 consumers; only the lifecycle moved.
+- **Not a prop.** The context value stays out of `component`'s resolved props (`ResolveView` is
+  unchanged); it is reached only via the hooks.
+
 ## More ideas
 
 - **Shared chain prefixes.** Two islands needing the space tree declare it independently;
@@ -582,6 +626,8 @@ Included:
   themselves straight off it instead of deriving `ResolveView<ReturnType<typeof viewFactory>>`
   by hand.
 - Opt-in auto-context: `provideContext: true` + `useIslandProps(Island)`.
+- Island-owned context: `.context(factory, { mount?, provideTo? })` + `useIslandContext(Island)`
+  (see "Island-owned context" above).
 - Router integration: islands as route components (existing `route` or `route2`); `route2`
   with `options: { view?, wrapper? }` producing the same record as `route`.
 
