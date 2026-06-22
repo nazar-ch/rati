@@ -399,22 +399,36 @@ const noIslandContext = createContext<unknown>(ISLAND_CONTEXT_MISSING);
 type ViewContextOf<View extends CreateView<any, any>> =
     View extends CreateView<any, infer Ctx> ? Ctx : never;
 
+// Shared lookup for the two reader hooks: resolve the island's context channel and
+// read it. Returns the raw value (possibly the MISSING sentinel) so each hook can
+// apply its own absent-value policy (throw vs. undefined). Throwing on a non-island
+// argument is common to both — that's a misuse, not an absent value. A hook (calls
+// useContext), so both callers invoke it unconditionally.
+function useRawIslandContext(island: object, hookName: string): unknown {
+    const channel = islandContextChannels.get(island);
+    const value = useContext(channel ?? noIslandContext);
+
+    if (!channel) {
+        throw new Error(`${hookName} expects a component created by createIsland`);
+    }
+    return value;
+}
+
 /**
  * Read the island-owned context declared by the view's `.context()` step — the
  * lifecycle-managed counterpart of `useIslandProps`. The value is created and torn
  * down by the island in lockstep with its sources (built when the chain is ready,
  * disposed before the sources detach), so a store built over a grabbed resource
  * never outlives that grab. Nearest island instance wins.
+ *
+ * Throws when no context value is above — see {@link useOptionalIslandContext} for
+ * the non-throwing form.
  */
 export function useIslandContext<View extends CreateView<any, any>>(
     island: IslandComponent<View>
 ): ViewContextOf<View> {
-    const channel = islandContextChannels.get(island);
-    const value = useContext(channel ?? noIslandContext);
+    const value = useRawIslandContext(island, 'useIslandContext');
 
-    if (!channel) {
-        throw new Error('useIslandContext expects a component created by createIsland');
-    }
     if (value === ISLAND_CONTEXT_MISSING) {
         throw new Error(
             'No island context found. Render this component under the island whose view ' +
@@ -423,6 +437,21 @@ export function useIslandContext<View extends CreateView<any, any>>(
     }
 
     return value as ViewContextOf<View>;
+}
+
+/**
+ * Optional form of {@link useIslandContext}: returns `undefined` instead of
+ * throwing when no context value is above — the component renders outside the
+ * island, or its view declares no `.context()` step. For components that may render
+ * either under the island or standalone. Still throws when `island` is not a
+ * `createIsland` component (a misuse, not an absent value).
+ */
+export function useOptionalIslandContext<View extends CreateView<any, any>>(
+    island: IslandComponent<View>
+): ViewContextOf<View> | undefined {
+    const value = useRawIslandContext(island, 'useOptionalIslandContext');
+
+    return value === ISLAND_CONTEXT_MISSING ? undefined : (value as ViewContextOf<View>);
 }
 
 export function createIsland<Env, View extends CreateView<any>>(

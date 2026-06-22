@@ -4,7 +4,7 @@ import { observable, runInAction } from 'mobx';
 import { createContext, StrictMode, useContext, type FC } from 'react';
 import { createView, viewParam } from '../common/view';
 import { NotAvailableError, SourceSymbol, type Source, type SourceState } from '../common/source';
-import { createIsland, useIslandContext } from '../experimental/island';
+import { createIsland, useIslandContext, useOptionalIslandContext } from '../experimental/island';
 
 type TestEnv = { prefix: string };
 
@@ -334,6 +334,64 @@ describe('createIsland', () => {
 
         render(<Island id="a1" />);
         expect(await screen.findByText('app #a1')).toBeTruthy();
+    });
+
+    test('useOptionalIslandContext returns the value when a context is provided above', async () => {
+        const Island = createIsland({
+            useEnv: () => ({ prefix: 'env' }) as TestEnv,
+            view: () =>
+                createView
+                    .chain({ id: viewParam<string>() })
+                    .context(({ id }) => ({ label: `#${id}` })),
+            component: () => <Consumer />,
+            loading: Loading,
+        });
+
+        function Consumer() {
+            const ctx = useOptionalIslandContext(Island);
+            return <div>opt {ctx ? ctx.label : 'none'}</div>;
+        }
+
+        render(<Island id="a1" />);
+        expect(await screen.findByText('opt #a1')).toBeTruthy();
+    });
+
+    test('useOptionalIslandContext returns undefined when rendered outside the island', () => {
+        const Island = createIsland({
+            useEnv: () => ({ prefix: 'env' }) as TestEnv,
+            view: () =>
+                createView
+                    .chain({ id: viewParam<string>() })
+                    .context(({ id }) => ({ label: `#${id}` })),
+            component: () => <div>page</div>,
+            loading: Loading,
+        });
+
+        // Rendered standalone — no <Island> above, so no context value is in scope.
+        function Consumer() {
+            const ctx = useOptionalIslandContext(Island);
+            return <div>opt {ctx === undefined ? 'none' : ctx.label}</div>;
+        }
+
+        render(<Consumer />);
+        expect(screen.getByText('opt none')).toBeTruthy();
+    });
+
+    test('useOptionalIslandContext returns undefined under an island whose view declares no .context()', async () => {
+        const Island = createIsland({
+            useEnv: () => ({ prefix: 'env' }) as TestEnv,
+            view: () => createView.chain({ id: viewParam<string>() }),
+            component: () => <Consumer />,
+            loading: Loading,
+        });
+
+        function Consumer() {
+            const ctx = useOptionalIslandContext(Island);
+            return <div>opt {ctx === undefined ? 'none' : 'some'}</div>;
+        }
+
+        render(<Island id="a1" />);
+        expect(await screen.findByText('opt none')).toBeTruthy();
     });
 
     // StrictMode mounts, tears down, then remounts on the initial commit. Each

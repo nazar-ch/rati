@@ -88,6 +88,7 @@ export {
     createIsland,
     useIslandProps,
     useIslandContext,
+    useOptionalIslandContext,
     IslandSymbol,
     type IslandComponent,
     type IslandConfig,

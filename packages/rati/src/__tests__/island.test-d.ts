@@ -4,6 +4,7 @@ import { type Source } from '../common/source';
 import {
     createIsland,
     useIslandContext,
+    useOptionalIslandContext,
     type IslandParams,
     type IslandProps,
     type IslandViewOf,
@@ -88,6 +89,11 @@ describe('island type helpers', () => {
         });
 
         expectTypeOf(useIslandContext(Island)).toEqualTypeOf<{ heading: string }>();
+
+        // The optional form widens the same value type with `undefined`.
+        expectTypeOf(useOptionalIslandContext(Island)).toEqualTypeOf<
+            { heading: string } | undefined
+        >();
 
         // The context value stays out of the component's resolved props.
         expectTypeOf<IslandProps<typeof ctxView>>().toEqualTypeOf<{ id: string; name: string }>();
