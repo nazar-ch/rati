@@ -26,6 +26,16 @@ function renderWithRouter(routes: readonly GenericRouteType[]) {
     return { router, ...result };
 }
 
+// A promise the test resolves by hand, so a suspended (Suspense) render can be
+// observed in its loading state before the value lands.
+function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((res) => {
+        resolve = res;
+    });
+    return { promise, resolve };
+}
+
 const Home: FC = () => <div>home</div>;
 const IslandLoading: FC = () => <div>island loading…</div>;
 
@@ -33,23 +43,30 @@ type TestEnv = { tag: string };
 
 describe('route2 + islands', () => {
     test('an island route resolves its waterfall from path params', async () => {
+        const label = deferred<string>();
         const Product = createIsland({
             useEnv: () => ({ tag: 'env' }) as TestEnv,
-            view: (env) =>
+            view: () =>
                 createView
                     .chain({ productId: viewParam<string>() })
-                    .chain({ label: async ({ productId }) => `${env.tag}:${productId}` }),
+                    .chain({ label: () => label.promise }),
             component: ({ label }) => <div>product {label}</div>,
             loading: IslandLoading,
         });
 
         window.history.replaceState(null, '', '/products/42');
-        const { router } = renderWithRouter([
-            route2('/products/:productId', 'product', Product),
-            route2('*', 'home', Home),
-        ]);
+        let router!: WebRouterStore<readonly GenericRouteType[]>;
+        await act(async () => {
+            ({ router } = renderWithRouter([
+                route2('/products/:productId', 'product', Product),
+                route2('*', 'home', Home),
+            ]));
+        });
 
         expect(screen.getByText('island loading…')).toBeTruthy();
+        await act(async () => {
+            label.resolve('env:42');
+        });
         expect(await screen.findByText('product env:42')).toBeTruthy();
         router.dispose();
     });
@@ -93,22 +110,29 @@ describe('route2 + islands', () => {
     });
 
     test('options.view resolves through the island engine (loading slot, then content)', async () => {
-        const homeView = createView({ greeting: async () => 'hello' });
+        const greeting = deferred<string>();
+        const homeView = createView({ greeting: () => greeting.promise });
         const HomeWithView: ViewComponent<typeof homeView> = ({ greeting }) => (
             <div>view says {greeting}</div>
         );
 
-        const { router } = renderWithRouter([
-            route2('/', 'home', HomeWithView, {
-                view: homeView,
-                loading: () => <div>resolving…</div>,
-            }),
-        ]);
+        let router!: WebRouterStore<readonly GenericRouteType[]>;
+        await act(async () => {
+            ({ router } = renderWithRouter([
+                route2('/', 'home', HomeWithView, {
+                    view: homeView,
+                    loading: () => <div>resolving…</div>,
+                }),
+            ]));
+        });
 
-        // The per-route loading slot showing while the async view resolves is
-        // proof route2 runs on the source engine: the old ViewLoader path had no
-        // per-route loading slot (it fell back to the Router-level Loading).
+        // The per-route loading slot is the Suspense fallback while the promise
+        // entry resolves — proof route2 runs on the island engine (the old
+        // ViewLoader path had no per-route loading slot).
         expect(screen.getByText('resolving…')).toBeTruthy();
+        await act(async () => {
+            greeting.resolve('hello');
+        });
         expect(await screen.findByText('view says hello')).toBeTruthy();
         router.dispose();
     });
@@ -121,12 +145,15 @@ describe('route2 + islands', () => {
         });
         const FailComponent: ViewComponent<typeof failView> = ({ data }) => <div>{data}</div>;
 
-        const { router } = renderWithRouter([
-            route2('/', 'home', FailComponent, {
-                view: failView,
-                error: ({ error }) => <div>error: {error.code}</div>,
-            }),
-        ]);
+        let router!: WebRouterStore<readonly GenericRouteType[]>;
+        await act(async () => {
+            ({ router } = renderWithRouter([
+                route2('/', 'home', FailComponent, {
+                    view: failView,
+                    error: ({ error }) => <div>error: {error.code}</div>,
+                }),
+            ]));
+        });
 
         // A throwing view function maps to a SourceError (code 'failed'); the
         // island renders the route's error slot instead of the component.
@@ -192,7 +219,9 @@ describe('island auto-context', () => {
             provideContext: true,
         });
 
-        render(<Product productId="42" />);
+        await act(async () => {
+            render(<Product productId="42" />);
+        });
 
         expect(await screen.findByText('from context: #42')).toBeTruthy();
     });

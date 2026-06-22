@@ -12,6 +12,18 @@ const Loading: FC = () => <div>loading...</div>;
 
 afterEach(cleanup);
 
+// A promise the test resolves by hand, so a suspended (Suspense) render can be
+// observed in its loading state before the value lands.
+function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    return { promise, resolve, reject };
+}
+
 // A hand-rolled source the test drives, logging attach/detach so lifetime is
 // observable. Mirrors what a CRDT/REST adapter implements.
 type TestSource<T> = Source<T> & {
@@ -39,20 +51,28 @@ function testSource<T>(log: string[], id: string): TestSource<T> {
 
 describe('createIsland', () => {
     test('shows loading, then the component with waterfall-resolved values', async () => {
+        // A promise entry suspends; the loading slot is the Suspense fallback. The
+        // dependent level then resolves off the first level's value.
+        const name = deferred<string>();
         const Island = createIsland({
             useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            view: (env) =>
+            view: () =>
                 createView
                     .chain({ id: viewParam<string>() })
-                    .chain({ name: async ({ id }) => `${env.prefix}:${id}` })
+                    .chain({ name: () => name.promise })
                     .chain({ label: async ({ name }) => `[${name}]` }),
             component: ({ label }) => <div>ready {label}</div>,
             loading: Loading,
         });
 
-        render(<Island id="a1" />);
-
+        await act(async () => {
+            render(<Island id="a1" />);
+        });
         expect(screen.getByText('loading...')).toBeTruthy();
+
+        await act(async () => {
+            name.resolve('env:a1');
+        });
         expect(await screen.findByText('ready [env:a1]')).toBeTruthy();
     });
 
@@ -70,7 +90,9 @@ describe('createIsland', () => {
             error: ({ error }) => <div>error: {error.code}</div>,
         });
 
-        render(<Island id="a1" />);
+        await act(async () => {
+            render(<Island id="a1" />);
+        });
 
         expect(await screen.findByText('error: not-available')).toBeTruthy();
     });
@@ -99,9 +121,14 @@ describe('createIsland', () => {
             ),
         });
 
-        render(<Island id="a1" />);
+        await act(async () => {
+            render(<Island id="a1" />);
+        });
 
-        fireEvent.click(await screen.findByText('retry'));
+        const retryButton = await screen.findByText('retry');
+        await act(async () => {
+            fireEvent.click(retryButton);
+        });
 
         expect(await screen.findByText('ready data:a1')).toBeTruthy();
     });
@@ -153,6 +180,48 @@ describe('createIsland', () => {
         expect(log).toContain('attach:page');
 
         page.ready({ id: 'p1' });
+        expect(await screen.findByText('ready p1')).toBeTruthy();
+    });
+
+    test('resolves a source level that depends on a promise level', async () => {
+        // The page route's shape: a promise (slug → spaceId) feeds a source (the doc
+        // keyed by that id). The source level can't build until the promise resolves.
+        const log: string[] = [];
+        const spaceId = deferred<string>();
+        const tree = testSource<{ id: string }>(log, 'tree');
+
+        const Island = createIsland({
+            useEnv: () => ({ prefix: 'env' }) as TestEnv,
+            view: () =>
+                createView
+                    .chain({ id: viewParam<string>() })
+                    .chain({ spaceId: () => spaceId.promise })
+                    .chain({
+                        tree: ({ spaceId }) => {
+                            log.push(`build-tree:${spaceId}`);
+                            return tree;
+                        },
+                    }),
+            component: ({ tree: t }) => <div>ready {t.id}</div>,
+            loading: Loading,
+        });
+
+        await act(async () => {
+            render(<Island id="a1" />);
+        });
+        // Suspended on the promise — the source level hasn't been built yet.
+        expect(screen.getByText('loading...')).toBeTruthy();
+        expect(log).not.toContain('build-tree:s1');
+
+        await act(async () => {
+            spaceId.resolve('s1');
+        });
+        // The promise resolved, so the source level builds (with the resolved id) and
+        // attaches; still loading until the source itself is ready.
+        expect(log).toContain('build-tree:s1');
+        expect(log).toContain('attach:tree');
+
+        tree.ready({ id: 'p1' });
         expect(await screen.findByText('ready p1')).toBeTruthy();
     });
 
@@ -225,7 +294,9 @@ describe('createIsland', () => {
             return <div>ctx {ctx.label}</div>;
         }
 
-        render(<Island id="a1" />);
+        await act(async () => {
+            render(<Island id="a1" />);
+        });
         expect(await screen.findByText('ctx <env:a1>')).toBeTruthy();
     });
 
@@ -451,7 +522,7 @@ describe('createIsland', () => {
         render(
             <StrictMode>
                 <Island id="a1" />
-            </StrictMode>,
+            </StrictMode>
         );
 
         // The subtree reads the second (surviving) run's context, not the first.
@@ -486,7 +557,7 @@ describe('createIsland', () => {
         render(
             <StrictMode>
                 <Island id="a1" />
-            </StrictMode>,
+            </StrictMode>
         );
 
         expect(await screen.findByText('app src2')).toBeTruthy();
@@ -498,7 +569,8 @@ describe('createIsland', () => {
 
         const Island = createIsland({
             useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            view: () => createView.chain({ id: viewParam<string>() }).chain({ res: () => makeSource() }),
+            view: () =>
+                createView.chain({ id: viewParam<string>() }).chain({ res: () => makeSource() }),
             component: ({ res }) => <div>prop {res.id}</div>,
             loading: Loading,
         });
@@ -506,7 +578,7 @@ describe('createIsland', () => {
         render(
             <StrictMode>
                 <Island id="a1" />
-            </StrictMode>,
+            </StrictMode>
         );
 
         expect(await screen.findByText('prop src2')).toBeTruthy();
