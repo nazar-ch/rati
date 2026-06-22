@@ -7,6 +7,7 @@ import { GenericStoresContext } from '../stores/RootStore';
 import { createView, viewParam, type ViewComponent } from '../common/view';
 import { SourceSymbol, type Source } from '../common/source';
 import { createIsland, useIslandProps } from '../experimental/island';
+import { useRouteContext } from '../common/useRouteContext';
 
 beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');
@@ -142,6 +143,29 @@ describe('route2 + islands', () => {
 
         const frame = await screen.findByLabelText('frame');
         expect(frame.textContent).toBe('home');
+        router.dispose();
+    });
+
+    test('useRouteContext reads a route2 island context by route name', async () => {
+        // The view ends in `.context()`; route2 builds the island, so there is no
+        // island component to import — the subtree reads the context by route name.
+        const productView = createView
+            .chain({ productId: viewParam<string>() })
+            .context(({ productId }) => ({ label: `#${productId}` }));
+
+        const Deep: FC = () => {
+            const { label } = useRouteContext<{ label: string }>('product');
+            return <div>ctx {label}</div>;
+        };
+        const ProductBody: ViewComponent<typeof productView> = () => <Deep />;
+
+        window.history.replaceState(null, '', '/products/7');
+        const { router } = renderWithRouter([
+            route2('/products/:productId', 'product', ProductBody, { view: productView }),
+            route2('*', 'home', Home),
+        ]);
+
+        expect(await screen.findByText('ctx #7')).toBeTruthy();
         router.dispose();
     });
 });

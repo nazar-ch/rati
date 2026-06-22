@@ -98,6 +98,8 @@ export {
     type IslandParams,
 } from './experimental/island';
 
+export { useRouteContext } from './common/useRouteContext';
+
 if (import.meta.env.DEV) {
     const pkg = await import('../package.json');
     console.log(`*********************** 🦜 rati @${pkg.version} LOCAL ***********************`);
