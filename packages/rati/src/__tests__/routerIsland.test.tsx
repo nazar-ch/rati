@@ -91,15 +91,45 @@ describe('route2 + islands', () => {
         router.dispose();
     });
 
-    test('options.view goes through the existing ViewLoader path', async () => {
+    test('options.view resolves through the island engine (loading slot, then content)', async () => {
         const homeView = createView({ greeting: async () => 'hello' });
         const HomeWithView: ViewComponent<typeof homeView> = ({ greeting }) => (
             <div>view says {greeting}</div>
         );
 
-        const { router } = renderWithRouter([route2('/', 'home', HomeWithView, { view: homeView })]);
+        const { router } = renderWithRouter([
+            route2('/', 'home', HomeWithView, {
+                view: homeView,
+                loading: () => <div>resolving…</div>,
+            }),
+        ]);
 
+        // The per-route loading slot showing while the async view resolves is
+        // proof route2 runs on the source engine: the old ViewLoader path had no
+        // per-route loading slot (it fell back to the Router-level Loading).
+        expect(screen.getByText('resolving…')).toBeTruthy();
         expect(await screen.findByText('view says hello')).toBeTruthy();
+        router.dispose();
+    });
+
+    test('options.error renders the island error slot on failure', async () => {
+        const failView = createView({
+            data: async (): Promise<string> => {
+                throw new Error('boom');
+            },
+        });
+        const FailComponent: ViewComponent<typeof failView> = ({ data }) => <div>{data}</div>;
+
+        const { router } = renderWithRouter([
+            route2('/', 'home', FailComponent, {
+                view: failView,
+                error: ({ error }) => <div>error: {error.code}</div>,
+            }),
+        ]);
+
+        // A throwing view function maps to a SourceError (code 'failed'); the
+        // island renders the route's error slot instead of the component.
+        expect(await screen.findByText('error: failed')).toBeTruthy();
         router.dispose();
     });
 

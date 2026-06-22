@@ -7,6 +7,7 @@ import {
 } from '../common/scrollRestoration';
 import type { TupleToUnion } from '../types/generic';
 import type { CreateView, ViewComponent } from '../common/view';
+import { createIsland, type IslandConfig } from '../experimental/island';
 import { GlobalStore } from '../stores/GlobalStore';
 // import { TupleToUnion } from 'type-fest';
 
@@ -135,22 +136,45 @@ export function route<
 
 export type RouteOptions<TView extends CreateView<any> | undefined> = {
     /**
-     * View resolved before the component renders (via ViewLoader; participates
-     * in SSR through prepareRoute). The component receives the resolved props.
+     * Data the route resolves before the component renders. When present,
+     * `route2` folds it together with the component into an island (see below),
+     * so resolution runs on the source-based island engine — loading/error
+     * slots, attach-on-build / detach-on-navigate — not the legacy ViewLoader.
+     * The component receives the resolved props.
      */
     view?: TView extends CreateView<any> ? TView : undefined;
     /** Route-level wrapper rendered around the component. */
     wrapper?: ComponentType | undefined;
+    /**
+     * Slot shown while the view resolves — the island's `loading`. Defaults to
+     * rendering nothing. Only meaningful alongside `view`.
+     */
+    loading?: TView extends CreateView<any> ? IslandConfig<{}, TView>['loading'] : undefined;
+    /**
+     * Slot shown on resolution failure — the island's `error` (switch on
+     * `error.code`). When omitted, the error throws to the nearest ErrorBoundary.
+     * Only meaningful alongside `view`.
+     */
+    error?: TView extends CreateView<any> ? IslandConfig<{}, TView>['error'] : undefined;
 };
 
 /**
- * Alternative `route` shape: view and wrapper move into an options object.
- * Produces the same route record as `route`, so matching, rendering, SSR and
- * hydration behave identically.
+ * Location-coupled twin of `createIsland`: a route2 *is* an island, specialized
+ * to a URL. The non-route-specific inputs (`view`, `loading`, `error`) are the
+ * same as `createIsland`'s and behave identically; route2 adds the route bits
+ * (path, name, wrapper) and feeds the path-matched params in as the island's
+ * props.
  *
- * Islands need no option here — a component created by `createIsland` is a
- * plain component whose props are the view's params, so the route's path
- * params feed it directly:
+ * When `options.view` is given, route2 wraps the component + view into a
+ * `createIsland` (env-less) and stores that island as the route's component, so
+ * resolution goes through the same source-based engine as a standalone island
+ * instead of the legacy `route`/ViewLoader/resolveView path. The record's `view`
+ * is therefore always undefined — the Router renders the (island) component
+ * directly, handing it the route params.
+ *
+ * A component built with `createIsland` up front needs no `view` here — it's
+ * already an island whose props are its view's params, so the path params feed
+ * it directly:
  *
  *     route2('/spaces/:spaceId/pages/:pageId', 'page', PageIsland)
  */
@@ -160,12 +184,33 @@ export function route2<
     TViewComponent extends ViewComponentForOptionalView<TView, ExtractRouteParams<Path>>,
     TView extends CreateView<any> | undefined = undefined,
 >(path: Path, name: Name, component: TViewComponent, options: RouteOptions<TView> = {}) {
+    const view = options.view;
+
+    // route2 = createIsland, coupled to a location. A supplied view is folded
+    // with the component into an island here; params arrive from the URL match
+    // (Router's no-`view` branch renders the island with the route params), and
+    // the island owns loading/error and source attach/detach across navigation.
+    const routeComponent =
+        view !== undefined
+            ? createIsland({
+                  view: () => view as CreateView<any>,
+                  // Routes carry no per-root env (env-bearing views are authored
+                  // as islands up front and passed as `component`).
+                  useEnv: () => ({}),
+                  component: component as ComponentType<any>,
+                  loading: options.loading ?? (() => null),
+                  ...(options.error ? { error: options.error } : {}),
+              })
+            : component;
+
     return {
         path,
         pathRe: buildPathRe(path),
         name,
-        view: options.view,
-        component,
+        // Always undefined: a supplied view became part of the island above, so
+        // route2 never traverses the ViewLoader path (that stays for legacy `route`).
+        view: undefined,
+        component: routeComponent,
         wrapperComponent: options.wrapper,
     };
 }
