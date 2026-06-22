@@ -145,6 +145,12 @@ class IslandRun {
         }
     }
 
+    // The app-owned React context (.context({ provideTo })) to also publish into,
+    // if any. Static for the run; read in the ready branch.
+    get contextChannel(): Context<unknown> | undefined {
+        return this.#contextDef?.channel;
+    }
+
     get phase(): RunPhase {
         const error = this.#firstError();
         if (error) return { phase: 'error', error };
@@ -482,6 +488,13 @@ export function createIsland<Env, View extends CreateView<any>>(
             // factory is expected to return a non-nullish value (a store/object).
             if (phase.context !== undefined) {
                 content = <ContextChannel.Provider value={phase.context}>{content}</ContextChannel.Provider>;
+                // Bridge into the app-owned context too, if `.context({ provideTo })`
+                // named one — lets app code read it without importing the island.
+                const appChannel = run?.contextChannel;
+                if (appChannel) {
+                    const AppProvider = appChannel.Provider;
+                    content = <AppProvider value={phase.context}>{content}</AppProvider>;
+                }
             }
             return content;
         }

@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { observable, runInAction } from 'mobx';
-import type { FC } from 'react';
+import { createContext, useContext, type FC } from 'react';
 import { createView, viewParam } from '../common/view';
 import { NotAvailableError, SourceSymbol, type Source, type SourceState } from '../common/source';
 import { createIsland, useIslandContext } from '../experimental/island';
@@ -304,5 +304,29 @@ describe('createIsland', () => {
         sourceFor('a2').ready({ id: 'a2' });
         await screen.findByText('ready a2');
         expect(log).toContain('context-mount:a2');
+    });
+
+    test('.context({ provideTo }) also publishes the value into an app-owned context', async () => {
+        const AppContext = createContext<{ label: string } | null>(null);
+
+        const Island = createIsland({
+            useEnv: () => ({ prefix: 'env' }) as TestEnv,
+            view: () =>
+                createView
+                    .chain({ id: viewParam<string>() })
+                    .context(({ id }) => ({ label: `#${id}` }), { provideTo: AppContext }),
+            component: () => <Consumer />,
+            loading: Loading,
+        });
+
+        // Reads the value through the app context — no useIslandContext, so an app
+        // consumer never has to import the island (which would cycle).
+        function Consumer() {
+            const ctx = useContext(AppContext);
+            return <div>app {ctx?.label}</div>;
+        }
+
+        render(<Island id="a1" />);
+        expect(await screen.findByText('app #a1')).toBeTruthy();
     });
 });

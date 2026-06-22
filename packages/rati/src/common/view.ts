@@ -1,5 +1,5 @@
 import type { Simplify } from 'type-fest';
-import type { FC } from 'react';
+import type { Context, FC } from 'react';
 import type { ExcludeNever } from '../types/generic';
 import type { Source } from './source';
 import { is } from './utils';
@@ -35,6 +35,11 @@ type UnwrapSource<T> = T extends Source<infer U> ? U : T;
 export type ViewContextDef = {
     factory: (resolved: Record<string, unknown>) => unknown;
     mount?: ((value: unknown) => (() => void) | void) | undefined;
+    // Optional app-owned React context to also publish the value into. Lets app
+    // code read the context through its own context instead of `useIslandContext`,
+    // which avoids the import cycle that reading it off the island component would
+    // create when the reader sits inside the island's own subtree.
+    channel?: Context<unknown> | undefined;
 };
 
 // `Ctx` defaults to `unknown` so the many `CreateView<any>` constraint sites keep
@@ -133,10 +138,20 @@ export type ChainableView<VD extends GenericViewDefinition> = CreateView<VD> & {
      * *before* the chain's sources detach, so a context built over a grabbed
      * resource is torn down while that grab is still live (fixing the decoupled
      * "accessed after releasing" race). Terminal: `.context()` ends the chain.
+     *
+     * `provideTo` additionally publishes the value into an app-owned React context,
+     * so app code can read it via that context (no `useIslandContext`, no import
+     * cycle with the island the reader is rendered under).
      */
     context<C>(
         factory: (resolved: Simplify<ResolveViewDefinition<VD>>) => C,
-        options?: { mount?: (value: C) => (() => void) | void }
+        options?: {
+            mount?: (value: C) => (() => void) | void;
+            // Bridge into an app context of the usual "provided by a parent" shape,
+            // `Context<C | null>` (nullable default). The `| null` makes `C` unify
+            // with the factory's return instead of being widened by the context.
+            provideTo?: Context<C | null>;
+        }
     ): CreateView<VD, C>;
 };
 
@@ -158,7 +173,10 @@ function createViewChain<VD extends GenericViewDefinition>(
         // unchanged and the island reads the factory off `view.context`.
         context: <C>(
             factory: (resolved: Simplify<ResolveViewDefinition<VD>>) => C,
-            options?: { mount?: (value: C) => (() => void) | void }
+            options?: {
+                mount?: (value: C) => (() => void) | void;
+                provideTo?: Context<C | null>;
+            }
         ): CreateView<VD, C> =>
             // The [ViewContextSymbol] carrier is type-only (never present at
             // runtime), so cast to stamp the C onto the otherwise-unchanged node.
@@ -167,6 +185,7 @@ function createViewChain<VD extends GenericViewDefinition>(
                 contextDef: {
                     factory: factory as ViewContextDef['factory'],
                     mount: options?.mount as ViewContextDef['mount'],
+                    channel: options?.provideTo as Context<unknown> | undefined,
                 },
             }) as CreateView<VD, C>,
     };
