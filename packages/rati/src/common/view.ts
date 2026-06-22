@@ -30,11 +30,10 @@ type GenericViewDefinition = Record<string, ViewProp>;
 type UnwrapSource<T> = T extends Source<infer U> ? U : T;
 
 // Runtime shape of a `.context()` declaration. The factory builds the context
-// value from the fully resolved chain; `mount` (optional) runs side effects and
-// returns a teardown the island calls before detaching the chain's sources.
+// value from the fully resolved chain; if that value is `Disposable`, the island
+// calls its `[Symbol.dispose]` on teardown, before detaching the chain's sources.
 export type ViewContextDef = {
     factory: (resolved: Record<string, unknown>) => unknown;
-    mount?: ((value: unknown) => (() => void) | void) | undefined;
     // Optional app-owned React context to also publish the value into. Lets app
     // code read the context through its own context instead of `useIslandContext`,
     // which avoids the import cycle that reading it off the island component would
@@ -133,11 +132,12 @@ export type ChainableView<VD extends GenericViewDefinition> = CreateView<VD> & {
     /**
      * Declare an island-owned context value derived from the fully resolved chain.
      * The factory runs once every level is ready; the value is handed to the
-     * subtree (read with `useIslandContext(Island)`) and, if `mount` is given,
-     * mounted at the same point — its returned cleanup runs on island teardown
-     * *before* the chain's sources detach, so a context built over a grabbed
-     * resource is torn down while that grab is still live (fixing the decoupled
-     * "accessed after releasing" race). Terminal: `.context()` ends the chain.
+     * subtree (read with `useIslandContext(Island)`). If the value is `Disposable`,
+     * its `[Symbol.dispose]` runs on island teardown *before* the chain's sources
+     * detach, so a context built over a grabbed resource is torn down while that
+     * grab is still live (fixing the decoupled "accessed after releasing" race).
+     * Set-up is the factory's job — construct, do any activation, return the value;
+     * there is no separate mount step. Terminal: `.context()` ends the chain.
      *
      * `provideTo` additionally publishes the value into an app-owned React context,
      * so app code can read it via that context (no `useIslandContext`, no import
@@ -146,7 +146,6 @@ export type ChainableView<VD extends GenericViewDefinition> = CreateView<VD> & {
     context<C>(
         factory: (resolved: Simplify<ResolveViewDefinition<VD>>) => C,
         options?: {
-            mount?: (value: C) => (() => void) | void;
             // Bridge into an app context of the usual "provided by a parent" shape,
             // `Context<C | null>` (nullable default). The `| null` makes `C` unify
             // with the factory's return instead of being widened by the context.
@@ -173,10 +172,7 @@ function createViewChain<VD extends GenericViewDefinition>(
         // unchanged and the island reads the factory off `view.context`.
         context: <C>(
             factory: (resolved: Simplify<ResolveViewDefinition<VD>>) => C,
-            options?: {
-                mount?: (value: C) => (() => void) | void;
-                provideTo?: Context<C | null>;
-            }
+            options?: { provideTo?: Context<C | null> }
         ): CreateView<VD, C> =>
             // The [ViewContextSymbol] carrier is type-only (never present at
             // runtime), so cast to stamp the C onto the otherwise-unchanged node.
@@ -184,7 +180,6 @@ function createViewChain<VD extends GenericViewDefinition>(
                 ...view,
                 contextDef: {
                     factory: factory as ViewContextDef['factory'],
-                    mount: options?.mount as ViewContextDef['mount'],
                     channel: options?.provideTo as Context<unknown> | undefined,
                 },
             }) as CreateView<VD, C>,

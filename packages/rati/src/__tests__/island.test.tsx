@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { observable, runInAction } from 'mobx';
-import { createContext, useContext, type FC } from 'react';
+import { createContext, StrictMode, useContext, type FC } from 'react';
 import { createView, viewParam } from '../common/view';
 import { NotAvailableError, SourceSymbol, type Source, type SourceState } from '../common/source';
 import { createIsland, useIslandContext } from '../experimental/island';
@@ -239,11 +239,14 @@ describe('createIsland', () => {
                 createView
                     .chain({ id: viewParam<string>() })
                     .chain({ res: () => res })
-                    .context(({ res: r }) => ({ id: r.id }), {
-                        mount: () => {
-                            log.push('context-mount');
-                            return () => log.push('context-dispose');
-                        },
+                    .context(({ res: r }) => {
+                        log.push('context-mount');
+                        return {
+                            id: r.id,
+                            [Symbol.dispose]() {
+                                log.push('context-dispose');
+                            },
+                        };
                     }),
             component: () => <Mounted />,
             loading: Loading,
@@ -283,11 +286,14 @@ describe('createIsland', () => {
                 createView
                     .chain({ id: viewParam<string>() })
                     .chain({ res: ({ id }) => sourceFor(id) })
-                    .context(({ res }) => ({ id: res.id }), {
-                        mount: (ctx) => {
-                            log.push(`context-mount:${ctx.id}`);
-                            return () => log.push(`context-dispose:${ctx.id}`);
-                        },
+                    .context(({ res }) => {
+                        log.push(`context-mount:${res.id}`);
+                        return {
+                            id: res.id,
+                            [Symbol.dispose]() {
+                                log.push(`context-dispose:${res.id}`);
+                            },
+                        };
                     }),
             component: ({ res }) => <div>ready {res.id}</div>,
             loading: Loading,
@@ -328,5 +334,126 @@ describe('createIsland', () => {
 
         render(<Island id="a1" />);
         expect(await screen.findByText('app #a1')).toBeTruthy();
+    });
+
+    // StrictMode mounts, tears down, then remounts on the initial commit. Each
+    // remount builds a *fresh* run (new sources, new context). These tests pin that
+    // the subtree ends up reading the surviving run's identities — never a value
+    // from the discarded first run — and that the discarded context is disposed
+    // while its own source is still attached.
+
+    // A source that is ready immediately, tagged with a per-build identity so run #1
+    // and run #2 are distinguishable. Logs attach/detach so teardown is observable.
+    function readySourceFactory(log: string[]) {
+        let seq = 0;
+        return () => {
+            const id = `src${++seq}`;
+            const source: Source<{ id: string }> = {
+                [SourceSymbol]: true,
+                get state(): SourceState<{ id: string }> {
+                    return { status: 'ready', value: { id } };
+                },
+                attach() {
+                    log.push(`attach:${id}`);
+                    return () => log.push(`detach:${id}`);
+                },
+            };
+            return source;
+        };
+    }
+
+    test('StrictMode: useIslandContext sees the surviving run, discarded context disposed before its source detaches', async () => {
+        const log: string[] = [];
+        const makeSource = readySourceFactory(log);
+
+        const Island = createIsland({
+            useEnv: () => ({ prefix: 'env' }) as TestEnv,
+            view: () =>
+                createView
+                    .chain({ id: viewParam<string>() })
+                    .chain({ res: () => makeSource() })
+                    .context(({ res }) => {
+                        log.push(`build:${res.id}`);
+                        return {
+                            id: res.id,
+                            [Symbol.dispose]() {
+                                log.push(`dispose:${res.id}`);
+                            },
+                        };
+                    }),
+            component: () => <Consumer />,
+            loading: Loading,
+        });
+
+        function Consumer() {
+            const ctx = useIslandContext(Island);
+            return <div>live {ctx.id}</div>;
+        }
+
+        render(
+            <StrictMode>
+                <Island id="a1" />
+            </StrictMode>,
+        );
+
+        // The subtree reads the second (surviving) run's context, not the first.
+        expect(await screen.findByText('live src2')).toBeTruthy();
+        // The discarded first context was disposed before its source detached…
+        expect(log.indexOf('dispose:src1')).toBeLessThan(log.indexOf('detach:src1'));
+        // …and the survivor's context is not disposed while it is live.
+        expect(log).not.toContain('dispose:src2');
+    });
+
+    test('StrictMode: a provideTo app context also ends up holding the surviving identity', async () => {
+        const log: string[] = [];
+        const makeSource = readySourceFactory(log);
+        const AppContext = createContext<{ id: string } | null>(null);
+
+        const Island = createIsland({
+            useEnv: () => ({ prefix: 'env' }) as TestEnv,
+            view: () =>
+                createView
+                    .chain({ id: viewParam<string>() })
+                    .chain({ res: () => makeSource() })
+                    .context(({ res }) => ({ id: res.id }), { provideTo: AppContext }),
+            component: () => <Consumer />,
+            loading: Loading,
+        });
+
+        function Consumer() {
+            const ctx = useContext(AppContext);
+            return <div>app {ctx?.id}</div>;
+        }
+
+        render(
+            <StrictMode>
+                <Island id="a1" />
+            </StrictMode>,
+        );
+
+        expect(await screen.findByText('app src2')).toBeTruthy();
+    });
+
+    test('StrictMode: plain resolved props come from the surviving run', async () => {
+        const log: string[] = [];
+        const makeSource = readySourceFactory(log);
+
+        const Island = createIsland({
+            useEnv: () => ({ prefix: 'env' }) as TestEnv,
+            view: () => createView.chain({ id: viewParam<string>() }).chain({ res: () => makeSource() }),
+            component: ({ res }) => <div>prop {res.id}</div>,
+            loading: Loading,
+        });
+
+        render(
+            <StrictMode>
+                <Island id="a1" />
+            </StrictMode>,
+        );
+
+        expect(await screen.findByText('prop src2')).toBeTruthy();
+        // Run #1's source was attached then detached; run #2's stays attached.
+        expect(log).toContain('detach:src1');
+        expect(log).not.toContain('detach:src2');
     });
 });

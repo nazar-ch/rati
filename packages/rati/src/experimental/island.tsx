@@ -88,8 +88,9 @@ function entryToSource(
 
 type AttachedLevel = Record<string, { source: Source<unknown>; detach: () => void }>;
 
-// A built `.context()` value plus the teardown its `mount` returned (if any).
-type BuiltContext = { value: unknown; cleanup: (() => void) | undefined };
+// A built `.context()` value, wrapped so "not built yet" (undefined box) stays
+// distinct from a value that is itself undefined.
+type BuiltContext = { value: unknown };
 
 type RunPhase =
     | { phase: 'pending' }
@@ -180,11 +181,13 @@ class IslandRun {
         runInAction(() => {
             // Dispose the context first: its teardown (e.g. deactivate) still reads
             // through the grabbed resource the chain resolved, which the source
-            // detach below then releases — so this order is load-bearing.
+            // detach below then releases — so this order is load-bearing. The
+            // disposer is read (not `in`-probed) per the lifecycle contract.
             const context = this.#context.get();
-            if (context?.cleanup) {
+            const dispose = (context?.value as Partial<Disposable> | undefined)?.[Symbol.dispose];
+            if (typeof dispose === 'function') {
                 try {
-                    context.cleanup();
+                    dispose.call(context!.value);
                 } catch (error) {
                     console.error('Island context dispose failed', error);
                 }
@@ -204,18 +207,16 @@ class IslandRun {
         });
     }
 
-    // Build the context value from the fully resolved chain and run its mount. The
-    // reads + side effects run inside an action because this fires from a reaction
-    // effect (untracked), where bare observable reads would trip the dev-only
-    // observableRequiresReaction warning.
+    // Build the context value from the fully resolved chain. The reads + the
+    // factory's set-up side effects run inside an action because this fires from a
+    // reaction effect (untracked), where bare observable reads would trip the
+    // dev-only observableRequiresReaction warning.
     #buildContext() {
         if (!this.#contextDef || this.#context.get() || this.#disposed) return;
         const contextDef = this.#contextDef;
         runInAction(() => {
             const resolved = this.#mergedReady(this.#built.length);
-            const value = contextDef.factory(resolved);
-            const cleanup = contextDef.mount?.(value) ?? undefined;
-            this.#context.set({ value, cleanup });
+            this.#context.set({ value: contextDef.factory(resolved) });
         });
     }
 
