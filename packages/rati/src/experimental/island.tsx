@@ -134,16 +134,21 @@ class IslandRun {
         if (this.#disposed) return;
         this.#disposed = true;
         this.#disposeProgression();
-        for (const level of this.#built) {
-            for (const { detach } of Object.values(level)) {
-                try {
-                    detach();
-                } catch (error) {
-                    console.error('Island source detach failed', error);
+        // detach() runs from the unmount effect / a rebuild, not a reaction, so
+        // iterating the observable level array goes through an action to keep
+        // dev-only `observableRequiresReaction` quiet.
+        runInAction(() => {
+            for (const level of this.#built) {
+                for (const { detach } of Object.values(level)) {
+                    try {
+                        detach();
+                    } catch (error) {
+                        console.error('Island source detach failed', error);
+                    }
                 }
             }
-        }
-        runInAction(() => this.#built.clear());
+            this.#built.clear();
+        });
     }
 
     // Index of the next level to build, or -1 if blocked (waiting / errored / done).
@@ -155,7 +160,11 @@ class IslandRun {
 
     #buildLevel(index: number, prevValues: Record<string, unknown>) {
         // Guard against out-of-order / double builds (the reaction may refire).
-        if (this.#built.length !== index) return;
+        // The length read goes through an action: build runs from a React effect
+        // (mount / param change), not a reaction, so a bare read trips MobX's
+        // dev-only `observableRequiresReaction`. attach() stays outside any action
+        // so each source's first autorun still runs synchronously.
+        if (runInAction(() => this.#built.length) !== index) return;
 
         const definition = this.#levels[index]!;
         const level: AttachedLevel = {};
