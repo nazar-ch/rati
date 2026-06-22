@@ -7,6 +7,7 @@ import {
     use,
     useContext,
     useEffect,
+    useId,
     useLayoutEffect,
     useReducer,
     useRef,
@@ -21,6 +22,7 @@ import {
 } from '../common/view';
 import { isSource, toSourceError, type Source, type SourceError } from '../common/source';
 import { deepEqual, is } from '../common/utils';
+import { IslandHydrationContext } from './islandHydration';
 
 /*
     EXPERIMENTAL — see docs/research/data-views.plan.md.
@@ -125,6 +127,9 @@ class IslandResolution {
     readonly levels: CreateView['definition'][];
     readonly #params: Record<string, unknown>;
     readonly #contextDef: ViewContextDef | undefined;
+    // Server-resolved promise values to rehydrate from (chain key -> value), or
+    // undefined off the hydration path. A key present here short-circuits its cell.
+    readonly #hydration: Record<string, unknown> | undefined;
     // Cells cached per key (keys are unique across the whole chain).
     readonly #cells = new Map<string, Cell>();
     // Source cells in construction order, each with its detach once attached.
@@ -134,10 +139,15 @@ class IslandResolution {
     readonly context = observable.box<BuiltContext | undefined>(undefined, { deep: false });
     #disposed = false;
 
-    constructor(view: CreateView, params: Record<string, unknown>) {
+    constructor(
+        view: CreateView,
+        params: Record<string, unknown>,
+        hydration?: Record<string, unknown> | undefined
+    ) {
         this.levels = flattenLevels(view);
         this.#params = params;
         this.#contextDef = view.contextDef;
+        this.#hydration = hydration;
     }
 
     get hasContext(): boolean {
@@ -155,9 +165,20 @@ class IslandResolution {
     cell(key: string, entry: unknown, prevValues: Record<string, unknown>): Cell {
         let cell = this.#cells.get(key);
         if (!cell) {
-            cell = classifyEntry(entry, prevValues, this.#params, key);
+            // A value dehydrated from the server short-circuits the entry: skip the
+            // view function (no re-fetch) and `use()` (no re-suspend), so the client's
+            // hydration render produces the server HTML synchronously. Only promise
+            // entries are ever dehydrated, so this only ever replaces a would-be
+            // `use()` — sources still go through classifyEntry and attach as usual.
+            if (this.#hydration && key in this.#hydration) {
+                cell = { kind: 'value', value: this.#hydration[key] };
+            } else {
+                cell = classifyEntry(entry, prevValues, this.#params, key);
+                if (cell.kind === 'source') {
+                    this.#sources.push({ source: cell.source, detach: null });
+                }
+            }
             this.#cells.set(key, cell);
-            if (cell.kind === 'source') this.#sources.push({ source: cell.source, detach: null });
         }
         return cell;
     }
@@ -275,6 +296,13 @@ export const IslandSymbol = Symbol();
 export type IslandComponent<View extends CreateView<any>> = FC<RequiredViewParams<View>> & {
     /** Type-level only: carries the view type for useIslandProps inference. */
     [IslandSymbol]?: View;
+    /**
+     * Forwarded from a `lazy()` component the island wraps, so the island is a
+     * transparent entry point: the router's `<Link prefetch>` / `prepareRoute`
+     * preload reach a route's chunk whether it is mounted as a bare component or
+     * folded into an island by `route2`. Absent when the component isn't lazy.
+     */
+    preload?: () => Promise<unknown>;
 };
 
 // ---------------------------------------------------------------------------------------
@@ -469,6 +497,9 @@ type ResolvedViewProps = {
     provideContext: boolean;
     propsContext: Context<Record<string, unknown> | null>;
     islandChannel: Context<unknown>;
+    // Server only: record a resolved promise value for dehydration (bound to this
+    // island's id). Undefined off the SSR collection path.
+    collect: ((key: string, value: unknown) => void) | undefined;
 };
 
 const ResolvedView = observer(function ResolvedView({
@@ -479,6 +510,7 @@ const ResolvedView = observer(function ResolvedView({
     provideContext,
     propsContext,
     islandChannel,
+    collect,
 }: ResolvedViewProps) {
     useLayoutEffect(() => {
         resolution.attachPending();
@@ -491,7 +523,12 @@ const ResolvedView = observer(function ResolvedView({
             if (cell.kind === 'promise') {
                 // `use()` is the one hook allowed in a loop / after an early return,
                 // so the level walk can suspend per promise.
-                resolved[key] = use(cell.promise);
+                const value = use(cell.promise);
+                // Record for dehydration. A render-time write, but it only runs on the
+                // server (the client provides no `collect`) and is idempotent per
+                // key — the established SSR data-collection pattern.
+                collect?.(key, value);
+                resolved[key] = value;
             } else if (cell.kind === 'source') {
                 const state = cell.source.state;
                 if (state.status === 'error') throw state.error;
@@ -537,7 +574,9 @@ function renderResolved(
 // The chain is fully resolved; build the `.context()` value in an effect (its
 // factory has side effects), hold the loading slot until it's built, then provide it
 // to the subtree (the island channel for useIslandContext, plus any app channel).
-type ContextGateProps = ResolvedViewProps & { resolved: Record<string, unknown> };
+// Collection already happened in ResolvedView's level walk before it hands off to
+// the gate, so the gate doesn't carry `collect`.
+type ContextGateProps = Omit<ResolvedViewProps, 'collect'> & { resolved: Record<string, unknown> };
 
 const ContextGate = observer(function ContextGate({
     resolution,
@@ -577,6 +616,11 @@ export function createIsland<Env, View extends CreateView<any>>(
     const Island = observer(function Island(params: RequiredViewParams<View>) {
         const env = config.useEnv();
 
+        // Stable across server render and client hydration by tree position, so it
+        // keys this island's slice of the SSR dehydration registry (see islandHydration).
+        const islandId = useId();
+        const hydration = useContext(IslandHydrationContext);
+
         // Retry rebuilds the resolution (fresh promises/sources) on error-slot retry.
         const [retry, bumpRetry] = useReducer((count: number) => count + 1, 0);
 
@@ -585,6 +629,7 @@ export function createIsland<Env, View extends CreateView<any>>(
         // changed (env, params, retry) key rebuilds it.
         const keyRef = useRef<{ env: Env; params: unknown; retry: number } | null>(null);
         const ref = useRef<IslandResolution | null>(null);
+        const initialParamsRef = useRef(params);
 
         const key = keyRef.current;
         if (
@@ -594,13 +639,27 @@ export function createIsland<Env, View extends CreateView<any>>(
             !deepEqual(key.params, params) ||
             key.retry !== retry
         ) {
+            // Seed from server-resolved values only on this island's *first* resolution:
+            // a retry must re-fetch, and a params change wants the new params' data, not
+            // the replayed first-paint slice. StrictMode's double-invoke and the
+            // post-hydration source re-render both keep (retry 0, initial params), so
+            // they stay consistent with the server HTML.
+            const firstResolution = retry === 0 && deepEqual(params, initialParamsRef.current);
+            const hydrationSlice = firstResolution ? hydration.data?.[islandId] : undefined;
             ref.current = new IslandResolution(
                 config.view(env) as CreateView,
-                params as Record<string, unknown>
+                params as Record<string, unknown>,
+                hydrationSlice
             );
             keyRef.current = { env, params, retry };
         }
         const resolution = ref.current;
+
+        // Bound to this island's id; present only on the server (the client provides no
+        // `collect`), where the level walk records each resolved promise for the wire.
+        const collect = hydration.collect
+            ? (k: string, value: unknown) => hydration.collect!(islandId, k, value)
+            : undefined;
 
         // Tear down (dispose context, then detach sources) when the resolution is
         // replaced (param change / retry) or the island unmounts. Reset the ref on
@@ -635,6 +694,7 @@ export function createIsland<Env, View extends CreateView<any>>(
                         provideContext={config.provideContext ?? false}
                         propsContext={PropsContext}
                         islandChannel={ContextChannel}
+                        collect={collect}
                     />
                 </Suspense>
             </IslandErrorBoundary>
@@ -644,6 +704,11 @@ export function createIsland<Env, View extends CreateView<any>>(
     const componentName =
         config.component.displayName ?? (config.component as { name?: string }).name;
     Island.displayName = `Island(${componentName || 'Component'})`;
+
+    // Stay transparent to chunk preloading: a `lazy()` component hangs `.preload` on
+    // itself; surface it on the island so the router can prefetch through the wrapper.
+    const preload = (config.component as { preload?: () => Promise<unknown> }).preload;
+    if (typeof preload === 'function') Island.preload = preload;
 
     islandContexts.set(Island, PropsContext);
     islandContextChannels.set(Island, ContextChannel);

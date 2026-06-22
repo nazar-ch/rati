@@ -98,6 +98,13 @@ export {
     type IslandParams,
 } from './experimental/island';
 
+export {
+    IslandHydrationProvider,
+    createIslandHydrationCollector,
+    type IslandHydration,
+    type IslandHydrationData,
+} from './experimental/islandHydration';
+
 export { useRouteContext } from './common/useRouteContext';
 
 if (import.meta.env.DEV) {

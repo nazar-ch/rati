@@ -1,9 +1,17 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, afterEach } from 'vitest';
 import { prerender } from 'react-dom/static';
+import { hydrateRoot } from 'react-dom/client';
+import { act, cleanup } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { createView, viewParam } from '../common/view';
 import { SourceSymbol, type Source } from '../common/source';
 import { createIsland } from '../experimental/island';
+import {
+    createIslandHydrationCollector,
+    IslandHydrationProvider,
+} from '../experimental/islandHydration';
+
+afterEach(cleanup);
 
 // Drive react-dom/static `prerender` (which awaits all Suspense before producing
 // HTML) to a string — the server-render path islands resolve their promises on.
@@ -60,5 +68,113 @@ describe('island SSR (prerender)', () => {
         // pending and renders the loading slot; the client resolves it after hydration.
         expect(html).toContain('loading slot');
         expect(html).not.toContain('ready');
+    });
+});
+
+describe('island SSR dehydration', () => {
+    test('collects each resolved promise value, keyed by island id then chain key', async () => {
+        const Island = createIsland({
+            useEnv: () => ({}),
+            view: () =>
+                createView
+                    .chain({ id: viewParam<string>() })
+                    .chain({ greeting: async ({ id }) => `hello ${id}` }),
+            component: ({ greeting }) => <div>{greeting}</div>,
+            loading: () => <div>loading</div>,
+        });
+
+        const collector = createIslandHydrationCollector();
+        await prerenderToString(
+            <IslandHydrationProvider collect={collector.collect}>
+                <Island id="ssr" />
+            </IslandHydrationProvider>
+        );
+
+        // One island → one slice, holding the resolved promise value under its key.
+        // (The id is React's useId, so we assert on the slice rather than the literal.)
+        const slices = Object.values(collector.data);
+        expect(slices).toHaveLength(1);
+        expect(slices[0]).toEqual({ greeting: 'hello ssr' });
+    });
+
+    test('rehydrates from the server data without re-running the promise', async () => {
+        let calls = 0;
+        const Island = createIsland({
+            useEnv: () => ({}),
+            view: () =>
+                createView.chain({ id: viewParam<string>() }).chain({
+                    greeting: async ({ id }: { id: string }) => {
+                        calls++;
+                        return `hello ${id}`;
+                    },
+                }),
+            component: ({ greeting }: { greeting: string }) => <div>{greeting}</div>,
+            loading: () => <div>loading</div>,
+        });
+
+        // Server: render + collect. The promise runs exactly once.
+        const collector = createIslandHydrationCollector();
+        const html = await prerenderToString(
+            <IslandHydrationProvider collect={collector.collect}>
+                <Island id="ssr" />
+            </IslandHydrationProvider>
+        );
+        expect(html).toContain('hello ssr');
+        expect(calls).toBe(1);
+
+        // Client: hydrate the server HTML, feeding the collected data back. The
+        // island's useId matches the server's (same tree position), so its slice is
+        // found and the promise is short-circuited — not run again, no loading flash.
+        const container = document.createElement('div');
+        container.innerHTML = html;
+        document.body.appendChild(container);
+        await act(async () => {
+            hydrateRoot(
+                container,
+                <IslandHydrationProvider data={collector.data}>
+                    <Island id="ssr" />
+                </IslandHydrationProvider>
+            );
+        });
+
+        expect(calls).toBe(1);
+        expect(container.textContent).toContain('hello ssr');
+    });
+
+    test('nested islands each collect their own slice (composition, no key collision)', async () => {
+        const Child = createIsland({
+            useEnv: () => ({}),
+            view: () => createView.chain({ value: async () => 'child-data' }),
+            component: ({ value }) => <span>{value}</span>,
+            loading: () => <span>l</span>,
+        });
+        const Parent = createIsland({
+            useEnv: () => ({}),
+            view: () => createView.chain({ value: async () => 'parent-data' }),
+            component: ({ value }) => (
+                <div>
+                    {value}
+                    <Child />
+                </div>
+            ),
+            loading: () => <div>l</div>,
+        });
+
+        const collector = createIslandHydrationCollector();
+        const html = await prerenderToString(
+            <IslandHydrationProvider collect={collector.collect}>
+                <Parent />
+            </IslandHydrationProvider>
+        );
+
+        expect(html).toContain('parent-data');
+        expect(html).toContain('child-data');
+
+        // Two distinct island ids, each with its own slice — even though both chains
+        // use the key `value`, the useId scope keeps them apart.
+        const slices = Object.values(collector.data);
+        expect(slices).toHaveLength(2);
+        expect(slices).toContainEqual({ value: 'parent-data' });
+        expect(slices).toContainEqual({ value: 'child-data' });
     });
 });

@@ -76,6 +76,29 @@ describe('createIsland', () => {
         expect(await screen.findByText('ready [env:a1]')).toBeTruthy();
     });
 
+    test('forwards a wrapped lazy component preload so the island stays preloadable', () => {
+        // A `lazy()` component hangs `.preload` on itself; the island must surface it
+        // so the router can prefetch the chunk through the wrapper (route2 + lazy view).
+        const preload = () => Promise.resolve();
+        const Lazy = Object.assign(() => <div>x</div>, { preload });
+
+        const Island = createIsland({
+            useEnv: () => ({}),
+            view: () => createView.chain({ id: viewParam<string>() }),
+            component: Lazy,
+            loading: Loading,
+        });
+        expect((Island as { preload?: unknown }).preload).toBe(preload);
+
+        const Plain = createIsland({
+            useEnv: () => ({}),
+            view: () => createView.chain({ id: viewParam<string>() }),
+            component: () => <div>x</div>,
+            loading: Loading,
+        });
+        expect((Plain as { preload?: unknown }).preload).toBeUndefined();
+    });
+
     test('routes a failed source to the error slot with the unified code', async () => {
         const Island = createIsland({
             useEnv: () => ({ prefix: 'env' }) as TestEnv,
