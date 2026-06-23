@@ -25,7 +25,6 @@ export {
     type ExtractRouteParams,
     type GenericRouteType,
     type RatiUserTypes,
-    RouteContextSymbol,
     type RouteContextValueOf,
     type RouteContextNames,
 } from './stores/WebRouterStore';

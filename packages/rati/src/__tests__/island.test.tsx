@@ -312,16 +312,17 @@ describe('island', () => {
     });
 
     test('builds the .provide() value from the resolved chain and provides it to the subtree', async () => {
+        const ctxScope = scope({ id: prop<string>() })
+            .load({ name: async ({ id }) => `env:${id}` })
+            .provide(({ name }) => ({ label: `<${name}>` }));
         const Island = island({
-            scope: scope({ id: prop<string>() })
-                    .load({ name: async ({ id }) => `env:${id}` })
-                    .provide(({ name }) => ({ label: `<${name}>` })),
+            scope: ctxScope,
             component: () => <Consumer />,
             loading: Loading,
         });
 
         function Consumer() {
-            const ctx = useScope(Island);
+            const ctx = useScope(ctxScope);
             return <div>ctx {ctx.label}</div>;
         }
 
@@ -335,24 +336,25 @@ describe('island', () => {
         const log: string[] = [];
         const res = testSource<{ id: string }>(log, 'res');
 
+        const ctxScope = scope({ id: prop<string>() })
+            .load({ res: () => res })
+            .provide(({ res: r }) => {
+                log.push('context-mount');
+                return {
+                    id: r.id,
+                    [Symbol.dispose]() {
+                        log.push('context-dispose');
+                    },
+                };
+            });
         const Island = island({
-            scope: scope({ id: prop<string>() })
-                    .load({ res: () => res })
-                    .provide(({ res: r }) => {
-                        log.push('context-mount');
-                        return {
-                            id: r.id,
-                            [Symbol.dispose]() {
-                                log.push('context-dispose');
-                            },
-                        };
-                    }),
+            scope: ctxScope,
             component: () => <Mounted />,
             loading: Loading,
         });
 
         function Mounted() {
-            const ctx = useScope(Island);
+            const ctx = useScope(ctxScope);
             return <div>ctx {ctx.id}</div>;
         }
 
@@ -430,15 +432,15 @@ describe('island', () => {
     });
 
     test('useOptionalScope returns the value when a context is provided above', async () => {
+        const ctxScope = scope({ id: prop<string>() }).provide(({ id }) => ({ label: `#${id}` }));
         const Island = island({
-            scope: scope({ id: prop<string>() })
-                    .provide(({ id }) => ({ label: `#${id}` })),
+            scope: ctxScope,
             component: () => <Consumer />,
             loading: Loading,
         });
 
         function Consumer() {
-            const ctx = useOptionalScope(Island);
+            const ctx = useOptionalScope(ctxScope);
             return <div>opt {ctx ? ctx.label : 'none'}</div>;
         }
 
@@ -447,16 +449,13 @@ describe('island', () => {
     });
 
     test('useOptionalScope returns undefined when rendered outside the island', () => {
-        const Island = island({
-            scope: scope({ id: prop<string>() })
-                    .provide(({ id }) => ({ label: `#${id}` })),
-            component: () => <div>page</div>,
-            loading: Loading,
-        });
+        const ctxScope = scope({ id: prop<string>() }).provide(({ id }) => ({ label: `#${id}` }));
+        // Build the island so the scope's channel exists, but render the reader with no
+        // <Island> above it — a present scope with no provider in the tree.
+        island({ scope: ctxScope, component: () => <div>page</div>, loading: Loading });
 
-        // Rendered standalone — no <Island> above, so no context value is in scope.
         function Consumer() {
-            const ctx = useOptionalScope(Island);
+            const ctx = useOptionalScope(ctxScope);
             return <div>opt {ctx === undefined ? 'none' : ctx.label}</div>;
         }
 
@@ -465,15 +464,16 @@ describe('island', () => {
     });
 
     test('provide-by-default: useScope returns the resolved props when the scope declares no .provide()', async () => {
+        const propsScope = scope({ id: prop<string>() });
         const Island = island({
-            scope: scope({ id: prop<string>() }),
+            scope: propsScope,
             component: () => <Consumer />,
             loading: Loading,
         });
 
         // No `.provide()`, so the island provides its resolved props to the subtree.
         function Consumer() {
-            const props = useScope(Island);
+            const props = useScope(propsScope);
             return <div>props {props.id}</div>;
         }
 
@@ -511,24 +511,25 @@ describe('island', () => {
         const log: string[] = [];
         const makeSource = readySourceFactory(log);
 
+        const ctxScope = scope({ id: prop<string>() })
+            .load({ res: () => makeSource() })
+            .provide(({ res }) => {
+                log.push(`build:${res.id}`);
+                return {
+                    id: res.id,
+                    [Symbol.dispose]() {
+                        log.push(`dispose:${res.id}`);
+                    },
+                };
+            });
         const Island = island({
-            scope: scope({ id: prop<string>() })
-                    .load({ res: () => makeSource() })
-                    .provide(({ res }) => {
-                        log.push(`build:${res.id}`);
-                        return {
-                            id: res.id,
-                            [Symbol.dispose]() {
-                                log.push(`dispose:${res.id}`);
-                            },
-                        };
-                    }),
+            scope: ctxScope,
             component: () => <Consumer />,
             loading: Loading,
         });
 
         function Consumer() {
-            const ctx = useScope(Island);
+            const ctx = useScope(ctxScope);
             return <div>live {ctx.id}</div>;
         }
 
@@ -593,36 +594,6 @@ describe('island', () => {
         // Run #1's source was attached then detached; run #2's stays attached.
         expect(log).toContain('detach:src1');
         expect(log).not.toContain('detach:src2');
-    });
-
-    test('a descendant reads the provided value by scope — no island component reference', async () => {
-        const ctxScope = scope({ id: prop<string>() }).provide(({ id }) => ({ label: `<${id}>` }));
-        const Island = island({ scope: ctxScope, component: () => <Reader />, loading: Loading });
-
-        // The reader keys off the scope it imports (a data module), never the island
-        // component that renders it — so there is no child→parent reference.
-        function Reader() {
-            const ctx = useScope(ctxScope);
-            return <div>ctx {ctx.label}</div>;
-        }
-
-        await act(async () => {
-            render(<Island id="a1" />);
-        });
-        expect(await screen.findByText('ctx <a1>')).toBeTruthy();
-    });
-
-    test('reading by scope returns the resolved props when the scope declares no .provide()', async () => {
-        const propsScope = scope({ id: prop<string>() });
-        const Island = island({ scope: propsScope, component: () => <Reader />, loading: Loading });
-
-        function Reader() {
-            const props = useScope(propsScope);
-            return <div>props {props.id}</div>;
-        }
-
-        render(<Island id="a1" />);
-        expect(await screen.findByText('props a1')).toBeTruthy();
     });
 
     test('islands sharing a scope each provide their own value; a by-scope reader gets the nearest', async () => {

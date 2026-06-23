@@ -36,45 +36,32 @@ export interface RatiUserTypes {
 export type UserRoutes = RatiUserTypes extends { routes: infer R } ? R : never;
 
 /**
- * Type-only carrier stamped onto a route object by {@link route}: the value that
- * route's scope provides (its `.provide()` value, else its resolved props), or
- * `unknown` for a scope-less route. Never present at runtime — like scope's
- * `ScopeProvidesSymbol`. {@link useRouteContext} reads it back off the routes table
- * by name, so the context type comes from the route definitions themselves (the same
- * `RatiUserTypes['routes']` source `Link`'s `to` reads) — no separate registration.
- */
-export const RouteContextSymbol = Symbol();
-
-// The context value a route built with this scope carries; scope-less routes (no
-// context to read) carry `unknown`.
-type RouteContextValue<TScope extends Scope<any> | undefined> = TScope extends Scope<any>
-    ? ScopeProvidesOf<TScope>
-    : unknown;
-
-/**
  * The context value the route registered under `Name` provides, read off the routes
- * tuple via {@link RouteContextSymbol}. `unknown` when that route has no scope (so no
- * context to read). This is what `useRouteContext(name)` returns.
+ * tuple by the route's `scope` (its `.provide()` value, else its resolved props). The
+ * context type comes from the route definitions themselves — the same
+ * `RatiUserTypes['routes']` source `Link`'s `to` reads, no separate registration.
+ * `unknown` when that route has no scope (so no context to read). This is what
+ * `useRouteContext(name)` returns.
  */
 export type RouteContextValueOf<
     Routes extends readonly GenericRouteType[],
     Name extends string,
-> = Extract<Routes[number], { name: Name }> extends {
-    readonly [RouteContextSymbol]?: infer C;
-}
-    ? C
+> = Extract<Routes[number], { name: Name }> extends { scope: infer S }
+    ? S extends Scope<any>
+        ? ScopeProvidesOf<S>
+        : unknown
     : unknown;
 
 /**
  * Names of the routes that carry a context (the scope-bearing ones) — the valid
- * arguments to {@link useRouteContext}. Routes without a scope carry `unknown` and
- * are filtered out.
+ * arguments to {@link useRouteContext}. Routes without a scope (`scope: undefined`) are
+ * filtered out.
  */
 export type RouteContextNames<Routes extends readonly GenericRouteType[]> = {
-    [K in keyof Routes]: Routes[K] extends { readonly [RouteContextSymbol]?: infer C }
-        ? unknown extends C
-            ? never
-            : Routes[K]['name']
+    [K in keyof Routes]: Routes[K] extends { scope: infer S }
+        ? S extends Scope<any>
+            ? Routes[K]['name']
+            : never
         : never;
 }[number];
 
@@ -203,19 +190,17 @@ export function route<
               })
             : component;
 
-    const routeDef = {
+    return {
         path,
         pathRe: buildPathRe(path),
         name,
         component: routeComponent,
         wrapperComponent: options.wrapper,
-    };
-
-    // Stamp the scope-provided type onto the route's *type* (type-only carrier, absent
-    // at runtime) so useRouteContext(name) reads it back off the routes table — the
-    // routing analogue of how an island carries its scope via IslandSymbol.
-    return routeDef as typeof routeDef & {
-        readonly [RouteContextSymbol]?: RouteContextValue<TScope>;
+        // The scope the route's island was built from (undefined for a plain route).
+        // useRouteContext(name) resolves the provided value through this scope, and the
+        // route-context types are derived from this field's type — so the context type
+        // comes straight from the route definition.
+        scope: scopeOption as TScope extends Scope<any> ? TScope : undefined,
     };
 }
 
@@ -225,6 +210,7 @@ export type GenericRouteType = {
     pathRe: RegExp | null;
     component: any;
     wrapperComponent?: ComponentType | undefined;
+    scope?: Scope<any> | undefined;
 };
 
 type RoutesType<

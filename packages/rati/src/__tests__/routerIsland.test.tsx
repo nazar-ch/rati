@@ -196,14 +196,17 @@ describe('route + islands', () => {
 
 describe('island auto-context', () => {
     test('useScope reads resolved props anywhere under the island', async () => {
+        const productScope = scope({ productId: prop<string>() }).load({
+            label: async ({ productId }) => `#${productId}`,
+        });
+
         const DeepChild: FC = () => {
-            const { label } = useScope(Product);
+            const { label } = useScope(productScope);
             return <div>from context: {label}</div>;
         };
 
         const Product = island({
-            scope: scope({ productId: prop<string>() })
-                    .load({ label: async ({ productId }) => `#${productId}` }),
+            scope: productScope,
             component: () => (
                 <div>
                     <DeepChild />
@@ -220,16 +223,13 @@ describe('island auto-context', () => {
     });
 
     test('useScope throws a helpful error when rendered outside the island', async () => {
-        // A valid island (so the channel exists), but the reader is rendered with no
-        // <Product> ancestor — so there is no provided value above it.
-        const Product = island({
-            scope: scope({ productId: prop<string>() }),
-            component: () => null,
-            loading: IslandLoading,
-        });
+        // A valid island (so the scope's channel exists), but the reader is rendered with
+        // no <Product> ancestor — so there is no provided value above it.
+        const productScope = scope({ productId: prop<string>() });
+        island({ scope: productScope, component: () => null, loading: IslandLoading });
 
         const Child: FC = () => {
-            const props = useScope(Product);
+            const props = useScope(productScope);
             return <div>{String(props)}</div>;
         };
 
@@ -255,7 +255,9 @@ describe('island auto-context', () => {
                     <Child />
                 </Boundary>
             );
-            expect(await screen.findByText(/caught: No scope value found/)).toBeTruthy();
+            expect(
+                await screen.findByText(/caught: .*no island for this scope is above/)
+            ).toBeTruthy();
         } finally {
             consoleError.mockRestore();
         }

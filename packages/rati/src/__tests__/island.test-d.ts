@@ -1,7 +1,7 @@
 import { describe, test, expectTypeOf } from 'vitest';
 import { scope, prop, hook, type ScopeParams, type ScopeProps } from '../common/scope';
 import { type Source } from '../common/source';
-import { island, useOptionalScope, useScope } from '../experimental/island';
+import { useOptionalScope, useScope } from '../experimental/island';
 
 class TitleStore {
     constructor(_params: { id: string }) {}
@@ -71,33 +71,23 @@ describe('scope type helpers', () => {
             });
     });
 
-    test('useScope returns the .provide() value type; the value is not a prop', () => {
+    test('useScope returns the .provide() value type off the scope; the value is not a prop', () => {
         const ctxScope = scope({ id: prop<string>() })
             .load({ name: async ({ id }) => `name:${id}` })
             .provide(({ name }) => ({ heading: name.toUpperCase() }));
 
-        const Island = island({ scope: ctxScope, component: () => null, loading: () => null });
-
-        expectTypeOf(useScope(Island)).toEqualTypeOf<{ heading: string }>();
+        // The scope is the key (a data module, importable cycle-free) — no island
+        // component reference; the type comes straight off the scope.
+        expectTypeOf(useScope(ctxScope)).toEqualTypeOf<{ heading: string }>();
 
         // The optional form widens the same value type with `undefined`.
-        expectTypeOf(useOptionalScope(Island)).toEqualTypeOf<{ heading: string } | undefined>();
+        expectTypeOf(useOptionalScope(ctxScope)).toEqualTypeOf<{ heading: string } | undefined>();
 
         // The provided value stays out of the component's resolved props.
         expectTypeOf<ScopeProps<typeof ctxScope>>().toEqualTypeOf<{ id: string; name: string }>();
     });
 
-    test('reading by scope infers the same value type — no island component reference', () => {
-        const ctxScope = scope({ id: prop<string>() })
-            .load({ name: async ({ id }) => `name:${id}` })
-            .provide(({ name }) => ({ heading: name.toUpperCase() }));
-
-        // The scope is the key (a data module, importable cycle-free), not the island.
-        expectTypeOf(useScope(ctxScope)).toEqualTypeOf<{ heading: string }>();
-        expectTypeOf(useOptionalScope(ctxScope)).toEqualTypeOf<{ heading: string } | undefined>();
-    });
-
-    test('reading a scope without .provide() by scope returns the resolved props', () => {
+    test('reading a scope without .provide() returns the resolved props', () => {
         expectTypeOf(useScope(pageScope)).toEqualTypeOf<{
             id: string;
             revision: number;

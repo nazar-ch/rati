@@ -423,83 +423,95 @@ export type IslandComponent<S extends Scope<any>> = FC<ScopeParams<S>> & {
 // ---------------------------------------------------------------------------------------
 
 // One value channel per island, holding whatever the island provides — the resolved
-// props by default, or the `.provide()` value when declared. The sentinel distinguishes
-// "no provider above" from a value that is itself nullish.
-//
-// Two keys resolve the same channel. The *scope* is the cycle-free key a descendant
-// uses: it imports the scope (a data module), never the island component — so there is
-// no child→parent reference and no import cycle (the island renders the descendant).
-// The island *component* is also accepted: back-compat, and the only way to target one
-// specific island when several are built from a shared scope. Islands built from the
-// same scope share one channel (scope identity, get-or-create in island()), so the
-// nearest one wins — ordinary React context semantics.
+// props by default, or the `.provide()` value when declared. Keyed by the *scope*: a
+// descendant imports the scope (a data module), never the island component that renders
+// it — so there is no child→parent reference and no import cycle. Islands built from the
+// same scope share one channel (get-or-create in island()), so the nearest one wins —
+// ordinary React context semantics. The sentinel distinguishes "no provider above" from
+// a provided value that is itself nullish.
 const ISLAND_SCOPE_MISSING = Symbol('rati.island-scope-missing');
 const scopeChannels = new WeakMap<object, Context<unknown>>();
-const islandChannels = new WeakMap<object, Context<unknown>>();
+// A human label per scope (the island's displayName), used only in error messages.
+const scopeLabels = new WeakMap<object, string>();
 const noScopeChannel = createContext<unknown>(ISLAND_SCOPE_MISSING);
 
-// Resolve a reader's key (a scope, or the island component) to its value channel.
-function channelFor(key: object): Context<unknown> | undefined {
-    return scopeChannels.get(key) ?? islandChannels.get(key);
+// A best-effort identifier for a scope in error messages: the island's displayName when
+// one was built from the scope, else the scope's own load keys.
+function describeScope(scope: object): string {
+    const label = scopeLabels.get(scope);
+    if (label) return label;
+    const def = (scope as Scope).definition;
+    const keys = is.object(def) ? Object.keys(def) : [];
+    return keys.length ? `scope({ ${keys.join(', ')} })` : 'the given scope';
 }
 
-// Shared lookup for the two reader hooks: read the resolved channel. Returns the raw
-// value (possibly the MISSING sentinel) so each hook can apply its own absent-value
-// policy (throw vs. undefined). Throwing on an unknown key is common to both — that's a
-// misuse, not an absent value. A hook (calls useContext), so both callers invoke it
-// unconditionally.
-function useRawScope(channel: Context<unknown> | undefined, hookName: string): unknown {
-    const value = useContext(channel ?? noScopeChannel);
+// The outcome of reading a scope's value channel — split so each caller applies its own
+// policy and crafts its own message with the right identifier. `no-provider`: an island
+// for the scope exists, but none is rendered above this component. `no-island`: no
+// island uses this scope at all (a misuse). A hook (calls useContext), so callers invoke
+// it unconditionally.
+export type ScopeRead =
+    | { status: 'value'; value: unknown }
+    | { status: 'no-provider' }
+    | { status: 'no-island' };
 
-    if (!channel) {
-        throw new Error(`${hookName} expects a scope, or an island built from one`);
-    }
-    return value;
+export function useScopeRead(scope: object): ScopeRead {
+    const channel = scopeChannels.get(scope);
+    const value = useContext(channel ?? noScopeChannel);
+    if (!channel) return { status: 'no-island' };
+    if (value === ISLAND_SCOPE_MISSING) return { status: 'no-provider' };
+    return { status: 'value', value };
 }
 
 /**
- * Read the value an island provides to its subtree — the resolved props by default,
- * or the `.provide()` value when the scope declares one. The value is created and
- * (for a `.provide()` value) torn down by the island in lockstep with its sources, so
- * a store built over a grabbed resource never outlives that grab. Nearest island
- * instance wins.
+ * Read the value an island provides to its subtree — the resolved props by default, or
+ * the `.provide()` value when the scope declares one. The value is created and (for a
+ * `.provide()` value) torn down by the island in lockstep with its sources, so a store
+ * built over a grabbed resource never outlives that grab. Nearest island instance wins.
  *
- * Identify the channel by the **scope** — a descendant imports the scope (a data
- * module), never the island component, so there is no child→parent reference or import
- * cycle. The type comes straight off the scope. Passing the island component still works
- * (back-compat, or to target one of several islands built from a shared scope).
+ * Keyed by the **scope**: a descendant imports the scope (a data module), never the
+ * island component that renders it — so there is no child→parent reference or import
+ * cycle, and the type comes straight off the scope.
  *
- * Throws when no island is above — see {@link useOptionalScope} for the non-throwing
- * form.
+ * Throws when no island for the scope is above — see {@link useOptionalScope} for the
+ * non-throwing form.
  */
-export function useScope<S extends Scope<any>>(scope: S): ScopeProvidesOf<S>;
-export function useScope<S extends Scope<any>>(island: IslandComponent<S>): ScopeProvidesOf<S>;
-export function useScope<S extends Scope<any>>(key: S | IslandComponent<S>): ScopeProvidesOf<S> {
-    const value = useRawScope(channelFor(key), 'useScope');
-
-    if (value === ISLAND_SCOPE_MISSING) {
-        throw new Error('No scope value found. Render this component under the island.');
+export function useScope<S extends Scope<any>>(scope: S): ScopeProvidesOf<S> {
+    const read = useScopeRead(scope);
+    switch (read.status) {
+        case 'value':
+            return read.value as ScopeProvidesOf<S>;
+        case 'no-provider':
+            throw new Error(
+                `useScope(${describeScope(scope)}): no island for this scope is above the current ` +
+                    `component — render it inside the island's subtree.`
+            );
+        case 'no-island':
+            throw new Error(
+                `useScope(${describeScope(scope)}): no island uses this scope — pass the scope an ` +
+                    `island() was built from.`
+            );
     }
-
-    return value as ScopeProvidesOf<S>;
 }
 
 /**
  * Optional form of {@link useScope}: returns `undefined` instead of throwing when no
- * island is above — the component renders outside the island. For components that may
- * render either under the island or standalone. Still throws when the key is neither a
- * scope nor an island built from one (a misuse, not an absent value).
+ * island for the scope is above (the component renders standalone). Still throws when no
+ * island uses the scope at all — that's a misuse, not an absent value.
  */
-export function useOptionalScope<S extends Scope<any>>(scope: S): ScopeProvidesOf<S> | undefined;
-export function useOptionalScope<S extends Scope<any>>(
-    island: IslandComponent<S>
-): ScopeProvidesOf<S> | undefined;
-export function useOptionalScope<S extends Scope<any>>(
-    key: S | IslandComponent<S>
-): ScopeProvidesOf<S> | undefined {
-    const value = useRawScope(channelFor(key), 'useOptionalScope');
-
-    return value === ISLAND_SCOPE_MISSING ? undefined : (value as ScopeProvidesOf<S>);
+export function useOptionalScope<S extends Scope<any>>(scope: S): ScopeProvidesOf<S> | undefined {
+    const read = useScopeRead(scope);
+    switch (read.status) {
+        case 'value':
+            return read.value as ScopeProvidesOf<S>;
+        case 'no-provider':
+            return undefined;
+        case 'no-island':
+            throw new Error(
+                `useOptionalScope(${describeScope(scope)}): no island uses this scope — pass the ` +
+                    `scope an island() was built from.`
+            );
+    }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -555,8 +567,7 @@ class IslandErrorBoundary extends Component<ErrorBoundaryProps, { error: unknown
 
 export function island<S extends Scope<any>>(config: IslandConfig<S>): IslandComponent<S> {
     // One value channel per scope identity: islands built from the same scope share it,
-    // so a descendant reading by scope resolves the nearest island's value. Keyed by the
-    // scope here, and by the island component below (the component-form read).
+    // so a descendant reading by scope resolves the nearest island's value.
     const scopeKey = config.scope as object;
     const Channel = scopeChannels.get(scopeKey) ?? createContext<unknown>(ISLAND_SCOPE_MISSING);
     scopeChannels.set(scopeKey, Channel);
@@ -656,7 +667,9 @@ export function island<S extends Scope<any>>(config: IslandConfig<S>): IslandCom
     const preload = (config.component as { preload?: () => Promise<unknown> }).preload;
     if (typeof preload === 'function') Island.preload = preload;
 
-    islandChannels.set(Island, Channel);
+    // A readable identifier for this scope's read errors (best-effort: shared scopes
+    // keep the last island's label).
+    scopeLabels.set(scopeKey, Island.displayName);
 
     return Island;
 }
