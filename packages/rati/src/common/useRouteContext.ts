@@ -1,13 +1,20 @@
 import { useIslandContext, type IslandComponent } from '../experimental/island';
 import { useWebRouter } from '../stores/RootStore';
-import type { UserRoutes } from '../stores/WebRouterStore';
+import type { RatiRouteContexts } from '../stores/WebRouterStore';
 
-// Route names available to `useRouteContext`. Falls back to `string` when the app
-// hasn't declared its routes via `RatiUserTypes` (e.g. rati's own tests), so the
-// hook stays usable without the augmentation.
-type RouteName = [UserRoutes] extends [never] ? string : UserRoutes[number]['name'] & string;
+// Context-bearing route names — the keys an app registers in `RatiRouteContexts`.
+// Falls back to `string` when none are registered, so the hook stays usable
+// (returning `unknown`) without the augmentation — e.g. in rati's own tests.
+type RegisteredName = keyof RatiRouteContexts & string;
+type RouteContextName = [RegisteredName] extends [never] ? string : RegisteredName;
 
-// Resolve the island a named route2 built off the live routes table. Kept out of
+// The context type registered for a route name, or `unknown` for an unregistered
+// (string-fallback) name.
+type RouteContextOf<Name extends RouteContextName> = Name extends keyof RatiRouteContexts
+    ? RatiRouteContexts[Name]
+    : unknown;
+
+// Resolve the island a named route built off the live routes table. Kept out of
 // the hook body (and throwing a clear error on a bad name there) so the two hooks
 // in `useRouteContext` stay unconditional — rules-of-hooks safe.
 function islandForRoute(
@@ -22,17 +29,18 @@ function islandForRoute(
 }
 
 /**
- * Read the island-owned context (`.context()`) of a route2 route by its `name`,
- * without importing the island component to hand to `useIslandContext`. Because
- * route2 builds the island from the route's `view`, there is no island module to
- * import; the `name` resolves it off the live routes table — the very island
- * object that keys the context channel. So a route's subtree reads its context
- * without depending on the island's identity (which route2 doesn't export).
+ * Read the island-owned context (`.context()`) of a route by its `name`, without
+ * importing the island component to hand to `useIslandContext`. Because `route`
+ * builds the island from the route's `view`, there is no island module to import;
+ * the `name` resolves it off the live routes table — the very island object that
+ * keys the context channel. So a route's subtree reads its context without
+ * depending on the island's identity (which `route` doesn't export).
  *
- * The context value type can't be recovered from the type-erased routes table, so
- * pass it as the type argument: `useRouteContext<PageContext>('page')`.
+ * The return type comes from the app's {@link RatiRouteContexts} augmentation —
+ * `useRouteContext('page')` is typed with no type argument. Names the app hasn't
+ * registered fall back to `unknown`.
  */
-export function useRouteContext<Context = unknown>(name: RouteName): Context {
+export function useRouteContext<Name extends RouteContextName>(name: Name): RouteContextOf<Name> {
     const router = useWebRouter();
-    return useIslandContext(islandForRoute(router.routes, name)) as Context;
+    return useIslandContext(islandForRoute(router.routes, name as string)) as RouteContextOf<Name>;
 }

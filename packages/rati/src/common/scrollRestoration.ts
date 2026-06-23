@@ -9,10 +9,10 @@
  *
  * Caveats:
  * - Restoration fires on the next paint, which is correct for routes that
- *   render synchronously. Routes that wait on async data (e.g. ViewLoader)
- *   render later — the restored scroll position will be clamped against the
- *   pre-render content height. Anchor lookup may also miss elements not yet
- *   in the DOM. Both are acceptable defaults; tying restoration to async
+ *   render synchronously. Routes that wait on async data (an island view
+ *   resolving) render later — the restored scroll position will be clamped
+ *   against the pre-render content height. Anchor lookup may also miss elements
+ *   not yet in the DOM. Both are acceptable defaults; tying restoration to async
  *   data-loading boundaries is a future enhancement.
  * - Saved positions live in memory for the session. They are not persisted
  *   across reloads.
@@ -52,8 +52,8 @@ export function installScrollRestoration(
 
         // Defer the restore until the new route has had a chance to commit.
         // A double rAF lands one full frame later — long enough for React's
-        // synchronous renders to flush. Async views (ViewLoader) will render
-        // after this fires; that's the documented caveat above.
+        // synchronous renders to flush. Async island views will render after
+        // this fires; that's the documented caveat above.
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 applyScroll(action, location, positions, scrollToTop);

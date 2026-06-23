@@ -1,5 +1,5 @@
 import { observable, action, computed } from 'mobx';
-import type { ComponentType, FC } from 'react';
+import type { ComponentType } from 'react';
 import { createBrowserHistory, type History, type Location } from '../common/history';
 import {
     installScrollRestoration,
@@ -89,12 +89,22 @@ export interface RatiUserTypes {
 
 export type UserRoutes = RatiUserTypes extends { routes: infer R } ? R : never;
 
-// -------------------------------------------------------------
+/**
+ * App-augmented map of route name → the context value type that route's view
+ * exposes via `.context()`. Lets `useRouteContext(name)` return the right type
+ * with no type argument. Augment it the same way as {@link RatiUserTypes}:
+ *
+ *     declare module 'rati' {
+ *         interface RatiRouteContexts {
+ *             page: { pageContext: PageContextStore };
+ *         }
+ *     }
+ */
+export interface RatiRouteContexts {
+    // page: { pageContext: PageContextStore };
+}
 
-export type ViewComponentForOptionalView<
-    View extends CreateView<any> | undefined,
-    Params extends {},
-> = View extends CreateView<any> ? ViewComponent<View> : FC<Params>;
+// -------------------------------------------------------------
 
 function buildPathRe(path: string): RegExp | null {
     // TODO 2023: allow regexps for the path (manually type params in this case)
@@ -111,36 +121,13 @@ function buildPathRe(path: string): RegExp | null {
     return path === '*' ? null : new RegExp(pathReString);
 }
 
-export function route<
-    Path extends string,
-    Name extends string,
-    TViewComponent extends ViewComponentForOptionalView<TView, ExtractRouteParams<Path>>, // ViewComponentForClass<VS>,
-    TView extends CreateView<any> | undefined,
->(
-    path: Path,
-    name: Name,
-    component: TViewComponent,
-    view?: TView extends CreateView<any> ? TView : undefined,
-    wrapperComponent?: ComponentType
-) {
-    return {
-        path,
-        pathRe: buildPathRe(path),
-        name,
-        // Empty view is used here to pass routeParams to the component
-        view,
-        component,
-        wrapperComponent,
-    };
-}
-
 export type RouteOptions<Env, TView extends CreateView<any> | undefined> = {
     /**
-     * Data the route resolves before the component renders. When present,
-     * `route2` folds it together with the component into an island (see below),
-     * so resolution runs on the source-based island engine — loading/error
-     * slots, attach-on-build / detach-on-navigate — not the legacy ViewLoader.
-     * The component receives the resolved props.
+     * Data the route resolves before the component renders. When present, `route`
+     * folds it together with the component into an island (see below), so
+     * resolution runs on the source-based island engine — loading/error slots,
+     * attach-on-build / detach-on-navigate, SSR via Suspense (and promise
+     * dehydration). The component receives the resolved props.
      *
      * Either a plain view (env-less) or an env→view factory, exactly like
      * `createIsland`'s `view`. Pair a factory with `useEnv` to supply per-root
@@ -172,19 +159,19 @@ type RequiredKeys<T> = {
     [K in keyof T]-?: {} extends Pick<T, K> ? never : K;
 }[keyof T];
 
-// Surfaced when a route2 component requires props the path can't supply.
+// Surfaced when a route component requires props the path can't supply.
 type MissingRouteParams<Missing extends PropertyKey> = {
-    'route2: component needs props not present in the path': Missing;
+    'route: component needs props not present in the path': Missing;
 };
 
 /*
-    Validates the (inferred) route2 component, intersected onto its type so the
+    Validates the (inferred) route component, intersected onto its type so the
     argument must satisfy it. With a `view`, the component is checked against the
     view. Otherwise it's checked by param *name*: its required props must all be
     path params. Values are intentionally not pinned to the path's plain `string`
     — a component (typically an island) brands a URL segment via
-    `viewParam<Base64Uuid>()`, the same refinement the legacy `view` path encodes,
-    so a branded prop like `pageId: Base64Uuid` is accepted by name.
+    `viewParam<Base64Uuid>()`, so a branded prop like `pageId: Base64Uuid` is
+    accepted by name.
 */
 type RouteComponentGuard<
     Path extends string,
@@ -199,22 +186,19 @@ type RouteComponentGuard<
       : unknown;
 
 /**
- * Location-coupled twin of `createIsland`: a route2 *is* an island, specialized
- * to a URL. The non-route-specific inputs (`view`, `loading`, `error`) are the
- * same as `createIsland`'s and behave identically; route2 adds the route bits
- * (path, name, wrapper) and feeds the path-matched params in as the island's
- * props.
+ * Location-coupled twin of `createIsland`: a route *is* an island, specialized to
+ * a URL. The non-route-specific inputs (`view`, `loading`, `error`) are the same
+ * as `createIsland`'s and behave identically; a route adds the route bits (path,
+ * name, wrapper) and feeds the path-matched params in as the island's props.
  *
- * When `options.view` is given, route2 wraps the component + view (+ `useEnv`,
- * `loading`, `error` — the same inputs as `createIsland`) into an island and
- * stores it as the route's component, so resolution goes through the same
- * source-based engine as a standalone island instead of the legacy
- * `route`/ViewLoader/resolveView path. The record's `view` is therefore always
- * undefined — the Router renders the (island) component directly, handing it the
- * route params. So a route declares its island inline — no separate
+ * When `options.view` is given, the component + view (+ `useEnv`, `loading`,
+ * `error` — the same inputs as `createIsland`) are folded into an island and
+ * stored as the route's component, so resolution goes through the source-based
+ * island engine — the Router renders the (island) component directly, handing it
+ * the route params. So a route declares its island inline, no separate
  * `createIsland` module needed:
  *
- *     route2('/spaces/:spaceId/pages/:pageId', 'page', PageBody, {
+ *     route('/spaces/:spaceId/pages/:pageId', 'page', PageBody, {
  *         view: pageView,
  *         useEnv: usePageEnv,
  *         loading: PageLoading,
@@ -223,9 +207,10 @@ type RouteComponentGuard<
  *
  * A component built with `createIsland` up front also works as-is with no `view`
  * — it's already an island whose props are its view's params, so the path params
- * feed it directly: `route2('/spaces/:spaceId/pages/:pageId', 'page', PageIsland)`.
+ * feed it directly: `route('/spaces/:spaceId/pages/:pageId', 'page', PageIsland)`.
+ * A plain component with no `view` is rendered directly with the route params.
  */
-export function route2<
+export function route<
     Path extends string,
     Name extends string,
     Component extends ComponentType<any>,
@@ -239,10 +224,10 @@ export function route2<
 ) {
     const view = options.view;
 
-    // route2 = createIsland, coupled to a location. A supplied view is folded
-    // with the component into an island here; params arrive from the URL match
-    // (Router's no-`view` branch renders the island with the route params), and
-    // the island owns loading/error and source attach/detach across navigation.
+    // A route is createIsland coupled to a location. A supplied view is folded with
+    // the component into an island here; params arrive from the URL match (the
+    // Router renders the island with the route params), and the island owns
+    // loading/error and source attach/detach across navigation.
     const routeComponent =
         view !== undefined
             ? createIsland({
@@ -263,9 +248,6 @@ export function route2<
         path,
         pathRe: buildPathRe(path),
         name,
-        // Always undefined: a supplied view became part of the island above, so
-        // route2 never traverses the ViewLoader path (that stays for legacy `route`).
-        view: undefined,
         component: routeComponent,
         wrapperComponent: options.wrapper,
     };
@@ -275,7 +257,6 @@ export type GenericRouteType = {
     name: string;
     path: string;
     pathRe: RegExp | null;
-    view: any;
     component: any;
     wrapperComponent?: ComponentType | undefined;
 };
@@ -292,23 +273,17 @@ type RoutesType<
 
 type GetView = ReturnType<WebRouterStore<GenericRouteType[]>['getActiveRoute']>;
 
-/** Activated route shape, with an optional hydration-only payload. */
-type ActiveRoute = NonNullable<GetView> & {
-    /**
-     * View props pre-resolved on the server. Present only on the very first
-     * `activeRoute` after client-side hydration; subsequent navigations leave
-     * this `undefined` and ViewLoader resolves on its own.
-     */
-    hydratedViewProps?: Record<string, unknown> | undefined;
-};
+/** Activated route shape. */
+type ActiveRoute = NonNullable<GetView>;
 
 export type NameToRoute<T extends readonly GenericRouteType[]> = TupleToUnion<RoutesType<T>>;
 
 /**
- * Snapshot used to seed a router on the client after server rendering.
- * Mirrors what the server entry serialized into the HTML response — the
- * client passes it back so the first paint reads the same active route
- * and view props as the server, with no async resolution gap.
+ * Snapshot used to seed a router on the client after server rendering. Mirrors
+ * what the server entry serialized into the HTML response — the client passes it
+ * back so the first paint reads the same active route as the server. This is the
+ * *routing* snapshot only; a route's resolved view data is dehydrated separately
+ * by the island engine (see `IslandHydrationProvider`).
  */
 export interface WebRouterHydratedState {
     path: string;
@@ -317,8 +292,6 @@ export interface WebRouterHydratedState {
     /** `name` of the route definition that was matched on the server. */
     activeRouteName: string;
     routeParams: Record<string, string>;
-    /** Resolved view props (output of `resolveView`), if the route had a view. */
-    viewProps?: Record<string, unknown> | undefined;
 }
 
 export interface WebRouterStoreOptions {
@@ -443,12 +416,10 @@ export class WebRouterStore<
         this.activeRoute = {
             name: matched.name,
             component: matched.component,
-            view: matched.view,
             wrapperComponent: matched.wrapperComponent,
             path: matched.path,
             routeParams: state.routeParams,
             pathCounter: this.pathCounter,
-            hydratedViewProps: state.viewProps,
         };
     }
 
@@ -661,7 +632,7 @@ export class WebRouterStore<
     }
 
     getActiveRoute(currentPath: string, _stores: any, pathCounter: number) {
-        for (const { pathRe, path, view, name, component, wrapperComponent } of this.routes) {
+        for (const { pathRe, path, name, component, wrapperComponent } of this.routes) {
             let result;
 
             if (pathRe) {
@@ -676,7 +647,6 @@ export class WebRouterStore<
                 return {
                     name,
                     component,
-                    view,
                     routeParams: (result.groups as any) ?? {},
                     path,
                     wrapperComponent,

@@ -1,11 +1,28 @@
 import { describe, test, expect } from 'vitest';
 import { renderToString } from 'react-dom/server';
-import { WebRouterStore, route } from '../stores/WebRouterStore';
+import { prerender } from 'react-dom/static';
+import type { ReactElement } from 'react';
+import { WebRouterStore, route, type GenericRouteType } from '../stores/WebRouterStore';
 import { RootStore, RootStoreProvider } from '../stores/RootStore';
 import { Router } from '../common/Router';
 import { createMemoryHistory } from '../common/history';
 import { prepareRoute } from '../common/prepareRoute';
-import { createView } from '../common/view';
+import { createView, type ViewComponent } from '../common/view';
+
+// react-dom/static `prerender` awaits Suspense before producing HTML, so an island
+// route's promise-backed view resolves server-side (renderToString does not).
+async function prerenderToString(element: ReactElement): Promise<string> {
+    const { prelude } = await prerender(element);
+    const reader = prelude.getReader();
+    const decoder = new TextDecoder();
+    let html = '';
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        html += decoder.decode(value, { stream: true });
+    }
+    return html;
+}
 
 function Home() {
     return <div data-testid="home">welcome home</div>;
@@ -25,8 +42,8 @@ const routes = [
     route('*', 'notFound', NotFound),
 ] as const;
 
-function buildAppFor(url: string) {
-    const router = new WebRouterStore({}, routes, {
+function buildAppFor(url: string, routesArg: readonly GenericRouteType[] = routes) {
+    const router = new WebRouterStore({}, routesArg, {
         history: createMemoryHistory({ url }),
     });
     const root = new RootStore({ router }, { isReady: true });
@@ -72,27 +89,22 @@ describe('renderToString with WebRouterStore + memory history', () => {
         router.dispose();
     });
 
-    test('renders a route with a view, using props resolved by prepareRoute', async () => {
-        function Greeting(props: { greeting: string }) {
-            return <div data-testid="greeting">{props.greeting}</div>;
-        }
+    test('renders a route whose view resolves through the island engine (SSR via prerender)', async () => {
         const view = createView({
             greeting: async () => 'hello from server',
         });
-        const router = new WebRouterStore(
-            {},
-            [route('/', 'home', Greeting as any, view as any)] as const,
-            { history: createMemoryHistory({ url: '/' }) }
+        const Greeting: ViewComponent<typeof view> = ({ greeting }) => (
+            <div data-testid="greeting">{greeting}</div>
         );
-        const root = new RootStore({ router }, { isReady: true });
+
+        const { router, App } = buildAppFor('/', [
+            route('/', 'greet', Greeting, { view }),
+        ] as const);
 
         await prepareRoute(router);
-
-        const html = renderToString(
-            <RootStoreProvider rootStore={root}>
-                <Router />
-            </RootStoreProvider>
-        );
+        // prerender (not renderToString) awaits the view's promise, so the resolved
+        // content lands in the HTML — the route runs on the island engine.
+        const html = await prerenderToString(<App />);
 
         expect(html).toContain('hello from server');
         router.dispose();

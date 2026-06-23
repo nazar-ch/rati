@@ -1,13 +1,21 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Component, type FC, type ReactNode } from 'react';
 import { act, render, screen, cleanup } from '@testing-library/react';
-import { WebRouterStore, route2, type GenericRouteType } from '../stores/WebRouterStore';
+import { WebRouterStore, route, type GenericRouteType } from '../stores/WebRouterStore';
 import { Router } from '../common/Router';
 import { GenericStoresContext } from '../stores/RootStore';
 import { createView, viewParam, type ViewComponent } from '../common/view';
 import { SourceSymbol, type Source } from '../common/source';
 import { createIsland, useIslandProps } from '../experimental/island';
 import { useRouteContext } from '../common/useRouteContext';
+
+// Register the 'product' route's context type so `useRouteContext('product')` is
+// typed with no type argument — the same augmentation an app declares on `rati`.
+declare module '../stores/WebRouterStore' {
+    interface RatiRouteContexts {
+        product: { label: string };
+    }
+}
 
 beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');
@@ -41,7 +49,7 @@ const IslandLoading: FC = () => <div>island loading…</div>;
 
 type TestEnv = { tag: string };
 
-describe('route2 + islands', () => {
+describe('route + islands', () => {
     test('an island route resolves its waterfall from path params', async () => {
         const label = deferred<string>();
         const Product = createIsland({
@@ -58,8 +66,8 @@ describe('route2 + islands', () => {
         let router!: WebRouterStore<readonly GenericRouteType[]>;
         await act(async () => {
             ({ router } = renderWithRouter([
-                route2('/products/:productId', 'product', Product),
-                route2('*', 'home', Home),
+                route('/products/:productId', 'product', Product),
+                route('*', 'home', Home),
             ]));
         });
 
@@ -93,8 +101,8 @@ describe('route2 + islands', () => {
 
         window.history.replaceState(null, '', '/products/42');
         const { router } = renderWithRouter([
-            route2('/products/:productId', 'product', Product),
-            route2('*', 'home', Home),
+            route('/products/:productId', 'product', Product),
+            route('*', 'home', Home),
         ]);
 
         await screen.findByText('product 42');
@@ -119,7 +127,7 @@ describe('route2 + islands', () => {
         let router!: WebRouterStore<readonly GenericRouteType[]>;
         await act(async () => {
             ({ router } = renderWithRouter([
-                route2('/', 'home', HomeWithView, {
+                route('/', 'home', HomeWithView, {
                     view: homeView,
                     loading: () => <div>resolving…</div>,
                 }),
@@ -127,7 +135,7 @@ describe('route2 + islands', () => {
         });
 
         // The per-route loading slot is the Suspense fallback while the promise
-        // entry resolves — proof route2 runs on the island engine (the old
+        // entry resolves — proof route runs on the island engine (the old
         // ViewLoader path had no per-route loading slot).
         expect(screen.getByText('resolving…')).toBeTruthy();
         await act(async () => {
@@ -148,7 +156,7 @@ describe('route2 + islands', () => {
         let router!: WebRouterStore<readonly GenericRouteType[]>;
         await act(async () => {
             ({ router } = renderWithRouter([
-                route2('/', 'home', FailComponent, {
+                route('/', 'home', FailComponent, {
                     view: failView,
                     error: ({ error }) => <div>error: {error.code}</div>,
                 }),
@@ -166,30 +174,30 @@ describe('route2 + islands', () => {
             <section aria-label="frame">{children}</section>
         );
 
-        const { router } = renderWithRouter([route2('/', 'home', Home, { wrapper: Frame })]);
+        const { router } = renderWithRouter([route('/', 'home', Home, { wrapper: Frame })]);
 
         const frame = await screen.findByLabelText('frame');
         expect(frame.textContent).toBe('home');
         router.dispose();
     });
 
-    test('useRouteContext reads a route2 island context by route name', async () => {
-        // The view ends in `.context()`; route2 builds the island, so there is no
+    test('useRouteContext reads a route island context by route name', async () => {
+        // The view ends in `.context()`; route builds the island, so there is no
         // island component to import — the subtree reads the context by route name.
         const productView = createView
             .chain({ productId: viewParam<string>() })
             .context(({ productId }) => ({ label: `#${productId}` }));
 
         const Deep: FC = () => {
-            const { label } = useRouteContext<{ label: string }>('product');
+            const { label } = useRouteContext('product');
             return <div>ctx {label}</div>;
         };
         const ProductBody: ViewComponent<typeof productView> = () => <Deep />;
 
         window.history.replaceState(null, '', '/products/7');
         const { router } = renderWithRouter([
-            route2('/products/:productId', 'product', ProductBody, { view: productView }),
-            route2('*', 'home', Home),
+            route('/products/:productId', 'product', ProductBody, { view: productView }),
+            route('*', 'home', Home),
         ]);
 
         expect(await screen.findByText('ctx #7')).toBeTruthy();

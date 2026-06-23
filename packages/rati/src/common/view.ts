@@ -2,7 +2,6 @@ import type { Simplify } from 'type-fest';
 import type { Context, FC } from 'react';
 import type { ExcludeNever } from '../types/generic';
 import type { Source } from './source';
-import { is } from './utils';
 
 export const ViewSymbol = Symbol();
 
@@ -44,10 +43,7 @@ export type ViewContextDef = {
 // `Ctx` defaults to `unknown` so the many `CreateView<any>` constraint sites keep
 // accepting context-bearing views (a `PageContextStore` context is assignable to
 // `unknown`); a view without `.context()` carries `unknown` here.
-export type CreateView<
-    VD extends GenericViewDefinition = GenericViewDefinition,
-    Ctx = unknown,
-> = {
+export type CreateView<VD extends GenericViewDefinition = GenericViewDefinition, Ctx = unknown> = {
     definition: GenericViewDefinition;
     prevView?: CreateView | undefined;
     // Present only when the chain ends in `.context()`. Named `contextDef` (not
@@ -187,46 +183,6 @@ function createViewChain<VD extends GenericViewDefinition>(
 }
 
 createView.chain = viewChainHead;
-
-// ---------------------------------------------------------------------------------------
-
-export async function resolveView<View extends CreateView>(
-    view: View,
-    params: RequiredViewParams<View>
-): Promise<ResolveView<View>> {
-    const prevViewResolvedProps = view.prevView
-        ? await resolveView(view.prevView as any, params)
-        : {};
-
-    const keys: string[] = [];
-    const values: any[] = [];
-
-    for (const [key, value] of Object.entries(view.definition)) {
-        keys.push(key);
-
-        if (is.object(value) && ParamSymbol in value) {
-            // params case
-            values.push((params as any)[key]);
-        } else if (is.promise(value)) {
-            values.push(value);
-        } else if (is.class(value)) {
-            // create the class instance with the params from the previous views
-            values.push(new value(prevViewResolvedProps));
-        } else if (is.function(value)) {
-            // call the function with the params from the previous views
-            values.push(value(prevViewResolvedProps));
-        } else {
-            values.push(value);
-        }
-    }
-
-    const resolvedValues = await Promise.all(values);
-
-    return {
-        ...prevViewResolvedProps,
-        ...Object.fromEntries(keys.map((k, i) => [k, resolvedValues[i]])),
-    } as any;
-}
 
 // ----------------------
 

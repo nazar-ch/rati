@@ -18,7 +18,6 @@ export { GlobalStore } from './stores/GlobalStore';
 export {
     WebRouterStore,
     route,
-    route2,
     type RouteOptions,
     type NameToRoute,
     type WebRouterStoreOptions,
@@ -26,6 +25,7 @@ export {
     type ExtractRouteParams,
     type GenericRouteType,
     type RatiUserTypes,
+    type RatiRouteContexts,
 } from './stores/WebRouterStore';
 export { Router } from './common/Router';
 export {
@@ -42,8 +42,6 @@ export {
     type ScrollRestorationOptions,
 } from './common/scrollRestoration';
 
-export { ViewLoader, type ViewLoaderComponent } from './common/ViewLoader';
-
 export * from './types/generic';
 
 export { Link, ContextualLink, LinkContextProvider, useLinkContext } from './common/GenericLink';
@@ -58,7 +56,6 @@ export {
     type ChainableView,
     type CreateView,
     createView,
-    resolveView,
     type ResolveView,
     type RequiredViewParams,
     type ViewComponent,

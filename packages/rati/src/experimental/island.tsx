@@ -300,7 +300,7 @@ export type IslandComponent<View extends CreateView<any>> = FC<RequiredViewParam
      * Forwarded from a `lazy()` component the island wraps, so the island is a
      * transparent entry point: the router's `<Link prefetch>` / `prepareRoute`
      * preload reach a route's chunk whether it is mounted as a bare component or
-     * folded into an island by `route2`. Absent when the component isn't lazy.
+     * folded into an island by `route`. Absent when the component isn't lazy.
      */
     preload?: () => Promise<unknown>;
 };

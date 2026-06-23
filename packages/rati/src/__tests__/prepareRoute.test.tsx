@@ -3,7 +3,6 @@ import { WebRouterStore, route } from '../stores/WebRouterStore';
 import { createMemoryHistory } from '../common/history';
 import { prepareRoute } from '../common/prepareRoute';
 import { lazy } from '../common/lazy';
-import { createView } from '../common/view';
 
 const NoopComponent = () => null;
 const HomeComponent = () => <div>home</div>;
@@ -24,7 +23,6 @@ describe('prepareRoute', () => {
             hash: '',
             activeRouteName: 'home',
             routeParams: {},
-            viewProps: undefined,
         });
         router.dispose();
     });
@@ -87,26 +85,7 @@ describe('prepareRoute', () => {
         router.dispose();
     });
 
-    test('resolves the view and exposes its props on the snapshot', async () => {
-        const view = createView({
-            greeting: async () => 'hello from server',
-            answer: () => 42,
-        });
-
-        const router = new WebRouterStore(
-            {},
-            [route('/', 'home', HomeComponent as any, view as any)] as const,
-            {
-                history: createMemoryHistory({ url: '/' }),
-            }
-        );
-
-        const prepared = await prepareRoute(router);
-
-        expect(prepared!.hydratedState.viewProps).toEqual({
-            greeting: 'hello from server',
-            answer: 42,
-        });
-        router.dispose();
-    });
+    // View *data* resolution + SSR dehydration is the island engine's job now
+    // (prepareRoute only builds the routing snapshot) — covered by islandSsr.test.tsx
+    // and the router-level case in ssrRender.test.tsx.
 });

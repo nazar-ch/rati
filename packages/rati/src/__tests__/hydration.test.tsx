@@ -1,13 +1,31 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderToString } from 'react-dom/server';
+import { prerender } from 'react-dom/static';
 import { hydrateRoot } from 'react-dom/client';
 import { WebRouterStore, route } from '../stores/WebRouterStore';
 import { RootStore, RootStoreProvider } from '../stores/RootStore';
 import { Router } from '../common/Router';
 import { createBrowserHistory, createMemoryHistory } from '../common/history';
 import { prepareRoute } from '../common/prepareRoute';
-import { createView } from '../common/view';
+import { createView, type ViewComponent } from '../common/view';
+import {
+    createIslandHydrationCollector,
+    IslandHydrationProvider,
+} from '../experimental/islandHydration';
 import { act } from '@testing-library/react';
+
+async function prerenderToString(element: React.ReactElement): Promise<string> {
+    const { prelude } = await prerender(element);
+    const reader = prelude.getReader();
+    const decoder = new TextDecoder();
+    let html = '';
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        html += decoder.decode(value, { stream: true });
+    }
+    return html;
+}
 
 function Home() {
     return <div data-testid="home">welcome home</div>;
@@ -100,22 +118,77 @@ describe('SSR + hydration', () => {
         cleanup();
     });
 
-    test('captures view props in the hydrated state for routes with views', async () => {
-        function Greeting(props: { greeting: string }) {
-            return <div data-testid="greeting">{props.greeting}</div>;
-        }
+    test('hydrates a view route from dehydrated island data without re-running its promise', async () => {
+        let calls = 0;
         const view = createView({
-            greeting: async () => 'hello from server',
+            greeting: async () => {
+                calls++;
+                return 'hello from server';
+            },
         });
-        const routesWithView = [route('/', 'home', Greeting as any, view as any)] as const;
+        const Greeting: ViewComponent<typeof view> = ({ greeting }) => (
+            <div data-testid="greeting">{greeting}</div>
+        );
+        const routesWithView = [route('/', 'home', Greeting, { view })] as const;
 
-        const { html, prepared, cleanup } = await ssrThenHydrate('/', routesWithView);
+        // ----- Server: prerender (awaits the promise) + collect its resolved value -----
+        const serverRouter = new WebRouterStore({}, routesWithView, {
+            history: createMemoryHistory({ url: '/' }),
+        });
+        const serverRoot = new RootStore({ router: serverRouter }, { isReady: true });
+        const prepared = await prepareRoute(serverRouter);
+        const collector = createIslandHydrationCollector();
+        const html = await prerenderToString(
+            <IslandHydrationProvider collect={collector.collect}>
+                <RootStoreProvider rootStore={serverRoot}>
+                    <Router />
+                </RootStoreProvider>
+            </IslandHydrationProvider>
+        );
+        serverRouter.dispose();
 
         expect(html).toContain('hello from server');
-        expect(prepared!.hydratedState.viewProps).toEqual({
-            greeting: 'hello from server',
+        expect(calls).toBe(1);
+
+        // ----- Client: hydrate from the routing snapshot + dehydrated island data -----
+        window.history.replaceState(null, '', '/');
+        const container = document.createElement('div');
+        container.innerHTML = html;
+        document.body.appendChild(container);
+
+        const clientRouter = new WebRouterStore({}, routesWithView, {
+            history: createBrowserHistory(),
+            hydratedState: prepared!.hydratedState,
         });
-        expect(consoleErrorSpy).not.toHaveBeenCalled();
-        cleanup();
+        const clientRoot = new RootStore({ router: clientRouter }, { isReady: true });
+
+        let root: ReturnType<typeof hydrateRoot>;
+        await act(async () => {
+            root = hydrateRoot(
+                container,
+                <IslandHydrationProvider data={collector.data}>
+                    <RootStoreProvider rootStore={clientRoot}>
+                        <Router />
+                    </RootStoreProvider>
+                </IslandHydrationProvider>
+            );
+        });
+
+        // The promise was not re-run on the client and the content hydrated.
+        expect(calls).toBe(1);
+        expect(container.textContent).toContain('hello from server');
+        // No hydration *mismatch* surfaced. We tolerate one dev-only warning: running
+        // react-dom/static (server) and react-dom/client (hydrate) in a single process
+        // shares the module-level store context between two renderers — impossible in
+        // production, where server and browser are separate processes. A real mismatch
+        // would be a different message and still fail here.
+        const mismatchErrors = consoleErrorSpy.mock.calls.filter(
+            (args: unknown[]) => !String(args[0]).includes('multiple renderers concurrently')
+        );
+        expect(mismatchErrors).toEqual([]);
+
+        root!.unmount();
+        container.remove();
+        clientRouter.dispose();
     });
 });
