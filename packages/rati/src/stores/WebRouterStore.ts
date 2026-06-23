@@ -6,7 +6,7 @@ import {
     type ScrollRestorationOptions,
 } from '../common/scrollRestoration';
 import type { TupleToUnion } from '../types/generic';
-import type { Scope, ScopeComponent } from '../common/scope';
+import type { Scope, ScopeComponent, ScopeProvidesOf } from '../common/scope';
 import { island, type IslandConfig } from '../experimental/island';
 import { GlobalStore } from '../stores/GlobalStore';
 // import { TupleToUnion } from 'type-fest';
@@ -36,19 +36,47 @@ export interface RatiUserTypes {
 export type UserRoutes = RatiUserTypes extends { routes: infer R } ? R : never;
 
 /**
- * App-augmented map of route name → the value type that route's scope provides
- * via `.provide()`. Lets `useRouteContext(name)` return the right type with no
- * type argument. Augment it the same way as {@link RatiUserTypes}:
- *
- *     declare module 'rati' {
- *         interface RatiRouteContexts {
- *             page: { pageContext: PageContextStore };
- *         }
- *     }
+ * Type-only carrier stamped onto a route object by {@link route}: the value that
+ * route's scope provides (its `.provide()` value, else its resolved props), or
+ * `unknown` for a scope-less route. Never present at runtime — like scope's
+ * `ScopeProvidesSymbol`. {@link useRouteContext} reads it back off the routes table
+ * by name, so the context type comes from the route definitions themselves (the same
+ * `RatiUserTypes['routes']` source `Link`'s `to` reads) — no separate registration.
  */
-export interface RatiRouteContexts {
-    // page: { pageContext: PageContextStore };
+export const RouteContextSymbol = Symbol();
+
+// The context value a route built with this scope carries; scope-less routes (no
+// context to read) carry `unknown`.
+type RouteContextValue<TScope extends Scope<any> | undefined> = TScope extends Scope<any>
+    ? ScopeProvidesOf<TScope>
+    : unknown;
+
+/**
+ * The context value the route registered under `Name` provides, read off the routes
+ * tuple via {@link RouteContextSymbol}. `unknown` when that route has no scope (so no
+ * context to read). This is what `useRouteContext(name)` returns.
+ */
+export type RouteContextValueOf<
+    Routes extends readonly GenericRouteType[],
+    Name extends string,
+> = Extract<Routes[number], { name: Name }> extends {
+    readonly [RouteContextSymbol]?: infer C;
 }
+    ? C
+    : unknown;
+
+/**
+ * Names of the routes that carry a context (the scope-bearing ones) — the valid
+ * arguments to {@link useRouteContext}. Routes without a scope carry `unknown` and
+ * are filtered out.
+ */
+export type RouteContextNames<Routes extends readonly GenericRouteType[]> = {
+    [K in keyof Routes]: Routes[K] extends { readonly [RouteContextSymbol]?: infer C }
+        ? unknown extends C
+            ? never
+            : Routes[K]['name']
+        : never;
+}[number];
 
 // -------------------------------------------------------------
 
@@ -175,12 +203,19 @@ export function route<
               })
             : component;
 
-    return {
+    const routeDef = {
         path,
         pathRe: buildPathRe(path),
         name,
         component: routeComponent,
         wrapperComponent: options.wrapper,
+    };
+
+    // Stamp the scope-provided type onto the route's *type* (type-only carrier, absent
+    // at runtime) so useRouteContext(name) reads it back off the routes table — the
+    // routing analogue of how an island carries its scope via IslandSymbol.
+    return routeDef as typeof routeDef & {
+        readonly [RouteContextSymbol]?: RouteContextValue<TScope>;
     };
 }
 

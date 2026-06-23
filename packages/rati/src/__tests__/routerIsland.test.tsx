@@ -9,13 +9,10 @@ import { SourceSymbol, type Source } from '../common/source';
 import { island, useScope } from '../experimental/island';
 import { useRouteContext } from '../common/useRouteContext';
 
-// Register the 'product' route's context type so `useRouteContext('product')` is
-// typed with no type argument — the same augmentation an app declares on `rati`.
-declare module '../stores/WebRouterStore' {
-    interface RatiRouteContexts {
-        product: { label: string };
-    }
-}
+// The 'product' route's context type is registered globally via the app-routes
+// augmentation in `routeContext.test-d.ts` (`RatiUserTypes['routes']`), so the
+// `useRouteContext('product')` call below is typed straight off the route's scope —
+// no separate context registration.
 
 beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');

@@ -25,7 +25,9 @@ export {
     type ExtractRouteParams,
     type GenericRouteType,
     type RatiUserTypes,
-    type RatiRouteContexts,
+    RouteContextSymbol,
+    type RouteContextValueOf,
+    type RouteContextNames,
 } from './stores/WebRouterStore';
 export { Router } from './common/Router';
 export {
@@ -58,6 +60,7 @@ export {
     scope,
     type ScopeProps,
     type ScopeParams,
+    type ScopeProvidesOf,
     type ScopeComponent,
     type Prop,
     prop,

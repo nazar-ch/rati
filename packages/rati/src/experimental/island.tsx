@@ -22,6 +22,7 @@ import {
     type ScopeParams,
     type ScopeProps,
     type ScopeProvideDef,
+    type ScopeProvidesOf,
 } from '../common/scope';
 import { isSource, toSourceError, type Source, type SourceError } from '../common/source';
 import { deepEqual, is } from '../common/utils';
@@ -427,13 +428,6 @@ export type IslandComponent<S extends Scope<any>> = FC<ScopeParams<S>> & {
 const ISLAND_SCOPE_MISSING = Symbol('rati.island-scope-missing');
 const islandChannels = new WeakMap<object, Context<unknown>>();
 const noScopeChannel = createContext<unknown>(ISLAND_SCOPE_MISSING);
-
-// The value a scope provides, read back off the island for useScope's return type:
-// the `.provide()` value when present, else the resolved props (provide-by-default).
-type ProvidedOf<S extends Scope<any>> = S extends Scope<any, infer P> ? P : never;
-type ScopeProvidesOf<S extends Scope<any>> = unknown extends ProvidedOf<S>
-    ? ScopeProps<S>
-    : ProvidedOf<S>;
 
 // Shared lookup for the two reader hooks: resolve the island's value channel and read
 // it. Returns the raw value (possibly the MISSING sentinel) so each hook can apply its

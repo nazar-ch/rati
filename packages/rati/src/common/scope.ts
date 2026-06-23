@@ -108,6 +108,18 @@ type ParamsOf<Defs extends GenericScopeDefinition> = ExcludeNever<{
 /** The inputs a scope accepts (island props / slot `params`) — its `prop()` head. */
 export type ScopeParams<S extends Scope<any>> = Simplify<ParamsOf<ScopeDefinitions<S>>>;
 
+// The `.provide()` value a scope declares, or `unknown` when the chain has none.
+type ScopeProvided<S extends Scope<any>> = S extends Scope<any, infer P> ? P : never;
+
+/**
+ * The value a scope provides to its subtree — and so the type `useScope` /
+ * `useRouteContext` return: the `.provide()` value when the chain declares one, else
+ * the resolved props (provide-by-default). Mirrors the island's runtime `Leaf`.
+ */
+export type ScopeProvidesOf<S extends Scope<any>> = unknown extends ScopeProvided<S>
+    ? ScopeProps<S>
+    : ScopeProvided<S>;
+
 // ---------------------------------------------------------------------------------------
 
 type CreateScopeFunc = <P extends ParamsDefinition = {}>(params?: P) => ChainableScope<P>;

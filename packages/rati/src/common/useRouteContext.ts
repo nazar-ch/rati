@@ -1,18 +1,20 @@
 import { useScope, type IslandComponent } from '../experimental/island';
 import { useWebRouter } from '../stores/RootStore';
-import type { RatiRouteContexts } from '../stores/WebRouterStore';
+import type { UserRoutes, RouteContextNames, RouteContextValueOf } from '../stores/WebRouterStore';
 
-// Context-bearing route names — the keys an app registers in `RatiRouteContexts`.
-// Falls back to `string` when none are registered, so the hook stays usable
-// (returning `unknown`) without the augmentation — e.g. in rati's own tests.
-type RegisteredName = keyof RatiRouteContexts & string;
-type RouteContextName = [RegisteredName] extends [never] ? string : RegisteredName;
+// Context-bearing route names, derived from the app's routes table
+// (`RatiUserTypes['routes']`) — the same source `Link`'s `to` reads, so the context
+// type comes from the route definitions with no separate registration. Falls back to
+// `string` when the app hasn't augmented its routes (e.g. rati's own tests), keeping
+// the hook usable (returning `unknown`).
+type ContextName = [UserRoutes] extends [never] ? never : RouteContextNames<UserRoutes>;
+type RouteContextName = [ContextName] extends [never] ? string : ContextName;
 
-// The context type registered for a route name, or `unknown` for an unregistered
-// (string-fallback) name.
-type RouteContextOf<Name extends RouteContextName> = Name extends keyof RatiRouteContexts
-    ? RatiRouteContexts[Name]
-    : unknown;
+// The context type a route name provides (its scope's `.provide()` value, else the
+// resolved props), or `unknown` when the app hasn't augmented its routes.
+type RouteContextOf<Name extends RouteContextName> = [UserRoutes] extends [never]
+    ? unknown
+    : RouteContextValueOf<UserRoutes, Name & string>;
 
 // Resolve the island a named route built off the live routes table. Kept out of
 // the hook body (and throwing a clear error on a bad name there) so the two hooks
@@ -36,9 +38,11 @@ function islandForRoute(
  * value channel. So a route's subtree reads its provided value without depending on
  * the island's identity (which `route` doesn't export).
  *
- * The return type comes from the app's {@link RatiRouteContexts} augmentation —
- * `useRouteContext('page')` is typed with no type argument. Names the app hasn't
- * registered fall back to `unknown`.
+ * The return type is read off the app's routes table (`RatiUserTypes['routes']`) by
+ * name — `useRouteContext('page')` is typed with no type argument, and only
+ * context-bearing (scope-carrying) route names are accepted. The same augmentation
+ * `Link` relies on; no separate registration. Falls back to `unknown` when the app
+ * hasn't augmented its routes.
  */
 export function useRouteContext<Name extends RouteContextName>(name: Name): RouteContextOf<Name> {
     const router = useWebRouter();
