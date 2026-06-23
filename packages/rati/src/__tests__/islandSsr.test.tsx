@@ -29,7 +29,7 @@ async function prerenderToString(element: ReactElement): Promise<string> {
 }
 
 describe('island SSR (prerender)', () => {
-    test('resolves a promise-backed view server-side', async () => {
+    test('resolves a promise-backed scope server-side', async () => {
         const Island = island({
             useEnv: () => ({}),
             scope: () =>
@@ -47,7 +47,7 @@ describe('island SSR (prerender)', () => {
         expect(html).not.toContain('loading');
     });
 
-    test('renders the loading slot for a source-backed view (sources stay pending under SSR)', async () => {
+    test('renders the loading slot for a source-backed scope (sources stay pending under SSR)', async () => {
         const pending: Source<{ id: string }> = {
             [SourceSymbol]: true,
             state: { status: 'pending' },

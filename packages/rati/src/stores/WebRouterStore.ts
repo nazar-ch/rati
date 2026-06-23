@@ -27,60 +27,6 @@ export type ExtractRouteParams<T extends string> = string extends T
         ? { [k in Param]: string }
         : {};
 
-/*
-export type ViewComponentForOptionalView<
-    TView extends GenericView | undefined,
-    TParams extends {}
-> = TView extends GenericView
-    ? LegacyViewComponent<TView>
-    : LegacyViewComponent<EmptyView<TParams>>;
-
-
-export class EmptyView<Params extends {} = {}> extends View<EmptyView<Params>, Params> {
-    data = {};
-    stores = {};
-}
-
-export function routeLegacy<
-    Path extends string,
-    Name extends string,
-    ViewComponent extends ViewComponentForOptionalView<
-        TView,
-        { routeParams: ExtractRouteParams<Path> }
-    >, // ViewComponentForClass<VS>,
-    TView extends GenericView | undefined
->(
-    path: Path,
-    name: Name,
-    component: ViewComponent,
-    view?: ViewClassForView<TView, { routeParams: ExtractRouteParams<Path> }, any>, // TODO: improve any type
-    wrapperComponent?: ComponentType
-) {
-    // TODO 2023: allow regexps for the path (manually type params in this case)
-    const pathReCore = path.replace(/:(.*?)(\/|$)/g, '(?<$1>[^/]+?)$2');
-    const pathReString =
-        '^' +
-        pathReCore +
-        (pathReCore.endsWith('/')
-            ? '$'
-            : // Optional slash in the end (match /path & /path/)
-              // TODO 2023: use redirects for this case
-              '/{0,1}$');
-
-    const pathRe = path === '*' ? null : new RegExp(pathReString);
-
-    return {
-        path,
-        pathRe,
-        name,
-        // Empty view is used here to pass routeParams to the component
-        view: view ?? EmptyView,
-        component,
-        wrapperComponent,
-    };
-}
-*/
-
 // -------------------------------------------------------------
 
 export interface RatiUserTypes {
@@ -121,7 +67,7 @@ function buildPathRe(path: string): RegExp | null {
     return path === '*' ? null : new RegExp(pathReString);
 }
 
-export type RouteOptions<Env, TView extends Scope<any> | undefined> = {
+export type RouteOptions<Env, TScope extends Scope<any> | undefined> = {
     /**
      * Data the route resolves before the component renders. When present, `route`
      * folds it together with the component into an island (see below), so
@@ -133,7 +79,7 @@ export type RouteOptions<Env, TView extends Scope<any> | undefined> = {
      * `island`'s `scope`. Pair a factory with `useEnv` to supply per-root
      * services (stores, api clients) the scope's loads need.
      */
-    scope?: TView extends Scope<any> ? TView | ((env: Env) => TView) : undefined;
+    scope?: TScope extends Scope<any> ? TScope | ((env: Env) => TScope) : undefined;
     /**
      * Builds the environment a factory `scope` receives — the island's `useEnv`
      * hook. Defaults to an empty env; only needed when `scope` is a factory.
@@ -145,13 +91,13 @@ export type RouteOptions<Env, TView extends Scope<any> | undefined> = {
      * Slot shown while the scope resolves — the island's `loading`. Defaults to
      * rendering nothing. Only meaningful alongside `scope`.
      */
-    loading?: TView extends Scope<any> ? IslandConfig<Env, TView>['loading'] : undefined;
+    loading?: TScope extends Scope<any> ? IslandConfig<Env, TScope>['loading'] : undefined;
     /**
      * Slot shown on resolution failure — the island's `error` (switch on
      * `error.code`). When omitted, the error throws to the nearest ErrorBoundary.
      * Only meaningful alongside `scope`.
      */
-    error?: TView extends Scope<any> ? IslandConfig<Env, TView>['error'] : undefined;
+    error?: TScope extends Scope<any> ? IslandConfig<Env, TScope>['error'] : undefined;
 };
 
 // The required (non-optional) keys of an object type.
@@ -175,10 +121,10 @@ type MissingRouteParams<Missing extends PropertyKey> = {
 */
 type RouteComponentGuard<
     Path extends string,
-    TView extends Scope<any> | undefined,
+    TScope extends Scope<any> | undefined,
     Component,
-> = [TView] extends [Scope<any>]
-    ? ScopeComponent<TView>
+> = [TScope] extends [Scope<any>]
+    ? ScopeComponent<TScope>
     : Component extends (props: infer P) => any
       ? [RequiredKeys<P>] extends [keyof ExtractRouteParams<Path>]
           ? unknown
@@ -215,12 +161,12 @@ export function route<
     Name extends string,
     Component extends ComponentType<any>,
     Env = {},
-    TView extends Scope<any> | undefined = undefined,
+    TScope extends Scope<any> | undefined = undefined,
 >(
     path: Path,
     name: Name,
-    component: Component & RouteComponentGuard<Path, TView, Component>,
-    options: RouteOptions<Env, TView> = {}
+    component: Component & RouteComponentGuard<Path, TScope, Component>,
+    options: RouteOptions<Env, TScope> = {}
 ) {
     const scopeOption = options.scope;
 
@@ -271,10 +217,10 @@ type RoutesType<
     } & ExtractRouteParams<T[K]['path']>;
 };
 
-type GetView = ReturnType<WebRouterStore<GenericRouteType[]>['getActiveRoute']>;
+type GetActiveRoute = ReturnType<WebRouterStore<GenericRouteType[]>['getActiveRoute']>;
 
 /** Activated route shape. */
-type ActiveRoute = NonNullable<GetView>;
+type ActiveRoute = NonNullable<GetActiveRoute>;
 
 export type NameToRoute<T extends readonly GenericRouteType[]> = TupleToUnion<RoutesType<T>>;
 
@@ -282,7 +228,7 @@ export type NameToRoute<T extends readonly GenericRouteType[]> = TupleToUnion<Ro
  * Snapshot used to seed a router on the client after server rendering. Mirrors
  * what the server entry serialized into the HTML response — the client passes it
  * back so the first paint reads the same active route as the server. This is the
- * *routing* snapshot only; a route's resolved view data is dehydrated separately
+ * *routing* snapshot only; a route's resolved scope data is dehydrated separately
  * by the island engine (see `IslandHydrationProvider`).
  */
 export interface WebRouterHydratedState {
@@ -471,7 +417,7 @@ export class WebRouterStore<
     /**
      * User state attached to the current history entry via `navigate`/`replace`
      * `{ state }`, or `null`. The browser persists it per entry, so it survives
-     * back/forward. Use it to carry view-local context that shouldn't live in the
+     * back/forward. Use it to carry UI-local context that shouldn't live in the
      * URL itself — e.g. which panel a navigation targets.
      */
     @computed get state(): unknown {
@@ -512,7 +458,7 @@ export class WebRouterStore<
     @observable private accessor _hash: string = '';
     @observable.ref private accessor _state: unknown = null;
 
-    // Non-shallow observable breaks view class inside this property
+    // Non-shallow observable breaks the component class inside this property
     @observable.shallow accessor activeRoute: ActiveRoute | null = null;
 
     private pathCounter: number = 0;

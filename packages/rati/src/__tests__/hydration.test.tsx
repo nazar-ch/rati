@@ -118,21 +118,21 @@ describe('SSR + hydration', () => {
         cleanup();
     });
 
-    test('hydrates a view route from dehydrated island data without re-running its promise', async () => {
+    test('hydrates a scope route from dehydrated island data without re-running its promise', async () => {
         let calls = 0;
-        const view = scope().load({
+        const greetingScope = scope().load({
             greeting: async () => {
                 calls++;
                 return 'hello from server';
             },
         });
-        const Greeting: ScopeComponent<typeof view> = ({ greeting }) => (
+        const Greeting: ScopeComponent<typeof greetingScope> = ({ greeting }) => (
             <div data-testid="greeting">{greeting}</div>
         );
-        const routesWithView = [route('/', 'home', Greeting, { scope: view })] as const;
+        const routesWithScope = [route('/', 'home', Greeting, { scope: greetingScope })] as const;
 
         // ----- Server: prerender (awaits the promise) + collect its resolved value -----
-        const serverRouter = new WebRouterStore({}, routesWithView, {
+        const serverRouter = new WebRouterStore({}, routesWithScope, {
             history: createMemoryHistory({ url: '/' }),
         });
         const serverRoot = new RootStore({ router: serverRouter }, { isReady: true });
@@ -156,7 +156,7 @@ describe('SSR + hydration', () => {
         container.innerHTML = html;
         document.body.appendChild(container);
 
-        const clientRouter = new WebRouterStore({}, routesWithView, {
+        const clientRouter = new WebRouterStore({}, routesWithScope, {
             history: createBrowserHistory(),
             hydratedState: prepared!.hydratedState,
         });

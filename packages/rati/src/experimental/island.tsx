@@ -25,7 +25,7 @@ import { deepEqual, is } from '../common/utils';
 import { IslandHydrationContext } from './islandHydration';
 
 /*
-    EXPERIMENTAL — see docs/research/data-views.plan.md.
+    EXPERIMENTAL — the scope/island data-loading engine.
 
     An island is a self-contained unit of UI: a scope (declarative data definition)
     bundled with a component and loading/error slots. It resolves the scope at render
@@ -250,30 +250,30 @@ function asSourceError(thrown: unknown): SourceError {
 
 // ---------------------------------------------------------------------------------------
 
-type IslandFallbackProps<View extends Scope<any>> = {
-    params: ScopeParams<View>;
+type IslandFallbackProps<S extends Scope<any>> = {
+    params: ScopeParams<S>;
     retry: () => void;
 };
 
-export type IslandConfig<Env, View extends Scope<any>> = {
+export type IslandConfig<Env, S extends Scope<any>> = {
     /**
      * The declarative data definition, parameterized by the environment (stores,
      * api clients — anything per-root loads need). Called on every (re)resolve;
      * keep it a cheap pure function.
      */
-    scope: (env: Env) => View;
+    scope: (env: Env) => S;
 
     /** Composes the environment from the host app's contexts. It's a hook. */
     useEnv: () => Env;
 
     /** Gets clean, fully resolved props — no loading/error states inside. */
-    component: ComponentType<ScopeProps<View>>;
+    component: ComponentType<ScopeProps<S>>;
 
     /**
      * Shown while the scope resolves — also the `<Suspense>` fallback for a pending
      * promise entry. Defaults to rendering nothing.
      */
-    loading?: ComponentType<{ params: ScopeParams<View> }>;
+    loading?: ComponentType<{ params: ScopeParams<S> }>;
 
     /**
      * Rendered on any failure. not-available / forbidden / failed all arrive here
@@ -281,14 +281,14 @@ export type IslandConfig<Env, View extends Scope<any>> = {
      * omitted, the error is thrown during render so the nearest ErrorBoundary
      * handles it.
      */
-    error?: ComponentType<IslandFallbackProps<View> & { error: SourceError }>;
+    error?: ComponentType<IslandFallbackProps<S> & { error: SourceError }>;
 };
 
 export const IslandSymbol = Symbol();
 
-export type IslandComponent<View extends Scope<any>> = FC<ScopeParams<View>> & {
+export type IslandComponent<S extends Scope<any>> = FC<ScopeParams<S>> & {
     /** Type-level only: carries the scope type for useScope inference. */
-    [IslandSymbol]?: View;
+    [IslandSymbol]?: S;
     /**
      * Forwarded from a `lazy()` component the island wraps, so the island is a
      * transparent entry point: the router's `<Link prefetch>` / `prepareRoute`
@@ -309,10 +309,10 @@ const noScopeChannel = createContext<unknown>(ISLAND_SCOPE_MISSING);
 
 // The value a scope provides, read back off the island for useScope's return type:
 // the `.provide()` value when present, else the resolved props (provide-by-default).
-type ProvidedOf<View extends Scope<any>> = View extends Scope<any, infer P> ? P : never;
-type ScopeProvidesOf<View extends Scope<any>> = unknown extends ProvidedOf<View>
-    ? ScopeProps<View>
-    : ProvidedOf<View>;
+type ProvidedOf<S extends Scope<any>> = S extends Scope<any, infer P> ? P : never;
+type ScopeProvidesOf<S extends Scope<any>> = unknown extends ProvidedOf<S>
+    ? ScopeProps<S>
+    : ProvidedOf<S>;
 
 // Shared lookup for the two reader hooks: resolve the island's value channel and read
 // it. Returns the raw value (possibly the MISSING sentinel) so each hook can apply its
@@ -339,16 +339,16 @@ function useRawScope(island: object, hookName: string): unknown {
  * Throws when no island is above — see {@link useOptionalScope} for the non-throwing
  * form.
  */
-export function useScope<View extends Scope<any>>(
-    island: IslandComponent<View>
-): ScopeProvidesOf<View> {
+export function useScope<S extends Scope<any>>(
+    island: IslandComponent<S>
+): ScopeProvidesOf<S> {
     const value = useRawScope(island, 'useScope');
 
     if (value === ISLAND_SCOPE_MISSING) {
         throw new Error('No scope value found. Render this component under the island.');
     }
 
-    return value as ScopeProvidesOf<View>;
+    return value as ScopeProvidesOf<S>;
 }
 
 /**
@@ -357,12 +357,12 @@ export function useScope<View extends Scope<any>>(
  * render either under the island or standalone. Still throws when `island` is not an
  * `island()` component (a misuse, not an absent value).
  */
-export function useOptionalScope<View extends Scope<any>>(
-    island: IslandComponent<View>
-): ScopeProvidesOf<View> | undefined {
+export function useOptionalScope<S extends Scope<any>>(
+    island: IslandComponent<S>
+): ScopeProvidesOf<S> | undefined {
     const value = useRawScope(island, 'useOptionalScope');
 
-    return value === ISLAND_SCOPE_MISSING ? undefined : (value as ScopeProvidesOf<View>);
+    return value === ISLAND_SCOPE_MISSING ? undefined : (value as ScopeProvidesOf<S>);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -420,7 +420,7 @@ class IslandErrorBoundary extends Component<ErrorBoundaryProps, { error: unknown
 // fallback), reactive read for sources (pending → the loading slot), values inline.
 // An observer so a source transition re-renders. Attaches sources from a layout
 // effect after each commit (a source built in render attaches as its level renders).
-type ResolvedViewProps = {
+type ResolvedScopeProps = {
     resolution: IslandResolution;
     component: ComponentType<any>;
     loading: ComponentType<{ params: unknown }>;
@@ -431,14 +431,14 @@ type ResolvedViewProps = {
     collect: ((key: string, value: unknown) => void) | undefined;
 };
 
-const ResolvedView = observer(function ResolvedView({
+const ResolvedScope = observer(function ResolvedScope({
     resolution,
     component: ResolvedComponent,
     loading: Loading,
     params,
     channel,
     collect,
-}: ResolvedViewProps) {
+}: ResolvedScopeProps) {
     useLayoutEffect(() => {
         resolution.attachPending();
     });
@@ -500,9 +500,9 @@ function renderResolved(
 // The scope is fully resolved; build the `.provide()` value in an effect (its factory
 // has side effects), hold the loading slot until it's built, then provide it to the
 // subtree (the island channel for useScope, plus any app channel). Collection already
-// happened in ResolvedView's level walk before it hands off to the gate, so the gate
+// happened in ResolvedScope's level walk before it hands off to the gate, so the gate
 // doesn't carry `collect`.
-type ProvideGateProps = Omit<ResolvedViewProps, 'collect'> & { resolved: Record<string, unknown> };
+type ProvideGateProps = Omit<ResolvedScopeProps, 'collect'> & { resolved: Record<string, unknown> };
 
 const ProvideGate = observer(function ProvideGate({
     resolution,
@@ -529,13 +529,13 @@ const ProvideGate = observer(function ProvideGate({
     return content;
 });
 
-export function island<Env, View extends Scope<any>>(
-    config: IslandConfig<Env, View>
-): IslandComponent<View> {
+export function island<Env, S extends Scope<any>>(
+    config: IslandConfig<Env, S>
+): IslandComponent<S> {
     const Channel = createContext<unknown>(ISLAND_SCOPE_MISSING);
     const Loading = (config.loading ?? DefaultLoading) as ComponentType<{ params: unknown }>;
 
-    const Island = observer(function Island(params: ScopeParams<View>) {
+    const Island = observer(function Island(params: ScopeParams<S>) {
         const env = config.useEnv();
 
         // Stable across server render and client hydration by tree position, so it
@@ -608,7 +608,7 @@ export function island<Env, View extends Scope<any>>(
                 resetKey={resolution}
             >
                 <Suspense fallback={<Loading params={params} />}>
-                    <ResolvedView
+                    <ResolvedScope
                         resolution={resolution}
                         component={config.component}
                         loading={Loading}
@@ -619,7 +619,7 @@ export function island<Env, View extends Scope<any>>(
                 </Suspense>
             </IslandErrorBoundary>
         );
-    }) as IslandComponent<View>;
+    }) as IslandComponent<S>;
 
     const componentName =
         config.component.displayName ?? (config.component as { name?: string }).name;

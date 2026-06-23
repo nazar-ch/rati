@@ -23,7 +23,7 @@ export interface PreparedRoute {
  * Returns `null` when no route matches (typically a routing table without a
  * wildcard catch-all). Callers can treat that as a 404.
  *
- * View *data* is not resolved here — a route's view is an island that resolves at
+ * Scope *data* is not resolved here — a route's scope is an island that resolves at
  * render time, so a Suspense-awaiting server render (`react-dom/static`
  * `prerender`) resolves it and the island engine dehydrates the promise values
  * (see `IslandHydrationProvider`). This builds only the routing snapshot.

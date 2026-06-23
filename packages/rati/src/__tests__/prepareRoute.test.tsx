@@ -85,7 +85,7 @@ describe('prepareRoute', () => {
         router.dispose();
     });
 
-    // View *data* resolution + SSR dehydration is the island engine's job now
+    // Scope *data* resolution + SSR dehydration is the island engine's job now
     // (prepareRoute only builds the routing snapshot) — covered by islandSsr.test.tsx
     // and the router-level case in ssrRender.test.tsx.
 });

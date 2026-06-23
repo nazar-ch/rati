@@ -10,7 +10,7 @@ import { prepareRoute } from '../common/prepareRoute';
 import { scope, type ScopeComponent } from '../common/scope';
 
 // react-dom/static `prerender` awaits Suspense before producing HTML, so an island
-// route's promise-backed view resolves server-side (renderToString does not).
+// route's promise-backed scope resolves server-side (renderToString does not).
 async function prerenderToString(element: ReactElement): Promise<string> {
     const { prelude } = await prerender(element);
     const reader = prelude.getReader();
@@ -89,20 +89,20 @@ describe('renderToString with WebRouterStore + memory history', () => {
         router.dispose();
     });
 
-    test('renders a route whose view resolves through the island engine (SSR via prerender)', async () => {
-        const view = scope().load({
+    test('renders a route whose scope resolves through the island engine (SSR via prerender)', async () => {
+        const greetingScope = scope().load({
             greeting: async () => 'hello from server',
         });
-        const Greeting: ScopeComponent<typeof view> = ({ greeting }) => (
+        const Greeting: ScopeComponent<typeof greetingScope> = ({ greeting }) => (
             <div data-testid="greeting">{greeting}</div>
         );
 
         const { router, App } = buildAppFor('/', [
-            route('/', 'greet', Greeting, { scope: view }),
+            route('/', 'greet', Greeting, { scope: greetingScope }),
         ] as const);
 
         await prepareRoute(router);
-        // prerender (not renderToString) awaits the view's promise, so the resolved
+        // prerender (not renderToString) awaits the scope's promise, so the resolved
         // content lands in the HTML — the route runs on the island engine.
         const html = await prerenderToString(<App />);
 

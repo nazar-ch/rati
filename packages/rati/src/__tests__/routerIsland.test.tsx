@@ -116,53 +116,53 @@ describe('route + islands', () => {
         router.dispose();
     });
 
-    test('options.view resolves through the island engine (loading slot, then content)', async () => {
+    test('options.scope resolves through the island engine (loading slot, then content)', async () => {
         const greeting = deferred<string>();
-        const homeView = scope().load({ greeting: () => greeting.promise });
-        const HomeWithView: ScopeComponent<typeof homeView> = ({ greeting }) => (
-            <div>view says {greeting}</div>
+        const homeScope = scope().load({ greeting: () => greeting.promise });
+        const HomeWithScope: ScopeComponent<typeof homeScope> = ({ greeting }) => (
+            <div>scope says {greeting}</div>
         );
 
         let router!: WebRouterStore<readonly GenericRouteType[]>;
         await act(async () => {
             ({ router } = renderWithRouter([
-                route('/', 'home', HomeWithView, {
-                    scope: homeView,
+                route('/', 'home', HomeWithScope, {
+                    scope: homeScope,
                     loading: () => <div>resolving…</div>,
                 }),
             ]));
         });
 
         // The per-route loading slot is the Suspense fallback while the promise
-        // entry resolves — proof route runs on the island engine (the old
-        // ViewLoader path had no per-route loading slot).
+        // entry resolves — proof route runs on the island engine (the
+        // old route-loader path had no per-route loading slot).
         expect(screen.getByText('resolving…')).toBeTruthy();
         await act(async () => {
             greeting.resolve('hello');
         });
-        expect(await screen.findByText('view says hello')).toBeTruthy();
+        expect(await screen.findByText('scope says hello')).toBeTruthy();
         router.dispose();
     });
 
     test('options.error renders the island error slot on failure', async () => {
-        const failView = scope().load({
+        const failScope = scope().load({
             data: async (): Promise<string> => {
                 throw new Error('boom');
             },
         });
-        const FailComponent: ScopeComponent<typeof failView> = ({ data }) => <div>{data}</div>;
+        const FailComponent: ScopeComponent<typeof failScope> = ({ data }) => <div>{data}</div>;
 
         let router!: WebRouterStore<readonly GenericRouteType[]>;
         await act(async () => {
             ({ router } = renderWithRouter([
                 route('/', 'home', FailComponent, {
-                    scope: failView,
+                    scope: failScope,
                     error: ({ error }) => <div>error: {error.code}</div>,
                 }),
             ]));
         });
 
-        // A throwing view function maps to a SourceError (code 'failed'); the
+        // A throwing load function maps to a SourceError (code 'failed'); the
         // island renders the route's error slot instead of the component.
         expect(await screen.findByText('error: failed')).toBeTruthy();
         router.dispose();
@@ -181,20 +181,20 @@ describe('route + islands', () => {
     });
 
     test('useRouteContext reads a route island context by route name', async () => {
-        // The view ends in `.provide()`; route builds the island, so there is no
+        // The scope ends in `.provide()`; route builds the island, so there is no
         // island component to import — the subtree reads the context by route name.
-        const productView = scope({ productId: prop<string>() })
+        const productScope = scope({ productId: prop<string>() })
             .provide(({ productId }) => ({ label: `#${productId}` }));
 
         const Deep: FC = () => {
             const { label } = useRouteContext('product');
             return <div>ctx {label}</div>;
         };
-        const ProductBody: ScopeComponent<typeof productView> = () => <Deep />;
+        const ProductBody: ScopeComponent<typeof productScope> = () => <Deep />;
 
         window.history.replaceState(null, '', '/products/7');
         const { router } = renderWithRouter([
-            route('/products/:productId', 'product', ProductBody, { scope: productView }),
+            route('/products/:productId', 'product', ProductBody, { scope: productScope }),
             route('*', 'home', Home),
         ]);
 

@@ -2,8 +2,7 @@ import { observable, runInAction } from 'mobx';
 import { is } from './utils';
 
 /*
-    Sources — the reactive data primitive an island observes (see
-    docs/research/data-views.plan.md). A source is a live `pending | ready | error`
+    Sources — the reactive data primitive an island observes. A source is a live `pending | ready | error`
     state machine; the island aggregates a set of them into one of those phases and
     renders the matching slot. Source-agnostic: CRDT resources, REST loaders, plain
     promises all implement the same interface, so the island never knows what's
@@ -11,7 +10,7 @@ import { is } from './utils';
 */
 
 /**
- * Thrown by a view function (or used as a promise rejection) to signal that the
+ * Thrown by a load function (or used as a promise rejection) to signal that the
  * requested data does not exist. {@link toSourceError} maps it to the unified
  * `error` state with `code: 'not-available'`.
  */
