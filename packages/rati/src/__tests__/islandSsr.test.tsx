@@ -31,9 +31,7 @@ async function prerenderToString(element: ReactElement): Promise<string> {
 describe('island SSR (prerender)', () => {
     test('resolves a promise-backed scope server-side', async () => {
         const Island = island({
-            useEnv: () => ({}),
-            scope: () =>
-                scope({ id: prop<string>() })
+            scope: scope({ id: prop<string>() })
                     .load({ greeting: async ({ id }) => `hello ${id}` }),
             component: ({ greeting }) => <div>{greeting}</div>,
             loading: () => <div>loading</div>,
@@ -54,9 +52,7 @@ describe('island SSR (prerender)', () => {
             attach: () => () => {},
         };
         const Island = island({
-            useEnv: () => ({}),
-            scope: () =>
-                scope({ id: prop<string>() }).load({ data: () => pending }),
+            scope: scope({ id: prop<string>() }).load({ data: () => pending }),
             component: () => <div>ready</div>,
             loading: () => <div>loading slot</div>,
         });
@@ -73,9 +69,7 @@ describe('island SSR (prerender)', () => {
 describe('island SSR dehydration', () => {
     test('collects each resolved promise value, keyed by island id then chain key', async () => {
         const Island = island({
-            useEnv: () => ({}),
-            scope: () =>
-                scope({ id: prop<string>() })
+            scope: scope({ id: prop<string>() })
                     .load({ greeting: async ({ id }) => `hello ${id}` }),
             component: ({ greeting }) => <div>{greeting}</div>,
             loading: () => <div>loading</div>,
@@ -98,9 +92,7 @@ describe('island SSR dehydration', () => {
     test('rehydrates from the server data without re-running the promise', async () => {
         let calls = 0;
         const Island = island({
-            useEnv: () => ({}),
-            scope: () =>
-                scope({ id: prop<string>() }).load({
+            scope: scope({ id: prop<string>() }).load({
                     greeting: async ({ id }: { id: string }) => {
                         calls++;
                         return `hello ${id}`;
@@ -141,14 +133,12 @@ describe('island SSR dehydration', () => {
 
     test('nested islands each collect their own slice (composition, no key collision)', async () => {
         const Child = island({
-            useEnv: () => ({}),
-            scope: () => scope().load({ value: async () => 'child-data' }),
+            scope: scope().load({ value: async () => 'child-data' }),
             component: ({ value }) => <span>{value}</span>,
             loading: () => <span>l</span>,
         });
         const Parent = island({
-            useEnv: () => ({}),
-            scope: () => scope().load({ value: async () => 'parent-data' }),
+            scope: scope().load({ value: async () => 'parent-data' }),
             component: ({ value }) => (
                 <div>
                     {value}

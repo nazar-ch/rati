@@ -22,8 +22,7 @@ async function resolveThroughIsland(
 ): Promise<Record<string, unknown>> {
     let received: Record<string, unknown> | undefined;
     const Island = island({
-        useEnv: () => ({}),
-        scope: () => scopeDef,
+        scope: scopeDef,
         component: (props: Record<string, unknown>) => {
             received = props;
             return <div>ready</div>;

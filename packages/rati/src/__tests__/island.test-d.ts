@@ -1,24 +1,20 @@
 import { describe, test, expectTypeOf } from 'vitest';
-import { scope, prop, type ScopeOf, type ScopeParams, type ScopeProps } from '../common/scope';
+import { scope, prop, hook, type ScopeParams, type ScopeProps } from '../common/scope';
 import { type Source } from '../common/source';
 import { island, useOptionalScope, useScope } from '../experimental/island';
-
-type Env = { prefix: string };
 
 class TitleStore {
     constructor(_params: { id: string }) {}
     title = 'store';
 }
 
-// A representative env→scope factory: two params, a load level that reads the env,
-// and a class level — i.e. the shape passed to `island({ scope })`.
-const pageScope = (env: Env) =>
-    scope({ id: prop<string>(), revision: prop<number>() })
-        .load({ name: async ({ id }) => `${env.prefix}:${id}` })
-        .load({ store: TitleStore });
+// A representative scope: two params, a function level, and a class level.
+const pageScope = scope({ id: prop<string>(), revision: prop<number>() })
+    .load({ name: async ({ id }) => `name:${id}` })
+    .load({ store: TitleStore });
 
 describe('scope type helpers', () => {
-    test('ScopeProps resolves the component props straight off the factory', () => {
+    test('ScopeProps resolves the component props off the scope', () => {
         expectTypeOf<ScopeProps<typeof pageScope>>().toEqualTypeOf<{
             id: string;
             revision: number;
@@ -27,23 +23,17 @@ describe('scope type helpers', () => {
         }>();
     });
 
-    test('ScopeParams collects only the props the island accepts as inputs', () => {
+    test('ScopeParams collects only the prop() inputs', () => {
         expectTypeOf<ScopeParams<typeof pageScope>>().toEqualTypeOf<{
             id: string;
             revision: number;
         }>();
     });
 
-    test('ScopeProps matches deriving from the scope by hand (factory unwrapped)', () => {
-        type ByHand = ScopeOf<typeof pageScope>;
-        expectTypeOf<ScopeProps<typeof pageScope>>().toEqualTypeOf<ScopeProps<ByHand>>();
-    });
-
     test('ScopeProps unwraps a Source<T> prop to its ready value T', () => {
-        const liveScope = (_env: Env) =>
-            scope({ id: prop<string>() }).load({
-                live: (): Source<number> => undefined as unknown as Source<number>,
-            });
+        const liveScope = scope({ id: prop<string>() }).load({
+            live: (): Source<number> => undefined as unknown as Source<number>,
+        });
 
         expectTypeOf<ScopeProps<typeof liveScope>>().toEqualTypeOf<{
             id: string;
@@ -51,32 +41,42 @@ describe('scope type helpers', () => {
         }>();
     });
 
+    test('a hook() load resolves to its return type (Source unwrapped); not an input', () => {
+        const hookScope = scope({ id: prop<string>() })
+            .load({ stores: hook(() => ({ prefix: 'p' })) })
+            .load({ live: hook((): Source<number> => undefined as unknown as Source<number>) })
+            .load({ greeting: ({ stores, id }) => `${stores.prefix}:${id}` });
+
+        expectTypeOf<ScopeProps<typeof hookScope>>().toEqualTypeOf<{
+            id: string;
+            stores: { prefix: string };
+            live: number;
+            greeting: string;
+        }>();
+
+        // hook loads aren't inputs.
+        expectTypeOf<ScopeParams<typeof hookScope>>().toEqualTypeOf<{ id: string }>();
+    });
+
     test('.provide() factory receives the fully resolved scope, typed', () => {
-        (_env: Env) =>
-            scope({ id: prop<string>(), revision: prop<number>() })
-                .load({ name: async ({ id }) => `${id}` })
-                .provide((resolved) => {
-                    expectTypeOf(resolved).toEqualTypeOf<{
-                        id: string;
-                        revision: number;
-                        name: string;
-                    }>();
-                    return { heading: resolved.name };
-                });
+        scope({ id: prop<string>(), revision: prop<number>() })
+            .load({ name: async ({ id }) => `${id}` })
+            .provide((resolved) => {
+                expectTypeOf(resolved).toEqualTypeOf<{
+                    id: string;
+                    revision: number;
+                    name: string;
+                }>();
+                return { heading: resolved.name };
+            });
     });
 
     test('useScope returns the .provide() value type; the value is not a prop', () => {
-        const ctxScope = (env: Env) =>
-            scope({ id: prop<string>() })
-                .load({ name: async ({ id }) => `${env.prefix}:${id}` })
-                .provide(({ name }) => ({ heading: name.toUpperCase() }));
+        const ctxScope = scope({ id: prop<string>() })
+            .load({ name: async ({ id }) => `name:${id}` })
+            .provide(({ name }) => ({ heading: name.toUpperCase() }));
 
-        const Island = island({
-            useEnv: () => ({ prefix: 'p' }) as Env,
-            scope: ctxScope,
-            component: () => null,
-            loading: () => null,
-        });
+        const Island = island({ scope: ctxScope, component: () => null, loading: () => null });
 
         expectTypeOf(useScope(Island)).toEqualTypeOf<{ heading: string }>();
 

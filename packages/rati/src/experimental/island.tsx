@@ -1,8 +1,8 @@
 import { observer } from 'mobx-react-lite';
-import { observable, runInAction } from 'mobx';
 import {
     Component,
     createContext,
+    Fragment,
     Suspense,
     use,
     useContext,
@@ -11,10 +11,13 @@ import {
     useLayoutEffect,
     useReducer,
     useRef,
+    useState,
 } from 'react';
 import type { ComponentType, Context, ErrorInfo, FC, ReactNode } from 'react';
 import {
+    isHookLoad,
     ParamSymbol,
+    type HookLoad,
     type Scope,
     type ScopeParams,
     type ScopeProps,
@@ -28,9 +31,12 @@ import { IslandHydrationContext } from './islandHydration';
     EXPERIMENTAL — the scope/island data-loading engine.
 
     An island is a self-contained unit of UI: a scope (declarative data definition)
-    bundled with a component and loading/error slots. It resolves the scope at render
-    time, level by level, and renders:
+    bundled with a component and loading/error slots. It compiles the scope's levels
+    into a nested tree of `Step` components — one per level — and lets React be the
+    resolver:
 
+      - Waterfall = nesting. Each `Step` resolves its level and renders the next once
+        ready; the leaf provides the value to the subtree and renders the component.
       - every entry ready  → the main component, fed each entry's value;
       - any entry errored  → the error slot (one slot: not-available / forbidden /
                              failed all arrive as a SourceError, switch on `code`);
@@ -46,33 +52,18 @@ import { IslandHydrationContext } from './islandHydration';
         observably; pending renders the loading slot (no server resolution — sources
         stay pending under SSR and resolve on the client), error throws to the slot.
         A ready source returning to pending drops back to loading, live.
+      - a *hook* load (`hook(fn)`) runs every render so `fn` may call any React hook;
+        it's the seam that lets a level read its own deps (`use(StoresContext)`) — the
+        reason `env` is gone. Its result is classified like a function load. rati never
+        attaches/detaches a hook source; the hook owns its own subscription.
 
-    Lifetime is explicit: each source attaches when its level builds and detaches on
-    teardown / param change. A `.provide()` value is built once the scope resolves and
-    disposed on teardown *before* the sources it was built over detach.
+    Lifetime is React's: each `Step` attaches its level's *data* sources in an effect
+    and detaches on unmount; a param change remounts the inner tree, so React tears the
+    old one down (children first → the leaf's `.provide()` value disposes before the
+    sources it was built over detach) and mounts a fresh one.
 */
 
 // ---------------------------------------------------------------------------------------
-
-/*
-    `useEnv` typically builds a fresh object from stable services on every render
-    (`() => ({ resourcesStore })`), so the environment is compared shallowly — a
-    changed service identity re-resolves, a fresh wrapper object does not.
-*/
-function shallowEqual(a: unknown, b: unknown): boolean {
-    if (Object.is(a, b)) return true;
-    if (!is.object(a) || !is.object(b)) return false;
-
-    const aKeys = Object.keys(a);
-    const bKeys = Object.keys(b);
-
-    return (
-        aKeys.length === bKeys.length &&
-        aKeys.every((key) =>
-            Object.is((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
-        )
-    );
-}
 
 // Flatten the scope's prevScope links into ordered levels (level 0 first).
 function flattenLevels(scope: Scope): Scope['definition'][] {
@@ -83,156 +74,48 @@ function flattenLevels(scope: Scope): Scope['definition'][] {
     return levels;
 }
 
-// One resolved scope cell. Props/classes/plain values resolve instantly; a function
-// is called with the prior levels' ready values and its result re-classified; a
-// promise is unwrapped with `use()`; a source is read observably.
+// hook keys vs data keys per level — static (a level is frozen at build time), so
+// memoized once per level object. `hook()` loads run every render; everything else
+// (props, functions, promises, sources, classes, values) is a cached data load.
+const partitionCache = new WeakMap<object, { hookKeys: string[]; dataKeys: string[] }>();
+function partition(level: Scope['definition']): { hookKeys: string[]; dataKeys: string[] } {
+    let parts = partitionCache.get(level);
+    if (!parts) {
+        const hookKeys: string[] = [];
+        const dataKeys: string[] = [];
+        for (const key of Object.keys(level)) {
+            if (isHookLoad(level[key])) hookKeys.push(key);
+            else dataKeys.push(key);
+        }
+        parts = { hookKeys, dataKeys };
+        partitionCache.set(level, parts);
+    }
+    return parts;
+}
+
+// One resolved cell. Props/classes/plain values resolve instantly; a function is
+// called with the prior levels' ready values and its result re-classified; a promise
+// is unwrapped with `use()`; a source is read observably.
 type Cell =
     | { kind: 'value'; value: unknown }
     | { kind: 'promise'; promise: Promise<unknown> }
     | { kind: 'source'; source: Source<unknown> };
 
-function classifyEntry(
-    entry: unknown,
-    prevValues: Record<string, unknown>,
-    params: Record<string, unknown>,
-    key: string
-): Cell {
-    if (is.object(entry) && ParamSymbol in entry) return { kind: 'value', value: params[key] };
+// Classify a *data entry* (the value written in the scope definition).
+function classifyEntry(entry: unknown, prev: Record<string, unknown>, key: string): Cell {
+    if (is.object(entry) && ParamSymbol in entry) return { kind: 'value', value: prev[key] };
     if (is.promise(entry)) return { kind: 'promise', promise: entry };
     if (isSource(entry)) return { kind: 'source', source: entry };
-    if (is.class(entry)) return { kind: 'value', value: new entry(prevValues) };
-    if (is.function(entry)) {
-        const result = entry(prevValues);
-        if (is.promise(result)) return { kind: 'promise', promise: result };
-        if (isSource(result)) return { kind: 'source', source: result };
-        return { kind: 'value', value: result };
-    }
+    if (is.class(entry)) return { kind: 'value', value: new entry(prev) };
+    if (is.function(entry)) return classifyResult((entry as (p: unknown) => unknown)(prev));
     return { kind: 'value', value: entry };
 }
 
-// A built `.provide()` value, wrapped so "not built yet" (undefined box) stays
-// distinct from a value that is itself undefined.
-type BuiltProvided = { value: unknown };
-
-/*
-    One resolution attempt for a given (params, env). Holds the scope's levels and a
-    lazily-built, render-stable cache of cells — so a promise handed to `use()` and a
-    source handed to the reactive read keep their identity across re-renders. Cells are
-    built in render as prior levels resolve (pure: no attach, no side effects beyond
-    constructing the source/promise); attach and the `.provide()` build/dispose run in
-    effects. Construction in render (not an effect) is what lets SSR resolve the
-    promises — effects don't run on the server.
-*/
-class IslandResolution {
-    readonly levels: Scope['definition'][];
-    readonly #params: Record<string, unknown>;
-    readonly #provideDef: ScopeProvideDef | undefined;
-    // Server-resolved promise values to rehydrate from (scope key -> value), or
-    // undefined off the hydration path. A key present here short-circuits its cell.
-    readonly #hydration: Record<string, unknown> | undefined;
-    // Cells cached per key (keys are unique across the whole scope).
-    readonly #cells = new Map<string, Cell>();
-    // Source cells in construction order, each with its detach once attached.
-    readonly #sources: { source: Source<unknown>; detach: (() => void) | null }[] = [];
-    // The value the island provides (`.provide()`): built once the scope resolves,
-    // disposed before the sources detach. `undefined` until built / when the scope
-    // declares no `.provide()`.
-    readonly provided = observable.box<BuiltProvided | undefined>(undefined, { deep: false });
-    #disposed = false;
-
-    constructor(
-        scope: Scope,
-        params: Record<string, unknown>,
-        hydration?: Record<string, unknown> | undefined
-    ) {
-        this.levels = flattenLevels(scope);
-        this.#params = params;
-        this.#provideDef = scope.provideDef;
-        this.#hydration = hydration;
-    }
-
-    get hasProvide(): boolean {
-        return this.#provideDef !== undefined;
-    }
-
-    // The app-owned React context (.provide({ provideTo })) to also publish into.
-    get appChannel(): Context<unknown> | undefined {
-        return this.#provideDef?.channel;
-    }
-
-    // Build-or-get the cell for `key`, classified from `entry` with the prior levels'
-    // resolved values. Cached, so the same promise/source identity is reused across
-    // renders. Reached only once every prior level is ready, so `prevValues` is stable.
-    cell(key: string, entry: unknown, prevValues: Record<string, unknown>): Cell {
-        let cell = this.#cells.get(key);
-        if (!cell) {
-            // A value dehydrated from the server short-circuits the entry: skip the
-            // load function (no re-fetch) and `use()` (no re-suspend), so the client's
-            // hydration render produces the server HTML synchronously. Only promise
-            // entries are ever dehydrated, so this only ever replaces a would-be
-            // `use()` — sources still go through classifyEntry and attach as usual.
-            if (this.#hydration && key in this.#hydration) {
-                cell = { kind: 'value', value: this.#hydration[key] };
-            } else {
-                cell = classifyEntry(entry, prevValues, this.#params, key);
-                if (cell.kind === 'source') {
-                    this.#sources.push({ source: cell.source, detach: null });
-                }
-            }
-            this.#cells.set(key, cell);
-        }
-        return cell;
-    }
-
-    // Attach any not-yet-attached sources. Runs from a layout effect after each commit,
-    // so a source built in render is attached as soon as its level renders.
-    attachPending() {
-        if (this.#disposed) return;
-        for (const entry of this.#sources) {
-            if (!entry.detach) entry.detach = entry.source.attach();
-        }
-    }
-
-    // Build the `.provide()` value from the fully resolved scope. Runs from an effect
-    // (not render) because the factory does set-up side effects that must run once and
-    // never during render / a discarded StrictMode pass.
-    buildProvided(resolved: Record<string, unknown>) {
-        if (!this.#provideDef || this.#disposed || this.provided.get()) return;
-        const provideDef = this.#provideDef;
-        runInAction(() => this.provided.set({ value: provideDef.factory(resolved) }));
-    }
-
-    teardown() {
-        if (this.#disposed) return;
-        this.#disposed = true;
-        runInAction(() => {
-            // Dispose the provided value first: its teardown (e.g. deactivate) still
-            // reads through the grabbed resource the scope resolved, which the source
-            // detach below then releases — so this order is load-bearing.
-            const provided = this.provided.get();
-            const dispose = (provided?.value as Partial<Disposable> | undefined)?.[Symbol.dispose];
-            if (typeof dispose === 'function') {
-                try {
-                    dispose.call(provided!.value);
-                } catch (error) {
-                    console.error('Island provided value dispose failed', error);
-                }
-            }
-            this.provided.set(undefined);
-            // Detach in reverse: a later level may depend on an earlier one.
-            for (let i = this.#sources.length - 1; i >= 0; i--) {
-                const entry = this.#sources[i]!;
-                if (entry.detach) {
-                    try {
-                        entry.detach();
-                    } catch (error) {
-                        console.error('Island source detach failed', error);
-                    }
-                    entry.detach = null;
-                }
-            }
-        });
-    }
+// Classify the *result* of a function/hook load (already called).
+function classifyResult(result: unknown): Cell {
+    if (is.promise(result)) return { kind: 'promise', promise: result };
+    if (isSource(result)) return { kind: 'source', source: result };
+    return { kind: 'value', value: result };
 }
 
 function asSourceError(thrown: unknown): SourceError {
@@ -250,21 +133,259 @@ function asSourceError(thrown: unknown): SourceError {
 
 // ---------------------------------------------------------------------------------------
 
+type SourceEntry = { source: Source<unknown>; detach: (() => void) | null };
+
+// One level's data cells, built once. Lives on the island's committed ref (not the
+// Step's fiber) so it survives a `use()` suspension: a suspended render is discarded,
+// which would otherwise re-build the cell — re-running its load and re-suspending on a
+// brand-new promise forever. Built per level here; the load side effect runs once.
+type Bucket = { cells: Map<string, Cell>; sources: SourceEntry[]; built: boolean };
+
+// Shared, render-stable inputs threaded down the Step tree.
+type Shared = {
+    scope: Scope;
+    component: ComponentType<any>;
+    channel: Context<unknown>;
+    loading: ComponentType<{ params: unknown }>;
+    params: unknown;
+    // Per-level data-cell caches, held on the island's committed ref (see Bucket).
+    buckets: Bucket[];
+    // Server only: record a resolved promise value for dehydration. Undefined on client.
+    collect: ((key: string, value: unknown) => void) | undefined;
+    // Client only: server-resolved promise values to rehydrate from (scope key -> value).
+    hydration: Record<string, unknown> | undefined;
+};
+
+type StepProps = {
+    level: Scope['definition'];
+    index: number;
+    hookKeys: string[];
+    dataKeys: string[];
+    prev: Record<string, unknown>;
+    shared: Shared;
+    children: (resolved: Record<string, unknown>) => ReactNode;
+};
+
+/*
+    One level of the waterfall. Hook loads run every render in stable order (never
+    cached); data loads are built once for this mount (cached identity, so a promise
+    handed to `use()` / a source handed to the reactive read stay stable across the
+    source-transition re-renders), and attached/detached in an effect. The hooks pass
+    runs before any `use()` so an early `<Loading/>` return is hook-order safe.
+*/
+const Step = observer(function Step({
+    level,
+    index,
+    hookKeys,
+    dataKeys,
+    prev,
+    shared,
+    children,
+}: StepProps) {
+    // Data cells for this level, built once into the island-held bucket (survives a
+    // `use()` suspension). The inner tree remounts on a param change, so `prev` is
+    // stable for a Step's lifetime and the bucket is fresh per mount.
+    const bucket = shared.buckets[index]!;
+    if (!bucket.built) {
+        for (const key of dataKeys) {
+            // A value dehydrated from the server short-circuits the entry: skip the
+            // load (no re-fetch) and `use()` (no re-suspend), so hydration renders the
+            // server HTML synchronously. Only promises are ever dehydrated.
+            const cell =
+                shared.hydration && key in shared.hydration
+                    ? ({ kind: 'value', value: shared.hydration[key] } as Cell)
+                    : classifyEntry(level[key], prev, key);
+            if (cell.kind === 'source') bucket.sources.push({ source: cell.source, detach: null });
+            bucket.cells.set(key, cell);
+        }
+        bucket.built = true;
+    }
+    const { cells: dataCells, sources } = bucket;
+
+    // Attach this level's data sources after mount; detach on unmount. Both this and
+    // the leaf's `.provide()` dispose are passive effects, so React's child-first
+    // unmount runs dispose (deeper) before detach (shallower) — the load-bearing
+    // dispose-before-detach order, structural now.
+    useEffect(() => {
+        for (const entry of sources) if (!entry.detach) entry.detach = entry.source.attach();
+        return () => {
+            for (let i = sources.length - 1; i >= 0; i--) {
+                const entry = sources[i]!;
+                if (entry.detach) {
+                    try {
+                        entry.detach();
+                    } catch (error) {
+                        console.error('Island source detach failed', error);
+                    }
+                    entry.detach = null;
+                }
+            }
+        };
+    }, [sources]);
+
+    // Hook loads first (every render, stable order — they may call React hooks), then
+    // the cached data cells. `use()` in the resolve pass below is loop/early-return
+    // safe, so the hook-call sequence is identical every render.
+    const cells: [string, Cell][] = [];
+    for (const key of hookKeys) {
+        cells.push([key, classifyResult((level[key] as HookLoad)(prev))]);
+    }
+    for (const key of dataKeys) cells.push([key, dataCells.get(key)!]);
+
+    const resolved: Record<string, unknown> = { ...prev };
+    let pending = false;
+    for (const [key, cell] of cells) {
+        if (cell.kind === 'value') {
+            resolved[key] = cell.value;
+        } else if (cell.kind === 'promise') {
+            const value = use(cell.promise);
+            // Render-time write, but only on the server (client has no `collect`) and
+            // idempotent per key — the established SSR data-collection pattern.
+            shared.collect?.(key, value);
+            resolved[key] = value;
+        } else {
+            const state = cell.source.state;
+            if (state.status === 'error') throw state.error;
+            if (state.status === 'pending') pending = true;
+            else resolved[key] = state.value;
+        }
+    }
+
+    if (pending) {
+        const Loading = shared.loading;
+        return <Loading params={shared.params} />;
+    }
+    return children(resolved);
+});
+
+// The waterfall's tail: provide the value to the subtree (the resolved props by
+// default, or the `.provide()` value) and render the component. A `.provide()` value
+// is built in an effect (its factory has side effects) and disposed on unmount —
+// before the sources it was built over detach (see Step's effect comment).
+type LeafProps = { resolved: Record<string, unknown>; shared: Shared };
+
+const Leaf = observer(function Leaf({ resolved, shared }: LeafProps) {
+    const provideDef = shared.scope.provideDef;
+    const Component = shared.component;
+    const channel = shared.channel;
+
+    if (!provideDef) {
+        // Provide-by-default: publish the resolved props to the subtree (useScope).
+        return (
+            <channel.Provider value={resolved}>
+                <Component {...resolved} />
+            </channel.Provider>
+        );
+    }
+    return (
+        <ProvideLeaf
+            provideDef={provideDef}
+            resolved={resolved}
+            component={Component}
+            channel={channel}
+            loading={shared.loading}
+            params={shared.params}
+            cacheToken={shared.buckets}
+        />
+    );
+});
+
+type ProvideLeafProps = {
+    provideDef: ScopeProvideDef;
+    resolved: Record<string, unknown>;
+    component: ComponentType<any>;
+    channel: Context<unknown>;
+    loading: ComponentType<{ params: unknown }>;
+    params: unknown;
+    // The island's bucket array — a new identity whenever the cache is rebuilt (param
+    // change / StrictMode remount), and stable across plain re-renders + live source
+    // updates. Used as the rebuild key so the provided value tracks the surviving run
+    // without deep-comparing `resolved` (which holds live store instances).
+    cacheToken: unknown;
+};
+
+function ProvideLeaf({
+    provideDef,
+    resolved,
+    component: Component,
+    channel,
+    loading: Loading,
+    params,
+    cacheToken,
+}: ProvideLeafProps) {
+    const [built, setBuilt] = useState<{ value: unknown } | null>(null);
+
+    // Build the value, dispose it on teardown / rebuild. A *layout* effect so that, on
+    // unmount, this dispose runs in the commit's layout phase — before the *passive*
+    // effect that detaches the sources it was built over (React flushes all layout
+    // cleanups before any passive cleanup). That's the load-bearing dispose-before-detach
+    // order. Keyed by `cacheToken`: rebuilds for a new run (param change / StrictMode
+    // remount), not on per-render churn. `resolved` is read from the rebuild render.
+    useLayoutEffect(() => {
+        const value = provideDef.factory(resolved);
+        setBuilt({ value });
+        return () => {
+            const dispose = (value as Partial<Disposable> | undefined)?.[Symbol.dispose];
+            if (typeof dispose === 'function') {
+                try {
+                    dispose.call(value);
+                } catch (error) {
+                    console.error('Island provided value dispose failed', error);
+                }
+            }
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by cacheToken
+    }, [cacheToken]);
+
+    if (!built) return <Loading params={params} />;
+
+    let content: ReactNode = (
+        <channel.Provider value={built.value}>
+            <Component {...resolved} />
+        </channel.Provider>
+    );
+    if (provideDef.channel) {
+        const AppProvider = provideDef.channel.Provider;
+        content = <AppProvider value={built.value}>{content}</AppProvider>;
+    }
+    return content;
+}
+
+// Build the nested Step tree from the scope's levels: each level is a Step that
+// renders the next once ready; the innermost renders the Leaf.
+function buildTree(
+    levels: Scope['definition'][],
+    index: number,
+    prev: Record<string, unknown>,
+    shared: Shared
+): ReactNode {
+    if (index >= levels.length) return <Leaf resolved={prev} shared={shared} />;
+    const level = levels[index]!;
+    const { hookKeys, dataKeys } = partition(level);
+    return (
+        <Step
+            level={level}
+            index={index}
+            hookKeys={hookKeys}
+            dataKeys={dataKeys}
+            prev={prev}
+            shared={shared}
+        >
+            {(resolved) => buildTree(levels, index + 1, resolved, shared)}
+        </Step>
+    );
+}
+
+// ---------------------------------------------------------------------------------------
+
 type IslandFallbackProps<S extends Scope<any>> = {
     params: ScopeParams<S>;
     retry: () => void;
 };
 
-export type IslandConfig<Env, S extends Scope<any>> = {
-    /**
-     * The declarative data definition, parameterized by the environment (stores,
-     * api clients — anything per-root loads need). Called on every (re)resolve;
-     * keep it a cheap pure function.
-     */
-    scope: (env: Env) => S;
-
-    /** Composes the environment from the host app's contexts. It's a hook. */
-    useEnv: () => Env;
+export type IslandConfig<S extends Scope<any>> = {
+    /** The declarative data definition (a scope value). */
+    scope: S;
 
     /** Gets clean, fully resolved props — no loading/error states inside. */
     component: ComponentType<ScopeProps<S>>;
@@ -339,9 +460,7 @@ function useRawScope(island: object, hookName: string): unknown {
  * Throws when no island is above — see {@link useOptionalScope} for the non-throwing
  * form.
  */
-export function useScope<S extends Scope<any>>(
-    island: IslandComponent<S>
-): ScopeProvidesOf<S> {
+export function useScope<S extends Scope<any>>(island: IslandComponent<S>): ScopeProvidesOf<S> {
     const value = useRawScope(island, 'useScope');
 
     if (value === ISLAND_SCOPE_MISSING) {
@@ -371,7 +490,7 @@ const DefaultLoading: FC<{ params: unknown }> = () => null;
 
 // Catches a rejected promise (`use()`) or a thrown source error and renders the
 // island's error slot — or rethrows to the nearest outer boundary when there's no
-// slot. `resetKey` (the live resolution) clears the error on retry / param change.
+// slot. `resetKey` (the live tree key) clears the error on retry / param change.
 type ErrorBoundaryProps = {
     errorSlot:
         | ComponentType<{ params: unknown; error: SourceError; retry: () => void }>
@@ -390,8 +509,8 @@ class IslandErrorBoundary extends Component<ErrorBoundaryProps, { error: unknown
     }
 
     override componentDidUpdate(prev: ErrorBoundaryProps) {
-        // A new resolution (retry or param change) clears the caught error so the
-        // fresh attempt renders.
+        // A new tree (retry or param change) clears the caught error so the fresh
+        // attempt renders.
         if (prev.resetKey !== this.props.resetKey && this.state.error !== null) {
             this.setState({ error: null });
         }
@@ -416,185 +535,76 @@ class IslandErrorBoundary extends Component<ErrorBoundaryProps, { error: unknown
     }
 }
 
-// Walks the resolution at render time: `use()` for promises (suspends → the Suspense
-// fallback), reactive read for sources (pending → the loading slot), values inline.
-// An observer so a source transition re-renders. Attaches sources from a layout
-// effect after each commit (a source built in render attaches as its level renders).
-type ResolvedScopeProps = {
-    resolution: IslandResolution;
-    component: ComponentType<any>;
-    loading: ComponentType<{ params: unknown }>;
-    params: unknown;
-    channel: Context<unknown>;
-    // Server only: record a resolved promise value for dehydration (bound to this
-    // island's id). Undefined off the SSR collection path.
-    collect: ((key: string, value: unknown) => void) | undefined;
-};
-
-const ResolvedScope = observer(function ResolvedScope({
-    resolution,
-    component: ResolvedComponent,
-    loading: Loading,
-    params,
-    channel,
-    collect,
-}: ResolvedScopeProps) {
-    useLayoutEffect(() => {
-        resolution.attachPending();
-    });
-
-    const resolved: Record<string, unknown> = {};
-    for (const level of resolution.levels) {
-        for (const key of Object.keys(level)) {
-            const cell = resolution.cell(key, level[key], resolved);
-            if (cell.kind === 'promise') {
-                // `use()` is the one hook allowed in a loop / after an early return,
-                // so the level walk can suspend per promise.
-                const value = use(cell.promise);
-                // Record for dehydration. A render-time write, but it only runs on the
-                // server (the client provides no `collect`) and is idempotent per
-                // key — the established SSR data-collection pattern.
-                collect?.(key, value);
-                resolved[key] = value;
-            } else if (cell.kind === 'source') {
-                const state = cell.source.state;
-                if (state.status === 'error') throw state.error;
-                if (state.status === 'pending') return <Loading params={params} />;
-                resolved[key] = state.value;
-            } else {
-                resolved[key] = cell.value;
-            }
-        }
-    }
-
-    if (resolution.hasProvide) {
-        return (
-            <ProvideGate
-                resolution={resolution}
-                resolved={resolved}
-                component={ResolvedComponent}
-                loading={Loading}
-                params={params}
-                channel={channel}
-            />
-        );
-    }
-
-    // Provide-by-default: publish the resolved props to the subtree (useScope).
-    return renderResolved(ResolvedComponent, resolved, resolved, channel);
-});
-
-function renderResolved(
-    ResolvedComponent: ComponentType<any>,
-    resolved: Record<string, unknown>,
-    channelValue: unknown,
-    channel: Context<unknown>
-): ReactNode {
-    return (
-        <channel.Provider value={channelValue}>
-            <ResolvedComponent {...resolved} />
-        </channel.Provider>
-    );
-}
-
-// The scope is fully resolved; build the `.provide()` value in an effect (its factory
-// has side effects), hold the loading slot until it's built, then provide it to the
-// subtree (the island channel for useScope, plus any app channel). Collection already
-// happened in ResolvedScope's level walk before it hands off to the gate, so the gate
-// doesn't carry `collect`.
-type ProvideGateProps = Omit<ResolvedScopeProps, 'collect'> & { resolved: Record<string, unknown> };
-
-const ProvideGate = observer(function ProvideGate({
-    resolution,
-    resolved,
-    component: ResolvedComponent,
-    loading: Loading,
-    params,
-    channel,
-}: ProvideGateProps) {
-    useEffect(() => {
-        resolution.buildProvided(resolved);
-        // Dispose is owned by the island's resolution teardown (dispose-before-detach).
-    }, [resolution]);
-
-    const built = resolution.provided.get();
-    if (!built) return <Loading params={params} />;
-
-    let content = renderResolved(ResolvedComponent, resolved, built.value, channel);
-    const appChannel = resolution.appChannel;
-    if (appChannel) {
-        const AppProvider = appChannel.Provider;
-        content = <AppProvider value={built.value}>{content}</AppProvider>;
-    }
-    return content;
-});
-
-export function island<Env, S extends Scope<any>>(
-    config: IslandConfig<Env, S>
-): IslandComponent<S> {
+export function island<S extends Scope<any>>(config: IslandConfig<S>): IslandComponent<S> {
     const Channel = createContext<unknown>(ISLAND_SCOPE_MISSING);
     const Loading = (config.loading ?? DefaultLoading) as ComponentType<{ params: unknown }>;
+    const levels = flattenLevels(config.scope as Scope);
 
     const Island = observer(function Island(params: ScopeParams<S>) {
-        const env = config.useEnv();
-
         // Stable across server render and client hydration by tree position, so it
         // keys this island's slice of the SSR dehydration registry (see islandHydration).
         const islandId = useId();
         const hydration = useContext(IslandHydrationContext);
 
-        // Retry rebuilds the resolution (fresh promises/sources) on error-slot retry.
+        // Retry re-mounts the inner tree (fresh promises/sources) on error-slot retry.
         const [retry, bumpRetry] = useReducer((count: number) => count + 1, 0);
 
-        // The resolution is built in render (pure — no attach, no side effects) so it
-        // exists on the server too; attach + teardown run in the effects below. A
-        // changed (env, params, retry) key rebuilds it.
-        const keyRef = useRef<{ env: Env; params: unknown; retry: number } | null>(null);
-        const ref = useRef<IslandResolution | null>(null);
+        // Bump a version when params change by value, so the inner tree remounts —
+        // React tears the old one down (children first: the `.provide()` value disposes
+        // before its sources detach) and resolves the new params from scratch. Source
+        // transitions (same params) re-render in place, keeping promise/source identity.
         const initialParamsRef = useRef(params);
-
-        const key = keyRef.current;
-        if (
-            !ref.current ||
-            !key ||
-            !shallowEqual(key.env, env) ||
-            !deepEqual(key.params, params) ||
-            key.retry !== retry
-        ) {
-            // Seed from server-resolved values only on this island's *first* resolution:
-            // a retry must re-fetch, and a params change wants the new params' data, not
-            // the replayed first-paint slice. StrictMode's double-invoke and the
-            // post-hydration source re-render both keep (retry 0, initial params), so
-            // they stay consistent with the server HTML.
-            const firstResolution = retry === 0 && deepEqual(params, initialParamsRef.current);
-            const hydrationSlice = firstResolution ? hydration.data?.[islandId] : undefined;
-            ref.current = new IslandResolution(
-                config.scope(env) as Scope,
-                params as Record<string, unknown>,
-                hydrationSlice
-            );
-            keyRef.current = { env, params, retry };
+        const paramsRef = useRef(params);
+        const versionRef = useRef(0);
+        if (!deepEqual(paramsRef.current, params)) {
+            paramsRef.current = params;
+            versionRef.current += 1;
         }
-        const resolution = ref.current;
+        const treeKey = `${versionRef.current}:${retry}`;
 
-        // Bound to this island's id; present only on the server (the client provides no
-        // `collect`), where the level walk records each resolved promise for the wire.
+        // Seed from server-resolved values only on this island's *first* resolution: a
+        // retry must re-fetch, and a params change wants the new params' data. The
+        // post-hydration source re-render keeps (retry 0, initial params), consistent
+        // with the server HTML.
+        const firstMount = retry === 0 && deepEqual(params, initialParamsRef.current);
+        const hydrationSlice = firstMount ? hydration.data?.[islandId] : undefined;
+
+        // Bound to this island's id; present only on the server (client has no
+        // `collect`), where each Step records its resolved promise for the wire.
         const collect = hydration.collect
-            ? (k: string, value: unknown) => hydration.collect!(islandId, k, value)
+            ? (key: string, value: unknown) => hydration.collect!(islandId, key, value)
             : undefined;
 
-        // Tear down (dispose provided value, then detach sources) when the resolution
-        // is replaced (param change / retry) or the island unmounts. Reset the ref on
-        // unmount so a StrictMode remount rebuilds a fresh resolution.
+        // Per-level data-cell caches, rebuilt when the inner tree remounts (treeKey
+        // change). Held on the island's committed ref so a Step's `use()` suspension
+        // can't discard a half-built cell (which would re-run its load forever).
+        const cacheRef = useRef<{ key: string; buckets: Bucket[] } | null>(null);
+        if (!cacheRef.current || cacheRef.current.key !== treeKey) {
+            cacheRef.current = {
+                key: treeKey,
+                buckets: levels.map(() => ({ cells: new Map(), sources: [], built: false })),
+            };
+        }
+
+        // Drop the cache on unmount so a StrictMode remount (mount → cleanup → mount)
+        // rebuilds a fresh run instead of reusing the torn-down one's cells/sources —
+        // the subtree then reads the surviving run's identities.
         useEffect(() => {
             return () => {
-                resolution.teardown();
-                if (ref.current === resolution) {
-                    ref.current = null;
-                    keyRef.current = null;
-                }
+                cacheRef.current = null;
             };
-        }, [resolution]);
+        }, []);
+
+        const shared: Shared = {
+            scope: config.scope as Scope,
+            component: config.component as ComponentType<any>,
+            channel: Channel,
+            loading: Loading,
+            params,
+            buckets: cacheRef.current.buckets,
+            collect,
+            hydration: hydrationSlice,
+        };
 
         return (
             <IslandErrorBoundary
@@ -605,17 +615,10 @@ export function island<Env, S extends Scope<any>>(
                 }
                 params={params}
                 retry={bumpRetry}
-                resetKey={resolution}
+                resetKey={treeKey}
             >
                 <Suspense fallback={<Loading params={params} />}>
-                    <ResolvedScope
-                        resolution={resolution}
-                        component={config.component}
-                        loading={Loading}
-                        params={params}
-                        channel={Channel}
-                        collect={collect}
-                    />
+                    <Fragment key={treeKey}>{buildTree(levels, 0, params, shared)}</Fragment>
                 </Suspense>
             </IslandErrorBoundary>
         );

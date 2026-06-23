@@ -14,10 +14,27 @@ export const ScopeDefinitionsSymbol = Symbol();
 // off the scope instead of re-deriving it.
 export const ScopeProvidesSymbol = Symbol();
 
-// One entry of a scope's merged definition: a `prop()` input (head only) or a data
-// load (function / promise / source / class / value). The two are kept apart at the
-// builder surface — `scope({…})` takes inputs, `.load({…})` takes data — but the
-// merged definition carries both, so the resolver and prop/param helpers see them.
+// Brands a load as a *hook load* (see `hook()`): the resolver runs it every render
+// in stable order and never caches it, so its function may call React hooks. A
+// symbol prop (not a name) so it survives minification, mirroring `ParamSymbol`.
+export const HookSymbol = Symbol();
+
+/**
+ * A hook load — a function the resolver calls every render (so it may call any React
+ * hook: `use(SomeContext)`, Apollo's `useQuery`, react-query, SWR…) and never caches.
+ * It's the adapter seam: shape the resolved-so-far into the hook's inputs and map its
+ * output back to a value or a `Source`. The hook owns its own subscription lifecycle;
+ * rati never attaches/detaches a hook source. Create one with {@link hook}.
+ */
+export type HookLoad<T = unknown> = ((resolved: any) => T) & { readonly [HookSymbol]: true };
+
+// One entry of a scope's merged definition: a `prop()` input (head only), a `hook()`
+// load, or a data load (function / promise / source / class / value). They're kept
+// apart at the builder surface — `scope({…})` takes inputs, `.load({…})` takes hooks
+// and data — but the merged definition carries all, so the resolver and prop/param
+// helpers see them. (A `HookLoad` is structurally a function, so the function member
+// covers it here; it's not listed separately to avoid polluting the contextual
+// `params` typing of plain function loads.)
 type ScopeEntry =
     | ((...args: any) => any | Promise<any>)
     | { new (...args: any): any }
@@ -60,34 +77,28 @@ export type Scope<VD extends GenericScopeDefinition = GenericScopeDefinition, Pr
 };
 
 type ResolveScopeDefinition<VD extends GenericScopeDefinition> = {
+    // HookLoad is also a function, so it must be matched before the function branch.
+    // A hook resolves like a function load: its Source<T> (or promise) unwraps to T.
     [K in keyof VD]: VD[K] extends Prop<any>
         ? VD[K]['value']
-        : VD[K] extends Promise<any>
-          ? UnwrapSource<Awaited<VD[K]>>
-          : VD[K] extends (...args: any) => any
-            ? UnwrapSource<Awaited<ReturnType<VD[K]>>>
-            : VD[K] extends { new (...args: any): any }
-              ? InstanceType<VD[K]>
-              : VD[K] extends Source<infer U>
-                ? U
-                : VD[K];
+        : VD[K] extends HookLoad<infer R>
+          ? UnwrapSource<Awaited<R>>
+          : VD[K] extends Promise<any>
+            ? UnwrapSource<Awaited<VD[K]>>
+            : VD[K] extends (...args: any) => any
+              ? UnwrapSource<Awaited<ReturnType<VD[K]>>>
+              : VD[K] extends { new (...args: any): any }
+                ? InstanceType<VD[K]>
+                : VD[K] extends Source<infer U>
+                  ? U
+                  : VD[K];
 };
-
-// A scope value, or the `(env) => scope(…)` factory still used in Step 1 to thread
-// per-root services. The prop/param helpers accept either and unwrap the factory,
-// so `ScopeProps<typeof pageScope>` works whether `pageScope` is a value or a
-// factory — and the call sites stay correct once Step 2 drops the factory.
-export type ScopeFactory<S extends Scope<any> = Scope<any>> = (env: any) => S;
-type ScopeOrFactory = Scope<any> | ScopeFactory;
-
-/** The scope a `ScopeFactory` produces, or the scope itself when given a value. */
-export type ScopeOf<S extends ScopeOrFactory> = S extends (...args: any[]) => infer V ? V : S;
 
 type ScopeDefinitions<S extends Scope<any>> = NonNullable<S[typeof ScopeDefinitionsSymbol]>;
 
 /** Clean, fully-resolved props the component receives — inputs plus loaded data. */
-export type ScopeProps<S extends ScopeOrFactory> = Simplify<
-    ResolveScopeDefinition<ScopeDefinitions<ScopeOf<S>>>
+export type ScopeProps<S extends Scope<any>> = Simplify<
+    ResolveScopeDefinition<ScopeDefinitions<S>>
 >;
 
 type ParamsOf<Defs extends GenericScopeDefinition> = ExcludeNever<{
@@ -95,9 +106,7 @@ type ParamsOf<Defs extends GenericScopeDefinition> = ExcludeNever<{
 }>;
 
 /** The inputs a scope accepts (island props / slot `params`) — its `prop()` head. */
-export type ScopeParams<S extends ScopeOrFactory> = Simplify<
-    ParamsOf<ScopeDefinitions<ScopeOf<S>>>
->;
+export type ScopeParams<S extends Scope<any>> = Simplify<ParamsOf<ScopeDefinitions<S>>>;
 
 // ---------------------------------------------------------------------------------------
 
@@ -108,8 +117,11 @@ type CreateScopeFunc = <P extends ParamsDefinition = {}>(params?: P) => Chainabl
 type ParamsDefinition = Record<string, Prop<any>>;
 
 // A dependent level: each entry receives the prior levels' resolved values and
-// yields data — a function/promise/source/class/value. Not `prop()`: inputs live
-// in the `scope({…})` head, so a `prop()` here is a (type) error.
+// yields data — a `hook()` load, function, promise, source, class, or value. Not
+// `prop()`: inputs live in the `scope({…})` head, so a `prop()` here is a (type) error.
+// A `hook()` load satisfies the function member (a `HookLoad` is a function), so it's
+// accepted without a dedicated union member — which would otherwise widen the
+// contextual `params` type of plain function loads to `any`.
 type LoadDefinition<PrevDefs extends GenericScopeDefinition> = {
     [key: string]:
         | ((params: Simplify<ResolveScopeDefinition<PrevDefs>>) => any | Promise<any>)
@@ -211,7 +223,25 @@ export function prop<T>(): Prop<T> {
 
 // ----------------------
 
+/**
+ * Mark a load as a *hook load*: `fn` runs every render (never cached), so it may
+ * call any React hook. Use it for dependency injection — `hook(() => use(StoresCtx))`
+ * — and to adapt external hook-based data libs to a `Source`. The resolver classifies
+ * `fn`'s return like a function load (a `Source<T>` unwraps to `T`); a bare function
+ * load that calls a hook (no `hook()`) is a bug — it would be cached and its hook run
+ * once.
+ */
+export function hook<T>(fn: (resolved: any) => T): HookLoad<T> {
+    (fn as { [HookSymbol]?: true })[HookSymbol] = true;
+    return fn as HookLoad<T>;
+}
+
+export const isHookLoad = (entry: unknown): entry is HookLoad =>
+    typeof entry === 'function' && (entry as { [HookSymbol]?: true })[HookSymbol] === true;
+
+// ----------------------
+
 export type ScopeComponent<
-    S extends ScopeOrFactory,
+    S extends Scope<any>,
     Props extends Record<string, unknown> = {},
 > = FC<ScopeProps<S> & Props>;

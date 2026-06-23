@@ -47,15 +47,11 @@ function deferred<T>() {
 const Home: FC = () => <div>home</div>;
 const IslandLoading: FC = () => <div>island loading…</div>;
 
-type TestEnv = { tag: string };
-
 describe('route + islands', () => {
     test('an island route resolves its waterfall from path params', async () => {
         const label = deferred<string>();
         const Product = island({
-            useEnv: () => ({ tag: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ productId: prop<string>() })
+            scope: scope({ productId: prop<string>() })
                     .load({ label: () => label.promise }),
             component: ({ label }) => <div>product {label}</div>,
             loading: IslandLoading,
@@ -82,9 +78,7 @@ describe('route + islands', () => {
         const log: string[] = [];
 
         const Product = island({
-            useEnv: () => ({ tag: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ productId: prop<string>() }).load({
+            scope: scope({ productId: prop<string>() }).load({
                     res: ({ productId }): Source<{ productId: string }> => ({
                         [SourceSymbol]: true,
                         state: { status: 'ready', value: { productId } },
@@ -211,9 +205,7 @@ describe('island auto-context', () => {
         };
 
         const Product = island({
-            useEnv: () => ({ tag: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ productId: prop<string>() })
+            scope: scope({ productId: prop<string>() })
                     .load({ label: async ({ productId }) => `#${productId}` }),
             component: () => (
                 <div>
@@ -234,8 +226,7 @@ describe('island auto-context', () => {
         // A valid island (so the channel exists), but the reader is rendered with no
         // <Product> ancestor — so there is no provided value above it.
         const Product = island({
-            useEnv: () => ({ tag: 'env' }) as TestEnv,
-            scope: () => scope({ productId: prop<string>() }),
+            scope: scope({ productId: prop<string>() }),
             component: () => null,
             loading: IslandLoading,
         });

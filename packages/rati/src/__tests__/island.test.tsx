@@ -2,11 +2,9 @@ import { describe, test, expect, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { observable, runInAction } from 'mobx';
 import { createContext, StrictMode, useContext, type FC } from 'react';
-import { scope, prop } from '../common/scope';
+import { scope, prop, hook } from '../common/scope';
 import { NotAvailableError, SourceSymbol, type Source, type SourceState } from '../common/source';
 import { island, useScope, useOptionalScope } from '../experimental/island';
-
-type TestEnv = { prefix: string };
 
 const Loading: FC = () => <div>loading...</div>;
 
@@ -55,9 +53,7 @@ describe('island', () => {
         // dependent level then resolves off the first level's value.
         const name = deferred<string>();
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() })
+            scope: scope({ id: prop<string>() })
                     .load({ name: () => name.promise })
                     .load({ label: async ({ name }) => `[${name}]` }),
             component: ({ label }) => <div>ready {label}</div>,
@@ -75,6 +71,39 @@ describe('island', () => {
         expect(await screen.findByText('ready [env:a1]')).toBeTruthy();
     });
 
+    test('a hook() load reads React context every render and feeds downstream loads', async () => {
+        // The reason `env` is gone: a load reads its own deps via a hook. Here the
+        // store comes from React context inside `hook(...)`, and a plain data load
+        // downstream consumes the resolved value.
+        const StoresContext = createContext('default');
+        let calls = 0;
+
+        const Island = island({
+            scope: scope({ id: prop<string>() })
+                .load({
+                    prefix: hook(() => {
+                        calls++;
+                        return useContext(StoresContext);
+                    }),
+                })
+                .load({ label: ({ prefix, id }) => `${prefix}:${id}` }),
+            component: ({ label }) => <div>hooked {label}</div>,
+            loading: Loading,
+        });
+
+        await act(async () => {
+            render(
+                <StoresContext.Provider value="ctx">
+                    <Island id="a1" />
+                </StoresContext.Provider>
+            );
+        });
+
+        expect(await screen.findByText('hooked ctx:a1')).toBeTruthy();
+        // The hook ran during render (not cached once like a data load).
+        expect(calls).toBeGreaterThan(0);
+    });
+
     test('forwards a wrapped lazy component preload so the island stays preloadable', () => {
         // A `lazy()` component hangs `.preload` on itself; the island must surface it
         // so the router can prefetch the chunk through the wrapper (route + lazy scope).
@@ -82,16 +111,14 @@ describe('island', () => {
         const Lazy = Object.assign(() => <div>x</div>, { preload });
 
         const Island = island({
-            useEnv: () => ({}),
-            scope: () => scope({ id: prop<string>() }),
+            scope: scope({ id: prop<string>() }),
             component: Lazy,
             loading: Loading,
         });
         expect((Island as { preload?: unknown }).preload).toBe(preload);
 
         const Plain = island({
-            useEnv: () => ({}),
-            scope: () => scope({ id: prop<string>() }),
+            scope: scope({ id: prop<string>() }),
             component: () => <div>x</div>,
             loading: Loading,
         });
@@ -100,9 +127,7 @@ describe('island', () => {
 
     test('routes a failed source to the error slot with the unified code', async () => {
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() }).load({
+            scope: scope({ id: prop<string>() }).load({
                     page: async (): Promise<string> => {
                         throw new NotAvailableError('no such page', { code: 'not-available' });
                     },
@@ -123,9 +148,7 @@ describe('island', () => {
         let failures = 1;
 
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() }).load({
+            scope: scope({ id: prop<string>() }).load({
                     data: async ({ id }) => {
                         if (failures > 0) {
                             failures--;
@@ -160,8 +183,7 @@ describe('island', () => {
         const res = testSource<{ id: string }>(log, 'res');
 
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () => scope({ id: prop<string>() }).load({ res: () => res }),
+            scope: scope({ id: prop<string>() }).load({ res: () => res }),
             component: ({ res: r }) => <div>ready {r.id}</div>,
             loading: Loading,
         });
@@ -182,9 +204,7 @@ describe('island', () => {
         const page = testSource<{ id: string }>(log, 'page');
 
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() })
+            scope: scope({ id: prop<string>() })
                     .load({ space: () => space })
                     .load({ page: () => page }),
             component: ({ page: p }) => <div>ready {p.id}</div>,
@@ -212,9 +232,7 @@ describe('island', () => {
         const tree = testSource<{ id: string }>(log, 'tree');
 
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() })
+            scope: scope({ id: prop<string>() })
                     .load({ spaceId: () => spaceId.promise })
                     .load({
                         tree: ({ spaceId }) => {
@@ -250,8 +268,7 @@ describe('island', () => {
         const res = testSource<{ id: string }>(log, 'res');
 
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () => scope({ id: prop<string>() }).load({ res: () => res }),
+            scope: scope({ id: prop<string>() }).load({ res: () => res }),
             component: ({ res: r }) => <div>ready {r.id}</div>,
             loading: Loading,
         });
@@ -277,9 +294,7 @@ describe('island', () => {
         };
 
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() })
+            scope: scope({ id: prop<string>() })
                     .load({ res: ({ id }) => sourceFor(id) }),
             component: ({ res }) => <div>ready {res.id}</div>,
             loading: Loading,
@@ -298,10 +313,8 @@ describe('island', () => {
 
     test('builds the .provide() value from the resolved chain and provides it to the subtree', async () => {
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: (env) =>
-                scope({ id: prop<string>() })
-                    .load({ name: async ({ id }) => `${env.prefix}:${id}` })
+            scope: scope({ id: prop<string>() })
+                    .load({ name: async ({ id }) => `env:${id}` })
                     .provide(({ name }) => ({ label: `<${name}>` })),
             component: () => <Consumer />,
             loading: Loading,
@@ -323,9 +336,7 @@ describe('island', () => {
         const res = testSource<{ id: string }>(log, 'res');
 
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() })
+            scope: scope({ id: prop<string>() })
                     .load({ res: () => res })
                     .provide(({ res: r }) => {
                         log.push('context-mount');
@@ -369,9 +380,7 @@ describe('island', () => {
         };
 
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() })
+            scope: scope({ id: prop<string>() })
                     .load({ res: ({ id }) => sourceFor(id) })
                     .provide(({ res }) => {
                         log.push(`context-mount:${res.id}`);
@@ -403,9 +412,7 @@ describe('island', () => {
         const AppContext = createContext<{ label: string } | null>(null);
 
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() })
+            scope: scope({ id: prop<string>() })
                     .provide(({ id }) => ({ label: `#${id}` }), { provideTo: AppContext }),
             component: () => <Consumer />,
             loading: Loading,
@@ -424,9 +431,7 @@ describe('island', () => {
 
     test('useOptionalScope returns the value when a context is provided above', async () => {
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() })
+            scope: scope({ id: prop<string>() })
                     .provide(({ id }) => ({ label: `#${id}` })),
             component: () => <Consumer />,
             loading: Loading,
@@ -443,9 +448,7 @@ describe('island', () => {
 
     test('useOptionalScope returns undefined when rendered outside the island', () => {
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() })
+            scope: scope({ id: prop<string>() })
                     .provide(({ id }) => ({ label: `#${id}` })),
             component: () => <div>page</div>,
             loading: Loading,
@@ -463,8 +466,7 @@ describe('island', () => {
 
     test('provide-by-default: useScope returns the resolved props when the scope declares no .provide()', async () => {
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () => scope({ id: prop<string>() }),
+            scope: scope({ id: prop<string>() }),
             component: () => <Consumer />,
             loading: Loading,
         });
@@ -510,9 +512,7 @@ describe('island', () => {
         const makeSource = readySourceFactory(log);
 
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() })
+            scope: scope({ id: prop<string>() })
                     .load({ res: () => makeSource() })
                     .provide(({ res }) => {
                         log.push(`build:${res.id}`);
@@ -552,9 +552,7 @@ describe('island', () => {
         const AppContext = createContext<{ id: string } | null>(null);
 
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() })
+            scope: scope({ id: prop<string>() })
                     .load({ res: () => makeSource() })
                     .provide(({ res }) => ({ id: res.id }), { provideTo: AppContext }),
             component: () => <Consumer />,
@@ -580,9 +578,7 @@ describe('island', () => {
         const makeSource = readySourceFactory(log);
 
         const Island = island({
-            useEnv: () => ({ prefix: 'env' }) as TestEnv,
-            scope: () =>
-                scope({ id: prop<string>() }).load({ res: () => makeSource() }),
+            scope: scope({ id: prop<string>() }).load({ res: () => makeSource() }),
             component: ({ res }) => <div>prop {res.id}</div>,
             loading: Loading,
         });

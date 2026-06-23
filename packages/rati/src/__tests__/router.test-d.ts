@@ -10,8 +10,7 @@ const EmptyScope = scope();
 
 describe('route()', () => {
     const ProductIsland = island({
-        useEnv: () => ({}),
-        scope: () => scope({ productId: prop<string>() }),
+        scope: scope({ productId: prop<string>() }),
         component: () => null,
         loading: () => null,
     });
@@ -45,8 +44,7 @@ describe('route()', () => {
     test('feeds an island whose params are branded (URL string refined by prop)', () => {
         type PageId = string & { readonly __brand: 'PageId' };
         const BrandedIsland = island({
-            useEnv: () => ({}),
-            scope: () => scope({ pageId: prop<PageId>() }),
+            scope: scope({ pageId: prop<PageId>() }),
             component: () => null,
             loading: () => null,
         });

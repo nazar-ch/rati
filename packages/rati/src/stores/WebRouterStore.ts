@@ -67,7 +67,7 @@ function buildPathRe(path: string): RegExp | null {
     return path === '*' ? null : new RegExp(pathReString);
 }
 
-export type RouteOptions<Env, TScope extends Scope<any> | undefined> = {
+export type RouteOptions<TScope extends Scope<any> | undefined> = {
     /**
      * Data the route resolves before the component renders. When present, `route`
      * folds it together with the component into an island (see below), so
@@ -75,29 +75,23 @@ export type RouteOptions<Env, TScope extends Scope<any> | undefined> = {
      * attach-on-build / detach-on-navigate, SSR via Suspense (and promise
      * dehydration). The component receives the resolved props.
      *
-     * Either a plain scope (env-less) or an env→scope factory, exactly like
-     * `island`'s `scope`. Pair a factory with `useEnv` to supply per-root
-     * services (stores, api clients) the scope's loads need.
+     * A scope value, exactly like `island`'s `scope` — a load reads its own deps
+     * via `hook(() => use(SomeContext))`, so there's no env to thread.
      */
-    scope?: TScope extends Scope<any> ? TScope | ((env: Env) => TScope) : undefined;
-    /**
-     * Builds the environment a factory `scope` receives — the island's `useEnv`
-     * hook. Defaults to an empty env; only needed when `scope` is a factory.
-     */
-    useEnv?: () => Env;
+    scope?: TScope extends Scope<any> ? TScope : undefined;
     /** Route-level wrapper rendered around the component. */
     wrapper?: ComponentType | undefined;
     /**
      * Slot shown while the scope resolves — the island's `loading`. Defaults to
      * rendering nothing. Only meaningful alongside `scope`.
      */
-    loading?: TScope extends Scope<any> ? IslandConfig<Env, TScope>['loading'] : undefined;
+    loading?: TScope extends Scope<any> ? IslandConfig<TScope>['loading'] : undefined;
     /**
      * Slot shown on resolution failure — the island's `error` (switch on
      * `error.code`). When omitted, the error throws to the nearest ErrorBoundary.
      * Only meaningful alongside `scope`.
      */
-    error?: TScope extends Scope<any> ? IslandConfig<Env, TScope>['error'] : undefined;
+    error?: TScope extends Scope<any> ? IslandConfig<TScope>['error'] : undefined;
 };
 
 // The required (non-optional) keys of an object type.
@@ -137,16 +131,14 @@ type RouteComponentGuard<
  * as `island`'s and behave identically; a route adds the route bits (path, name,
  * wrapper) and feeds the path-matched params in as the island's props.
  *
- * When `options.scope` is given, the component + scope (+ `useEnv`, `loading`,
- * `error` — the same inputs as `island`) are folded into an island and stored as
- * the route's component, so resolution goes through the source-based island
- * engine — the Router renders the (island) component directly, handing it the
- * route params. So a route declares its island inline, no separate `island`
- * module needed:
+ * When `options.scope` is given, the component + scope (+ `loading`, `error` —
+ * the same inputs as `island`) are folded into an island and stored as the
+ * route's component, so resolution goes through the source-based island engine —
+ * the Router renders the (island) component directly, handing it the route params.
+ * So a route declares its island inline, no separate `island` module needed:
  *
  *     route('/spaces/:spaceId/pages/:pageId', 'page', PageBody, {
  *         scope: pageScope,
- *         useEnv: usePageEnv,
  *         loading: PageLoading,
  *         error: PageError,
  *     })
@@ -160,13 +152,12 @@ export function route<
     Path extends string,
     Name extends string,
     Component extends ComponentType<any>,
-    Env = {},
     TScope extends Scope<any> | undefined = undefined,
 >(
     path: Path,
     name: Name,
     component: Component & RouteComponentGuard<Path, TScope, Component>,
-    options: RouteOptions<Env, TScope> = {}
+    options: RouteOptions<TScope> = {}
 ) {
     const scopeOption = options.scope;
 
@@ -177,13 +168,7 @@ export function route<
     const routeComponent =
         scopeOption !== undefined
             ? island({
-                  // `scope` is either a plain scope or an env→scope factory;
-                  // normalize to the factory shape `island` expects.
-                  scope:
-                      typeof scopeOption === 'function'
-                          ? (scopeOption as (env: Env) => Scope<any>)
-                          : () => scopeOption as Scope<any>,
-                  useEnv: options.useEnv ?? (() => ({}) as Env),
+                  scope: scopeOption as Scope<any>,
                   component: component as ComponentType<any>,
                   loading: options.loading ?? (() => null),
                   ...(options.error ? { error: options.error } : {}),
