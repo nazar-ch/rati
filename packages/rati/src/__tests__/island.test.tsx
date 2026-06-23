@@ -4,7 +4,8 @@ import { observable, runInAction } from 'mobx';
 import { createContext, StrictMode, useContext, type FC } from 'react';
 import { scope, prop, hook } from '../common/scope';
 import { NotAvailableError, SourceSymbol, type Source, type SourceState } from '../common/source';
-import { island, useScope, useOptionalScope } from '../experimental/island';
+import { island } from '../island/island';
+import { useScope, useOptionalScope } from '../mandala/channel';
 
 const Loading: FC = () => <div>loading...</div>;
 

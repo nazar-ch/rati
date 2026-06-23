@@ -6,7 +6,8 @@ import { Router } from '../common/Router';
 import { GenericStoresContext } from '../stores/RootStore';
 import { scope, prop, type ScopeComponent } from '../common/scope';
 import { SourceSymbol, type Source } from '../common/source';
-import { island, useScope } from '../experimental/island';
+import { island } from '../island/island';
+import { useScope } from '../mandala/channel';
 import { useRouteContext } from '../common/useRouteContext';
 
 // The 'product' route's context type is registered globally via the app-routes

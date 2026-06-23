@@ -1,4 +1,4 @@
-import { useScopeRead } from '../experimental/island';
+import { useScopeRead } from '../mandala/channel';
 import { useWebRouter } from '../stores/RootStore';
 import type {
     UserRoutes,

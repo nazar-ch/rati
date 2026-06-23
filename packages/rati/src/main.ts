@@ -85,21 +85,17 @@ export {
     type SourceError,
 } from './common/source';
 
-export {
-    island,
-    useScope,
-    useOptionalScope,
-    IslandSymbol,
-    type IslandComponent,
-    type IslandConfig,
-} from './experimental/island';
+export { useScope, useOptionalScope } from './mandala/channel';
 
 export {
+    island,
+    type IslandComponent,
+    type IslandConfig,
     IslandHydrationProvider,
     createIslandHydrationCollector,
     type IslandHydration,
     type IslandHydrationData,
-} from './experimental/islandHydration';
+} from './island/island';
 
 export { useRouteContext } from './common/useRouteContext';
 

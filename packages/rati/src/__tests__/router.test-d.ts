@@ -2,7 +2,7 @@ import { describe, test, expectTypeOf } from 'vitest';
 import { ComponentType, FC } from 'react';
 import { route } from '../stores/WebRouterStore';
 import { scope, prop, ScopeComponent } from '../common/scope';
-import { island } from '../experimental/island';
+import { island } from '../island/island';
 
 const TestFC: FC = () => null;
 

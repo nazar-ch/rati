@@ -8,10 +8,7 @@ import { Router } from '../common/Router';
 import { createBrowserHistory, createMemoryHistory } from '../common/history';
 import { prepareRoute } from '../common/prepareRoute';
 import { scope, type ScopeComponent } from '../common/scope';
-import {
-    createIslandHydrationCollector,
-    IslandHydrationProvider,
-} from '../experimental/islandHydration';
+import { createIslandHydrationCollector, IslandHydrationProvider } from '../island/island';
 import { act } from '@testing-library/react';
 
 async function prerenderToString(element: React.ReactElement): Promise<string> {

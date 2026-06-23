@@ -5,11 +5,11 @@ import { act, cleanup } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { scope, prop } from '../common/scope';
 import { SourceSymbol, type Source } from '../common/source';
-import { island } from '../experimental/island';
 import {
+    island,
     createIslandHydrationCollector,
     IslandHydrationProvider,
-} from '../experimental/islandHydration';
+} from '../island/island';
 
 afterEach(cleanup);
 

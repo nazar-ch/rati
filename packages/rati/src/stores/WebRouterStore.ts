@@ -7,7 +7,7 @@ import {
 } from '../common/scrollRestoration';
 import type { TupleToUnion } from '../types/generic';
 import type { Scope, ScopeComponent, ScopeProvidesOf } from '../common/scope';
-import { island, type IslandConfig } from '../experimental/island';
+import { createMandala, type MandalaConfig } from '../mandala/mandala';
 import { GlobalStore } from '../stores/GlobalStore';
 // import { TupleToUnion } from 'type-fest';
 
@@ -85,28 +85,28 @@ function buildPathRe(path: string): RegExp | null {
 export type RouteOptions<TScope extends Scope<any> | undefined> = {
     /**
      * Data the route resolves before the component renders. When present, `route`
-     * folds it together with the component into an island (see below), so
-     * resolution runs on the source-based island engine — loading/error slots,
-     * attach-on-build / detach-on-navigate, SSR via Suspense (and promise
-     * dehydration). The component receives the resolved props.
+     * folds it together with the component into a mandala (see below), so resolution
+     * runs on the source-based mandala engine — loading/error slots, attach-on-build /
+     * detach-on-navigate, SSR via Suspense (and promise dehydration). The component
+     * receives the resolved props.
      *
-     * A scope value, exactly like `island`'s `scope` — a load reads its own deps
-     * via `hook(() => use(SomeContext))`, so there's no env to thread.
+     * A scope value, exactly like `island`'s `scope` — a load reads its own deps via
+     * `hook(() => use(SomeContext))`, so there's no env to thread.
      */
     scope?: TScope extends Scope<any> ? TScope : undefined;
     /** Route-level wrapper rendered around the component. */
     wrapper?: ComponentType | undefined;
     /**
-     * Slot shown while the scope resolves — the island's `loading`. Defaults to
+     * Slot shown while the scope resolves — the mandala's `loading`. Defaults to
      * rendering nothing. Only meaningful alongside `scope`.
      */
-    loading?: TScope extends Scope<any> ? IslandConfig<TScope>['loading'] : undefined;
+    loading?: TScope extends Scope<any> ? MandalaConfig<TScope>['loading'] : undefined;
     /**
-     * Slot shown on resolution failure — the island's `error` (switch on
-     * `error.code`). When omitted, the error throws to the nearest ErrorBoundary.
-     * Only meaningful alongside `scope`.
+     * Slot shown on resolution failure — the mandala's `error` (switch on `error.code`).
+     * When omitted, the error throws to the nearest ErrorBoundary. Only meaningful
+     * alongside `scope`.
      */
-    error?: TScope extends Scope<any> ? IslandConfig<TScope>['error'] : undefined;
+    error?: TScope extends Scope<any> ? MandalaConfig<TScope>['error'] : undefined;
 };
 
 // The required (non-optional) keys of an object type.
@@ -141,16 +141,16 @@ type RouteComponentGuard<
       : unknown;
 
 /**
- * Location-coupled twin of `island`: a route *is* an island, specialized to a
- * URL. The non-route-specific inputs (`scope`, `loading`, `error`) are the same
- * as `island`'s and behave identically; a route adds the route bits (path, name,
- * wrapper) and feeds the path-matched params in as the island's props.
+ * The URL-bound sibling of `island`: both build a mandala (rati's core renderable unit
+ * — a scope bound to a component with loading/error), `route` specialized to a location.
+ * Its data inputs (`scope`, `loading`, `error`) are the mandala's and behave identically;
+ * a route adds the route bits (path, name, wrapper) and feeds the path-matched params in
+ * as the mandala's props.
  *
- * When `options.scope` is given, the component + scope (+ `loading`, `error` —
- * the same inputs as `island`) are folded into an island and stored as the
- * route's component, so resolution goes through the source-based island engine —
- * the Router renders the (island) component directly, handing it the route params.
- * So a route declares its island inline, no separate `island` module needed:
+ * When `options.scope` is given, the component + scope (+ `loading`, `error`) are folded
+ * into a mandala and stored as the route's component, so resolution goes through the
+ * source-based mandala engine — the Router renders that component directly, handing it the
+ * route params. So a route declares its data inline, no separate `island` module needed:
  *
  *     route('/spaces/:spaceId/pages/:pageId', 'page', PageBody, {
  *         scope: pageScope,
@@ -158,10 +158,10 @@ type RouteComponentGuard<
  *         error: PageError,
  *     })
  *
- * A component built with `island` up front also works as-is with no `scope` —
- * it's already an island whose props are its scope's params, so the path params
- * feed it directly: `route('/spaces/:spaceId/pages/:pageId', 'page', PageIsland)`.
- * A plain component with no `scope` is rendered directly with the route params.
+ * A component built with `island` up front also works as-is with no `scope` — it is
+ * already a mandala whose props are its scope's params, so the path params feed it
+ * directly: `route('/spaces/:spaceId/pages/:pageId', 'page', PageIsland)`. A plain
+ * component with no `scope` is rendered directly with the route params.
  */
 export function route<
     Path extends string,
@@ -176,18 +176,21 @@ export function route<
 ) {
     const scopeOption = options.scope;
 
-    // A route is `island` coupled to a location. A supplied scope is folded with
-    // the component into an island here; params arrive from the URL match (the
-    // Router renders the island with the route params), and the island owns
-    // loading/error and source attach/detach across navigation.
+    // A route is a mandala coupled to a location. A supplied scope is folded with the
+    // component into a mandala here (labelled `Route` for DevTools / read errors); params
+    // arrive from the URL match (the Router renders it with the route params), and the
+    // mandala owns loading/error and source attach/detach across navigation.
     const routeComponent =
         scopeOption !== undefined
-            ? island({
-                  scope: scopeOption as Scope<any>,
-                  component: component as ComponentType<any>,
-                  loading: options.loading ?? (() => null),
-                  ...(options.error ? { error: options.error } : {}),
-              })
+            ? createMandala(
+                  {
+                      scope: scopeOption as Scope<any>,
+                      component: component as ComponentType<any>,
+                      loading: options.loading ?? (() => null),
+                      ...(options.error ? { error: options.error } : {}),
+                  },
+                  'Route'
+              )
             : component;
 
     return {
@@ -196,7 +199,7 @@ export function route<
         name,
         component: routeComponent,
         wrapperComponent: options.wrapper,
-        // The scope the route's island was built from (undefined for a plain route).
+        // The scope the route's mandala was built from (undefined for a plain route).
         // useRouteContext(name) resolves the provided value through this scope, and the
         // route-context types are derived from this field's type — so the context type
         // comes straight from the route definition.
@@ -235,7 +238,7 @@ export type NameToRoute<T extends readonly GenericRouteType[]> = TupleToUnion<Ro
  * what the server entry serialized into the HTML response — the client passes it
  * back so the first paint reads the same active route as the server. This is the
  * *routing* snapshot only; a route's resolved scope data is dehydrated separately
- * by the island engine (see `IslandHydrationProvider`).
+ * by the mandala engine (see `IslandHydrationProvider`).
  */
 export interface WebRouterHydratedState {
     path: string;
