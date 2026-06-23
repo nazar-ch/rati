@@ -53,20 +53,22 @@ export { remoteData } from './common/remoteData';
 export { remoteDataKey, responseKey } from './common/apiUtils';
 
 export {
-    type ChainableView,
-    type CreateView,
-    createView,
-    type ResolveView,
-    type RequiredViewParams,
-    type ViewComponent,
-    type ViewParam,
-    viewParam,
-    type ViewContextDef,
+    type ChainableScope,
+    type Scope,
+    scope,
+    type ScopeProps,
+    type ScopeParams,
+    type ScopeComponent,
+    type ScopeFactory,
+    type ScopeOf,
+    type Prop,
+    prop,
+    type ScopeProvideDef,
     ParamSymbol,
-    ViewSymbol,
-    ViewDefinitionsSymbol,
-    ViewContextSymbol,
-} from './common/view';
+    ScopeSymbol,
+    ScopeDefinitionsSymbol,
+    ScopeProvidesSymbol,
+} from './common/scope';
 
 export {
     NotAvailableError,
@@ -82,17 +84,12 @@ export {
 } from './common/source';
 
 export {
-    createIsland,
-    useIslandProps,
-    useIslandContext,
-    useOptionalIslandContext,
+    island,
+    useScope,
+    useOptionalScope,
     IslandSymbol,
     type IslandComponent,
     type IslandConfig,
-    type IslandViewFactory,
-    type IslandViewOf,
-    type IslandProps,
-    type IslandParams,
 } from './experimental/island';
 
 export {

@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, act } from '@testing-library/react';
-import { createView, viewParam, type CreateView } from '../common/view';
-import { createIsland } from '../experimental/island';
+import { scope, prop, type Scope } from '../common/scope';
+import { island } from '../experimental/island';
 
 afterEach(cleanup);
 
@@ -12,19 +12,18 @@ class TestStore {
     }
 }
 
-// The standalone `resolveView` is gone — a view now resolves at render time inside
-// the island engine. Render a throwaway island over `view` and capture the resolved
-// props its component receives, so these exercise the same resolution matrix
-// (params, raw promises, functions, classes, plain values, chained levels) through
-// the engine that replaced it.
+// A scope resolves at render time inside the island engine. Render a throwaway island
+// over `scopeDef` and capture the resolved props its component receives, so these
+// exercise the resolution matrix (params, raw promises, functions, classes, plain
+// values, dependent levels) through the engine.
 async function resolveThroughIsland(
-    view: CreateView<any>,
+    scopeDef: Scope<any>,
     params: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
     let received: Record<string, unknown> | undefined;
-    const Island = createIsland({
+    const Island = island({
         useEnv: () => ({}),
-        view: () => view,
+        scope: () => scopeDef,
         component: (props: Record<string, unknown>) => {
             received = props;
             return <div>ready</div>;
@@ -39,16 +38,15 @@ async function resolveThroughIsland(
     return received!;
 }
 
-describe('view resolution through the island engine', () => {
+describe('scope resolution through the island engine', () => {
     test('resolves params, raw promises, functions and plain values', async () => {
-        const view = createView({
-            productName: viewParam<string>(),
+        const scopeDef = scope({ productName: prop<string>() }).load({
             count: Promise.resolve(1),
             load: async () => 'loaded',
             plain: 'plain',
         });
 
-        const resolved = await resolveThroughIsland(view, { productName: 'book' });
+        const resolved = await resolveThroughIsland(scopeDef, { productName: 'book' });
 
         expect(resolved).toMatchObject({
             productName: 'book',
@@ -58,42 +56,38 @@ describe('view resolution through the island engine', () => {
         });
     });
 
-    test('resolves views created with createView(prevView, definition), instantiating classes from prior levels', async () => {
-        const base = createView({
-            productName: viewParam<string>(),
-            id: async () => 7,
-        });
+    test('resolves dependent levels, instantiating classes from prior levels', async () => {
+        const scopeDef = scope({ productName: prop<string>() })
+            .load({ id: async () => 7 })
+            .load({
+                label: async (params) => `${params.productName}#${params.id}`,
+                store: TestStore,
+            });
 
-        const view = createView(base, {
-            label: async (params) => `${params.productName}#${params.id}`,
-            store: TestStore,
-        });
-
-        const resolved = await resolveThroughIsland(view, { productName: 'book' });
+        const resolved = await resolveThroughIsland(scopeDef, { productName: 'book' });
 
         expect(resolved['label']).toBe('book#7');
         expect((resolved['store'] as TestStore).text).toBe('store:book');
     });
 
-    test('resolves chained views level by level (waterfall order)', async () => {
+    test('resolves dependent levels in waterfall order', async () => {
         const order: string[] = [];
 
-        const view = createView
-            .chain({ productName: viewParam<string>() })
-            .chain({
+        const scopeDef = scope({ productName: prop<string>() })
+            .load({
                 name: async (params) => {
                     order.push('name');
                     return `name:${params.productName}`;
                 },
             })
-            .chain({
+            .load({
                 label: async (params) => {
                     order.push('label');
                     return `label:${params.name}`;
                 },
             });
 
-        const resolved = await resolveThroughIsland(view, { productName: 'book' });
+        const resolved = await resolveThroughIsland(scopeDef, { productName: 'book' });
 
         expect(resolved).toMatchObject({
             productName: 'book',

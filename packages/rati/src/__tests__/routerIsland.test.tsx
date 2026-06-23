@@ -4,9 +4,9 @@ import { act, render, screen, cleanup } from '@testing-library/react';
 import { WebRouterStore, route, type GenericRouteType } from '../stores/WebRouterStore';
 import { Router } from '../common/Router';
 import { GenericStoresContext } from '../stores/RootStore';
-import { createView, viewParam, type ViewComponent } from '../common/view';
+import { scope, prop, type ScopeComponent } from '../common/scope';
 import { SourceSymbol, type Source } from '../common/source';
-import { createIsland, useIslandProps } from '../experimental/island';
+import { island, useScope } from '../experimental/island';
 import { useRouteContext } from '../common/useRouteContext';
 
 // Register the 'product' route's context type so `useRouteContext('product')` is
@@ -52,12 +52,11 @@ type TestEnv = { tag: string };
 describe('route + islands', () => {
     test('an island route resolves its waterfall from path params', async () => {
         const label = deferred<string>();
-        const Product = createIsland({
+        const Product = island({
             useEnv: () => ({ tag: 'env' }) as TestEnv,
-            view: () =>
-                createView
-                    .chain({ productId: viewParam<string>() })
-                    .chain({ label: () => label.promise }),
+            scope: () =>
+                scope({ productId: prop<string>() })
+                    .load({ label: () => label.promise }),
             component: ({ label }) => <div>product {label}</div>,
             loading: IslandLoading,
         });
@@ -82,10 +81,10 @@ describe('route + islands', () => {
     test('navigating away from an island route detaches its sources', async () => {
         const log: string[] = [];
 
-        const Product = createIsland({
+        const Product = island({
             useEnv: () => ({ tag: 'env' }) as TestEnv,
-            view: () =>
-                createView.chain({ productId: viewParam<string>() }).chain({
+            scope: () =>
+                scope({ productId: prop<string>() }).load({
                     res: ({ productId }): Source<{ productId: string }> => ({
                         [SourceSymbol]: true,
                         state: { status: 'ready', value: { productId } },
@@ -119,8 +118,8 @@ describe('route + islands', () => {
 
     test('options.view resolves through the island engine (loading slot, then content)', async () => {
         const greeting = deferred<string>();
-        const homeView = createView({ greeting: () => greeting.promise });
-        const HomeWithView: ViewComponent<typeof homeView> = ({ greeting }) => (
+        const homeView = scope().load({ greeting: () => greeting.promise });
+        const HomeWithView: ScopeComponent<typeof homeView> = ({ greeting }) => (
             <div>view says {greeting}</div>
         );
 
@@ -128,7 +127,7 @@ describe('route + islands', () => {
         await act(async () => {
             ({ router } = renderWithRouter([
                 route('/', 'home', HomeWithView, {
-                    view: homeView,
+                    scope: homeView,
                     loading: () => <div>resolving…</div>,
                 }),
             ]));
@@ -146,18 +145,18 @@ describe('route + islands', () => {
     });
 
     test('options.error renders the island error slot on failure', async () => {
-        const failView = createView({
+        const failView = scope().load({
             data: async (): Promise<string> => {
                 throw new Error('boom');
             },
         });
-        const FailComponent: ViewComponent<typeof failView> = ({ data }) => <div>{data}</div>;
+        const FailComponent: ScopeComponent<typeof failView> = ({ data }) => <div>{data}</div>;
 
         let router!: WebRouterStore<readonly GenericRouteType[]>;
         await act(async () => {
             ({ router } = renderWithRouter([
                 route('/', 'home', FailComponent, {
-                    view: failView,
+                    scope: failView,
                     error: ({ error }) => <div>error: {error.code}</div>,
                 }),
             ]));
@@ -182,21 +181,20 @@ describe('route + islands', () => {
     });
 
     test('useRouteContext reads a route island context by route name', async () => {
-        // The view ends in `.context()`; route builds the island, so there is no
+        // The view ends in `.provide()`; route builds the island, so there is no
         // island component to import — the subtree reads the context by route name.
-        const productView = createView
-            .chain({ productId: viewParam<string>() })
-            .context(({ productId }) => ({ label: `#${productId}` }));
+        const productView = scope({ productId: prop<string>() })
+            .provide(({ productId }) => ({ label: `#${productId}` }));
 
         const Deep: FC = () => {
             const { label } = useRouteContext('product');
             return <div>ctx {label}</div>;
         };
-        const ProductBody: ViewComponent<typeof productView> = () => <Deep />;
+        const ProductBody: ScopeComponent<typeof productView> = () => <Deep />;
 
         window.history.replaceState(null, '', '/products/7');
         const { router } = renderWithRouter([
-            route('/products/:productId', 'product', ProductBody, { view: productView }),
+            route('/products/:productId', 'product', ProductBody, { scope: productView }),
             route('*', 'home', Home),
         ]);
 
@@ -206,25 +204,23 @@ describe('route + islands', () => {
 });
 
 describe('island auto-context', () => {
-    test('useIslandProps reads resolved props anywhere under the island', async () => {
+    test('useScope reads resolved props anywhere under the island', async () => {
         const DeepChild: FC = () => {
-            const { label } = useIslandProps(Product);
+            const { label } = useScope(Product);
             return <div>from context: {label}</div>;
         };
 
-        const Product = createIsland({
+        const Product = island({
             useEnv: () => ({ tag: 'env' }) as TestEnv,
-            view: () =>
-                createView
-                    .chain({ productId: viewParam<string>() })
-                    .chain({ label: async ({ productId }) => `#${productId}` }),
+            scope: () =>
+                scope({ productId: prop<string>() })
+                    .load({ label: async ({ productId }) => `#${productId}` }),
             component: () => (
                 <div>
                     <DeepChild />
                 </div>
             ),
             loading: IslandLoading,
-            provideContext: true,
         });
 
         await act(async () => {
@@ -234,19 +230,20 @@ describe('island auto-context', () => {
         expect(await screen.findByText('from context: #42')).toBeTruthy();
     });
 
-    test('useIslandProps throws a helpful error when context is not provided', async () => {
-        const Child: FC = () => {
-            const props = useIslandProps(Product);
-            return <div>{String(props)}</div>;
-        };
-
-        // No provideContext here
-        const Product = createIsland({
+    test('useScope throws a helpful error when rendered outside the island', async () => {
+        // A valid island (so the channel exists), but the reader is rendered with no
+        // <Product> ancestor — so there is no provided value above it.
+        const Product = island({
             useEnv: () => ({ tag: 'env' }) as TestEnv,
-            view: () => createView.chain({ productId: viewParam<string>() }),
-            component: () => <Child />,
+            scope: () => scope({ productId: prop<string>() }),
+            component: () => null,
             loading: IslandLoading,
         });
+
+        const Child: FC = () => {
+            const props = useScope(Product);
+            return <div>{String(props)}</div>;
+        };
 
         class Boundary extends Component<{ children: ReactNode }, { message: string | null }> {
             override state = { message: null };
@@ -267,10 +264,10 @@ describe('island auto-context', () => {
         try {
             render(
                 <Boundary>
-                    <Product productId="42" />
+                    <Child />
                 </Boundary>
             );
-            expect(await screen.findByText(/caught: No island props found/)).toBeTruthy();
+            expect(await screen.findByText(/caught: No scope value found/)).toBeTruthy();
         } finally {
             consoleError.mockRestore();
         }

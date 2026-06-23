@@ -1,14 +1,7 @@
 import { describe, test, expectTypeOf } from 'vitest';
-import { createView, viewParam, type ResolveView } from '../common/view';
+import { scope, prop, type ScopeOf, type ScopeParams, type ScopeProps } from '../common/scope';
 import { type Source } from '../common/source';
-import {
-    createIsland,
-    useIslandContext,
-    useOptionalIslandContext,
-    type IslandParams,
-    type IslandProps,
-    type IslandViewOf,
-} from '../experimental/island';
+import { island, useOptionalScope, useScope } from '../experimental/island';
 
 type Env = { prefix: string };
 
@@ -17,17 +10,16 @@ class TitleStore {
     title = 'store';
 }
 
-// A representative env→view factory: two params, a function level that reads the
-// env, and a class level — i.e. the shape passed to `createIsland({ view })`.
-const pageView = (env: Env) =>
-    createView
-        .chain({ id: viewParam<string>(), revision: viewParam<number>() })
-        .chain({ name: async ({ id }) => `${env.prefix}:${id}` })
-        .chain({ store: TitleStore });
+// A representative env→scope factory: two params, a load level that reads the env,
+// and a class level — i.e. the shape passed to `island({ scope })`.
+const pageScope = (env: Env) =>
+    scope({ id: prop<string>(), revision: prop<number>() })
+        .load({ name: async ({ id }) => `${env.prefix}:${id}` })
+        .load({ store: TitleStore });
 
-describe('island type helpers', () => {
-    test('IslandProps resolves the component props straight off the factory', () => {
-        expectTypeOf<IslandProps<typeof pageView>>().toEqualTypeOf<{
+describe('scope type helpers', () => {
+    test('ScopeProps resolves the component props straight off the factory', () => {
+        expectTypeOf<ScopeProps<typeof pageScope>>().toEqualTypeOf<{
             id: string;
             revision: number;
             name: string;
@@ -35,36 +27,35 @@ describe('island type helpers', () => {
         }>();
     });
 
-    test('IslandParams collects only the viewParams the island accepts as props', () => {
-        expectTypeOf<IslandParams<typeof pageView>>().toEqualTypeOf<{
+    test('ScopeParams collects only the props the island accepts as inputs', () => {
+        expectTypeOf<ScopeParams<typeof pageScope>>().toEqualTypeOf<{
             id: string;
             revision: number;
         }>();
     });
 
-    test('IslandProps matches deriving from the view by hand (no ReturnType step)', () => {
-        type ByHand = IslandViewOf<typeof pageView>;
-        expectTypeOf<IslandProps<typeof pageView>>().toEqualTypeOf<ResolveView<ByHand>>();
+    test('ScopeProps matches deriving from the scope by hand (factory unwrapped)', () => {
+        type ByHand = ScopeOf<typeof pageScope>;
+        expectTypeOf<ScopeProps<typeof pageScope>>().toEqualTypeOf<ScopeProps<ByHand>>();
     });
 
-    test('IslandProps unwraps a Source<T> prop to its ready value T', () => {
-        const liveView = (_env: Env) =>
-            createView
-                .chain({ id: viewParam<string>() })
-                .chain({ live: (): Source<number> => undefined as unknown as Source<number> });
+    test('ScopeProps unwraps a Source<T> prop to its ready value T', () => {
+        const liveScope = (_env: Env) =>
+            scope({ id: prop<string>() }).load({
+                live: (): Source<number> => undefined as unknown as Source<number>,
+            });
 
-        expectTypeOf<IslandProps<typeof liveView>>().toEqualTypeOf<{
+        expectTypeOf<ScopeProps<typeof liveScope>>().toEqualTypeOf<{
             id: string;
             live: number;
         }>();
     });
 
-    test('.context() factory receives the fully resolved chain, typed', () => {
+    test('.provide() factory receives the fully resolved scope, typed', () => {
         (_env: Env) =>
-            createView
-                .chain({ id: viewParam<string>(), revision: viewParam<number>() })
-                .chain({ name: async ({ id }) => `${id}` })
-                .context((resolved) => {
+            scope({ id: prop<string>(), revision: prop<number>() })
+                .load({ name: async ({ id }) => `${id}` })
+                .provide((resolved) => {
                     expectTypeOf(resolved).toEqualTypeOf<{
                         id: string;
                         revision: number;
@@ -74,28 +65,25 @@ describe('island type helpers', () => {
                 });
     });
 
-    test('useIslandContext returns the .context() value type; .context() is not a prop', () => {
-        const ctxView = (env: Env) =>
-            createView
-                .chain({ id: viewParam<string>() })
-                .chain({ name: async ({ id }) => `${env.prefix}:${id}` })
-                .context(({ name }) => ({ heading: name.toUpperCase() }));
+    test('useScope returns the .provide() value type; the value is not a prop', () => {
+        const ctxScope = (env: Env) =>
+            scope({ id: prop<string>() })
+                .load({ name: async ({ id }) => `${env.prefix}:${id}` })
+                .provide(({ name }) => ({ heading: name.toUpperCase() }));
 
-        const Island = createIsland({
+        const Island = island({
             useEnv: () => ({ prefix: 'p' }) as Env,
-            view: ctxView,
+            scope: ctxScope,
             component: () => null,
             loading: () => null,
         });
 
-        expectTypeOf(useIslandContext(Island)).toEqualTypeOf<{ heading: string }>();
+        expectTypeOf(useScope(Island)).toEqualTypeOf<{ heading: string }>();
 
         // The optional form widens the same value type with `undefined`.
-        expectTypeOf(useOptionalIslandContext(Island)).toEqualTypeOf<
-            { heading: string } | undefined
-        >();
+        expectTypeOf(useOptionalScope(Island)).toEqualTypeOf<{ heading: string } | undefined>();
 
-        // The context value stays out of the component's resolved props.
-        expectTypeOf<IslandProps<typeof ctxView>>().toEqualTypeOf<{ id: string; name: string }>();
+        // The provided value stays out of the component's resolved props.
+        expectTypeOf<ScopeProps<typeof ctxScope>>().toEqualTypeOf<{ id: string; name: string }>();
     });
 });

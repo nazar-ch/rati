@@ -7,7 +7,7 @@ import { RootStore, RootStoreProvider } from '../stores/RootStore';
 import { Router } from '../common/Router';
 import { createMemoryHistory } from '../common/history';
 import { prepareRoute } from '../common/prepareRoute';
-import { createView, type ViewComponent } from '../common/view';
+import { scope, type ScopeComponent } from '../common/scope';
 
 // react-dom/static `prerender` awaits Suspense before producing HTML, so an island
 // route's promise-backed view resolves server-side (renderToString does not).
@@ -90,15 +90,15 @@ describe('renderToString with WebRouterStore + memory history', () => {
     });
 
     test('renders a route whose view resolves through the island engine (SSR via prerender)', async () => {
-        const view = createView({
+        const view = scope().load({
             greeting: async () => 'hello from server',
         });
-        const Greeting: ViewComponent<typeof view> = ({ greeting }) => (
+        const Greeting: ScopeComponent<typeof view> = ({ greeting }) => (
             <div data-testid="greeting">{greeting}</div>
         );
 
         const { router, App } = buildAppFor('/', [
-            route('/', 'greet', Greeting, { view }),
+            route('/', 'greet', Greeting, { scope: view }),
         ] as const);
 
         await prepareRoute(router);

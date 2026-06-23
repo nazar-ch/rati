@@ -3,9 +3,9 @@ import { prerender } from 'react-dom/static';
 import { hydrateRoot } from 'react-dom/client';
 import { act, cleanup } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { createView, viewParam } from '../common/view';
+import { scope, prop } from '../common/scope';
 import { SourceSymbol, type Source } from '../common/source';
-import { createIsland } from '../experimental/island';
+import { island } from '../experimental/island';
 import {
     createIslandHydrationCollector,
     IslandHydrationProvider,
@@ -30,12 +30,11 @@ async function prerenderToString(element: ReactElement): Promise<string> {
 
 describe('island SSR (prerender)', () => {
     test('resolves a promise-backed view server-side', async () => {
-        const Island = createIsland({
+        const Island = island({
             useEnv: () => ({}),
-            view: () =>
-                createView
-                    .chain({ id: viewParam<string>() })
-                    .chain({ greeting: async ({ id }) => `hello ${id}` }),
+            scope: () =>
+                scope({ id: prop<string>() })
+                    .load({ greeting: async ({ id }) => `hello ${id}` }),
             component: ({ greeting }) => <div>{greeting}</div>,
             loading: () => <div>loading</div>,
         });
@@ -54,10 +53,10 @@ describe('island SSR (prerender)', () => {
             state: { status: 'pending' },
             attach: () => () => {},
         };
-        const Island = createIsland({
+        const Island = island({
             useEnv: () => ({}),
-            view: () =>
-                createView.chain({ id: viewParam<string>() }).chain({ data: () => pending }),
+            scope: () =>
+                scope({ id: prop<string>() }).load({ data: () => pending }),
             component: () => <div>ready</div>,
             loading: () => <div>loading slot</div>,
         });
@@ -73,12 +72,11 @@ describe('island SSR (prerender)', () => {
 
 describe('island SSR dehydration', () => {
     test('collects each resolved promise value, keyed by island id then chain key', async () => {
-        const Island = createIsland({
+        const Island = island({
             useEnv: () => ({}),
-            view: () =>
-                createView
-                    .chain({ id: viewParam<string>() })
-                    .chain({ greeting: async ({ id }) => `hello ${id}` }),
+            scope: () =>
+                scope({ id: prop<string>() })
+                    .load({ greeting: async ({ id }) => `hello ${id}` }),
             component: ({ greeting }) => <div>{greeting}</div>,
             loading: () => <div>loading</div>,
         });
@@ -99,10 +97,10 @@ describe('island SSR dehydration', () => {
 
     test('rehydrates from the server data without re-running the promise', async () => {
         let calls = 0;
-        const Island = createIsland({
+        const Island = island({
             useEnv: () => ({}),
-            view: () =>
-                createView.chain({ id: viewParam<string>() }).chain({
+            scope: () =>
+                scope({ id: prop<string>() }).load({
                     greeting: async ({ id }: { id: string }) => {
                         calls++;
                         return `hello ${id}`;
@@ -142,15 +140,15 @@ describe('island SSR dehydration', () => {
     });
 
     test('nested islands each collect their own slice (composition, no key collision)', async () => {
-        const Child = createIsland({
+        const Child = island({
             useEnv: () => ({}),
-            view: () => createView.chain({ value: async () => 'child-data' }),
+            scope: () => scope().load({ value: async () => 'child-data' }),
             component: ({ value }) => <span>{value}</span>,
             loading: () => <span>l</span>,
         });
-        const Parent = createIsland({
+        const Parent = island({
             useEnv: () => ({}),
-            view: () => createView.chain({ value: async () => 'parent-data' }),
+            scope: () => scope().load({ value: async () => 'parent-data' }),
             component: ({ value }) => (
                 <div>
                     {value}

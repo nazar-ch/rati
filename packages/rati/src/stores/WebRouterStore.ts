@@ -6,8 +6,8 @@ import {
     type ScrollRestorationOptions,
 } from '../common/scrollRestoration';
 import type { TupleToUnion } from '../types/generic';
-import type { CreateView, ViewComponent } from '../common/view';
-import { createIsland, type IslandConfig } from '../experimental/island';
+import type { Scope, ScopeComponent } from '../common/scope';
+import { island, type IslandConfig } from '../experimental/island';
 import { GlobalStore } from '../stores/GlobalStore';
 // import { TupleToUnion } from 'type-fest';
 
@@ -90,9 +90,9 @@ export interface RatiUserTypes {
 export type UserRoutes = RatiUserTypes extends { routes: infer R } ? R : never;
 
 /**
- * App-augmented map of route name → the context value type that route's view
- * exposes via `.context()`. Lets `useRouteContext(name)` return the right type
- * with no type argument. Augment it the same way as {@link RatiUserTypes}:
+ * App-augmented map of route name → the value type that route's scope provides
+ * via `.provide()`. Lets `useRouteContext(name)` return the right type with no
+ * type argument. Augment it the same way as {@link RatiUserTypes}:
  *
  *     declare module 'rati' {
  *         interface RatiRouteContexts {
@@ -121,7 +121,7 @@ function buildPathRe(path: string): RegExp | null {
     return path === '*' ? null : new RegExp(pathReString);
 }
 
-export type RouteOptions<Env, TView extends CreateView<any> | undefined> = {
+export type RouteOptions<Env, TView extends Scope<any> | undefined> = {
     /**
      * Data the route resolves before the component renders. When present, `route`
      * folds it together with the component into an island (see below), so
@@ -129,29 +129,29 @@ export type RouteOptions<Env, TView extends CreateView<any> | undefined> = {
      * attach-on-build / detach-on-navigate, SSR via Suspense (and promise
      * dehydration). The component receives the resolved props.
      *
-     * Either a plain view (env-less) or an env→view factory, exactly like
-     * `createIsland`'s `view`. Pair a factory with `useEnv` to supply per-root
-     * services (stores, api clients) the view functions need.
+     * Either a plain scope (env-less) or an env→scope factory, exactly like
+     * `island`'s `scope`. Pair a factory with `useEnv` to supply per-root
+     * services (stores, api clients) the scope's loads need.
      */
-    view?: TView extends CreateView<any> ? TView | ((env: Env) => TView) : undefined;
+    scope?: TView extends Scope<any> ? TView | ((env: Env) => TView) : undefined;
     /**
-     * Builds the environment a factory `view` receives — the island's `useEnv`
-     * hook. Defaults to an empty env; only needed when `view` is a factory.
+     * Builds the environment a factory `scope` receives — the island's `useEnv`
+     * hook. Defaults to an empty env; only needed when `scope` is a factory.
      */
     useEnv?: () => Env;
     /** Route-level wrapper rendered around the component. */
     wrapper?: ComponentType | undefined;
     /**
-     * Slot shown while the view resolves — the island's `loading`. Defaults to
-     * rendering nothing. Only meaningful alongside `view`.
+     * Slot shown while the scope resolves — the island's `loading`. Defaults to
+     * rendering nothing. Only meaningful alongside `scope`.
      */
-    loading?: TView extends CreateView<any> ? IslandConfig<Env, TView>['loading'] : undefined;
+    loading?: TView extends Scope<any> ? IslandConfig<Env, TView>['loading'] : undefined;
     /**
      * Slot shown on resolution failure — the island's `error` (switch on
      * `error.code`). When omitted, the error throws to the nearest ErrorBoundary.
-     * Only meaningful alongside `view`.
+     * Only meaningful alongside `scope`.
      */
-    error?: TView extends CreateView<any> ? IslandConfig<Env, TView>['error'] : undefined;
+    error?: TView extends Scope<any> ? IslandConfig<Env, TView>['error'] : undefined;
 };
 
 // The required (non-optional) keys of an object type.
@@ -166,19 +166,19 @@ type MissingRouteParams<Missing extends PropertyKey> = {
 
 /*
     Validates the (inferred) route component, intersected onto its type so the
-    argument must satisfy it. With a `view`, the component is checked against the
-    view. Otherwise it's checked by param *name*: its required props must all be
+    argument must satisfy it. With a `scope`, the component is checked against the
+    scope. Otherwise it's checked by param *name*: its required props must all be
     path params. Values are intentionally not pinned to the path's plain `string`
     — a component (typically an island) brands a URL segment via
-    `viewParam<Base64Uuid>()`, so a branded prop like `pageId: Base64Uuid` is
+    `prop<Base64Uuid>()`, so a branded prop like `pageId: Base64Uuid` is
     accepted by name.
 */
 type RouteComponentGuard<
     Path extends string,
-    TView extends CreateView<any> | undefined,
+    TView extends Scope<any> | undefined,
     Component,
-> = [TView] extends [CreateView<any>]
-    ? ViewComponent<TView>
+> = [TView] extends [Scope<any>]
+    ? ScopeComponent<TView>
     : Component extends (props: infer P) => any
       ? [RequiredKeys<P>] extends [keyof ExtractRouteParams<Path>]
           ? unknown
@@ -186,57 +186,57 @@ type RouteComponentGuard<
       : unknown;
 
 /**
- * Location-coupled twin of `createIsland`: a route *is* an island, specialized to
- * a URL. The non-route-specific inputs (`view`, `loading`, `error`) are the same
- * as `createIsland`'s and behave identically; a route adds the route bits (path,
- * name, wrapper) and feeds the path-matched params in as the island's props.
+ * Location-coupled twin of `island`: a route *is* an island, specialized to a
+ * URL. The non-route-specific inputs (`scope`, `loading`, `error`) are the same
+ * as `island`'s and behave identically; a route adds the route bits (path, name,
+ * wrapper) and feeds the path-matched params in as the island's props.
  *
- * When `options.view` is given, the component + view (+ `useEnv`, `loading`,
- * `error` — the same inputs as `createIsland`) are folded into an island and
- * stored as the route's component, so resolution goes through the source-based
- * island engine — the Router renders the (island) component directly, handing it
- * the route params. So a route declares its island inline, no separate
- * `createIsland` module needed:
+ * When `options.scope` is given, the component + scope (+ `useEnv`, `loading`,
+ * `error` — the same inputs as `island`) are folded into an island and stored as
+ * the route's component, so resolution goes through the source-based island
+ * engine — the Router renders the (island) component directly, handing it the
+ * route params. So a route declares its island inline, no separate `island`
+ * module needed:
  *
  *     route('/spaces/:spaceId/pages/:pageId', 'page', PageBody, {
- *         view: pageView,
+ *         scope: pageScope,
  *         useEnv: usePageEnv,
  *         loading: PageLoading,
  *         error: PageError,
  *     })
  *
- * A component built with `createIsland` up front also works as-is with no `view`
- * — it's already an island whose props are its view's params, so the path params
+ * A component built with `island` up front also works as-is with no `scope` —
+ * it's already an island whose props are its scope's params, so the path params
  * feed it directly: `route('/spaces/:spaceId/pages/:pageId', 'page', PageIsland)`.
- * A plain component with no `view` is rendered directly with the route params.
+ * A plain component with no `scope` is rendered directly with the route params.
  */
 export function route<
     Path extends string,
     Name extends string,
     Component extends ComponentType<any>,
     Env = {},
-    TView extends CreateView<any> | undefined = undefined,
+    TView extends Scope<any> | undefined = undefined,
 >(
     path: Path,
     name: Name,
     component: Component & RouteComponentGuard<Path, TView, Component>,
     options: RouteOptions<Env, TView> = {}
 ) {
-    const view = options.view;
+    const scopeOption = options.scope;
 
-    // A route is createIsland coupled to a location. A supplied view is folded with
+    // A route is `island` coupled to a location. A supplied scope is folded with
     // the component into an island here; params arrive from the URL match (the
     // Router renders the island with the route params), and the island owns
     // loading/error and source attach/detach across navigation.
     const routeComponent =
-        view !== undefined
-            ? createIsland({
-                  // `view` is either a plain view or an env→view factory; normalize
-                  // to the factory shape createIsland expects.
-                  view:
-                      typeof view === 'function'
-                          ? (view as (env: Env) => CreateView<any>)
-                          : () => view as CreateView<any>,
+        scopeOption !== undefined
+            ? island({
+                  // `scope` is either a plain scope or an env→scope factory;
+                  // normalize to the factory shape `island` expects.
+                  scope:
+                      typeof scopeOption === 'function'
+                          ? (scopeOption as (env: Env) => Scope<any>)
+                          : () => scopeOption as Scope<any>,
                   useEnv: options.useEnv ?? (() => ({}) as Env),
                   component: component as ComponentType<any>,
                   loading: options.loading ?? (() => null),

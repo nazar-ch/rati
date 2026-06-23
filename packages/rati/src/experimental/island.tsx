@@ -15,11 +15,11 @@ import {
 import type { ComponentType, Context, ErrorInfo, FC, ReactNode } from 'react';
 import {
     ParamSymbol,
-    type CreateView,
-    type RequiredViewParams,
-    type ResolveView,
-    type ViewContextDef,
-} from '../common/view';
+    type Scope,
+    type ScopeParams,
+    type ScopeProps,
+    type ScopeProvideDef,
+} from '../common/scope';
 import { isSource, toSourceError, type Source, type SourceError } from '../common/source';
 import { deepEqual, is } from '../common/utils';
 import { IslandHydrationContext } from './islandHydration';
@@ -27,8 +27,8 @@ import { IslandHydrationContext } from './islandHydration';
 /*
     EXPERIMENTAL — see docs/research/data-views.plan.md.
 
-    An island is a self-contained unit of UI: a chain (declarative data definition)
-    bundled with a component and loading/error slots. It resolves the chain at render
+    An island is a self-contained unit of UI: a scope (declarative data definition)
+    bundled with a component and loading/error slots. It resolves the scope at render
     time, level by level, and renders:
 
       - every entry ready  → the main component, fed each entry's value;
@@ -48,7 +48,7 @@ import { IslandHydrationContext } from './islandHydration';
         A ready source returning to pending drops back to loading, live.
 
     Lifetime is explicit: each source attaches when its level builds and detaches on
-    teardown / param change. A `.context()` value is built once the chain resolves and
+    teardown / param change. A `.provide()` value is built once the scope resolves and
     disposed on teardown *before* the sources it was built over detach.
 */
 
@@ -74,16 +74,16 @@ function shallowEqual(a: unknown, b: unknown): boolean {
     );
 }
 
-// Flatten the chain's prevView links into ordered levels (level 0 first).
-function flattenLevels(view: CreateView): CreateView['definition'][] {
-    const levels: CreateView['definition'][] = [];
-    for (let current: CreateView | undefined = view; current; current = current.prevView) {
+// Flatten the scope's prevScope links into ordered levels (level 0 first).
+function flattenLevels(scope: Scope): Scope['definition'][] {
+    const levels: Scope['definition'][] = [];
+    for (let current: Scope | undefined = scope; current; current = current.prevScope) {
         levels.unshift(current.definition);
     }
     return levels;
 }
 
-// One resolved chain cell. Params/classes/plain values resolve instantly; a function
+// One resolved scope cell. Props/classes/plain values resolve instantly; a function
 // is called with the prior levels' ready values and its result re-classified; a
 // promise is unwrapped with `use()`; a source is read observably.
 type Cell =
@@ -110,53 +110,54 @@ function classifyEntry(
     return { kind: 'value', value: entry };
 }
 
-// A built `.context()` value, wrapped so "not built yet" (undefined box) stays
+// A built `.provide()` value, wrapped so "not built yet" (undefined box) stays
 // distinct from a value that is itself undefined.
-type BuiltContext = { value: unknown };
+type BuiltProvided = { value: unknown };
 
 /*
-    One resolution attempt for a given (params, env). Holds the chain's levels and a
+    One resolution attempt for a given (params, env). Holds the scope's levels and a
     lazily-built, render-stable cache of cells — so a promise handed to `use()` and a
     source handed to the reactive read keep their identity across re-renders. Cells are
     built in render as prior levels resolve (pure: no attach, no side effects beyond
-    constructing the source/promise); attach and the `.context()` build/dispose run in
+    constructing the source/promise); attach and the `.provide()` build/dispose run in
     effects. Construction in render (not an effect) is what lets SSR resolve the
     promises — effects don't run on the server.
 */
 class IslandResolution {
-    readonly levels: CreateView['definition'][];
+    readonly levels: Scope['definition'][];
     readonly #params: Record<string, unknown>;
-    readonly #contextDef: ViewContextDef | undefined;
-    // Server-resolved promise values to rehydrate from (chain key -> value), or
+    readonly #provideDef: ScopeProvideDef | undefined;
+    // Server-resolved promise values to rehydrate from (scope key -> value), or
     // undefined off the hydration path. A key present here short-circuits its cell.
     readonly #hydration: Record<string, unknown> | undefined;
-    // Cells cached per key (keys are unique across the whole chain).
+    // Cells cached per key (keys are unique across the whole scope).
     readonly #cells = new Map<string, Cell>();
     // Source cells in construction order, each with its detach once attached.
     readonly #sources: { source: Source<unknown>; detach: (() => void) | null }[] = [];
-    // Island-owned context (`.context()`): built once the chain resolves, disposed
-    // before the sources detach. `undefined` until built / when the view has none.
-    readonly context = observable.box<BuiltContext | undefined>(undefined, { deep: false });
+    // The value the island provides (`.provide()`): built once the scope resolves,
+    // disposed before the sources detach. `undefined` until built / when the scope
+    // declares no `.provide()`.
+    readonly provided = observable.box<BuiltProvided | undefined>(undefined, { deep: false });
     #disposed = false;
 
     constructor(
-        view: CreateView,
+        scope: Scope,
         params: Record<string, unknown>,
         hydration?: Record<string, unknown> | undefined
     ) {
-        this.levels = flattenLevels(view);
+        this.levels = flattenLevels(scope);
         this.#params = params;
-        this.#contextDef = view.contextDef;
+        this.#provideDef = scope.provideDef;
         this.#hydration = hydration;
     }
 
-    get hasContext(): boolean {
-        return this.#contextDef !== undefined;
+    get hasProvide(): boolean {
+        return this.#provideDef !== undefined;
     }
 
-    // The app-owned React context (.context({ provideTo })) to also publish into.
+    // The app-owned React context (.provide({ provideTo })) to also publish into.
     get appChannel(): Context<unknown> | undefined {
-        return this.#contextDef?.channel;
+        return this.#provideDef?.channel;
     }
 
     // Build-or-get the cell for `key`, classified from `entry` with the prior levels'
@@ -166,7 +167,7 @@ class IslandResolution {
         let cell = this.#cells.get(key);
         if (!cell) {
             // A value dehydrated from the server short-circuits the entry: skip the
-            // view function (no re-fetch) and `use()` (no re-suspend), so the client's
+            // load function (no re-fetch) and `use()` (no re-suspend), so the client's
             // hydration render produces the server HTML synchronously. Only promise
             // entries are ever dehydrated, so this only ever replaces a would-be
             // `use()` — sources still go through classifyEntry and attach as usual.
@@ -192,32 +193,32 @@ class IslandResolution {
         }
     }
 
-    // Build the `.context()` value from the fully resolved chain. Runs from an effect
+    // Build the `.provide()` value from the fully resolved scope. Runs from an effect
     // (not render) because the factory does set-up side effects that must run once and
     // never during render / a discarded StrictMode pass.
-    buildContext(resolved: Record<string, unknown>) {
-        if (!this.#contextDef || this.#disposed || this.context.get()) return;
-        const contextDef = this.#contextDef;
-        runInAction(() => this.context.set({ value: contextDef.factory(resolved) }));
+    buildProvided(resolved: Record<string, unknown>) {
+        if (!this.#provideDef || this.#disposed || this.provided.get()) return;
+        const provideDef = this.#provideDef;
+        runInAction(() => this.provided.set({ value: provideDef.factory(resolved) }));
     }
 
     teardown() {
         if (this.#disposed) return;
         this.#disposed = true;
         runInAction(() => {
-            // Dispose the context first: its teardown (e.g. deactivate) still reads
-            // through the grabbed resource the chain resolved, which the source detach
-            // below then releases — so this order is load-bearing.
-            const context = this.context.get();
-            const dispose = (context?.value as Partial<Disposable> | undefined)?.[Symbol.dispose];
+            // Dispose the provided value first: its teardown (e.g. deactivate) still
+            // reads through the grabbed resource the scope resolved, which the source
+            // detach below then releases — so this order is load-bearing.
+            const provided = this.provided.get();
+            const dispose = (provided?.value as Partial<Disposable> | undefined)?.[Symbol.dispose];
             if (typeof dispose === 'function') {
                 try {
-                    dispose.call(context!.value);
+                    dispose.call(provided!.value);
                 } catch (error) {
-                    console.error('Island context dispose failed', error);
+                    console.error('Island provided value dispose failed', error);
                 }
             }
-            this.context.set(undefined);
+            this.provided.set(undefined);
             // Detach in reverse: a later level may depend on an earlier one.
             for (let i = this.#sources.length - 1; i >= 0; i--) {
                 const entry = this.#sources[i]!;
@@ -249,30 +250,30 @@ function asSourceError(thrown: unknown): SourceError {
 
 // ---------------------------------------------------------------------------------------
 
-type IslandFallbackProps<View extends CreateView<any>> = {
-    params: RequiredViewParams<View>;
+type IslandFallbackProps<View extends Scope<any>> = {
+    params: ScopeParams<View>;
     retry: () => void;
 };
 
-export type IslandConfig<Env, View extends CreateView<any>> = {
+export type IslandConfig<Env, View extends Scope<any>> = {
     /**
      * The declarative data definition, parameterized by the environment (stores,
-     * api clients — anything per-root view functions need). Called on every
-     * (re)resolve; keep it a cheap pure function.
+     * api clients — anything per-root loads need). Called on every (re)resolve;
+     * keep it a cheap pure function.
      */
-    view: (env: Env) => View;
+    scope: (env: Env) => View;
 
     /** Composes the environment from the host app's contexts. It's a hook. */
     useEnv: () => Env;
 
     /** Gets clean, fully resolved props — no loading/error states inside. */
-    component: ComponentType<ResolveView<View>>;
+    component: ComponentType<ScopeProps<View>>;
 
     /**
-     * Shown while the chain resolves — also the `<Suspense>` fallback for a pending
+     * Shown while the scope resolves — also the `<Suspense>` fallback for a pending
      * promise entry. Defaults to rendering nothing.
      */
-    loading?: ComponentType<{ params: RequiredViewParams<View> }>;
+    loading?: ComponentType<{ params: ScopeParams<View> }>;
 
     /**
      * Rendered on any failure. not-available / forbidden / failed all arrive here
@@ -281,20 +282,12 @@ export type IslandConfig<Env, View extends CreateView<any>> = {
      * handles it.
      */
     error?: ComponentType<IslandFallbackProps<View> & { error: SourceError }>;
-
-    /**
-     * Provide the resolved props to all descendants via context — read them with
-     * `useIslandProps(ThisIsland)` anywhere under the island's component instead of
-     * prop drilling. Nearest island instance wins, so two islands of the same kind
-     * (e.g. two panels with different pages) stay scoped.
-     */
-    provideContext?: boolean;
 };
 
 export const IslandSymbol = Symbol();
 
-export type IslandComponent<View extends CreateView<any>> = FC<RequiredViewParams<View>> & {
-    /** Type-level only: carries the view type for useIslandProps inference. */
+export type IslandComponent<View extends Scope<any>> = FC<ScopeParams<View>> & {
+    /** Type-level only: carries the scope type for useScope inference. */
     [IslandSymbol]?: View;
     /**
      * Forwarded from a `lazy()` component the island wraps, so the island is a
@@ -307,131 +300,69 @@ export type IslandComponent<View extends CreateView<any>> = FC<RequiredViewParam
 
 // ---------------------------------------------------------------------------------------
 
-/*
-    Island type helpers — the island-side counterparts of `ResolveView` /
-    `RequiredViewParams` / `ViewComponent`. Because an island's view is an env→view
-    *factory* (the `view` field of IslandConfig), reading its prop and param types
-    by hand meant `ResolveView<ReturnType<typeof factory>>`. These collapse that to
-    `IslandProps<typeof factory>` / `IslandParams<typeof factory>`, so the component
-    and slots type themselves straight off the factory.
-*/
+// Single value channel per island component, for useScope. Holds whatever the island
+// provides — the resolved props by default, or the `.provide()` value when declared.
+// The sentinel distinguishes "no provider above" from a value that is itself nullish.
+const ISLAND_SCOPE_MISSING = Symbol('rati.island-scope-missing');
+const islandChannels = new WeakMap<object, Context<unknown>>();
+const noScopeChannel = createContext<unknown>(ISLAND_SCOPE_MISSING);
 
-/** The env→view factory shape an island is configured with (`IslandConfig.view`). */
-export type IslandViewFactory<View extends CreateView<any> = CreateView<any>> = (env: any) => View;
+// The value a scope provides, read back off the island for useScope's return type:
+// the `.provide()` value when present, else the resolved props (provide-by-default).
+type ProvidedOf<View extends Scope<any>> = View extends Scope<any, infer P> ? P : never;
+type ScopeProvidesOf<View extends Scope<any>> = unknown extends ProvidedOf<View>
+    ? ScopeProps<View>
+    : ProvidedOf<View>;
 
-/** The view a `createIsland` factory produces — the input to the view helpers. */
-export type IslandViewOf<Factory extends IslandViewFactory> = ReturnType<Factory>;
-
-/**
- * Clean, fully-resolved props an island's `component` receives — the island
- * analogue of `ResolveView`, read from the view factory. Source props are already
- * unwrapped to their ready value type by `ResolveView`.
- */
-export type IslandProps<Factory extends IslandViewFactory> = ResolveView<ReturnType<Factory>>;
-
-/**
- * The params an island accepts as props (URL/host inputs) and that its slots
- * receive as `params` — the island analogue of `RequiredViewParams`.
- */
-export type IslandParams<Factory extends IslandViewFactory> = RequiredViewParams<
-    ReturnType<Factory>
->;
-
-// ---------------------------------------------------------------------------------------
-
-// Resolved-props context per island component, for useIslandProps
-const islandContexts = new WeakMap<object, Context<Record<string, unknown> | null>>();
-
-// Lets useIslandProps call useContext unconditionally even for a component that
-// didn't come from createIsland (it throws right after)
-const noContext = createContext<Record<string, unknown> | null>(null);
-
-export function useIslandProps<View extends CreateView<any>>(
-    island: IslandComponent<View>
-): ResolveView<View> {
-    const context = islandContexts.get(island);
-    const props = useContext(context ?? noContext);
-
-    if (!context) {
-        throw new Error('useIslandProps expects a component created by createIsland');
-    }
-    if (!props) {
-        throw new Error(
-            'No island props found in context. Render this component under the island ' +
-                'and set `provideContext: true` in its config'
-        );
-    }
-
-    return props as ResolveView<View>;
-}
-
-// ---------------------------------------------------------------------------------------
-
-// Island-owned context value (`.context()`) per island component, for
-// useIslandContext. Keyed by the island component like useIslandProps; the sentinel
-// distinguishes "no provider above" from a context whose value is nullish.
-const ISLAND_CONTEXT_MISSING = Symbol('rati.island-context-missing');
-const islandContextChannels = new WeakMap<object, Context<unknown>>();
-const noIslandContext = createContext<unknown>(ISLAND_CONTEXT_MISSING);
-
-// The context value type a view carries via `.context()` (CreateView's second
-// param), read back off the island for useIslandContext's return type.
-type ViewContextOf<View extends CreateView<any, any>> =
-    View extends CreateView<any, infer Ctx> ? Ctx : never;
-
-// Shared lookup for the two reader hooks: resolve the island's context channel and
-// read it. Returns the raw value (possibly the MISSING sentinel) so each hook can
-// apply its own absent-value policy (throw vs. undefined). Throwing on a non-island
-// argument is common to both — that's a misuse, not an absent value. A hook (calls
-// useContext), so both callers invoke it unconditionally.
-function useRawIslandContext(island: object, hookName: string): unknown {
-    const channel = islandContextChannels.get(island);
-    const value = useContext(channel ?? noIslandContext);
+// Shared lookup for the two reader hooks: resolve the island's value channel and read
+// it. Returns the raw value (possibly the MISSING sentinel) so each hook can apply its
+// own absent-value policy (throw vs. undefined). Throwing on a non-island argument is
+// common to both — that's a misuse, not an absent value. A hook (calls useContext), so
+// both callers invoke it unconditionally.
+function useRawScope(island: object, hookName: string): unknown {
+    const channel = islandChannels.get(island);
+    const value = useContext(channel ?? noScopeChannel);
 
     if (!channel) {
-        throw new Error(`${hookName} expects a component created by createIsland`);
+        throw new Error(`${hookName} expects a component created by island()`);
     }
     return value;
 }
 
 /**
- * Read the island-owned context declared by the view's `.context()` step — the
- * lifecycle-managed counterpart of `useIslandProps`. The value is created and torn
- * down by the island in lockstep with its sources (built when the chain is ready,
- * disposed before the sources detach), so a store built over a grabbed resource
- * never outlives that grab. Nearest island instance wins.
+ * Read the value an island provides to its subtree — the resolved props by default,
+ * or the `.provide()` value when the scope declares one. The value is created and
+ * (for a `.provide()` value) torn down by the island in lockstep with its sources, so
+ * a store built over a grabbed resource never outlives that grab. Nearest island
+ * instance wins.
  *
- * Throws when no context value is above — see {@link useOptionalIslandContext} for
- * the non-throwing form.
+ * Throws when no island is above — see {@link useOptionalScope} for the non-throwing
+ * form.
  */
-export function useIslandContext<View extends CreateView<any, any>>(
+export function useScope<View extends Scope<any>>(
     island: IslandComponent<View>
-): ViewContextOf<View> {
-    const value = useRawIslandContext(island, 'useIslandContext');
+): ScopeProvidesOf<View> {
+    const value = useRawScope(island, 'useScope');
 
-    if (value === ISLAND_CONTEXT_MISSING) {
-        throw new Error(
-            'No island context found. Render this component under the island whose view ' +
-                'ends in a `.context()` step.'
-        );
+    if (value === ISLAND_SCOPE_MISSING) {
+        throw new Error('No scope value found. Render this component under the island.');
     }
 
-    return value as ViewContextOf<View>;
+    return value as ScopeProvidesOf<View>;
 }
 
 /**
- * Optional form of {@link useIslandContext}: returns `undefined` instead of
- * throwing when no context value is above — the component renders outside the
- * island, or its view declares no `.context()` step. For components that may render
- * either under the island or standalone. Still throws when `island` is not a
- * `createIsland` component (a misuse, not an absent value).
+ * Optional form of {@link useScope}: returns `undefined` instead of throwing when no
+ * island is above — the component renders outside the island. For components that may
+ * render either under the island or standalone. Still throws when `island` is not an
+ * `island()` component (a misuse, not an absent value).
  */
-export function useOptionalIslandContext<View extends CreateView<any, any>>(
+export function useOptionalScope<View extends Scope<any>>(
     island: IslandComponent<View>
-): ViewContextOf<View> | undefined {
-    const value = useRawIslandContext(island, 'useOptionalIslandContext');
+): ScopeProvidesOf<View> | undefined {
+    const value = useRawScope(island, 'useOptionalScope');
 
-    return value === ISLAND_CONTEXT_MISSING ? undefined : (value as ViewContextOf<View>);
+    return value === ISLAND_SCOPE_MISSING ? undefined : (value as ScopeProvidesOf<View>);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -494,9 +425,7 @@ type ResolvedViewProps = {
     component: ComponentType<any>;
     loading: ComponentType<{ params: unknown }>;
     params: unknown;
-    provideContext: boolean;
-    propsContext: Context<Record<string, unknown> | null>;
-    islandChannel: Context<unknown>;
+    channel: Context<unknown>;
     // Server only: record a resolved promise value for dehydration (bound to this
     // island's id). Undefined off the SSR collection path.
     collect: ((key: string, value: unknown) => void) | undefined;
@@ -507,9 +436,7 @@ const ResolvedView = observer(function ResolvedView({
     component: ResolvedComponent,
     loading: Loading,
     params,
-    provideContext,
-    propsContext,
-    islandChannel,
+    channel,
     collect,
 }: ResolvedViewProps) {
     useLayoutEffect(() => {
@@ -540,64 +467,60 @@ const ResolvedView = observer(function ResolvedView({
         }
     }
 
-    if (resolution.hasContext) {
+    if (resolution.hasProvide) {
         return (
-            <ContextGate
+            <ProvideGate
                 resolution={resolution}
                 resolved={resolved}
                 component={ResolvedComponent}
                 loading={Loading}
                 params={params}
-                provideContext={provideContext}
-                propsContext={propsContext}
-                islandChannel={islandChannel}
+                channel={channel}
             />
         );
     }
 
-    return renderResolved(ResolvedComponent, resolved, provideContext, propsContext);
+    // Provide-by-default: publish the resolved props to the subtree (useScope).
+    return renderResolved(ResolvedComponent, resolved, resolved, channel);
 });
 
 function renderResolved(
     ResolvedComponent: ComponentType<any>,
     resolved: Record<string, unknown>,
-    provideContext: boolean,
-    propsContext: Context<Record<string, unknown> | null>
+    channelValue: unknown,
+    channel: Context<unknown>
 ): ReactNode {
-    let content: ReactNode = <ResolvedComponent {...resolved} />;
-    if (provideContext) {
-        content = <propsContext.Provider value={resolved}>{content}</propsContext.Provider>;
-    }
-    return content;
+    return (
+        <channel.Provider value={channelValue}>
+            <ResolvedComponent {...resolved} />
+        </channel.Provider>
+    );
 }
 
-// The chain is fully resolved; build the `.context()` value in an effect (its
-// factory has side effects), hold the loading slot until it's built, then provide it
-// to the subtree (the island channel for useIslandContext, plus any app channel).
-// Collection already happened in ResolvedView's level walk before it hands off to
-// the gate, so the gate doesn't carry `collect`.
-type ContextGateProps = Omit<ResolvedViewProps, 'collect'> & { resolved: Record<string, unknown> };
+// The scope is fully resolved; build the `.provide()` value in an effect (its factory
+// has side effects), hold the loading slot until it's built, then provide it to the
+// subtree (the island channel for useScope, plus any app channel). Collection already
+// happened in ResolvedView's level walk before it hands off to the gate, so the gate
+// doesn't carry `collect`.
+type ProvideGateProps = Omit<ResolvedViewProps, 'collect'> & { resolved: Record<string, unknown> };
 
-const ContextGate = observer(function ContextGate({
+const ProvideGate = observer(function ProvideGate({
     resolution,
     resolved,
     component: ResolvedComponent,
     loading: Loading,
     params,
-    provideContext,
-    propsContext,
-    islandChannel,
-}: ContextGateProps) {
+    channel,
+}: ProvideGateProps) {
     useEffect(() => {
-        resolution.buildContext(resolved);
+        resolution.buildProvided(resolved);
         // Dispose is owned by the island's resolution teardown (dispose-before-detach).
     }, [resolution]);
 
-    const built = resolution.context.get();
+    const built = resolution.provided.get();
     if (!built) return <Loading params={params} />;
 
-    let content = renderResolved(ResolvedComponent, resolved, provideContext, propsContext);
-    content = <islandChannel.Provider value={built.value}>{content}</islandChannel.Provider>;
+    let content = renderResolved(ResolvedComponent, resolved, built.value, channel);
     const appChannel = resolution.appChannel;
     if (appChannel) {
         const AppProvider = appChannel.Provider;
@@ -606,14 +529,13 @@ const ContextGate = observer(function ContextGate({
     return content;
 });
 
-export function createIsland<Env, View extends CreateView<any>>(
+export function island<Env, View extends Scope<any>>(
     config: IslandConfig<Env, View>
 ): IslandComponent<View> {
-    const PropsContext = createContext<Record<string, unknown> | null>(null);
-    const ContextChannel = createContext<unknown>(ISLAND_CONTEXT_MISSING);
+    const Channel = createContext<unknown>(ISLAND_SCOPE_MISSING);
     const Loading = (config.loading ?? DefaultLoading) as ComponentType<{ params: unknown }>;
 
-    const Island = observer(function Island(params: RequiredViewParams<View>) {
+    const Island = observer(function Island(params: ScopeParams<View>) {
         const env = config.useEnv();
 
         // Stable across server render and client hydration by tree position, so it
@@ -647,7 +569,7 @@ export function createIsland<Env, View extends CreateView<any>>(
             const firstResolution = retry === 0 && deepEqual(params, initialParamsRef.current);
             const hydrationSlice = firstResolution ? hydration.data?.[islandId] : undefined;
             ref.current = new IslandResolution(
-                config.view(env) as CreateView,
+                config.scope(env) as Scope,
                 params as Record<string, unknown>,
                 hydrationSlice
             );
@@ -661,8 +583,8 @@ export function createIsland<Env, View extends CreateView<any>>(
             ? (k: string, value: unknown) => hydration.collect!(islandId, k, value)
             : undefined;
 
-        // Tear down (dispose context, then detach sources) when the resolution is
-        // replaced (param change / retry) or the island unmounts. Reset the ref on
+        // Tear down (dispose provided value, then detach sources) when the resolution
+        // is replaced (param change / retry) or the island unmounts. Reset the ref on
         // unmount so a StrictMode remount rebuilds a fresh resolution.
         useEffect(() => {
             return () => {
@@ -691,9 +613,7 @@ export function createIsland<Env, View extends CreateView<any>>(
                         component={config.component}
                         loading={Loading}
                         params={params}
-                        provideContext={config.provideContext ?? false}
-                        propsContext={PropsContext}
-                        islandChannel={ContextChannel}
+                        channel={Channel}
                         collect={collect}
                     />
                 </Suspense>
@@ -710,8 +630,7 @@ export function createIsland<Env, View extends CreateView<any>>(
     const preload = (config.component as { preload?: () => Promise<unknown> }).preload;
     if (typeof preload === 'function') Island.preload = preload;
 
-    islandContexts.set(Island, PropsContext);
-    islandContextChannels.set(Island, ContextChannel);
+    islandChannels.set(Island, Channel);
 
     return Island;
 }

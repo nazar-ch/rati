@@ -23,7 +23,7 @@ export const Router: FC<{
     const Wrapper = activeRoute.wrapperComponent ?? DefaultWrapper;
 
     // A route's component is either a plain component or an island (built by
-    // `route({ view })` / `createIsland`); both render directly with the route
+    // `route({ scope })` / `island`); both render directly with the route
     // params. An island owns its own loading/error slots and data resolution; the
     // Suspense here is for a `lazy()` route component while its chunk imports
     // (eager components never suspend, so it's a no-op for them).

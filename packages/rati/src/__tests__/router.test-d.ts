@@ -1,17 +1,17 @@
 import { describe, test, expectTypeOf } from 'vitest';
 import { ComponentType, FC } from 'react';
 import { route } from '../stores/WebRouterStore';
-import { createView, viewParam, ViewComponent } from '../common/view';
-import { createIsland } from '../experimental/island';
+import { scope, prop, ScopeComponent } from '../common/scope';
+import { island } from '../experimental/island';
 
 const TestFC: FC = () => null;
 
-const EmptyView = createView({});
+const EmptyScope = scope();
 
 describe('route()', () => {
-    const ProductIsland = createIsland({
+    const ProductIsland = island({
         useEnv: () => ({}),
-        view: () => createView.chain({ productId: viewParam<string>() }),
+        scope: () => scope({ productId: prop<string>() }),
         component: () => null,
         loading: () => null,
     });
@@ -23,7 +23,7 @@ describe('route()', () => {
     });
 
     test('accepts a component that opts out of route params', () => {
-        const C: ViewComponent<typeof EmptyView> = () => null;
+        const C: ScopeComponent<typeof EmptyScope> = () => null;
         route('/:productId', 'product', C);
     });
 
@@ -42,16 +42,16 @@ describe('route()', () => {
         route('/shop/:productId', 'product', ProductIsland);
     });
 
-    test('feeds an island whose params are branded (URL string refined by viewParam)', () => {
+    test('feeds an island whose params are branded (URL string refined by prop)', () => {
         type PageId = string & { readonly __brand: 'PageId' };
-        const BrandedIsland = createIsland({
+        const BrandedIsland = island({
             useEnv: () => ({}),
-            view: () => createView.chain({ pageId: viewParam<PageId>() }),
+            scope: () => scope({ pageId: prop<PageId>() }),
             component: () => null,
             loading: () => null,
         });
-        // The path yields a plain string; the island brands it via viewParam, so
-        // it's accepted by param name even though `pageId` is a branded string.
+        // The path yields a plain string; the island brands it via prop(), so it's
+        // accepted by param name even though `pageId` is a branded string.
         route('/pages/:pageId', 'page', BrandedIsland);
     });
 
@@ -60,9 +60,9 @@ describe('route()', () => {
         route('/', 'home', ProductIsland);
     });
 
-    test('accepts a view via options', () => {
-        const C: ViewComponent<typeof EmptyView> = () => null;
-        route('/:productId', 'product', C, { view: EmptyView });
+    test('accepts a scope via options', () => {
+        const C: ScopeComponent<typeof EmptyScope> = () => null;
+        route('/:productId', 'product', C, { scope: EmptyScope });
     });
 
     test('accepts a wrapper via options', () => {

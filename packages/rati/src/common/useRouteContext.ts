@@ -1,4 +1,4 @@
-import { useIslandContext, type IslandComponent } from '../experimental/island';
+import { useScope, type IslandComponent } from '../experimental/island';
 import { useWebRouter } from '../stores/RootStore';
 import type { RatiRouteContexts } from '../stores/WebRouterStore';
 
@@ -29,12 +29,12 @@ function islandForRoute(
 }
 
 /**
- * Read the island-owned context (`.context()`) of a route by its `name`, without
- * importing the island component to hand to `useIslandContext`. Because `route`
- * builds the island from the route's `view`, there is no island module to import;
- * the `name` resolves it off the live routes table — the very island object that
- * keys the context channel. So a route's subtree reads its context without
- * depending on the island's identity (which `route` doesn't export).
+ * Read the value a route's scope provides (`.provide()`) by its `name`, without
+ * importing the island component to hand to `useScope`. Because `route` builds the
+ * island from the route's `scope`, there is no island module to import; the `name`
+ * resolves it off the live routes table — the very island object that keys the
+ * value channel. So a route's subtree reads its provided value without depending on
+ * the island's identity (which `route` doesn't export).
  *
  * The return type comes from the app's {@link RatiRouteContexts} augmentation —
  * `useRouteContext('page')` is typed with no type argument. Names the app hasn't
@@ -42,5 +42,5 @@ function islandForRoute(
  */
 export function useRouteContext<Name extends RouteContextName>(name: Name): RouteContextOf<Name> {
     const router = useWebRouter();
-    return useIslandContext(islandForRoute(router.routes, name as string)) as RouteContextOf<Name>;
+    return useScope(islandForRoute(router.routes, name as string)) as RouteContextOf<Name>;
 }

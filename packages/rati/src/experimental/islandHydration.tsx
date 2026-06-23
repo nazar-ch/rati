@@ -12,7 +12,7 @@ import { createContext, useMemo, type ReactNode } from 'react';
     This module carries each island's resolved promise values across the wire so the
     client short-circuits them to their server values and hydrates synchronously. The
     key is the island's `useId()` (stable between server render and hydration by tree
-    position) then the chain key — so arbitrarily nested / composed islands each own a
+    position) then the scope key — so arbitrarily nested / composed islands each own a
     unique slice with no collisions, and the registry stays flat.
 
     Only promises are serialized. A *source* is a reactive state machine, not a
@@ -24,7 +24,7 @@ import { createContext, useMemo, type ReactNode } from 'react';
     without a router participates the same way.
 */
 
-// islandId (useId) -> chain key -> resolved promise value.
+// islandId (useId) -> scope key -> resolved promise value.
 export type IslandHydrationData = Record<string, Record<string, unknown>>;
 
 export type IslandHydration = {

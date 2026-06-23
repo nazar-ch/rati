@@ -7,7 +7,7 @@ import { RootStore, RootStoreProvider } from '../stores/RootStore';
 import { Router } from '../common/Router';
 import { createBrowserHistory, createMemoryHistory } from '../common/history';
 import { prepareRoute } from '../common/prepareRoute';
-import { createView, type ViewComponent } from '../common/view';
+import { scope, type ScopeComponent } from '../common/scope';
 import {
     createIslandHydrationCollector,
     IslandHydrationProvider,
@@ -120,16 +120,16 @@ describe('SSR + hydration', () => {
 
     test('hydrates a view route from dehydrated island data without re-running its promise', async () => {
         let calls = 0;
-        const view = createView({
+        const view = scope().load({
             greeting: async () => {
                 calls++;
                 return 'hello from server';
             },
         });
-        const Greeting: ViewComponent<typeof view> = ({ greeting }) => (
+        const Greeting: ScopeComponent<typeof view> = ({ greeting }) => (
             <div data-testid="greeting">{greeting}</div>
         );
-        const routesWithView = [route('/', 'home', Greeting, { view })] as const;
+        const routesWithView = [route('/', 'home', Greeting, { scope: view })] as const;
 
         // ----- Server: prerender (awaits the promise) + collect its resolved value -----
         const serverRouter = new WebRouterStore({}, routesWithView, {
