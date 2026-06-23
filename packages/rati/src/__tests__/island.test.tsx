@@ -594,4 +594,70 @@ describe('island', () => {
         expect(log).toContain('detach:src1');
         expect(log).not.toContain('detach:src2');
     });
+
+    test('a descendant reads the provided value by scope — no island component reference', async () => {
+        const ctxScope = scope({ id: prop<string>() }).provide(({ id }) => ({ label: `<${id}>` }));
+        const Island = island({ scope: ctxScope, component: () => <Reader />, loading: Loading });
+
+        // The reader keys off the scope it imports (a data module), never the island
+        // component that renders it — so there is no child→parent reference.
+        function Reader() {
+            const ctx = useScope(ctxScope);
+            return <div>ctx {ctx.label}</div>;
+        }
+
+        await act(async () => {
+            render(<Island id="a1" />);
+        });
+        expect(await screen.findByText('ctx <a1>')).toBeTruthy();
+    });
+
+    test('reading by scope returns the resolved props when the scope declares no .provide()', async () => {
+        const propsScope = scope({ id: prop<string>() });
+        const Island = island({ scope: propsScope, component: () => <Reader />, loading: Loading });
+
+        function Reader() {
+            const props = useScope(propsScope);
+            return <div>props {props.id}</div>;
+        }
+
+        render(<Island id="a1" />);
+        expect(await screen.findByText('props a1')).toBeTruthy();
+    });
+
+    test('islands sharing a scope each provide their own value; a by-scope reader gets the nearest', async () => {
+        // The reuse case: two distinct islands built from the *same* scope. They share
+        // one value channel (scope identity), but each renders its own Provider subtree,
+        // so a by-scope reader under each gets that island's value — nearest wins, no
+        // cross-talk. (Nesting two of the same scope is the only ambiguous case, and
+        // then nearest-wins is the sane default.)
+        const sharedScope = scope({ id: prop<string>() }).provide(({ id }) => ({ tag: `#${id}` }));
+        const First = island({
+            scope: sharedScope,
+            component: () => <Reader />,
+            loading: Loading,
+        });
+        const Second = island({
+            scope: sharedScope,
+            component: () => <Reader />,
+            loading: Loading,
+        });
+
+        function Reader() {
+            const { tag } = useScope(sharedScope);
+            return <div>tag {tag}</div>;
+        }
+
+        await act(async () => {
+            render(
+                <>
+                    <First id="a" />
+                    <Second id="b" />
+                </>
+            );
+        });
+
+        expect(await screen.findByText('tag #a')).toBeTruthy();
+        expect(await screen.findByText('tag #b')).toBeTruthy();
+    });
 });

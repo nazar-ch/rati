@@ -86,4 +86,23 @@ describe('scope type helpers', () => {
         // The provided value stays out of the component's resolved props.
         expectTypeOf<ScopeProps<typeof ctxScope>>().toEqualTypeOf<{ id: string; name: string }>();
     });
+
+    test('reading by scope infers the same value type — no island component reference', () => {
+        const ctxScope = scope({ id: prop<string>() })
+            .load({ name: async ({ id }) => `name:${id}` })
+            .provide(({ name }) => ({ heading: name.toUpperCase() }));
+
+        // The scope is the key (a data module, importable cycle-free), not the island.
+        expectTypeOf(useScope(ctxScope)).toEqualTypeOf<{ heading: string }>();
+        expectTypeOf(useOptionalScope(ctxScope)).toEqualTypeOf<{ heading: string } | undefined>();
+    });
+
+    test('reading a scope without .provide() by scope returns the resolved props', () => {
+        expectTypeOf(useScope(pageScope)).toEqualTypeOf<{
+            id: string;
+            revision: number;
+            name: string;
+            store: TitleStore;
+        }>();
+    });
 });

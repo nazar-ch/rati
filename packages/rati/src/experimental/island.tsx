@@ -422,24 +422,37 @@ export type IslandComponent<S extends Scope<any>> = FC<ScopeParams<S>> & {
 
 // ---------------------------------------------------------------------------------------
 
-// Single value channel per island component, for useScope. Holds whatever the island
-// provides — the resolved props by default, or the `.provide()` value when declared.
-// The sentinel distinguishes "no provider above" from a value that is itself nullish.
+// One value channel per island, holding whatever the island provides — the resolved
+// props by default, or the `.provide()` value when declared. The sentinel distinguishes
+// "no provider above" from a value that is itself nullish.
+//
+// Two keys resolve the same channel. The *scope* is the cycle-free key a descendant
+// uses: it imports the scope (a data module), never the island component — so there is
+// no child→parent reference and no import cycle (the island renders the descendant).
+// The island *component* is also accepted: back-compat, and the only way to target one
+// specific island when several are built from a shared scope. Islands built from the
+// same scope share one channel (scope identity, get-or-create in island()), so the
+// nearest one wins — ordinary React context semantics.
 const ISLAND_SCOPE_MISSING = Symbol('rati.island-scope-missing');
+const scopeChannels = new WeakMap<object, Context<unknown>>();
 const islandChannels = new WeakMap<object, Context<unknown>>();
 const noScopeChannel = createContext<unknown>(ISLAND_SCOPE_MISSING);
 
-// Shared lookup for the two reader hooks: resolve the island's value channel and read
-// it. Returns the raw value (possibly the MISSING sentinel) so each hook can apply its
-// own absent-value policy (throw vs. undefined). Throwing on a non-island argument is
-// common to both — that's a misuse, not an absent value. A hook (calls useContext), so
-// both callers invoke it unconditionally.
-function useRawScope(island: object, hookName: string): unknown {
-    const channel = islandChannels.get(island);
+// Resolve a reader's key (a scope, or the island component) to its value channel.
+function channelFor(key: object): Context<unknown> | undefined {
+    return scopeChannels.get(key) ?? islandChannels.get(key);
+}
+
+// Shared lookup for the two reader hooks: read the resolved channel. Returns the raw
+// value (possibly the MISSING sentinel) so each hook can apply its own absent-value
+// policy (throw vs. undefined). Throwing on an unknown key is common to both — that's a
+// misuse, not an absent value. A hook (calls useContext), so both callers invoke it
+// unconditionally.
+function useRawScope(channel: Context<unknown> | undefined, hookName: string): unknown {
     const value = useContext(channel ?? noScopeChannel);
 
     if (!channel) {
-        throw new Error(`${hookName} expects a component created by island()`);
+        throw new Error(`${hookName} expects a scope, or an island built from one`);
     }
     return value;
 }
@@ -451,11 +464,18 @@ function useRawScope(island: object, hookName: string): unknown {
  * a store built over a grabbed resource never outlives that grab. Nearest island
  * instance wins.
  *
+ * Identify the channel by the **scope** — a descendant imports the scope (a data
+ * module), never the island component, so there is no child→parent reference or import
+ * cycle. The type comes straight off the scope. Passing the island component still works
+ * (back-compat, or to target one of several islands built from a shared scope).
+ *
  * Throws when no island is above — see {@link useOptionalScope} for the non-throwing
  * form.
  */
-export function useScope<S extends Scope<any>>(island: IslandComponent<S>): ScopeProvidesOf<S> {
-    const value = useRawScope(island, 'useScope');
+export function useScope<S extends Scope<any>>(scope: S): ScopeProvidesOf<S>;
+export function useScope<S extends Scope<any>>(island: IslandComponent<S>): ScopeProvidesOf<S>;
+export function useScope<S extends Scope<any>>(key: S | IslandComponent<S>): ScopeProvidesOf<S> {
+    const value = useRawScope(channelFor(key), 'useScope');
 
     if (value === ISLAND_SCOPE_MISSING) {
         throw new Error('No scope value found. Render this component under the island.');
@@ -467,13 +487,17 @@ export function useScope<S extends Scope<any>>(island: IslandComponent<S>): Scop
 /**
  * Optional form of {@link useScope}: returns `undefined` instead of throwing when no
  * island is above — the component renders outside the island. For components that may
- * render either under the island or standalone. Still throws when `island` is not an
- * `island()` component (a misuse, not an absent value).
+ * render either under the island or standalone. Still throws when the key is neither a
+ * scope nor an island built from one (a misuse, not an absent value).
  */
+export function useOptionalScope<S extends Scope<any>>(scope: S): ScopeProvidesOf<S> | undefined;
 export function useOptionalScope<S extends Scope<any>>(
     island: IslandComponent<S>
+): ScopeProvidesOf<S> | undefined;
+export function useOptionalScope<S extends Scope<any>>(
+    key: S | IslandComponent<S>
 ): ScopeProvidesOf<S> | undefined {
-    const value = useRawScope(island, 'useOptionalScope');
+    const value = useRawScope(channelFor(key), 'useOptionalScope');
 
     return value === ISLAND_SCOPE_MISSING ? undefined : (value as ScopeProvidesOf<S>);
 }
@@ -530,7 +554,12 @@ class IslandErrorBoundary extends Component<ErrorBoundaryProps, { error: unknown
 }
 
 export function island<S extends Scope<any>>(config: IslandConfig<S>): IslandComponent<S> {
-    const Channel = createContext<unknown>(ISLAND_SCOPE_MISSING);
+    // One value channel per scope identity: islands built from the same scope share it,
+    // so a descendant reading by scope resolves the nearest island's value. Keyed by the
+    // scope here, and by the island component below (the component-form read).
+    const scopeKey = config.scope as object;
+    const Channel = scopeChannels.get(scopeKey) ?? createContext<unknown>(ISLAND_SCOPE_MISSING);
+    scopeChannels.set(scopeKey, Channel);
     const Loading = (config.loading ?? DefaultLoading) as ComponentType<{ params: unknown }>;
     const levels = flattenLevels(config.scope as Scope);
 
