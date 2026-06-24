@@ -1,4 +1,4 @@
-import type { WebRouterStore, WebRouterHydratedState } from '../stores/WebRouterStore';
+import type { WebRouterStore, WebRouterHydratedState } from './store';
 
 /**
  * The result of preparing a route on the server. The {@link hydratedState}

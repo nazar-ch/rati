@@ -1,6 +1,6 @@
 import { observable, runInAction } from 'mobx';
 import React, { type Context, useEffect } from 'react';
-import { WebRouterStore } from './WebRouterStore';
+import { WebRouterStore } from '../router/store';
 import { sleep } from '../common/stuff';
 import { observer } from 'mobx-react-lite';
 

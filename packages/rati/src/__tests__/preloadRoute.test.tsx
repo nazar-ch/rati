@@ -1,9 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FC } from 'react';
 import { act, render, fireEvent, cleanup } from '@testing-library/react';
-import { WebRouterStore, route } from '../stores/WebRouterStore';
+import { WebRouterStore } from '../router/store';
+import { route } from '../router/route';
 import { lazy } from '../common/lazy';
-import { Link } from '../common/GenericLink';
+import { Link } from '../router/Link';
 import { GenericStoresContext } from '../stores/RootStore';
 
 const NoopComponent: FC = () => null;

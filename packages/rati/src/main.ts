@@ -17,18 +17,20 @@ export { GlobalStore } from './stores/GlobalStore';
 
 export {
     WebRouterStore,
+    type WebRouterStoreOptions,
+    type WebRouterHydratedState,
+} from './router/store';
+export {
     route,
     type RouteOptions,
     type NameToRoute,
-    type WebRouterStoreOptions,
-    type WebRouterHydratedState,
     type ExtractRouteParams,
     type GenericRouteType,
     type RatiUserTypes,
     type RouteContextValueOf,
     type RouteContextNames,
-} from './stores/WebRouterStore';
-export { Router } from './common/Router';
+} from './router/route';
+export { Router } from './router/Router';
 export {
     createBrowserHistory,
     createMemoryHistory,
@@ -45,10 +47,10 @@ export {
 
 export * from './types/generic';
 
-export { Link, ContextualLink, LinkContextProvider, useLinkContext } from './common/GenericLink';
+export { Link, ContextualLink, LinkContextProvider, useLinkContext } from './router/Link';
 export { lazy, type PreloadableLazyComponent } from './common/lazy';
-export { Navigate } from './common/Navigate';
-export { prepareRoute, type PreparedRoute } from './common/prepareRoute';
+export { Navigate } from './router/Navigate';
+export { prepareRoute, type PreparedRoute } from './router/prepareRoute';
 
 export { remoteData } from './common/remoteData';
 export { remoteDataKey, responseKey } from './common/apiUtils';
@@ -97,7 +99,7 @@ export {
     type IslandHydrationData,
 } from './island/island';
 
-export { useRouteContext } from './common/useRouteContext';
+export { useRouteContext } from './router/useRouteContext';
 
 if (import.meta.env.DEV) {
     const pkg = await import('../package.json');

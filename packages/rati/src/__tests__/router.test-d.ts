@@ -1,6 +1,6 @@
 import { describe, test, expectTypeOf } from 'vitest';
 import { ComponentType, FC } from 'react';
-import { route } from '../stores/WebRouterStore';
+import { route } from '../router/route';
 import { scope, prop, ScopeComponent } from '../common/scope';
 import { island } from '../island/island';
 

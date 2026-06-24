@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { WebRouterStore, route } from '../stores/WebRouterStore';
+import { WebRouterStore } from '../router/store';
+import { route } from '../router/route';
 import { createMemoryHistory } from '../common/history';
 
 const NoopComponent = () => null;

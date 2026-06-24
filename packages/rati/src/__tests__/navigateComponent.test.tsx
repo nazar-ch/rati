@@ -1,9 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { StrictMode, type FC } from 'react';
 import { act, render, screen, cleanup } from '@testing-library/react';
-import { WebRouterStore, route } from '../stores/WebRouterStore';
-import { Router } from '../common/Router';
-import { Navigate } from '../common/Navigate';
+import { WebRouterStore } from '../router/store';
+import { route } from '../router/route';
+import { Router } from '../router/Router';
+import { Navigate } from '../router/Navigate';
 import { GenericStoresContext } from '../stores/RootStore';
 import { createBrowserHistory } from '../common/history';
 

@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from 'vitest';
-import { WebRouterStore, route } from '../stores/WebRouterStore';
+import { WebRouterStore } from '../router/store';
+import { route } from '../router/route';
 
 const NoopComponent = () => null;
 

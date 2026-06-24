@@ -2,11 +2,12 @@ import { describe, test, expect } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { prerender } from 'react-dom/static';
 import type { ReactElement } from 'react';
-import { WebRouterStore, route, type GenericRouteType } from '../stores/WebRouterStore';
+import { WebRouterStore } from '../router/store';
+import { route, type GenericRouteType } from '../router/route';
 import { RootStore, RootStoreProvider } from '../stores/RootStore';
-import { Router } from '../common/Router';
+import { Router } from '../router/Router';
 import { createMemoryHistory } from '../common/history';
-import { prepareRoute } from '../common/prepareRoute';
+import { prepareRoute } from '../router/prepareRoute';
 import { scope, type ScopeComponent } from '../common/scope';
 
 // react-dom/static `prerender` awaits Suspense before producing HTML, so an island

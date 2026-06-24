@@ -1,12 +1,8 @@
 import { observer } from 'mobx-react-lite';
 import { createContext, memo, type PropsWithChildren, useCallback, useContext } from 'react';
 
-import {
-    type NameToRoute,
-    type GenericRouteType,
-    WebRouterStore,
-    type UserRoutes,
-} from '../stores/WebRouterStore';
+import { type NameToRoute, type GenericRouteType, type UserRoutes } from './route';
+import { WebRouterStore } from './store';
 import { useWebRouter } from '../stores/RootStore';
 import { computed } from 'mobx';
 

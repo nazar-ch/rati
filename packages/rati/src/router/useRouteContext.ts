@@ -5,7 +5,7 @@ import type {
     GenericRouteType,
     RouteContextNames,
     RouteContextValueOf,
-} from '../stores/WebRouterStore';
+} from './route';
 
 // Context-bearing route names, derived from the app's routes table
 // (`RatiUserTypes['routes']`) — the same source `Link`'s `to` reads, so the context
