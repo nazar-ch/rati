@@ -1,4 +1,4 @@
-import { reaction } from 'mobx';
+import { _allowStateReadsEnd, _allowStateReadsStart, reaction } from 'mobx';
 import { SourceSymbol, type Source, type SourceState } from '../scope/source';
 
 /*
@@ -25,10 +25,20 @@ export function observableSource<T>(
 ): Source<T> {
     let cached: SourceState<T> | undefined;
     const getSnapshot = (): SourceState<T> => {
-        const next = getState();
-        if (cached && sameState(cached, next)) return cached;
-        cached = next;
-        return next;
+        // uSES calls getSnapshot during render — outside any MobX reaction — so the
+        // observable reads in `getState` would trip `observableRequiresReaction`.
+        // They're deliberate (subscribe sets up the real tracking reaction); flag the
+        // window as a permitted state read, the same hook MobX uses internally for
+        // its own out-of-derivation reads.
+        const prevAllowReads = _allowStateReadsStart(true);
+        try {
+            const next = getState();
+            if (cached && sameState(cached, next)) return cached;
+            cached = next;
+            return next;
+        } finally {
+            _allowStateReadsEnd(prevAllowReads);
+        }
     };
     return {
         [SourceSymbol]: true,
