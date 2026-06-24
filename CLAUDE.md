@@ -130,8 +130,13 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
 
 ## Examples — current status
 
-`examples/demo` and `examples/ssr` are **out of date** against rati's API: they still use
-the removed `createView`/`viewParam` view vocabulary from the view→scope refactor. Their
-tooling is migrated to Vite+, but the source needs rewriting to the current `scope`/`island`
-API before they typecheck/build/lint. Until then `vp lint` is not green repo-wide — the
-residual errors are all under `examples/`; the `rati` package itself is clean.
+`examples/demo` and `examples/ssr` are on the current `scope`/`island`/`route` API and both
+typecheck, build, and lint — so `vp lint` is green repo-wide (the `rati` package emits only
+the intentional type-machinery warnings). `demo` is a client-only SPA showing plain route
+components, route params, and `scope().load(…)` waterfalls (incl. a store class). `ssr` is an
+SSR app: a route's scope is an island that resolves at render time, so the server uses
+`react-dom/static` `prerender` (not `renderToString`, which can't await the island's
+Suspense) and dehydrates the resolved promise values through `IslandHydrationProvider`; the
+client feeds them back so it rehydrates without re-running the loads. Server-only data must be
+an **async** load to be dehydrated (a sync load isn't serialized and would mismatch on
+hydration).
