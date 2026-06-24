@@ -170,15 +170,33 @@ const Step = observer(function Step({
     }
     const { cells: dataCells, sources } = bucket;
 
-    // Attach this level's data sources after mount; detach on unmount. Both this and
-    // the leaf's `.provide()` dispose are passive effects, so React's child-first
-    // unmount runs dispose (deeper) before detach (shallower) — the load-bearing
-    // dispose-before-detach order, structural now.
-    useEffect(() => {
+    // Attach (layout) and detach (passive) are split across two effects on purpose.
+    //
+    // ATTACH in a *layout* effect so a synchronously-ready source (an already-cached
+    // resource) flips ready before the browser paints: the attach runs in the commit's
+    // layout phase, its reactive read re-renders the Step before paint, and the loading
+    // slot below — though rendered for one pass — is replaced with content in the same
+    // frame (no visible flash). A passive attach ran after paint, so even cached data
+    // showed the loading slot for a frame. A genuinely pending source still renders the
+    // loading slot (its state stays pending after attach); only the wasted cached-data
+    // frame is removed.
+    //
+    // DETACH in a *passive* effect's cleanup so it stays ordered after the leaf's
+    // `.provide()` dispose, which is a layout cleanup: React flushes every layout
+    // cleanup before any passive cleanup, so the provided value (built over these
+    // grabbed sources) is disposed while the sources are still attached — the
+    // load-bearing dispose-before-detach order. (Keeping detach in the layout effect's
+    // own cleanup would make it a layout cleanup too, and layout cleanups run
+    // parent-first, so this level's detach would run before the deeper leaf's dispose —
+    // the exact inversion this split avoids.)
+    useLayoutEffect(() => {
         if (sources.length && navTraceEnabled()) {
-            navTrace(`level ${index} source attach (post-paint) [${dataKeys.join(',')}]`);
+            navTrace(`level ${index} source attach (pre-paint) [${dataKeys.join(',')}]`);
         }
         for (const entry of sources) if (!entry.detach) entry.detach = entry.source.attach();
+    }, [sources]);
+
+    useEffect(() => {
         return () => {
             for (let i = sources.length - 1; i >= 0; i--) {
                 const entry = sources[i]!;
