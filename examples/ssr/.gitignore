@@ -1,2 +1,4 @@
 dist/
 node_modules/
+# tsgo emits this for the composite tsconfig.node.json (vp run ssr-demo#typecheck)
+*.tsbuildinfo

@@ -2,7 +2,8 @@
 // client, ssrLoadModule for the server entry); prod mode serves the built
 // client bundle and imports the built server bundle.
 
-import { createServer as createHttpServer, IncomingMessage, ServerResponse } from 'node:http';
+import { createServer as createHttpServer } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
@@ -102,7 +103,9 @@ function tryServeStatic(req: IncomingMessage, res: ServerResponse): boolean {
 
 const loader = isProd ? await loadProd() : await loadDev();
 
-const server = createHttpServer(async (req, res) => {
+// The handler is async, but `createServer`'s listener must return `void` — so the
+// promise is wrapped with `void` at the registration site rather than passed directly.
+async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
         const url = req.url || '/';
 
@@ -134,7 +137,9 @@ const server = createHttpServer(async (req, res) => {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end(err instanceof Error && err.stack ? err.stack : String(err));
     }
-});
+}
+
+const server = createHttpServer((req, res) => void handleRequest(req, res));
 
 server.listen(port, () => {
     console.log(`rati SSR demo listening on http://localhost:${port}`);

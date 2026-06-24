@@ -9,7 +9,7 @@ export function About(props: AboutProps) {
     return (
         <section>
             <h1>About</h1>
-            <p>This page demonstrates the view system resolving on the server.</p>
+            <p>This page demonstrates a scope resolving on the server.</p>
             <ul>
                 <li>
                     <strong>Server time:</strong> {props.serverTime}

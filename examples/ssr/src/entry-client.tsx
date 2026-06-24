@@ -1,17 +1,18 @@
 import { hydrateRoot } from 'react-dom/client';
-import { createBrowserHistory, type WebRouterHydratedState } from 'rati';
-import { createApp } from './createApp';
+import { createBrowserHistory } from 'rati';
+import { type AppHydrationState, createApp } from './createApp';
 
 declare global {
     interface Window {
-        __RATI_STATE__: WebRouterHydratedState | null;
+        __RATI_STATE__: AppHydrationState | null;
     }
 }
 
-const hydratedState = window.__RATI_STATE__ ?? undefined;
+const state = window.__RATI_STATE__ ?? null;
 const { App } = createApp({
     history: createBrowserHistory(),
-    hydratedState,
+    hydratedState: state?.router,
+    islandData: state?.islands,
 });
 
 hydrateRoot(document.getElementById('root')!, <App />);

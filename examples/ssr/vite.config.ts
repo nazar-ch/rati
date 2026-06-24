@@ -7,10 +7,14 @@ const conditions = ['rati-dev', 'import', 'module', 'browser', 'default'];
 // Type-checking is handled by tsgo (`yarn typecheck`), not an in-dev plugin —
 // vite-plugin-checker was dropped with the move off the `typescript` package onto tsgo.
 export default defineConfig({
-    plugins: lazyPlugins(() => [
-        react(),
-        babel({ presets: [decoratorPreset({ version: '2023-11' })] }),
-    ]),
+    // `lazyPlugins` returns `undefined` for non-Vite commands (it skips
+    // instantiating the plugins then); `?? []` keeps the type a plain
+    // `PluginOption[]` for this tsconfig's exactOptionalPropertyTypes.
+    plugins:
+        lazyPlugins(() => [
+            react(),
+            babel({ presets: [decoratorPreset({ version: '2023-11' })] }),
+        ]) ?? [],
     build: {
         manifest: true,
     },
