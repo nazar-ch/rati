@@ -1,4 +1,4 @@
-import { describe, test, expectTypeOf } from 'vitest';
+import { describe, test, expectTypeOf } from 'vite-plus/test';
 import { route } from '../../router/route';
 import { scope, prop, type ScopeComponent } from '../../scope/scope';
 import { useRouteContext } from '../../router/useRouteContext';

@@ -7,7 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
 import { existsSync, createReadStream } from 'node:fs';
-import type { ViteDevServer } from 'vite';
+import type { ViteDevServer } from 'vite-plus';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isProd = process.env['NODE_ENV'] === 'production';
@@ -45,7 +45,7 @@ function escapeJsonForScript(value: unknown): string {
 }
 
 async function loadDev(): Promise<Loader> {
-    const { createServer: createViteServer } = await import('vite');
+    const { createServer: createViteServer } = await import('vite-plus');
     const vite = await createViteServer({
         root: __dirname,
         server: { middlewareMode: true },

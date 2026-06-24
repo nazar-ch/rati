@@ -1,4 +1,4 @@
-import { describe, test, expectTypeOf } from 'vitest';
+import { describe, test, expectTypeOf } from 'vite-plus/test';
 import { scope, prop, type ScopeParams, type ScopeProps } from '../../scope/scope';
 
 class TestStore {

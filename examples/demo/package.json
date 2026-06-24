@@ -4,9 +4,9 @@
     "version": "0.0.0",
     "type": "module",
     "scripts": {
-        "dev": "vite",
-        "build": "tsc && vite build",
-        "preview": "vite preview"
+        "dev": "vp dev",
+        "build": "tsc && vp build",
+        "preview": "vp preview"
     },
     "dependencies": {
         "rati": "workspace:*",
@@ -19,7 +19,8 @@
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^6.0.1",
-        "vite": "^8.0.10",
-        "vite-plugin-checker": "^0.13.0"
+        "vite": "catalog:",
+        "vite-plugin-checker": "^0.13.0",
+        "vite-plus": "catalog:"
     }
 }

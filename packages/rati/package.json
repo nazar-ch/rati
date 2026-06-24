@@ -21,10 +21,10 @@
     },
     "sideEffects": false,
     "scripts": {
-        "build": "vite build && yarn -T run tsc -p tsconfig.build.json",
+        "build": "vp build && yarn -T run tsc -p tsconfig.build.json",
         "watch": "yarn -T run tsc --watch",
-        "test": "vitest run --typecheck",
-        "test:watch": "vitest --typecheck"
+        "test": "vp test run --typecheck",
+        "test:watch": "vp test --typecheck"
     },
     "dependencies": {
         "type-fest": "^5.6.0"
@@ -44,9 +44,10 @@
         "mobx-react-lite": "^4.1.1",
         "react": "^19.2.5",
         "react-dom": "19.2.5",
-        "vite": "^8.0.10",
+        "vite": "catalog:",
         "vite-bundle-analyzer": "^1.3.8",
-        "vitest": "^4.1.5"
+        "vite-plus": "catalog:",
+        "vitest": "catalog:"
     },
     "peerDependencies": {
         "mobx": "^6.15.0",

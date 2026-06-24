@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 import react from '@vitejs/plugin-react';
 import babel from '@rolldown/plugin-babel';
 import { analyzer } from 'vite-bundle-analyzer';
@@ -9,11 +9,11 @@ const debugBundlePreserveModules = false;
 const bundleWhitelist: string[] = [];
 
 export default defineConfig({
-    plugins: [
+    plugins: lazyPlugins(() => [
         react(),
         babel({ presets: [decoratorPreset({ version: '2023-11' })] }),
         debugBundleContent && analyzer(),
-    ],
+    ]),
     build: {
         emptyOutDir: true,
         lib: {

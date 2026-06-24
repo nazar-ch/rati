@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach } from 'vite-plus/test';
 import { lazy, FC } from 'react';
 import { act, render, screen, cleanup } from '@testing-library/react';
 import { WebRouterStore } from '../../router/store';

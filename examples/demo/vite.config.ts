@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 import react from '@vitejs/plugin-react';
 import babel from '@rolldown/plugin-babel';
 import checker from 'vite-plugin-checker';
@@ -7,14 +7,14 @@ const conditions = ['rati-dev', 'import', 'module', 'browser', 'default'];
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [
+    plugins: lazyPlugins(() => [
         react(),
         babel({ presets: [decoratorPreset({ version: '2023-11' })] }),
         checker({
             enableBuild: false,
             typescript: true,
         }),
-    ],
+    ]),
     resolve: {
         conditions,
     },

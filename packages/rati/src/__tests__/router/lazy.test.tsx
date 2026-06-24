@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
 import { FC } from 'react';
 import { act, render, screen, cleanup } from '@testing-library/react';
 import { Suspense } from 'react';

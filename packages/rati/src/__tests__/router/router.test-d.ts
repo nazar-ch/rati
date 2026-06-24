@@ -1,4 +1,4 @@
-import { describe, test, expectTypeOf } from 'vitest';
+import { describe, test, expectTypeOf } from 'vite-plus/test';
 import { ComponentType, FC } from 'react';
 import { route } from '../../router/route';
 import { scope, prop, ScopeComponent } from '../../scope/scope';

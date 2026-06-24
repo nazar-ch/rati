@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect } from 'vite-plus/test';
 import { renderToString } from 'react-dom/server';
 import { prerender } from 'react-dom/static';
 import type { ReactElement } from 'react';

@@ -1,4 +1,4 @@
-import { describe, test, expectTypeOf } from 'vitest';
+import { describe, test, expectTypeOf } from 'vite-plus/test';
 import { responseKey } from '../../data/apiUtils';
 
 const apiCall = async (_v: { x: string }) => ({

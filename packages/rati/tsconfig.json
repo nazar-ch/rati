@@ -13,7 +13,7 @@
         "rootDir": "./src",
         "jsx": "react-jsx",
         "noEmit": true,
-        "types": ["vite/client"]
+        "types": ["vite-plus/client"]
     },
     "exclude": ["dist", "node_modules", "build", "src/__tests__"],
     "include": ["src"]

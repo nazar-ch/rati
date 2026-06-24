@@ -1,4 +1,4 @@
-import { describe, test, expectTypeOf } from 'vitest';
+import { describe, test, expectTypeOf } from 'vite-plus/test';
 import { scope, prop, hook, type ScopeParams, type ScopeProps } from '../../scope/scope';
 import { type Source } from '../../scope/source';
 import { useOptionalScope, useScope } from '../../mandala/channel';

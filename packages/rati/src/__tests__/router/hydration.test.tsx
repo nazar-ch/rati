@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vite-plus/test';
 import { renderToString } from 'react-dom/server';
 import { prerender } from 'react-dom/static';
 import { hydrateRoot } from 'react-dom/client';

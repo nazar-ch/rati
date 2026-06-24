@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite-plus';
 import babel from '@rolldown/plugin-babel';
 
 export default defineConfig({
