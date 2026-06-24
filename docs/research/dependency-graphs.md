@@ -1,25 +1,24 @@
 # Dependency graphs for islands — exploration
 
 > **Exploratory / future feature.** Not implemented and not committed to. The
-> shipping model is the **chain** (`createView` / `.chain()`) over reactive sources
-> — see [`data-views.plan.md`](./data-views.plan.md). This doc explores the
+> shipping model is the **scope chain** (`scope()` / `.load()`) over reactive sources
+> — see [design-and-usage.md](../design-and-usage.md). This doc explores the
 > *generalization* of the chain into a free dependency graph, focused on what the
 > **types** would look like, so we can decide if/when it's worth adding. Nothing
 > here changes current behavior.
 
 ## Why even consider it
 
-The chain we ship is a **depth-layered DAG**: each `.chain({...})` is one layer,
-props inside a layer resolve in parallel, and a layer sees the resolved values of
-all earlier layers. That already expresses fan-out and diamonds — you just bucket
-nodes by depth:
+The scope chain we ship is a **depth-layered DAG**: the `scope({...})` head is layer 0
+and each `.load({...})` is one more layer, props inside a layer resolve in parallel, and
+a layer sees the resolved values of all earlier layers. That already expresses fan-out and
+diamonds — you just bucket nodes by depth:
 
 ```ts
-createView
-    .chain({ spaceId: viewParam<Uuid>(), pageId: viewParam<Uuid>() }) // layer 0
-    .chain({ tree: ({ spaceId }) => loadTree(spaceId) })              // layer 1
-    .chain({ members: ({ spaceId }) => loadMembers(spaceId) })        // layer 1 (could merge)
-    .chain({ page: ({ spaceId, pageId }) => loadPage(spaceId, pageId) }); // layer 2
+scope({ spaceId: prop<Uuid>(), pageId: prop<Uuid>() })            // layer 0 (the head)
+    .load({ tree: ({ spaceId }) => loadTree(spaceId) })              // layer 1
+    .load({ members: ({ spaceId }) => loadMembers(spaceId) })        // layer 1 (could merge)
+    .load({ page: ({ spaceId, pageId }) => loadPage(spaceId, pageId) }); // layer 2
 ```
 
 A **free graph** drops the layer boundary: a node depends directly on the nodes it
@@ -31,7 +30,7 @@ doesn't matter — which is why the chain is the default. The graph is interesti
 (a) wide fan-out where one slow branch shouldn't gate the rest, and (b) as the
 conceptual model the chain is a special case of.
 
-This doc assumes the [source model](./data-views.plan.md): every node is a
+This doc assumes the [source model](../internals.md#sources-scopesourcets): every node is a
 `Source<T>` — a live `pending | ready | error` machine — and the island aggregates.
 
 ## Two construction styles
@@ -81,8 +80,8 @@ keys its function destructures*; the framework topologically sorts:
 
 ```ts
 const graph = sources({
-    space:   param<string>(),
-    pageId:  param<Uuid>(),
+    space:   prop<string>(),
+    pageId:  prop<Uuid>(),
     spaceId: ({ space })           => resolveSpace(space),
     tree:    ({ spaceId })         => loadTree(spaceId),
     members: ({ spaceId })         => loadMembers(spaceId),
@@ -97,7 +96,7 @@ mutually recursive:
 type UnwrapSource<T> = T extends Source<infer U> ? U : T;
 
 type Resolved<G> = {
-    [K in keyof G]: G[K] extends Param<infer T>     ? T
+    [K in keyof G]: G[K] extends Prop<infer T>      ? T
                   : G[K] extends (d: any) => infer R ? UnwrapSource<Awaited<R>>
                   : G[K] extends Source<infer T>     ? T
                   : G[K];
@@ -106,7 +105,7 @@ type Resolved<G> = {
 type GraphDef<G> = {
     // each node may read every *other* node's resolved value
     [K in keyof G]:
-        | Param<any>
+        | Prop<any>
         | ((deps: Omit<Resolved<G>, K>) => unknown | Promise<unknown> | Source<unknown>)
         | Source<any>;
 };
@@ -120,8 +119,8 @@ Two type problems live here:
    and `Resolved<G>` is computed *from the same object literal `G`* that is still
    being inferred. TypeScript can sometimes resolve `G extends GraphDef<G>`
    (F-bounded), but contextual typing of the function parameters through it is the
-   fragile case — exactly what `.chain()` sidesteps by making each layer's input a
-   **closed, already-known** type (`ResolveViewDefinition<PrevDefs>`), never the
+   fragile case — exactly what `.load()` sidesteps by making each layer's input a
+   **closed, already-known** type (`ResolveScopeDefinition<PrevDefs>`), never the
    in-progress whole.
 2. **No cycle prevention at the type level.** `Omit<Resolved<G>, K>` forbids the
    trivial self-edge (`spaceId` can't read `spaceId`), but it cannot express "only
@@ -131,7 +130,7 @@ So G2 reads best and types worst.
 
 ## Conclusion: the chain is the graph's typeable normal form
 
-A `.chain()` is a topological *pre-sort* of the graph into depth layers. That pre-sort
+A scope chain is a topological *pre-sort* of the graph into depth layers. That pre-sort
 is what makes the dependency types expressible: every node's input is the resolved
 type of a closed set of earlier nodes, so there's no self-referential `Resolved<G>`
 and no cycle question. The chain we ship is therefore the graph, minus the typing
@@ -140,12 +139,12 @@ hazard, minus the finer scheduling.
 Practical recommendation if we ever want graph-like power:
 
 - Keep the chain as the default surface.
-- Add **G1 `derive`** as an *escape hatch within a chain level* for the occasional
+- Add **G1 `derive`** as an *escape hatch within a `.load()` level* for the occasional
   cross-branch dependency that shouldn't spawn a whole new layer. It types cleanly,
   needs no new inference machinery, and is opt-in:
 
   ```ts
-  .chain({
+  .load({
       tree: ({ spaceId }) => loadTree(spaceId),
       // page only needs spaceId, not tree — don't gate it behind a tree layer
       page: ({ spaceId, pageId }) => loadPage(spaceId, pageId),
@@ -162,11 +161,11 @@ Practical recommendation if we ever want graph-like power:
 **Chain (depth-layered):**
 
 ```ts
-createView
-    .chain({ a: () => loadA() })                 // layer 0
-    .chain({ b: ({ a }) => loadB(a),
-             c: ({ a }) => loadC(a) })           // layer 1 (b, c in parallel)
-    .chain({ d: ({ b, c }) => combine(b, c) });  // layer 2
+scope()
+    .load({ a: () => loadA() })                  // layer 0 (first data level)
+    .load({ b: ({ a }) => loadB(a),
+            c: ({ a }) => loadC(a) })            // layer 1 (b, c in parallel)
+    .load({ d: ({ b, c }) => combine(b, c) });   // layer 2
 ```
 
 `d` waits for *both* `b` and `c` (same layer) — correct here, since `d` needs both.
