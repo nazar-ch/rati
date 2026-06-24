@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-rati is a small, custom TypeScript frontend framework for **React + MobX**, built and
+rati is a small, custom TypeScript frontend framework for **React**, built and
 evolved alongside Jnana (the app at `~/Sites/jnana`) to serve its needs — prioritizing
 simplicity, end-to-end type safety, and developer experience. Jnana consumes rati's source
 directly (via the `rati-dev` export condition) and drives its design.
@@ -100,15 +100,22 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
 - `island/island.ts` — the public `island()` wrapper.
 - `router/` — `route.tsx`, `store.ts` (WebRouterStore), `Router`/`Link`/`Navigate`,
   `useRouteContext`, `prepareRoute`, `history`, `scrollRestoration`, `lazy`.
-- `data/` — `remoteData` (debounced loader + race-guard), `apiUtils`, `ActiveData*`
-  (mutable MobX drafts).
+- `data/` — the legacy MobX-coupled data layer (`remoteData` debounced loader + race-guard,
+  `apiUtils`, `ActiveData*` mutable drafts), shipped via the `rati/mobx` entry, not core.
+- `mobx/` — the `rati/mobx` entry: `observableSource` (a MobX-derivation→`Source` adapter)
+  plus the `data/` re-exports. The only code that touches MobX (an optional peer dep).
 - `stores/` — `RootStore`, `GlobalStore`. `types/` — `generic.ts`. `util/` — `utils.ts`.
 
 ## Key patterns
 
-- **MobX decorators** (`@observable`/`@action`/`@computed`) compile via
-  `@babel/plugin-proposal-decorators` (oxc can't lower native decorators yet) — see
-  `vite.config.ts`/`vitest.config.ts`. Use the MobX `observer` pattern for components.
+- **Reactivity = `useSyncExternalStore`.** Core is MobX-free: a `Source` is a
+  `subscribe`/`getSnapshot` pair, `WebRouterStore` is a plain external store, and components
+  read both through uSES (no `observer`). Optional MobX bindings (`observableSource`) live in
+  `rati/mobx`.
+- **MobX decorators** (`@observable`/`@action`/`@computed`) survive only in the `data/` layer
+  (shipped via `rati/mobx`); they compile via `@babel/plugin-proposal-decorators` (oxc can't
+  lower native decorators yet) — see `vite.config.ts`/`vitest.config.ts`. Core is
+  decorator-free.
 - **`rati-dev` export condition** exposes `src/main.ts` so consumers (Jnana, the examples)
   type-check and bundle rati's *source* in dev — edits are picked up with no build. The
   published `import`/`types` conditions point at `dist/`.

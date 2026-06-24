@@ -1,7 +1,9 @@
 # rati — design & usage
 
-rati is a small TypeScript frontend framework for React + MobX: a type-safe router, a
+rati is a small TypeScript frontend framework for React: a type-safe router, a
 declarative data-loading model, and SSR/hydration, sharing one plain-English vocabulary.
+The core is reactivity-agnostic (it runs on React's `useSyncExternalStore`); optional MobX
+bindings live in `rati/mobx`.
 
 > Implementation notes (the resolver, the value channel, SSR dehydration, the internal
 > `mandala` core) live in [internals.md](./internals.md). Future-facing explorations are in
@@ -48,7 +50,7 @@ function App() {
 ```
 
 `WebRouterStore` owns history, the active route, and navigation. `<Router/>` renders the
-active route's component (with its optional `wrapper`). `RootStore` is the MobX store root;
+active route's component (with its optional `wrapper`). `RootStore` is the store root;
 extend it with your own stores and expose typed hooks via `createUseStoresHook`.
 
 ---
@@ -259,8 +261,9 @@ import {
 
 interface Source<T> {
     readonly [SourceSymbol]: true;
-    readonly state: SourceState<T>;   // a MobX-observable derivation (read inside observer)
-    attach(): () => void;             // start/hold the work; returns a detach fn
+    subscribe(onChange: () => void): () => void;  // useSyncExternalStore-shaped
+    getSnapshot(): SourceState<T>;                 // stable ref while unchanged
+    attach(): () => void;                          // start/hold the work; returns a detach fn
 }
 ```
 
@@ -269,9 +272,11 @@ interface Source<T> {
 - A load throwing `NotAvailableError` (or a promise rejecting with it) maps to
   `error.code === 'not-available'`; other failures map to `'failed'`. The error slot
   switches on `error.code`. `toSourceError(reason)` does the mapping.
-- Authoring a live source: make `state` an observable derivation and start the underlying
-  work in `attach()`, returning a detach function. The island calls `attach()` on mount and
-  detaches on unmount / input change.
+- Authoring a live source: implement `subscribe`/`getSnapshot` (the island reads it through
+  `useSyncExternalStore`) and start the underlying work in `attach()`, returning a detach
+  function. The island calls `attach()` on mount and detaches on unmount / input change.
+  `getSnapshot()` must return a stable reference while the state is unchanged. To back a
+  source with a MobX observable instead, use `observableSource` from `rati/mobx`.
 
 ---
 

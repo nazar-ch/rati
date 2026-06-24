@@ -20,7 +20,7 @@ src/
              scrollRestoration, lazy
   scope/     scope.ts (scope/prop/load/provide/hook + scope types), source.ts
   data/      remoteData, apiUtils, ActiveData (REST/data helpers)
-  stores/    RootStore, GlobalStore (MobX store roots)
+  stores/    RootStore, GlobalStore (store roots)
   util/      utils.ts
   types/     generic.ts
   main.ts    the public barrel
@@ -51,15 +51,17 @@ to its subtree, and owns the data lifecycle. That shared abstraction is the **ma
 - **Hooks/data split, per level.** `hook()` loads run **every render** in a stable loop
   (fixed key set → stable hook order, so the loop is rules-of-hooks-safe); everything else is
   a **data load** built once and cached. The Step runs all hook loads first, then resolves
-  the data cells (`use(promise)`, observable source reads), so an early "pending" return is
+  the data cells (`use(promise)`, source snapshot reads), so an early "pending" return is
   hook-order safe.
 - **Loading = Suspense + slot.** A pending *promise* suspends (the `<Suspense>` fallback is
   the loading slot); a pending *source* sets a pending flag → the loading slot.
 - **Errors = the boundary.** A rejected promise (`use()`) or a thrown source error reaches
   `MandalaErrorBoundary` → the `error` slot (switch on `error.code`), or rethrows to the
   nearest outer boundary when there's no slot.
-- **Live values = `observer`.** Steps and the Leaf are `observer`s; a ready `Source<T>` whose
-  value updates flows to the component reactively — only a *phase* change swaps slots.
+- **Live values = `useSyncExternalStore`.** Each Step subscribes to its level's sources
+  through one `useSyncExternalStore`; a ready `Source<T>` whose value updates flows to the
+  component reactively — only a *phase* change swaps slots. (Hook sources own their own
+  subscription.)
 
 ### The bucket cache lives on the mandala's committed ref
 
@@ -108,8 +110,9 @@ identity**, not the component's:
 
 ## Sources (`scope/source.ts`)
 
-A `Source<T>` is a reactive `pending | ready | error` machine: `state` is a MobX-observable
-derivation (read inside `observer`, so transitions re-render) and `attach()` starts/holds the
+A `Source<T>` is a reactive `pending | ready | error` machine: `subscribe`/`getSnapshot` are
+`useSyncExternalStore`-shaped (the Step reads them through uSES, so transitions re-render;
+`getSnapshot` must return a stable reference while unchanged) and `attach()` starts/holds the
 underlying work and returns a detach function. The unified `SourceError` collapses
 not-available / forbidden / failed into one shape with a machine-readable `code`. CRDT
 resources, REST loaders and promises all implement the interface, so the resolver is
@@ -137,8 +140,11 @@ seeds it via `WebRouterStoreOptions.hydratedState`.
 
 ## Router (`router/`)
 
-`WebRouterStore` (`store.ts`) owns history, the active route (`@observable.shallow`), basename
-handling, and navigation (`navigate`/`replace`/`setSearchParams`/`preloadRoute`). `route()`
+`WebRouterStore` (`store.ts`) owns history, the active route, basename
+handling, and navigation (`navigate`/`replace`/`setSearchParams`/`preloadRoute`). It is a
+plain external store — a listener `Set` plus `subscribe`/`getSnapshot` (a version counter);
+`useWebRouter` reads it through `useSyncExternalStore`, so every consumer re-renders on a
+change. `route()`
 (`route.tsx`) is a thin wrapper over `createMandala` plus the route/param **types**:
 
 - `ExtractRouteParams<Path>` turns `:param` segments into a typed param record.
@@ -170,7 +176,8 @@ Types: **tsgo** (`@typescript/native-preview`, the TS 7 native compiler) — the
 `typescript` dep. `vp run typecheck` type-checks (`tsconfig.json` for src,
 `tsconfig.test.json` for the test tree), `vp run build` emits `.d.ts` via
 `tsgo -p tsconfig.build.json`, and Vitest's `--typecheck` pass over `*.test-d.ts` uses tsgo
-through `test.typecheck.checker`. Decorators (MobX `@observable`/`@action`) compile via
+through `test.typecheck.checker`. The core is decorator-free; the MobX-coupled data layer
+under `rati/mobx` (`data/`) still uses decorators (`@observable`/`@action`), which compile via
 `@babel/plugin-proposal-decorators` — oxc can't lower native decorators yet — see
 `vite.config.ts`/`vitest.config.ts`.
 
