@@ -1,161 +1,58 @@
 import { type FC } from 'react';
-import { createView, resolveView, sleep, type ViewComponent, viewParam } from 'rati';
-import { useStores } from './globalStores';
+import { prop, scope, type ScopeComponent, sleep, useWebRouter } from 'rati';
 
-class XClass {
-    constructor(params: { whyNot: string; first: string }) {
-        this.niceThing = `~${params.whyNot}~`;
-    }
-
-    niceThing;
-}
-
-const vvv = createView({
-    productIdX: viewParam<number>(),
-    xx: async () => 'x',
-});
-
-const vvvvv = createView(vvv, {
-    first: '1',
-    productId: viewParam<number>(),
-    one: async (_params) => {},
-});
-
-// @ts-expect-error not used
-const xcxcx = vvvvv['prevView'];
-
-const heyView = createView(vvvvv, {
-    name: (async (_params) => {
-        await sleep(1000);
-        return 'Alina';
-    })(),
-    whyNot: 'hey',
-    productName: viewParam<string>(),
-});
-
-// @ts-expect-error not used
-const xcxcx223 = heyView['prevView'];
-
-const helloView = createView(heyView, {
-    hello: async (params) => {
-        await sleep(1000);
-        return `[${params.productName}] hello ${params.name}`;
-    },
-    hey: (async () => {
-        await sleep(1000);
-        return 14;
-    })(),
-    wow: 'wow',
-    xStore: XClass,
-});
-
-// @ts-expect-error not used
-async function test() {
-    const res = await resolveView(helloView, {
-        productId: 12,
-        productIdX: 123,
-        productName: 'cfdds',
-    });
-    console.log('res>', res);
-}
-
-export const SimpleTest: FC<{}> = () => {
-    const { router } = useStores();
+// A plain route component with no data of its own: it reads the router straight
+// off the global stores via rati's `useWebRouter()` hook (so it never has to
+// import the app's store module, which would cycle through the route list).
+export const SimpleTest: FC = () => {
+    const router = useWebRouter();
     return <div>simple test view - {router.path}</div>;
 };
 
+// A plain route component whose single prop is fed directly from the `:productId`
+// path param — no scope, no resolution.
 export const TestRouteParamsWithoutView: FC<{ productId: string }> = ({ productId }) => {
-    return <div>complex test view {productId}</div>;
+    return <div>route params, no scope: {productId}</div>;
 };
 
-export const SimpleTestWithView: ViewComponent<typeof simpleTestView> = (props) => {
-    return <div>simple test view: {props.xx}</div>;
-};
-
-export const simpleTestView = createView({
-    xx: async () => 'x',
+// A data-only scope: no inputs, one async load. The island resolves `xx` and
+// hands it to the component as a fully-resolved prop.
+export const simpleTestScope = scope().load({
+    xx: async () => {
+        await sleep(1000);
+        return 'x';
+    },
 });
 
-export const ComplexTestWithView: ViewComponent<typeof complexTestView> = (props) => {
-    return (
-        <div>
-            complex test view: {props.productName} → {props.name} → {props.xStore.text}
-        </div>
-    );
+export const SimpleTestWithScope: ScopeComponent<typeof simpleTestScope> = (props) => {
+    return <div>simple scope view: {props.xx}</div>;
 };
 
-class SimpleTextViewClass {
+// A small store class, built from the resolved values of the levels above it.
+class SimpleTextStore {
+    text: string;
     constructor(params: { productName: string; first: string }) {
         this.text = `~${params.first} ${params.productName}~`;
     }
-
-    text;
 }
 
-export const complexTestView = createView
-    .chain({
-        productName: viewParam<string>(),
-    })
-    .chain({
+// A waterfall scope: a `productName` input, then an async `name` load that
+// depends on it, then a plain `first` value, then a `SimpleTextStore`
+// instantiated from the resolved props of the prior levels.
+export const complexTestScope = scope({ productName: prop<string>() })
+    .load({
         name: async (params) => {
             await sleep(1000);
             return `product name: ${params.productName}`;
         },
     })
-    .chain({
-        first: '1',
-    })
-    .chain({
-        xStore: SimpleTextViewClass,
-    });
+    .load({ first: '1' })
+    .load({ xStore: SimpleTextStore });
 
-// @ts-expect-error not used
-const rrrrrr = createView
-    .chain({
-        productIdX: viewParam<number>(),
-        xx: async () => 'x',
-    })
-    .chain({
-        name2: async (_params) => {
-            await sleep(1000);
-            return 'Alina';
-        },
-        whyNot: 'hey',
-        productName: viewParam<string>(),
-    })
-    .chain({
-        first: '1',
-        productId: viewParam<number>(),
-        one: async (_params) => {},
-    })
-    .chain({
-        hello: async (params) => {
-            await sleep(1000);
-            return `[${params.xx}] hello ${params.productName}`;
-        },
-        hey: (async () => {
-            await sleep(1000);
-            return 14;
-        })(),
-        wow: 'wow',
-        xStore: XClass,
-    });
-
-// const rrr = await resolveView(rrrrrr, {
-//     productId: 1,
-//     productIdX: 2,
-//     productName: 'xx',
-// });
-
-// console.log('rrr', rrr);
-
-// // rrrrrr.prevView.definition
-
-// const xxx = createView.chain({
-//     productIdX: viewParam<number>(),
-//     xx: async () => 'x',
-// });
-
-// const zzxzxzxz = await resolveView(xxx, {
-//     productIdX: 1,
-// });
+export const ComplexTestWithScope: ScopeComponent<typeof complexTestScope> = (props) => {
+    return (
+        <div>
+            complex scope view: {props.productName} → {props.name} → {props.xStore.text}
+        </div>
+    );
+};

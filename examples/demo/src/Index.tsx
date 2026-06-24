@@ -1,19 +1,19 @@
 import { sleep, Link } from 'rati';
 
 export function Index() {
+    // The click handler is async, but a DOM `onClick` must return `void` — so the
+    // promise is wrapped with `void` at the call site rather than passed directly.
+    const onTestClick = async () => {
+        await sleep(2000);
+        alert('ok');
+    };
+
     return (
         <div className="App">
             Test
             <br />
             <br />
-            <button
-                onClick={async () => {
-                    await sleep(2000);
-                    alert('ok');
-                }}
-            >
-                test rati
-            </button>
+            <button onClick={() => void onTestClick()}>test rati</button>
             <br />
             <br />
             <Link to={{ name: 'test' }}>test page</Link> {' | '}
