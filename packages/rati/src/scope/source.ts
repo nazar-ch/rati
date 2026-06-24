@@ -1,5 +1,5 @@
 import { observable, runInAction } from 'mobx';
-import { is } from './utils';
+import { is } from '../util/utils';
 
 /*
     Sources — the reactive data primitive an island observes. A source is a live `pending | ready | error`

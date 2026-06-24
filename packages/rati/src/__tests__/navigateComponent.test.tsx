@@ -6,7 +6,7 @@ import { route } from '../router/route';
 import { Router } from '../router/Router';
 import { Navigate } from '../router/Navigate';
 import { GenericStoresContext } from '../stores/RootStore';
-import { createBrowserHistory } from '../common/history';
+import { createBrowserHistory } from '../router/history';
 
 const Home: FC = () => <Navigate to="/dashboard" />;
 const Dashboard: FC = () => <div data-testid="dashboard">dashboard</div>;

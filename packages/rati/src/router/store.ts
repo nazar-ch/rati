@@ -1,9 +1,9 @@
 import { observable, action, computed } from 'mobx';
-import { createBrowserHistory, type History, type Location } from '../common/history';
+import { createBrowserHistory, type History, type Location } from './history';
 import {
     installScrollRestoration,
     type ScrollRestorationOptions,
-} from '../common/scrollRestoration';
+} from './scrollRestoration';
 import { GlobalStore } from '../stores/GlobalStore';
 import type { GenericRouteType, NameToRoute } from './route';
 

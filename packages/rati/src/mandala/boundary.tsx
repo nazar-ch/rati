@@ -1,7 +1,7 @@
 import { Component } from 'react';
 import type { ComponentType, ErrorInfo, ReactNode } from 'react';
-import { toSourceError, type SourceError } from '../common/source';
-import { is } from '../common/utils';
+import { toSourceError, type SourceError } from '../scope/source';
+import { is } from '../util/utils';
 
 function asSourceError(thrown: unknown): SourceError {
     // A source error is already a SourceError (plain object with a string `code`); a

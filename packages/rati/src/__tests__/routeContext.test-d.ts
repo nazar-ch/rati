@@ -1,6 +1,6 @@
 import { describe, test, expectTypeOf } from 'vitest';
 import { route } from '../router/route';
-import { scope, prop, type ScopeComponent } from '../common/scope';
+import { scope, prop, type ScopeComponent } from '../scope/scope';
 import { useRouteContext } from '../router/useRouteContext';
 
 // Register the app's route table the way an app does — `RatiUserTypes['routes'] =

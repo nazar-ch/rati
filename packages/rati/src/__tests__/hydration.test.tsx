@@ -6,9 +6,9 @@ import { WebRouterStore } from '../router/store';
 import { route } from '../router/route';
 import { RootStore, RootStoreProvider } from '../stores/RootStore';
 import { Router } from '../router/Router';
-import { createBrowserHistory, createMemoryHistory } from '../common/history';
+import { createBrowserHistory, createMemoryHistory } from '../router/history';
 import { prepareRoute } from '../router/prepareRoute';
-import { scope, type ScopeComponent } from '../common/scope';
+import { scope, type ScopeComponent } from '../scope/scope';
 import { createIslandHydrationCollector, IslandHydrationProvider } from '../island/island';
 import { act } from '@testing-library/react';
 

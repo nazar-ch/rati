@@ -3,7 +3,7 @@ import { FC } from 'react';
 import { act, render, fireEvent, cleanup } from '@testing-library/react';
 import { WebRouterStore } from '../router/store';
 import { route } from '../router/route';
-import { lazy } from '../common/lazy';
+import { lazy } from '../router/lazy';
 import { Link } from '../router/Link';
 import { GenericStoresContext } from '../stores/RootStore';
 

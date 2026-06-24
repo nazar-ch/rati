@@ -1,7 +1,7 @@
-export { sleep } from './common/stuff';
+export { sleep } from './util/stuff';
 
-export { ActiveData, ActiveApiData } from './stores/ActiveData';
-export { type ActiveDataInstanceType } from './stores/ActiveDataInstanceType';
+export { ActiveData, ActiveApiData } from './data/ActiveData';
+export { type ActiveDataInstanceType } from './data/ActiveDataInstanceType';
 
 export {
     RootStore,
@@ -39,21 +39,21 @@ export {
     type HistoryListener,
     type HistoryUpdate,
     type Action as HistoryAction,
-} from './common/history';
+} from './router/history';
 export {
     installScrollRestoration,
     type ScrollRestorationOptions,
-} from './common/scrollRestoration';
+} from './router/scrollRestoration';
 
 export * from './types/generic';
 
 export { Link, ContextualLink, LinkContextProvider, useLinkContext } from './router/Link';
-export { lazy, type PreloadableLazyComponent } from './common/lazy';
+export { lazy, type PreloadableLazyComponent } from './router/lazy';
 export { Navigate } from './router/Navigate';
 export { prepareRoute, type PreparedRoute } from './router/prepareRoute';
 
-export { remoteData } from './common/remoteData';
-export { remoteDataKey, responseKey } from './common/apiUtils';
+export { remoteData } from './data/remoteData';
+export { remoteDataKey, responseKey } from './data/apiUtils';
 
 export {
     type ChainableScope,
@@ -72,7 +72,7 @@ export {
     ScopeSymbol,
     ScopeDefinitionsSymbol,
     ScopeProvidesSymbol,
-} from './common/scope';
+} from './scope/scope';
 
 export {
     NotAvailableError,
@@ -85,7 +85,7 @@ export {
     type Source,
     type SourceState,
     type SourceError,
-} from './common/source';
+} from './scope/source';
 
 export { useScope, useOptionalScope } from './mandala/channel';
 

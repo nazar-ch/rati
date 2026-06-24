@@ -1,6 +1,6 @@
 import { createContext, useContext, type Context } from 'react';
-import type { Scope, ScopeProvidesOf } from '../common/scope';
-import { is } from '../common/utils';
+import type { Scope, ScopeProvidesOf } from '../scope/scope';
+import { is } from '../util/utils';
 
 // One value channel per mandala, holding whatever it provides — the resolved props by
 // default, or the `.provide()` value when declared. Keyed by the *scope*: a descendant

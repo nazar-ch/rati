@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, act } from '@testing-library/react';
-import { scope, prop, type Scope } from '../common/scope';
+import { scope, prop, type Scope } from '../scope/scope';
 import { island } from '../island/island';
 
 afterEach(cleanup);

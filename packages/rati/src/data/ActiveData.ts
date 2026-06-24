@@ -1,7 +1,7 @@
 import { observable, computed, runInAction } from 'mobx';
 import type { PartialDeep, ReadonlyDeep } from 'type-fest';
 import type { Expand } from '../types/generic';
-import { deepMergeReplaceArrays } from '../common/utils';
+import { deepMergeReplaceArrays } from '../util/utils';
 
 export abstract class ActiveData<T> {
     protected constructor(data: T) {

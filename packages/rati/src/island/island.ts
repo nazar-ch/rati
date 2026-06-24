@@ -1,4 +1,4 @@
-import type { Scope } from '../common/scope';
+import type { Scope } from '../scope/scope';
 import { createMandala, type MandalaComponent, type MandalaConfig } from '../mandala/mandala';
 
 /**

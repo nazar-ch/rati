@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import type { TupleToUnion } from '../types/generic';
-import type { Scope, ScopeComponent, ScopeProvidesOf } from '../common/scope';
+import type { Scope, ScopeComponent, ScopeProvidesOf } from '../scope/scope';
 import { createMandala, type MandalaConfig } from '../mandala/mandala';
 
 //--------------------------------------------

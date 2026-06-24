@@ -7,9 +7,9 @@ import {
     type HookLoad,
     type Scope,
     type ScopeProvideDef,
-} from '../common/scope';
-import { isSource, type Source } from '../common/source';
-import { is } from '../common/utils';
+} from '../scope/scope';
+import { isSource, type Source } from '../scope/source';
+import { is } from '../util/utils';
 
 /*
     The mandala's resolution mechanics: compile a scope's levels into a nested tree of

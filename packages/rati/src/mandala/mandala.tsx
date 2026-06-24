@@ -1,9 +1,9 @@
 import { observer } from 'mobx-react-lite';
 import { Fragment, Suspense, useContext, useEffect, useId, useReducer, useRef } from 'react';
 import type { ComponentType, FC } from 'react';
-import type { Scope, ScopeParams, ScopeProps } from '../common/scope';
-import type { SourceError } from '../common/source';
-import { deepEqual } from '../common/utils';
+import type { Scope, ScopeParams, ScopeProps } from '../scope/scope';
+import type { SourceError } from '../scope/source';
+import { deepEqual } from '../util/utils';
 import { buildTree, flattenLevels, type Bucket, type Shared } from './resolver';
 import { registerScopeChannel, setScopeLabel } from './channel';
 import { MandalaErrorBoundary } from './boundary';
