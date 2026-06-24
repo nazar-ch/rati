@@ -129,6 +129,43 @@ type RouteComponentGuard<Path extends string, TScope extends Scope<any> | undefi
       : unknown;
 
 /**
+ * Fold a scope + component (+ slots) into the route's renderable mandala (labelled `Route`
+ * for DevTools / read errors). Shared by `route` and `group`: `route` builds it eagerly
+ * from its options; `group` rebuilds it when a group default supplies a `loading`/`error`
+ * slot the route itself didn't declare, merging child-over-group.
+ */
+export function buildRouteComponent(
+    component: ComponentType<any>,
+    fold: {
+        scope: Scope<any>;
+        loading?: ComponentType<any> | undefined;
+        error?: ComponentType<any> | undefined;
+    },
+): ComponentType<any> {
+    return createMandala(
+        {
+            scope: fold.scope,
+            component,
+            loading: fold.loading ?? (() => null),
+            ...(fold.error ? { error: fold.error } : {}),
+        },
+        'Route',
+    );
+}
+
+/**
+ * The inputs `route` folded its mandala from, retained so a wrapping `group` can re-derive
+ * the mandala when the group adds a `loading`/`error` slot. Present only on routes that
+ * carry a `scope` (a plain route has no mandala to refold). Internal plumbing — callers
+ * render the built `component`.
+ */
+export type RouteFoldInputs = {
+    component: ComponentType<any>;
+    loading?: ComponentType<any> | undefined;
+    error?: ComponentType<any> | undefined;
+};
+
+/**
  * The URL-bound sibling of `island`: both build a mandala (rati's core renderable unit
  * — a scope bound to a component with loading/error), `route` specialized to a location.
  * Its data inputs (`scope`, `loading`, `error`) are the mandala's and behave identically;
@@ -165,20 +202,16 @@ export function route<
     const scopeOption = options.scope;
 
     // A route is a mandala coupled to a location. A supplied scope is folded with the
-    // component into a mandala here (labelled `Route` for DevTools / read errors); params
-    // arrive from the URL match (the Router renders it with the route params), and the
-    // mandala owns loading/error and source attach/detach across navigation.
+    // component into a mandala (params arrive from the URL match; the mandala owns
+    // loading/error and source attach/detach across navigation). The fold inputs are kept
+    // in `foldInputs` so a wrapping `group` can re-fold with its shared slots.
     const routeComponent =
         scopeOption !== undefined
-            ? createMandala(
-                  {
-                      scope: scopeOption as Scope<any>,
-                      component: component as ComponentType<any>,
-                      loading: options.loading ?? (() => null),
-                      ...(options.error ? { error: options.error } : {}),
-                  },
-                  'Route',
-              )
+            ? buildRouteComponent(component as ComponentType<any>, {
+                  scope: scopeOption as Scope<any>,
+                  loading: options.loading as ComponentType<any> | undefined,
+                  error: options.error as ComponentType<any> | undefined,
+              })
             : component;
 
     return {
@@ -192,6 +225,15 @@ export function route<
         // route-context types are derived from this field's type — so the context type
         // comes straight from the route definition.
         scope: scopeOption as TScope extends Scope<any> ? TScope : undefined,
+        ...(scopeOption !== undefined
+            ? {
+                  foldInputs: {
+                      component: component as ComponentType<any>,
+                      loading: options.loading as ComponentType<any> | undefined,
+                      error: options.error as ComponentType<any> | undefined,
+                  } satisfies RouteFoldInputs,
+              }
+            : {}),
     };
 }
 
@@ -202,6 +244,9 @@ export type GenericRouteType = {
     component: any;
     wrapperComponent?: ComponentType | undefined;
     scope?: Scope<any> | undefined;
+    // Retained fold inputs so `group` can re-derive the mandala with shared slots; present
+    // only on scope-bearing routes. Read by `group`, not by the router.
+    foldInputs?: RouteFoldInputs | undefined;
 };
 
 type RoutesType<

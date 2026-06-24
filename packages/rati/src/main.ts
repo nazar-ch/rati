@@ -30,6 +30,7 @@ export {
     type RouteContextValueOf,
     type RouteContextNames,
 } from './router/route';
+export { group, type GroupDefaults } from './router/group';
 export { Router } from './router/Router';
 export {
     createBrowserHistory,
