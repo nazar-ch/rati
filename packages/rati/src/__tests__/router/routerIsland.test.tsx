@@ -6,7 +6,7 @@ import { route, type GenericRouteType } from '../../router/route';
 import { Router } from '../../router/Router';
 import { GenericStoresContext } from '../../stores/RootStore';
 import { scope, prop, type ScopeComponent } from '../../scope/scope';
-import { SourceSymbol, type Source } from '../../scope/source';
+import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
 import { useScope } from '../../mandala/channel';
 import { useRouteContext } from '../../router/useRouteContext';
@@ -77,14 +77,21 @@ describe('route + islands', () => {
 
         const Product = island({
             scope: scope({ productId: prop<string>() }).load({
-                res: ({ productId }): Source<{ productId: string }> => ({
-                    [SourceSymbol]: true,
-                    state: { status: 'ready', value: { productId } },
-                    attach() {
-                        log.push(`attach:${productId}`);
-                        return () => log.push(`detach:${productId}`);
-                    },
-                }),
+                res: ({ productId }): Source<{ productId: string }> => {
+                    const state: SourceState<{ productId: string }> = {
+                        status: 'ready',
+                        value: { productId },
+                    };
+                    return {
+                        [SourceSymbol]: true,
+                        getSnapshot: () => state,
+                        subscribe: () => () => {},
+                        attach() {
+                            log.push(`attach:${productId}`);
+                            return () => log.push(`detach:${productId}`);
+                        },
+                    };
+                },
             }),
             component: ({ res }) => <div>product {res.productId}</div>,
             loading: IslandLoading,

@@ -1,8 +1,8 @@
 export { sleep } from './util/utils';
 export { navTrace, navTraceStart, navTraceEnabled } from './util/navTrace';
 
-export { ActiveData, ActiveApiData } from './data/ActiveData';
-export { type ActiveDataInstanceType } from './data/ActiveDataInstanceType';
+// The MobX-coupled data layer (ActiveData / remoteData) moved to the `rati/mobx`
+// entry so core stays MobX-free — import it from there.
 
 export {
     RootStore,
@@ -53,9 +53,6 @@ export { Link, ContextualLink, LinkContextProvider, useLinkContext } from './rou
 export { lazy, type PreloadableLazyComponent } from './router/lazy';
 export { Navigate } from './router/Navigate';
 export { prepareRoute, type PreparedRoute } from './router/prepareRoute';
-
-export { remoteData } from './data/remoteData';
-export { remoteDataKey, responseKey } from './data/apiUtils';
 
 export {
     type ChainableScope,

@@ -1,5 +1,4 @@
-import { observer } from 'mobx-react-lite';
-import { use, useEffect, useLayoutEffect, useState } from 'react';
+import { use, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type { ComponentType, Context, ReactNode } from 'react';
 import {
     isHookLoad,
@@ -8,7 +7,7 @@ import {
     type Scope,
     type ScopeProvideDef,
 } from '../scope/scope';
-import { isSource, type Source } from '../scope/source';
+import { isSource, type Source, type SourceState } from '../scope/source';
 import { is } from '../util/utils';
 import { navTrace, navTraceEnabled } from '../util/navTrace';
 
@@ -141,15 +140,7 @@ type StepProps = {
     source-transition re-renders), and attached/detached in an effect. The hooks pass
     runs before any `use()` so an early `<Loading/>` return is hook-order safe.
 */
-const Step = observer(function Step({
-    level,
-    index,
-    hookKeys,
-    dataKeys,
-    prev,
-    shared,
-    children,
-}: StepProps) {
+function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: StepProps) {
     // Data cells for this level, built once into the mandala-held bucket (survives a
     // `use()` suspension). The inner tree remounts on a param change, so `prev` is
     // stable for a Step's lifetime and the bucket is fresh per mount.
@@ -212,6 +203,36 @@ const Step = observer(function Step({
         };
     }, [sources]);
 
+    // Re-render this level when any of its data sources transitions. One uSES per Step
+    // subscribes to all the level's sources at once (their count is fixed for this
+    // mount). The snapshot is the array of source states, rebuilt only when one changes
+    // identity — so it stays referentially stable between transitions (uSES requires
+    // that). Sources only emit from `attach()` (the effect above), so the subscription
+    // is live before any transition. Hook sources aren't here: a hook owns its own
+    // subscription (it runs every render and may call its own hooks).
+    const sourceStore = useMemo(() => {
+        let snapshot = sources.map((entry) => entry.source.getSnapshot());
+        const changed = () => {
+            for (let i = 0; i < sources.length; i++) {
+                if (sources[i]!.source.getSnapshot() !== snapshot[i]) return true;
+            }
+            return false;
+        };
+        return {
+            subscribe(onChange: () => void) {
+                const unsubs = sources.map((entry) => entry.source.subscribe(onChange));
+                return () => {
+                    for (const unsub of unsubs) unsub();
+                };
+            },
+            getSnapshot(): readonly SourceState<unknown>[] {
+                if (changed()) snapshot = sources.map((entry) => entry.source.getSnapshot());
+                return snapshot;
+            },
+        };
+    }, [sources]);
+    useSyncExternalStore(sourceStore.subscribe, sourceStore.getSnapshot, sourceStore.getSnapshot);
+
     // Hook loads first (every render, stable order — they may call React hooks), then
     // the cached data cells. `use()` in the resolve pass below is loop/early-return
     // safe, so the hook-call sequence is identical every render.
@@ -233,7 +254,7 @@ const Step = observer(function Step({
             shared.collect?.(key, value);
             resolved[key] = value;
         } else {
-            const state = cell.source.state;
+            const state = cell.source.getSnapshot();
             if (state.status === 'error') throw state.error;
             if (state.status === 'pending') pending = true;
             else resolved[key] = state.value;
@@ -246,7 +267,7 @@ const Step = observer(function Step({
         return <Loading params={shared.params} />;
     }
     return children(resolved);
-});
+}
 
 // The waterfall's tail: provide the value to the subtree (the resolved props by
 // default, or the `.provide()` value) and render the component. A `.provide()` value
@@ -254,7 +275,7 @@ const Step = observer(function Step({
 // before the sources it was built over detach (see Step's effect comment).
 type LeafProps = { resolved: Record<string, unknown>; shared: Shared };
 
-const Leaf = observer(function Leaf({ resolved, shared }: LeafProps) {
+function Leaf({ resolved, shared }: LeafProps) {
     const provideDef = shared.scope.provideDef;
     const Component = shared.component;
     const channel = shared.channel;
@@ -278,7 +299,7 @@ const Leaf = observer(function Leaf({ resolved, shared }: LeafProps) {
             cacheToken={shared.buckets}
         />
     );
-});
+}
 
 type ProvideLeafProps = {
     provideDef: ScopeProvideDef;

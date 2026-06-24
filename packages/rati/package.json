@@ -1,7 +1,7 @@
 {
     "name": "rati",
     "version": "0.5.0",
-    "description": "TypeScript frontend framework for React & MobX",
+    "description": "TypeScript frontend framework for React, with optional MobX bindings (rati/mobx)",
     "license": "MIT",
     "author": "Nazar Chobaniuk",
     "files": [
@@ -17,6 +17,12 @@
             "types": "./dist/main.d.ts",
             "import": "./dist/main.js",
             "source": "./src/main.ts"
+        },
+        "./mobx": {
+            "rati-dev": "./src/mobx/main.ts",
+            "types": "./dist/mobx/main.d.ts",
+            "import": "./dist/mobx/main.js",
+            "source": "./src/mobx/main.ts"
         },
         "./package.json": "./package.json"
     },
@@ -43,7 +49,6 @@
         "@types/react-dom": "~19.2.3",
         "jsdom": "^29.1.0",
         "mobx": "^6.15.0",
-        "mobx-react-lite": "^4.1.1",
         "react": "^19.2.5",
         "react-dom": "19.2.5",
         "vite": "catalog:",
@@ -53,8 +58,12 @@
     },
     "peerDependencies": {
         "mobx": "^6.15.0",
-        "mobx-react-lite": "^4.1.1",
         "react": "^19.2"
+    },
+    "peerDependenciesMeta": {
+        "mobx": {
+            "optional": true
+        }
     },
     "engines": {
         "node": ">=24"

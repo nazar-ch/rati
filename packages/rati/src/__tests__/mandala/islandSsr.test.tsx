@@ -4,7 +4,7 @@ import { hydrateRoot } from 'react-dom/client';
 import { act, cleanup } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { scope, prop } from '../../scope/scope';
-import { SourceSymbol, type Source } from '../../scope/source';
+import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import {
     island,
     createIslandHydrationCollector,
@@ -47,9 +47,11 @@ describe('island SSR (prerender)', () => {
     });
 
     test('renders the loading slot for a source-backed scope (sources stay pending under SSR)', async () => {
+        const pendingState: SourceState<{ id: string }> = { status: 'pending' };
         const pending: Source<{ id: string }> = {
             [SourceSymbol]: true,
-            state: { status: 'pending' },
+            subscribe: () => () => {},
+            getSnapshot: () => pendingState,
             attach: () => () => {},
         };
         const Island = island({

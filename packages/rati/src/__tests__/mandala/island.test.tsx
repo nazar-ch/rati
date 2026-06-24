@@ -1,6 +1,5 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
-import { observable, runInAction } from 'mobx';
 import { createContext, StrictMode, useContext, type FC } from 'react';
 import { scope, prop, hook } from '../../scope/scope';
 import { NotAvailableError, SourceSymbol, type Source, type SourceState } from '../../scope/source';
@@ -32,19 +31,31 @@ type TestSource<T> = Source<T> & {
 };
 
 function testSource<T>(log: string[], id: string): TestSource<T> {
-    const box = observable.box<SourceState<T>>({ status: 'pending' }, { deep: false });
+    // Hand-rolled subscribable (the new Source contract): a listener set + a stored
+    // state object whose identity changes on each transition, so getSnapshot is
+    // uSES-stable. Mirrors what an adapter (e.g. rati/mobx's observableSource) does.
+    let state: SourceState<T> = { status: 'pending' };
+    const listeners = new Set<() => void>();
+    const set = (next: SourceState<T>) => {
+        state = next;
+        for (const listener of listeners) listener();
+    };
     return {
         [SourceSymbol]: true,
-        get state() {
-            return box.get();
+        getSnapshot: () => state,
+        subscribe(onChange) {
+            listeners.add(onChange);
+            return () => {
+                listeners.delete(onChange);
+            };
         },
         attach() {
             log.push(`attach:${id}`);
             return () => log.push(`detach:${id}`);
         },
-        ready: (value) => act(() => runInAction(() => box.set({ status: 'ready', value }))),
-        fail: (code) => act(() => runInAction(() => box.set({ status: 'error', error: { code } }))),
-        pend: () => act(() => runInAction(() => box.set({ status: 'pending' }))),
+        ready: (value) => act(() => set({ status: 'ready', value })),
+        fail: (code) => act(() => set({ status: 'error', error: { code } })),
+        pend: () => act(() => set({ status: 'pending' })),
     };
 }
 
@@ -494,11 +505,11 @@ describe('island', () => {
         let seq = 0;
         return () => {
             const id = `src${++seq}`;
+            const state: SourceState<{ id: string }> = { status: 'ready', value: { id } };
             const source: Source<{ id: string }> = {
                 [SourceSymbol]: true,
-                get state(): SourceState<{ id: string }> {
-                    return { status: 'ready', value: { id } };
-                },
+                getSnapshot: () => state,
+                subscribe: () => () => {},
                 attach() {
                     log.push(`attach:${id}`);
                     return () => log.push(`detach:${id}`);

@@ -1,8 +1,6 @@
-import { observable, runInAction } from 'mobx';
-import React, { type Context, useEffect } from 'react';
+import React, { type Context, useEffect, useState, useSyncExternalStore } from 'react';
 import { WebRouterStore } from '../router/store';
 import { sleep } from '../util/utils';
-import { observer } from 'mobx-react-lite';
 
 export interface RootStoreOptions {
     /**
@@ -30,7 +28,7 @@ export class RootStore<T extends GlobalStores> {
         return this._isReady;
     }
 
-    @observable protected accessor _isReady: boolean = false;
+    protected _isReady: boolean = false;
 
     /**
      * Stores initialization and rehydration. Should be called before rendering app components
@@ -38,35 +36,40 @@ export class RootStore<T extends GlobalStores> {
     async init() {
         // TODO: hydrate stores
         await mockHydration();
-
-        runInAction(() => {
-            this._isReady = true;
-        });
+        this._isReady = true;
     }
 }
 
-export const RootStoreProvider = observer(function RootStoreProvider({
+export function RootStoreProvider({
     rootStore,
     children,
 }: {
     rootStore: RootStore<any>;
     children: React.ReactNode;
 }) {
-    useEffect(() => {
-        runInAction(() => {
-            if (rootStore.isReady) return;
-            rootStore.init().catch(console.error);
-        });
-    }, []);
+    // `isReady` is a one-shot latch (false → true after init), read only here — plain
+    // React state is enough, no external store / observer needed.
+    const [ready, setReady] = useState(rootStore.isReady);
 
-    if (!rootStore.isReady) return null;
+    useEffect(() => {
+        if (rootStore.isReady) {
+            setReady(true);
+            return;
+        }
+        rootStore
+            .init()
+            .then(() => setReady(true))
+            .catch(console.error);
+    }, [rootStore]);
+
+    if (!ready) return null;
 
     return (
         <GenericStoresContext.Provider value={rootStore.stores}>
             {children}
         </GenericStoresContext.Provider>
     );
-});
+}
 
 async function mockHydration() {
     await sleep(5);
@@ -91,13 +94,27 @@ export interface GlobalStores {
 /** @internal */
 export const useGenericStores = createUseStoresHook<GlobalStores>();
 
+const noopSubscribe = () => () => {};
+const noopGetSnapshot = () => 0;
+
 /** @internal */
 export function useWebRouter() {
     const { router } = useGenericStores();
+    const webRouter = router instanceof WebRouterStore ? router : null;
 
-    if (!router || !(router instanceof WebRouterStore)) {
+    // Subscribe so any component reading the router (Link, Router, app code) re-renders
+    // on navigation — this replaces the old mobx `observer` wrapping. A no-op
+    // subscription when the router isn't configured keeps the rules of hooks intact;
+    // the throw below turns that into a clear error.
+    useSyncExternalStore(
+        webRouter?.subscribe ?? noopSubscribe,
+        webRouter?.getSnapshot ?? noopGetSnapshot,
+        webRouter?.getSnapshot ?? noopGetSnapshot,
+    );
+
+    if (!webRouter) {
         throw new Error('Please add WebRouter to the global stores to use link components');
     }
 
-    return router;
+    return webRouter;
 }

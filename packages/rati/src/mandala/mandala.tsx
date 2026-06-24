@@ -1,4 +1,3 @@
-import { observer } from 'mobx-react-lite';
 import { Fragment, Suspense, useContext, useEffect, useId, useReducer, useRef } from 'react';
 import type { ComponentType, FC } from 'react';
 import type { Scope, ScopeParams, ScopeProps } from '../scope/scope';
@@ -76,7 +75,9 @@ export function createMandala<S extends Scope<any>>(
     const Loading = (config.loading ?? DefaultLoading) as ComponentType<{ params: unknown }>;
     const levels = flattenLevels(config.scope as Scope);
 
-    const Mandala = observer(function Mandala(params: ScopeParams<S>) {
+    // Plain function component: source reactivity now lives in each Step's
+    // useSyncExternalStore, so the mandala no longer needs to be an observer.
+    const Mandala = function Mandala(params: ScopeParams<S>) {
         // Stable across server render and client hydration by tree position, so it keys
         // this mandala's slice of the SSR dehydration registry (see hydration.tsx).
         const mandalaId = useId();
@@ -122,10 +123,17 @@ export function createMandala<S extends Scope<any>>(
             };
         }
 
+        // A bare re-render trigger (does not change treeKey), used by the effect below.
+        const [, forceRebuild] = useReducer((count: number) => count + 1, 0);
+
         // Drop the cache on unmount so a StrictMode remount (mount → cleanup → mount)
-        // rebuilds a fresh run instead of reusing the torn-down one's cells/sources — the
-        // subtree then reads the surviving run's identities.
+        // rebuilds a fresh run instead of reusing the torn-down one's cells/sources. On
+        // the remount the cache is null, so force one re-render to rebuild it into a fresh
+        // run — the mandala used to get this re-render for free as a mobx `observer`; now
+        // it's explicit. The subtree then reads the surviving run's identities. A real
+        // (production) mount runs once with the cache non-null, so it adds no render there.
         useEffect(() => {
+            if (cacheRef.current === null) forceRebuild();
             return () => {
                 cacheRef.current = null;
             };
@@ -158,7 +166,7 @@ export function createMandala<S extends Scope<any>>(
                 </Suspense>
             </MandalaErrorBoundary>
         );
-    }) as MandalaComponent<S>;
+    } as MandalaComponent<S>;
 
     const componentName =
         config.component.displayName ?? (config.component as { name?: string }).name;

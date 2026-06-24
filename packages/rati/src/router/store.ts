@@ -1,4 +1,3 @@
-import { observable, action, computed } from 'mobx';
 import { createBrowserHistory, type History, type Location } from './history';
 import { navTrace } from '../util/navTrace';
 import { installScrollRestoration, type ScrollRestorationOptions } from './scrollRestoration';
@@ -89,6 +88,25 @@ export class WebRouterStore<
     pendingNavigation: Promise<void> = Promise.resolve();
     private uninstallScrollRestoration: () => void = () => {};
 
+    // useSyncExternalStore subscription. Navigation is infrequent, so a single
+    // version counter bumped on every change (re-rendering each router consumer) is
+    // enough — no per-field selectors. `subscribe`/`getSnapshot` are arrow fields so
+    // their identity stays stable across renders, as uSES requires.
+    private listeners = new Set<() => void>();
+    private version = 0;
+    readonly subscribe = (onChange: () => void): (() => void) => {
+        this.listeners.add(onChange);
+        return () => {
+            this.listeners.delete(onChange);
+        };
+    };
+    readonly getSnapshot = (): number => this.version;
+    private emitChange() {
+        this.version++;
+        // Set iteration tolerates a listener unsubscribing mid-notify, so iterate directly.
+        for (const listener of this.listeners) listener();
+    }
+
     constructor(
         stores: any,
         public routes: T,
@@ -126,7 +144,7 @@ export class WebRouterStore<
         }
     }
 
-    @action.bound private seedFromHydratedState(state: WebRouterHydratedState) {
+    private seedFromHydratedState(state: WebRouterHydratedState) {
         const matched = this.routes.find((r) => r.name === state.activeRouteName);
         if (!matched) {
             // The hydrated route name doesn't exist in this client's route table
@@ -153,6 +171,7 @@ export class WebRouterStore<
             routeParams: state.routeParams,
             pathCounter: this.pathCounter,
         };
+        this.emitChange();
     }
 
     dispose() {
@@ -177,12 +196,12 @@ export class WebRouterStore<
         return this.basename + path;
     }
 
-    @computed get path() {
+    get path() {
         return this._path;
     }
 
     /** The raw `?…` portion of the current URL, including the leading `?`. */
-    @computed get search() {
+    get search() {
         return this._search;
     }
 
@@ -191,12 +210,12 @@ export class WebRouterStore<
      * each time the underlying search changes — treat it as immutable. To
      * change params, use {@link setSearchParams}.
      */
-    @computed get searchParams() {
+    get searchParams() {
         return new URLSearchParams(this._search);
     }
 
     /** The `#…` portion of the current URL, including the leading `#`. */
-    @computed get hash() {
+    get hash() {
         return this._hash;
     }
 
@@ -206,7 +225,7 @@ export class WebRouterStore<
      * back/forward. Use it to carry UI-local context that shouldn't live in the
      * URL itself — e.g. which panel a navigation targets.
      */
-    @computed get state(): unknown {
+    get state(): unknown {
         return this._state;
     }
 
@@ -239,60 +258,65 @@ export class WebRouterStore<
         return undefined;
     }
 
-    @observable private accessor _path: string = '';
-    @observable private accessor _search: string = '';
-    @observable private accessor _hash: string = '';
-    @observable.ref private accessor _state: unknown = null;
+    private _path: string = '';
+    private _search: string = '';
+    private _hash: string = '';
+    private _state: unknown = null;
 
-    // Non-shallow observable breaks the component class inside this property
-    @observable.shallow accessor activeRoute: ActiveRoute | null = null;
+    activeRoute: ActiveRoute | null = null;
 
     private pathCounter: number = 0;
     private readonly sessionId = globalThis.crypto?.randomUUID
         ? globalThis.crypto.randomUUID()
         : // for local development, and Node < 19 where globalThis.crypto is absent
           `${Math.random()}-${Math.random()}`;
-    @action.bound setPath(location: Location) {
-        const { state } = location;
-        const pathname = stripBasename(location.pathname, this.basename);
-        const currentPathCounter = this.pathCounter++;
+    setPath(location: Location) {
+        try {
+            const { state } = location;
+            const pathname = stripBasename(location.pathname, this.basename);
+            const currentPathCounter = this.pathCounter++;
 
-        // Search, hash and state always update so observers see them, even on
-        // hash-only or query-only navigations (or skipped shallow replaces) that
-        // leave the route unchanged.
-        this._search = location.search;
-        this._hash = location.hash;
-        this._state = state ?? null;
+            // Search, hash and state always update so observers see them, even on
+            // hash-only or query-only navigations (or skipped shallow replaces) that
+            // leave the route unchanged.
+            this._search = location.search;
+            this._hash = location.hash;
+            this._state = state ?? null;
 
-        // Skip resolution only when the URL didn't change AND we already have
-        // a resolved route. Otherwise we'd skip on the initial mount race or
-        // on StrictMode re-fires where _path was set but activeRoute wasn't
-        // yet committed.
-        if (this._path === pathname && this.activeRoute) {
-            return;
+            // Skip resolution only when the URL didn't change AND we already have
+            // a resolved route. Otherwise we'd skip on the initial mount race or
+            // on StrictMode re-fires where _path was set but activeRoute wasn't
+            // yet committed.
+            if (this._path === pathname && this.activeRoute) {
+                return;
+            }
+
+            this._path = pathname;
+
+            // Skip rendering the route if it was set by `replace({ keepCurrentRoute: true })`
+            if (
+                typeof state === 'object' &&
+                state &&
+                'skip' in state &&
+                state['skip'] === `${currentPathCounter}/${this.sessionId}`
+            ) {
+                return;
+            }
+
+            this.activeRoute =
+                this.getActiveRoute(
+                    this.path,
+                    this.stores as any,
+                    // Using this number as `key` ensures that the route that was not
+                    // skipped above will be rerendered
+                    this.pathCounter,
+                ) ?? null;
+            navTrace(`setPath → activeRoute=${this.activeRoute?.name ?? 'none'}`);
+        } finally {
+            // One notification per setPath regardless of which return ran —
+            // search/hash/state always change, so consumers must re-read.
+            this.emitChange();
         }
-
-        this._path = pathname;
-
-        // Skip rendering the route if it was set by `replace({ keepCurrentRoute: true })`
-        if (
-            typeof state === 'object' &&
-            state &&
-            'skip' in state &&
-            state['skip'] === `${currentPathCounter}/${this.sessionId}`
-        ) {
-            return;
-        }
-
-        this.activeRoute =
-            this.getActiveRoute(
-                this.path,
-                this.stores as any,
-                // Using this number as `key` ensures that the route that was not
-                // skipped above will be rerendered
-                this.pathCounter,
-            ) ?? null;
-        navTrace(`setPath → activeRoute=${this.activeRoute?.name ?? 'none'}`);
     }
 
     /**
@@ -302,7 +326,7 @@ export class WebRouterStore<
      *
      * Accepts anything `URLSearchParams` accepts (object, string, entries).
      */
-    @action.bound setSearchParams(
+    setSearchParams(
         init: ConstructorParameters<typeof URLSearchParams>[0] | URLSearchParams,
         options: { mode?: 'push' | 'replace' } = {},
     ) {
@@ -325,10 +349,7 @@ export class WebRouterStore<
      * reachable via back (post-login, auth-gate, canonicalization), use
      * `replace()`.
      */
-    @action.bound navigate(
-        to: NameToRoute<T> | string,
-        options: { state?: Record<string, unknown> } = {},
-    ) {
+    navigate(to: NameToRoute<T> | string, options: { state?: Record<string, unknown> } = {}) {
         const path = typeof to === 'string' ? to : this.getPath(to);
         this.history.push(path, options.state ?? null);
     }
@@ -352,7 +373,7 @@ export class WebRouterStore<
      * survives back/forward). Coexists with `keepCurrentRoute`'s internal skip
      * marker.
      */
-    @action.bound replace(
+    replace(
         to: NameToRoute<T> | string,
         options: { keepCurrentRoute?: boolean; state?: Record<string, unknown> } = {},
     ) {

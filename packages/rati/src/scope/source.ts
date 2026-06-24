@@ -1,4 +1,3 @@
-import { observable, runInAction } from 'mobx';
 import { is } from '../util/utils';
 
 /*
@@ -44,14 +43,21 @@ export type SourceState<T> =
 export const SourceSymbol = Symbol('rati.source');
 
 /**
- * A reactive 3-state data source. `state` must be a MobX-observable derivation —
- * the island reads it inside an `observer`, so transitions re-render. Lifetime is
- * explicit: `attach()` starts/holds the underlying work and returns a detach
- * function the island calls on teardown (unmount / param change).
+ * A reactive 3-state data source, shaped for React's `useSyncExternalStore`: the
+ * island subscribes with `subscribe(onChange)` and reads the current state with
+ * `getSnapshot()`, so a transition re-renders. `getSnapshot()` must return a
+ * referentially stable value while the state is unchanged — uSES compares snapshots
+ * by identity, so a fresh object every call would loop. Lifetime is explicit:
+ * `attach()` starts/holds the underlying work and returns a detach function the
+ * island calls on teardown (unmount / param change).
+ *
+ * Reactivity-agnostic: a plain promise, a CRDT handle, or a MobX derivation can all
+ * back one — see `rati/mobx`'s `observableSource` to adapt a MobX observable.
  */
 export interface Source<T> {
     readonly [SourceSymbol]: true;
-    readonly state: SourceState<T>;
+    subscribe(onChange: () => void): () => void;
+    getSnapshot(): SourceState<T>;
     attach(): () => void;
 }
 
@@ -63,22 +69,40 @@ const noopDetach = () => {};
 
 /** A source already holding a value (a plain prop, a resolved class instance). */
 export function readySource<T>(value: T): Source<T> {
-    return { [SourceSymbol]: true, state: { status: 'ready', value }, attach: () => noopDetach };
+    const state: SourceState<T> = { status: 'ready', value };
+    return {
+        [SourceSymbol]: true,
+        subscribe: () => noopDetach,
+        getSnapshot: () => state,
+        attach: () => noopDetach,
+    };
 }
 
 /** Adapts an in-flight promise to a source: pending → ready / error. */
 export function promiseSource<T>(promise: Promise<T>): Source<T> {
-    const state = observable.box<SourceState<T>>({ status: 'pending' }, { deep: false });
+    // Hand-rolled subscribable: a listener set + a single stored state object whose
+    // identity changes only on transition, so `getSnapshot` stays uSES-stable.
+    let state: SourceState<T> = { status: 'pending' };
+    const listeners = new Set<() => void>();
+    const set = (next: SourceState<T>) => {
+        state = next;
+        // Set iteration tolerates a listener unsubscribing mid-notify (a deleted,
+        // not-yet-visited entry is simply skipped), so iterate directly.
+        for (const listener of listeners) listener();
+    };
     void promise.then(
-        (value) => runInAction(() => state.set({ status: 'ready', value })),
-        (reason: unknown) =>
-            runInAction(() => state.set({ status: 'error', error: toSourceError(reason) })),
+        (value) => set({ status: 'ready', value }),
+        (reason: unknown) => set({ status: 'error', error: toSourceError(reason) }),
     );
     return {
         [SourceSymbol]: true,
-        get state() {
-            return state.get();
+        subscribe(onChange) {
+            listeners.add(onChange);
+            return () => {
+                listeners.delete(onChange);
+            };
         },
+        getSnapshot: () => state,
         attach: () => noopDetach,
     };
 }

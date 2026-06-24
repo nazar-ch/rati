@@ -1,11 +1,9 @@
-import { observer } from 'mobx-react-lite';
 import { createContext, memo, type PropsWithChildren, useCallback, useContext } from 'react';
 
 import { type NameToRoute, type GenericRouteType, type UserRoutes } from './route';
 import { type WebRouterStore } from './store';
 import { useWebRouter } from '../stores/RootStore';
 import { navTraceStart } from '../util/navTrace';
-import { computed } from 'mobx';
 
 type GenericAnchorProps = Omit<
     React.DetailedHTMLProps<React.AnchorHTMLAttributes<HTMLAnchorElement>, HTMLAnchorElement>,
@@ -39,7 +37,7 @@ type RatiRegularAnchorProps<T extends readonly GenericRouteType[]> = RatiLinkBas
     GenericAnchorProps &
     RatiLinkToProps<T>;
 
-const GenericAnchor = observer(function GenericAnchor({
+const GenericAnchor = function GenericAnchor({
     className,
     activeClassName,
     content,
@@ -96,9 +94,9 @@ const GenericAnchor = observer(function GenericAnchor({
             {children || (content && (isActive ? content.active : content.normal))}
         </a>
     );
-});
+};
 
-export const Link = observer(function Link({
+export const Link = function Link({
     to,
     href,
     ...props
@@ -109,7 +107,7 @@ export const Link = observer(function Link({
     const isActive = webRouter.isPath(resolvedHref);
 
     return <GenericAnchor {...props} {...{ isActive, href: resolvedHref }} />;
-});
+};
 
 export const LinkContextProvider = memo(function LinkContextProvider({
     children,
@@ -127,15 +125,18 @@ export const LinkContextProvider = memo(function LinkContextProvider({
     );
 });
 
-export const ContextualLink = observer(function ContextualAnchor(
+export const ContextualLink = function ContextualAnchor(
     props: PropsWithChildren<RatiLinkBaseProps & GenericAnchorProps>,
 ) {
+    // Subscribe to the router so active state re-renders on navigation — the
+    // LinkContextStore getters derive from it. Replaces the old mobx `observer`.
+    useWebRouter();
     const linkContext = useLinkContext();
 
     return (
         <GenericAnchor {...props} {...{ isActive: linkContext.isActive, href: linkContext.href }} />
     );
-});
+};
 
 /**
  * Decide whether to intercept this link click for SPA navigation, or let the
@@ -168,11 +169,11 @@ class LinkContextStore<T extends readonly GenericRouteType[]> {
         private to: NameToRoute<T> | string,
     ) {}
 
-    @computed get isActive() {
+    get isActive() {
         return this.webRouter.isPath(this.href);
     }
 
-    @computed get href() {
+    get href() {
         return this.webRouter.getPath(this.to);
     }
 }
