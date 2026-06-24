@@ -1,10 +1,11 @@
-import { observable, runInAction } from 'mobx';
 import { SourceSymbol, type Source, type SourceState } from 'rati';
 
 /**
  * A live clock as a rati `Source`: pending until attached, then ticking once a
- * second. A source's `state` is a MobX-observable derivation the island reads
- * inside an `observer`, so each tick re-renders.
+ * second. The source is a `subscribe` / `getSnapshot` pair (the uSES-shaped Source
+ * contract) — each tick stores a new state object and notifies, so the island
+ * re-renders. `getSnapshot` returns the stored object (stable identity until the
+ * next tick), as uSES requires.
  *
  * Sources stay *pending* under SSR — `attach()` runs from an effect, and effects
  * don't run during the server `prerender` — so the island renders its loading slot
@@ -12,21 +13,28 @@ import { SourceSymbol, type Source, type SourceState } from 'rati';
  * cleanup clears the interval when the island unmounts (e.g. navigating away).
  */
 export function clockSource(): Source<string> {
-    const box = observable.box<SourceState<string>>({ status: 'pending' }, { deep: false });
+    let state: SourceState<string> = { status: 'pending' };
+    const listeners = new Set<() => void>();
+    const set = (next: SourceState<string>) => {
+        state = next;
+        for (const listener of listeners) listener();
+    };
     const now = () => new Date().toLocaleTimeString('en-US', { hour12: false });
     return {
         [SourceSymbol]: true,
-        get state() {
-            return box.get();
+        getSnapshot: () => state,
+        subscribe(onChange) {
+            listeners.add(onChange);
+            return () => {
+                listeners.delete(onChange);
+            };
         },
         attach() {
-            runInAction(() => box.set({ status: 'ready', value: now() }));
-            const id = setInterval(() => {
-                runInAction(() => box.set({ status: 'ready', value: now() }));
-            }, 1000);
+            set({ status: 'ready', value: now() });
+            const id = setInterval(() => set({ status: 'ready', value: now() }), 1000);
             return () => {
                 clearInterval(id);
-                runInAction(() => box.set({ status: 'pending' }));
+                set({ status: 'pending' });
             };
         },
     };

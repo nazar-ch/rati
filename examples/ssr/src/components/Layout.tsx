@@ -1,4 +1,3 @@
-import { observer } from 'mobx-react-lite';
 import type { ReactNode } from 'react';
 import { Link, useWebRouter } from 'rati';
 
@@ -16,10 +15,11 @@ const LINKS = [
 
 /**
  * App chrome wrapped around the router (in `createApp`), so it renders once and
- * survives navigation. An `observer`, so reading `router.activeRoute` re-highlights
- * the active link as you navigate.
+ * survives navigation. `useWebRouter()` subscribes via useSyncExternalStore, so
+ * reading `router.activeRoute` re-highlights the active link as you navigate — no
+ * `observer` needed.
  */
-export const Layout = observer(function Layout({ children }: { children: ReactNode }) {
+export function Layout({ children }: { children: ReactNode }) {
     const router = useWebRouter();
     const active = router.activeRoute?.name;
     return (
@@ -47,4 +47,4 @@ export const Layout = observer(function Layout({ children }: { children: ReactNo
             </footer>
         </div>
     );
-});
+}

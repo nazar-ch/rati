@@ -1,4 +1,3 @@
-import { observable, runInAction } from 'mobx';
 import {
     NotAvailableError,
     SourceSymbol,
@@ -17,31 +16,41 @@ let attempt = 0;
  * `code` — and every even attempt succeeds. So the island shows its error slot
  * first, and the slot's `retry` (which remounts the inner tree → a fresh source)
  * recovers. Pending under SSR, so the server render emits the loading slot.
+ *
+ * A `subscribe` / `getSnapshot` pair (the uSES-shaped Source contract): `attach`
+ * stores the terminal state and notifies, and `getSnapshot` returns it.
  */
 export function flakyService(): Source<string> {
-    const box = observable.box<SourceState<string>>({ status: 'pending' }, { deep: false });
+    let state: SourceState<string> = { status: 'pending' };
+    const listeners = new Set<() => void>();
+    const set = (next: SourceState<string>) => {
+        state = next;
+        for (const listener of listeners) listener();
+    };
     return {
         [SourceSymbol]: true,
-        get state() {
-            return box.get();
+        getSnapshot: () => state,
+        subscribe(onChange) {
+            listeners.add(onChange);
+            return () => {
+                listeners.delete(onChange);
+            };
         },
         attach() {
             const mine = ++attempt;
             const id = setTimeout(() => {
-                runInAction(() => {
-                    if (mine % 2 === 1) {
-                        box.set({
-                            status: 'error',
-                            error: toSourceError(
-                                new NotAvailableError('flaky service is warming up', {
-                                    code: 'unavailable',
-                                }),
-                            ),
-                        });
-                    } else {
-                        box.set({ status: 'ready', value: `connected on attempt #${mine}` });
-                    }
-                });
+                if (mine % 2 === 1) {
+                    set({
+                        status: 'error',
+                        error: toSourceError(
+                            new NotAvailableError('flaky service is warming up', {
+                                code: 'unavailable',
+                            }),
+                        ),
+                    });
+                } else {
+                    set({ status: 'ready', value: `connected on attempt #${mine}` });
+                }
             }, 650);
             return () => clearTimeout(id);
         },
