@@ -20,7 +20,7 @@ export default defineConfig({
             // Two entries: the MobX-free core and the optional `rati/mobx` bindings.
             // Rolldown hoists the shared core modules into a common chunk, so
             // SourceSymbol (and friends) keep one identity across both.
-            entry: { main: 'src/main.ts', 'mobx/main': 'src/mobx/main.ts' },
+            entry: { main: 'src/main.ts', 'mobx/index': 'src/mobx/index.ts' },
             // the proper extensions will be added
             fileName: (_format, entryName) => `${entryName}.js`,
             formats: ['es'],

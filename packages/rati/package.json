@@ -19,10 +19,10 @@
             "source": "./src/main.ts"
         },
         "./mobx": {
-            "rati-dev": "./src/mobx/main.ts",
-            "types": "./dist/mobx/main.d.ts",
-            "import": "./dist/mobx/main.js",
-            "source": "./src/mobx/main.ts"
+            "rati-dev": "./src/mobx/index.ts",
+            "types": "./dist/mobx/index.d.ts",
+            "import": "./dist/mobx/index.js",
+            "source": "./src/mobx/index.ts"
         },
         "./package.json": "./package.json"
     },
