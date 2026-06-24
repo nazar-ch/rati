@@ -1,14 +1,15 @@
 {
     "name": "ssr-demo",
-    "private": true,
     "version": "0.0.0",
+    "private": true,
     "type": "module",
     "scripts": {
         "dev": "node server.ts",
         "build": "yarn build:client && yarn build:server",
         "build:client": "vp build --outDir dist/client --ssrManifest",
         "build:server": "vp build --outDir dist/server --ssr src/entry-server.tsx",
-        "start": "NODE_ENV=production node server.ts"
+        "start": "NODE_ENV=production node server.ts",
+        "typecheck": "tsgo --noEmit -p tsconfig.json && tsgo --noEmit -p tsconfig.node.json"
     },
     "dependencies": {
         "rati": "workspace:*",
@@ -23,7 +24,6 @@
         "@types/react-dom": "~19.2.3",
         "@vitejs/plugin-react": "^6.0.1",
         "vite": "catalog:",
-        "vite-plugin-checker": "^0.13.0",
         "vite-plus": "catalog:"
     }
 }

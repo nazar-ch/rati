@@ -1,12 +1,13 @@
 {
     "name": "demo",
-    "private": true,
     "version": "0.0.0",
+    "private": true,
     "type": "module",
     "scripts": {
         "dev": "vp dev",
-        "build": "tsc && vp build",
-        "preview": "vp preview"
+        "build": "tsgo --noEmit && vp build",
+        "preview": "vp preview",
+        "typecheck": "tsgo --noEmit"
     },
     "dependencies": {
         "rati": "workspace:*",
@@ -20,7 +21,6 @@
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^6.0.1",
         "vite": "catalog:",
-        "vite-plugin-checker": "^0.13.0",
         "vite-plus": "catalog:"
     }
 }
