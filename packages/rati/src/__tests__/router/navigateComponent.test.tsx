@@ -27,7 +27,7 @@ function renderApp(router: WebRouterStore<any>) {
             <GenericStoresContext.Provider value={{ router }}>
                 <Router />
             </GenericStoresContext.Provider>
-        </StrictMode>
+        </StrictMode>,
     );
 }
 

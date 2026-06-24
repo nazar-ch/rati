@@ -55,8 +55,8 @@ describe('island', () => {
         const name = deferred<string>();
         const Island = island({
             scope: scope({ id: prop<string>() })
-                    .load({ name: () => name.promise })
-                    .load({ label: async ({ name }) => `[${name}]` }),
+                .load({ name: () => name.promise })
+                .load({ label: async ({ name }) => `[${name}]` }),
             component: ({ label }) => <div>ready {label}</div>,
             loading: Loading,
         });
@@ -96,7 +96,7 @@ describe('island', () => {
             render(
                 <StoresContext.Provider value="ctx">
                     <Island id="a1" />
-                </StoresContext.Provider>
+                </StoresContext.Provider>,
             );
         });
 
@@ -129,10 +129,10 @@ describe('island', () => {
     test('routes a failed source to the error slot with the unified code', async () => {
         const Island = island({
             scope: scope({ id: prop<string>() }).load({
-                    page: async (): Promise<string> => {
-                        throw new NotAvailableError('no such page', { code: 'not-available' });
-                    },
-                }),
+                page: async (): Promise<string> => {
+                    throw new NotAvailableError('no such page', { code: 'not-available' });
+                },
+            }),
             component: () => <div>ready</div>,
             loading: Loading,
             error: ({ error }) => <div>error: {error.code}</div>,
@@ -150,14 +150,14 @@ describe('island', () => {
 
         const Island = island({
             scope: scope({ id: prop<string>() }).load({
-                    data: async ({ id }) => {
-                        if (failures > 0) {
-                            failures--;
-                            throw new Error('boom');
-                        }
-                        return `data:${id}`;
-                    },
-                }),
+                data: async ({ id }) => {
+                    if (failures > 0) {
+                        failures--;
+                        throw new Error('boom');
+                    }
+                    return `data:${id}`;
+                },
+            }),
             component: ({ data }) => <div>ready {data}</div>,
             loading: Loading,
             error: ({ retry }) => (
@@ -206,8 +206,8 @@ describe('island', () => {
 
         const Island = island({
             scope: scope({ id: prop<string>() })
-                    .load({ space: () => space })
-                    .load({ page: () => page }),
+                .load({ space: () => space })
+                .load({ page: () => page }),
             component: ({ page: p }) => <div>ready {p.id}</div>,
             loading: Loading,
         });
@@ -234,13 +234,13 @@ describe('island', () => {
 
         const Island = island({
             scope: scope({ id: prop<string>() })
-                    .load({ spaceId: () => spaceId.promise })
-                    .load({
-                        tree: ({ spaceId }) => {
-                            log.push(`build-tree:${spaceId}`);
-                            return tree;
-                        },
-                    }),
+                .load({ spaceId: () => spaceId.promise })
+                .load({
+                    tree: ({ spaceId }) => {
+                        log.push(`build-tree:${spaceId}`);
+                        return tree;
+                    },
+                }),
             component: ({ tree: t }) => <div>ready {t.id}</div>,
             loading: Loading,
         });
@@ -295,8 +295,7 @@ describe('island', () => {
         };
 
         const Island = island({
-            scope: scope({ id: prop<string>() })
-                    .load({ res: ({ id }) => sourceFor(id) }),
+            scope: scope({ id: prop<string>() }).load({ res: ({ id }) => sourceFor(id) }),
             component: ({ res }) => <div>ready {res.id}</div>,
             loading: Loading,
         });
@@ -384,16 +383,16 @@ describe('island', () => {
 
         const Island = island({
             scope: scope({ id: prop<string>() })
-                    .load({ res: ({ id }) => sourceFor(id) })
-                    .provide(({ res }) => {
-                        log.push(`context-mount:${res.id}`);
-                        return {
-                            id: res.id,
-                            [Symbol.dispose]() {
-                                log.push(`context-dispose:${res.id}`);
-                            },
-                        };
-                    }),
+                .load({ res: ({ id }) => sourceFor(id) })
+                .provide(({ res }) => {
+                    log.push(`context-mount:${res.id}`);
+                    return {
+                        id: res.id,
+                        [Symbol.dispose]() {
+                            log.push(`context-dispose:${res.id}`);
+                        },
+                    };
+                }),
             component: ({ res }) => <div>ready {res.id}</div>,
             loading: Loading,
         });
@@ -415,8 +414,9 @@ describe('island', () => {
         const AppContext = createContext<{ label: string } | null>(null);
 
         const Island = island({
-            scope: scope({ id: prop<string>() })
-                    .provide(({ id }) => ({ label: `#${id}` }), { provideTo: AppContext }),
+            scope: scope({ id: prop<string>() }).provide(({ id }) => ({ label: `#${id}` }), {
+                provideTo: AppContext,
+            }),
             component: () => <Consumer />,
             loading: Loading,
         });
@@ -537,7 +537,7 @@ describe('island', () => {
         render(
             <StrictMode>
                 <Island id="a1" />
-            </StrictMode>
+            </StrictMode>,
         );
 
         // The subtree reads the second (surviving) run's context, not the first.
@@ -555,8 +555,8 @@ describe('island', () => {
 
         const Island = island({
             scope: scope({ id: prop<string>() })
-                    .load({ res: () => makeSource() })
-                    .provide(({ res }) => ({ id: res.id }), { provideTo: AppContext }),
+                .load({ res: () => makeSource() })
+                .provide(({ res }) => ({ id: res.id }), { provideTo: AppContext }),
             component: () => <Consumer />,
             loading: Loading,
         });
@@ -569,7 +569,7 @@ describe('island', () => {
         render(
             <StrictMode>
                 <Island id="a1" />
-            </StrictMode>
+            </StrictMode>,
         );
 
         expect(await screen.findByText('app src2')).toBeTruthy();
@@ -588,7 +588,7 @@ describe('island', () => {
         render(
             <StrictMode>
                 <Island id="a1" />
-            </StrictMode>
+            </StrictMode>,
         );
 
         expect(await screen.findByText('prop src2')).toBeTruthy();
@@ -625,7 +625,7 @@ describe('island', () => {
                 <>
                     <First id="a" />
                     <Second id="b" />
-                </>
+                </>,
             );
         });
 

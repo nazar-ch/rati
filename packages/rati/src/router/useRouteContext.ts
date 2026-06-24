@@ -1,11 +1,6 @@
 import { useScopeRead } from '../mandala/channel';
 import { useWebRouter } from '../stores/RootStore';
-import type {
-    UserRoutes,
-    GenericRouteType,
-    RouteContextNames,
-    RouteContextValueOf,
-} from './route';
+import type { UserRoutes, GenericRouteType, RouteContextNames, RouteContextValueOf } from './route';
 
 // Context-bearing route names, derived from the app's routes table
 // (`RatiUserTypes['routes']`) — the same source `Link`'s `to` reads, so the context
@@ -31,7 +26,7 @@ function scopeForRoute(routes: readonly GenericRouteType[], name: string): objec
     }
     if (!route.scope) {
         throw new Error(
-            `useRouteContext('${name}'): the '${name}' route has no scope — no context to read.`
+            `useRouteContext('${name}'): the '${name}' route has no scope — no context to read.`,
         );
     }
     return route.scope;
@@ -58,11 +53,11 @@ export function useRouteContext<Name extends RouteContextName>(name: Name): Rout
         case 'no-provider':
             throw new Error(
                 `useRouteContext('${name}'): the '${name}' route's island is not above the current ` +
-                    `component — read it only inside that route's subtree.`
+                    `component — read it only inside that route's subtree.`,
             );
         case 'no-island':
             throw new Error(
-                `useRouteContext('${name}'): the '${name}' route's scope is not wired to an island.`
+                `useRouteContext('${name}'): the '${name}' route's scope is not wired to an island.`,
             );
     }
 }

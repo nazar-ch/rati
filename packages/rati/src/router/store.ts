@@ -1,9 +1,6 @@
 import { observable, action, computed } from 'mobx';
 import { createBrowserHistory, type History, type Location } from './history';
-import {
-    installScrollRestoration,
-    type ScrollRestorationOptions,
-} from './scrollRestoration';
+import { installScrollRestoration, type ScrollRestorationOptions } from './scrollRestoration';
 import { GlobalStore } from '../stores/GlobalStore';
 import type { GenericRouteType, NameToRoute } from './route';
 
@@ -94,7 +91,7 @@ export class WebRouterStore<
     constructor(
         stores: any,
         public routes: T,
-        options: WebRouterStoreOptions = {}
+        options: WebRouterStoreOptions = {},
     ) {
         super(stores);
 
@@ -114,7 +111,7 @@ export class WebRouterStore<
         if (options.scrollRestoration !== false) {
             this.uninstallScrollRestoration = installScrollRestoration(
                 this.history,
-                options.scrollRestoration ?? {}
+                options.scrollRestoration ?? {},
             );
         }
 
@@ -292,7 +289,7 @@ export class WebRouterStore<
                 this.stores as any,
                 // Using this number as `key` ensures that the route that was not
                 // skipped above will be rerendered
-                this.pathCounter
+                this.pathCounter,
             ) ?? null;
     }
 
@@ -305,7 +302,7 @@ export class WebRouterStore<
      */
     @action.bound setSearchParams(
         init: ConstructorParameters<typeof URLSearchParams>[0] | URLSearchParams,
-        options: { mode?: 'push' | 'replace' } = {}
+        options: { mode?: 'push' | 'replace' } = {},
     ) {
         const params = init instanceof URLSearchParams ? init : new URLSearchParams(init as string);
         const search = params.toString();
@@ -328,7 +325,7 @@ export class WebRouterStore<
      */
     @action.bound navigate(
         to: NameToRoute<T> | string,
-        options: { state?: Record<string, unknown> } = {}
+        options: { state?: Record<string, unknown> } = {},
     ) {
         const path = typeof to === 'string' ? to : this.getPath(to);
         this.history.push(path, options.state ?? null);
@@ -355,7 +352,7 @@ export class WebRouterStore<
      */
     @action.bound replace(
         to: NameToRoute<T> | string,
-        options: { keepCurrentRoute?: boolean; state?: Record<string, unknown> } = {}
+        options: { keepCurrentRoute?: boolean; state?: Record<string, unknown> } = {},
     ) {
         const path = typeof to === 'string' ? to : this.getPath(to);
         const skip = options.keepCurrentRoute

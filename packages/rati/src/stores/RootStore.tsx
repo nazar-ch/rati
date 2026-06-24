@@ -18,7 +18,7 @@ export interface RootStoreOptions {
 export class RootStore<T extends GlobalStores> {
     constructor(
         public stores: T,
-        options: RootStoreOptions = {}
+        options: RootStoreOptions = {},
     ) {
         if (options.isReady) this._isReady = true;
     }

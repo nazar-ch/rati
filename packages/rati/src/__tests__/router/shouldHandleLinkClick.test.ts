@@ -48,7 +48,7 @@ describe('shouldHandleLinkClick', () => {
 
     test('returns false when the event was already defaultPrevented', () => {
         expect(
-            shouldHandleLinkClick(fakeClickEvent({ href: '/foo', defaultPrevented: true }))
+            shouldHandleLinkClick(fakeClickEvent({ href: '/foo', defaultPrevented: true })),
         ).toBe(false);
     });
 
@@ -70,7 +70,7 @@ describe('shouldHandleLinkClick', () => {
 
     test('returns false for target="_blank"', () => {
         expect(shouldHandleLinkClick(fakeClickEvent({ href: '/foo', target: '_blank' }))).toBe(
-            false
+            false,
         );
     });
 
@@ -84,13 +84,13 @@ describe('shouldHandleLinkClick', () => {
 
     test('returns false for download links', () => {
         expect(shouldHandleLinkClick(fakeClickEvent({ href: '/file.pdf', download: true }))).toBe(
-            false
+            false,
         );
     });
 
     test('returns false for cross-origin links', () => {
         expect(shouldHandleLinkClick(fakeClickEvent({ href: 'https://example.com/x' }))).toBe(
-            false
+            false,
         );
     });
 

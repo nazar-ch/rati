@@ -65,7 +65,10 @@ export type ScopeProvideDef = {
 // accepting provide-bearing scopes (a `PageContextStore` value is assignable to
 // `unknown`); a scope without `.provide()` carries `unknown` here, and `useScope`
 // reads that as "provide the resolved props" (see ScopeProvidesOf).
-export type Scope<VD extends GenericScopeDefinition = GenericScopeDefinition, Provided = unknown> = {
+export type Scope<
+    VD extends GenericScopeDefinition = GenericScopeDefinition,
+    Provided = unknown,
+> = {
     definition: GenericScopeDefinition;
     prevScope?: Scope | undefined;
     // Present only when the chain ends in `.provide()`. Named `provideDef` (not
@@ -116,9 +119,8 @@ type ScopeProvided<S extends Scope<any>> = S extends Scope<any, infer P> ? P : n
  * `useRouteContext` return: the `.provide()` value when the chain declares one, else
  * the resolved props (provide-by-default). Mirrors the island's runtime `Leaf`.
  */
-export type ScopeProvidesOf<S extends Scope<any>> = unknown extends ScopeProvided<S>
-    ? ScopeProps<S>
-    : ScopeProvided<S>;
+export type ScopeProvidesOf<S extends Scope<any>> =
+    unknown extends ScopeProvided<S> ? ScopeProps<S> : ScopeProvided<S>;
 
 // ---------------------------------------------------------------------------------------
 
@@ -157,9 +159,7 @@ export const scope: CreateScopeFunc = <P extends ParamsDefinition = {}>(params?:
     createScopeChain<P>(params ?? ({} as P), undefined);
 
 export type ChainableScope<VD extends GenericScopeDefinition> = Scope<VD> & {
-    load<NextDef extends LoadDefinition<VD>>(
-        def: NextDef
-    ): ChainableScope<Simplify<VD & NextDef>>;
+    load<NextDef extends LoadDefinition<VD>>(def: NextDef): ChainableScope<Simplify<VD & NextDef>>;
 
     /**
      * Customize what the island provides to its subtree. By default an island
@@ -184,13 +184,13 @@ export type ChainableScope<VD extends GenericScopeDefinition> = Scope<VD> & {
             // `Context<C | null>` (nullable default). The `| null` makes `C` unify
             // with the factory's return instead of being widened by the context.
             provideTo?: Context<C | null>;
-        }
+        },
     ): Scope<VD, C>;
 };
 
 function createScopeChain<VD extends GenericScopeDefinition>(
     definition: GenericScopeDefinition,
-    prevScope: Scope | undefined
+    prevScope: Scope | undefined,
 ): ChainableScope<VD> {
     const node: Scope<VD> = { definition, prevScope, [ScopeSymbol]: true };
 
@@ -203,7 +203,7 @@ function createScopeChain<VD extends GenericScopeDefinition>(
         // unchanged and the island reads the factory off `scope.provideDef`.
         provide: <C>(
             factory: (resolved: Simplify<ResolveScopeDefinition<VD>>) => C,
-            options?: { provideTo?: Context<C | null> }
+            options?: { provideTo?: Context<C | null> },
         ): Scope<VD, C> =>
             // The [ScopeProvidesSymbol] carrier is type-only (never present at
             // runtime), so cast to stamp the C onto the otherwise-unchanged node.
@@ -253,7 +253,6 @@ export const isHookLoad = (entry: unknown): entry is HookLoad =>
 
 // ----------------------
 
-export type ScopeComponent<
-    S extends Scope<any>,
-    Props extends Record<string, unknown> = {},
-> = FC<ScopeProps<S> & Props>;
+export type ScopeComponent<S extends Scope<any>, Props extends Record<string, unknown> = {}> = FC<
+    ScopeProps<S> & Props
+>;

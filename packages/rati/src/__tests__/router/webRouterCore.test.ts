@@ -88,7 +88,7 @@ describe('WebRouterStore.getPath', () => {
         const router = new WebRouterStore({}, routes);
         expect(router.getPath({ name: 'user', userId: '42' })).toBe('/users/42');
         expect(router.getPath({ name: 'userPost', userId: '42', postId: 'abc' })).toBe(
-            '/users/42/posts/abc'
+            '/users/42/posts/abc',
         );
         router.dispose();
     });

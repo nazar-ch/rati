@@ -35,14 +35,12 @@ export type UserRoutes = RatiUserTypes extends { routes: infer R } ? R : never;
  * `unknown` when that route has no scope (so no context to read). This is what
  * `useRouteContext(name)` returns.
  */
-export type RouteContextValueOf<
-    Routes extends readonly GenericRouteType[],
-    Name extends string,
-> = Extract<Routes[number], { name: Name }> extends { scope: infer S }
-    ? S extends Scope<any>
-        ? ScopeProvidesOf<S>
-        : unknown
-    : unknown;
+export type RouteContextValueOf<Routes extends readonly GenericRouteType[], Name extends string> =
+    Extract<Routes[number], { name: Name }> extends { scope: infer S }
+        ? S extends Scope<any>
+            ? ScopeProvidesOf<S>
+            : unknown
+        : unknown;
 
 /**
  * Names of the routes that carry a context (the scope-bearing ones) — the valid
@@ -120,11 +118,9 @@ type MissingRouteParams<Missing extends PropertyKey> = {
     `prop<Base64Uuid>()`, so a branded prop like `pageId: Base64Uuid` is
     accepted by name.
 */
-type RouteComponentGuard<
-    Path extends string,
-    TScope extends Scope<any> | undefined,
-    Component,
-> = [TScope] extends [Scope<any>]
+type RouteComponentGuard<Path extends string, TScope extends Scope<any> | undefined, Component> = [
+    TScope,
+] extends [Scope<any>]
     ? ScopeComponent<TScope>
     : Component extends (props: infer P) => any
       ? [RequiredKeys<P>] extends [keyof ExtractRouteParams<Path>]
@@ -164,7 +160,7 @@ export function route<
     path: Path,
     name: Name,
     component: Component & RouteComponentGuard<Path, TScope, Component>,
-    options: RouteOptions<TScope> = {}
+    options: RouteOptions<TScope> = {},
 ) {
     const scopeOption = options.scope;
 
@@ -181,7 +177,7 @@ export function route<
                       loading: options.loading ?? (() => null),
                       ...(options.error ? { error: options.error } : {}),
                   },
-                  'Route'
+                  'Route',
               )
             : component;
 

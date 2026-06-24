@@ -31,8 +31,9 @@ async function prerenderToString(element: ReactElement): Promise<string> {
 describe('island SSR (prerender)', () => {
     test('resolves a promise-backed scope server-side', async () => {
         const Island = island({
-            scope: scope({ id: prop<string>() })
-                    .load({ greeting: async ({ id }) => `hello ${id}` }),
+            scope: scope({ id: prop<string>() }).load({
+                greeting: async ({ id }) => `hello ${id}`,
+            }),
             component: ({ greeting }) => <div>{greeting}</div>,
             loading: () => <div>loading</div>,
         });
@@ -69,8 +70,9 @@ describe('island SSR (prerender)', () => {
 describe('island SSR dehydration', () => {
     test('collects each resolved promise value, keyed by island id then chain key', async () => {
         const Island = island({
-            scope: scope({ id: prop<string>() })
-                    .load({ greeting: async ({ id }) => `hello ${id}` }),
+            scope: scope({ id: prop<string>() }).load({
+                greeting: async ({ id }) => `hello ${id}`,
+            }),
             component: ({ greeting }) => <div>{greeting}</div>,
             loading: () => <div>loading</div>,
         });
@@ -79,7 +81,7 @@ describe('island SSR dehydration', () => {
         await prerenderToString(
             <IslandHydrationProvider collect={collector.collect}>
                 <Island id="ssr" />
-            </IslandHydrationProvider>
+            </IslandHydrationProvider>,
         );
 
         // One island → one slice, holding the resolved promise value under its key.
@@ -93,11 +95,11 @@ describe('island SSR dehydration', () => {
         let calls = 0;
         const Island = island({
             scope: scope({ id: prop<string>() }).load({
-                    greeting: async ({ id }: { id: string }) => {
-                        calls++;
-                        return `hello ${id}`;
-                    },
-                }),
+                greeting: async ({ id }: { id: string }) => {
+                    calls++;
+                    return `hello ${id}`;
+                },
+            }),
             component: ({ greeting }: { greeting: string }) => <div>{greeting}</div>,
             loading: () => <div>loading</div>,
         });
@@ -107,7 +109,7 @@ describe('island SSR dehydration', () => {
         const html = await prerenderToString(
             <IslandHydrationProvider collect={collector.collect}>
                 <Island id="ssr" />
-            </IslandHydrationProvider>
+            </IslandHydrationProvider>,
         );
         expect(html).toContain('hello ssr');
         expect(calls).toBe(1);
@@ -123,7 +125,7 @@ describe('island SSR dehydration', () => {
                 container,
                 <IslandHydrationProvider data={collector.data}>
                     <Island id="ssr" />
-                </IslandHydrationProvider>
+                </IslandHydrationProvider>,
             );
         });
 
@@ -152,7 +154,7 @@ describe('island SSR dehydration', () => {
         const html = await prerenderToString(
             <IslandHydrationProvider collect={collector.collect}>
                 <Parent />
-            </IslandHydrationProvider>
+            </IslandHydrationProvider>,
         );
 
         expect(html).toContain('parent-data');

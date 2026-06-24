@@ -34,7 +34,7 @@ describe('prepareRoute', () => {
             [route('/users/:userId', 'user', UserComponent)] as const,
             {
                 history: createMemoryHistory({ url: '/users/42?tab=posts#bio' }),
-            }
+            },
         );
 
         const prepared = await prepareRoute(router);
@@ -63,7 +63,7 @@ describe('prepareRoute', () => {
             [route('/', 'home', HomeComponent), route('*', 'notFound', NoopComponent)] as const,
             {
                 history: createMemoryHistory({ url: '/missing' }),
-            }
+            },
         );
 
         const prepared = await prepareRoute(router);

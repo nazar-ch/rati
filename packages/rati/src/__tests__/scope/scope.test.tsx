@@ -18,7 +18,7 @@ class TestStore {
 // values, dependent levels) through the engine.
 async function resolveThroughIsland(
     scopeDef: Scope<any>,
-    params: Record<string, unknown>
+    params: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
     let received: Record<string, unknown> | undefined;
     const Island = island({

@@ -141,7 +141,7 @@ describe('SSR + hydration', () => {
                 <RootStoreProvider rootStore={serverRoot}>
                     <Router />
                 </RootStoreProvider>
-            </IslandHydrationProvider>
+            </IslandHydrationProvider>,
         );
         serverRouter.dispose();
 
@@ -168,7 +168,7 @@ describe('SSR + hydration', () => {
                     <RootStoreProvider rootStore={clientRoot}>
                         <Router />
                     </RootStoreProvider>
-                </IslandHydrationProvider>
+                </IslandHydrationProvider>,
             );
         });
 
@@ -181,7 +181,7 @@ describe('SSR + hydration', () => {
         // production, where server and browser are separate processes. A real mismatch
         // would be a different message and still fail here.
         const mismatchErrors = consoleErrorSpy.mock.calls.filter(
-            (args: unknown[]) => !String(args[0]).includes('multiple renderers concurrently')
+            (args: unknown[]) => !String(args[0]).includes('multiple renderers concurrently'),
         );
         expect(mismatchErrors).toEqual([]);
 

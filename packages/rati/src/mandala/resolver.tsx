@@ -324,7 +324,7 @@ export function buildTree(
     levels: Scope['definition'][],
     index: number,
     prev: Record<string, unknown>,
-    shared: Shared
+    shared: Shared,
 ): ReactNode {
     if (index >= levels.length) return <Leaf resolved={prev} shared={shared} />;
     const level = levels[index]!;

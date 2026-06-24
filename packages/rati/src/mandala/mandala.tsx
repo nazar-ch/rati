@@ -67,7 +67,7 @@ const DefaultLoading: FC<{ params: unknown }> = () => null;
  */
 export function createMandala<S extends Scope<any>>(
     config: MandalaConfig<S>,
-    kindLabel: string
+    kindLabel: string,
 ): MandalaComponent<S> {
     // One value channel per scope identity: mandalas built from the same scope share it,
     // so a descendant reading by scope resolves the nearest one's value.

@@ -31,7 +31,7 @@ export interface ScrollRestorationOptions {
 
 export function installScrollRestoration(
     history: History,
-    options: ScrollRestorationOptions = {}
+    options: ScrollRestorationOptions = {},
 ): () => void {
     if (typeof window === 'undefined') return () => {};
 
@@ -71,7 +71,7 @@ function applyScroll(
     action: 'PUSH' | 'REPLACE' | 'POP',
     location: { hash: string; key: string },
     positions: Map<string, { x: number; y: number }>,
-    scrollToTop: () => void
+    scrollToTop: () => void,
 ) {
     if (action === 'POP') {
         const saved = positions.get(location.key);

@@ -27,7 +27,7 @@ export type PreloadableLazyComponent<T extends ComponentType<any>> = LazyExoticC
  * ```
  */
 export function lazy<T extends ComponentType<any>>(
-    factory: () => Promise<{ default: T }>
+    factory: () => Promise<{ default: T }>,
 ): PreloadableLazyComponent<T> {
     let cached: Promise<{ default: T }> | undefined;
     const load = () => (cached ??= factory());

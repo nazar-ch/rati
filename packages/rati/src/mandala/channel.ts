@@ -78,12 +78,12 @@ export function useScope<S extends Scope<any>>(scope: S): ScopeProvidesOf<S> {
         case 'no-provider':
             throw new Error(
                 `useScope(${describeScope(scope)}): no island for this scope is above the current ` +
-                    `component — render it inside the island's subtree.`
+                    `component — render it inside the island's subtree.`,
             );
         case 'no-island':
             throw new Error(
                 `useScope(${describeScope(scope)}): no island uses this scope — pass the scope an ` +
-                    `island() was built from.`
+                    `island() was built from.`,
             );
     }
 }
@@ -103,7 +103,7 @@ export function useOptionalScope<S extends Scope<any>>(scope: S): ScopeProvidesO
         case 'no-island':
             throw new Error(
                 `useOptionalScope(${describeScope(scope)}): no island uses this scope — pass the ` +
-                    `scope an island() was built from.`
+                    `scope an island() was built from.`,
             );
     }
 }
