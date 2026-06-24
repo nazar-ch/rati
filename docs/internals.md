@@ -162,7 +162,22 @@ handling, and navigation (`navigate`/`replace`/`setSearchParams`/`preloadRoute`)
 
 ## Toolchain
 
-Types: `tsgo` is not used here — rati builds on plain `tsc` (`tsconfig.build.json` emits
-`.d.ts`). `yarn test` runs Vitest + the `--typecheck` pass over `*.test-d.ts`. Decorators
-(MobX `@observable`/`@action`) compile via `@babel/plugin-proposal-decorators` (see
-`vitest.config.ts`). Releasing: [RELEASING.md](./RELEASING.md).
+rati runs on **Vite+** (`vp` — bundles Vite/Rolldown, Vitest, oxlint, oxfmt). Lint/format
+config lives in the root `vite.config.ts` `lint`/`fmt` blocks (no eslint/prettier); Node is
+pinned to 26 via `devEngines.runtime`.
+
+Types: **tsgo** (`@typescript/native-preview`, the TS 7 native compiler) — there is no
+`typescript` dep. `vp run typecheck` type-checks (`tsconfig.json` for src,
+`tsconfig.test.json` for the test tree), `vp run build` emits `.d.ts` via
+`tsgo -p tsconfig.build.json`, and Vitest's `--typecheck` pass over `*.test-d.ts` uses tsgo
+through `test.typecheck.checker`. Decorators (MobX `@observable`/`@action`) compile via
+`@babel/plugin-proposal-decorators` — oxc can't lower native decorators yet — see
+`vite.config.ts`/`vitest.config.ts`.
+
+Lint deviates from a stock config for a generics-heavy framework: the type-machinery rules
+(`no-explicit-any`, `no-non-null-assertion`, `no-empty-object-type`,
+`no-redundant-type-constituents`) are `warn`, and `no-unnecessary-type-assertion` is `off`
+because tsgolint's necessity analysis disagrees with tsgo (it ignores
+`noUncheckedIndexedAccess` and strips load-bearing generic casts). tsgo is the authoritative
+type gate. Commands: `vp build` / `vp test` / `vp run typecheck` / `vp lint` / `vp fmt` /
+`vp check`. Releasing: [RELEASING.md](./RELEASING.md).

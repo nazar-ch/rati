@@ -1,0 +1,137 @@
+# CLAUDE.md
+
+rati is a small, custom TypeScript frontend framework for **React + MobX**, built and
+evolved alongside Jnana (the app at `~/Sites/jnana`) to serve its needs — prioritizing
+simplicity, end-to-end type safety, and developer experience. Jnana consumes rati's source
+directly (via the `rati-dev` export condition) and drives its design.
+
+Yarn-workspaces monorepo: `packages/rati` (the published `rati` package) plus
+`examples/{demo,ssr}` (dev/test apps). Workspace names: `rati`, `demo`, `ssr-demo`.
+
+## Canonical docs — read these first
+
+They are the source of truth and are kept current. Keep them in sync when you change
+behavior they describe.
+
+- `docs/design-and-usage.md` — public API + mental model (scope / prop / load / provide /
+  hook / source / island / route / useScope), app setup, routing, SSR.
+- `docs/internals.md` — source layout, the `mandala` engine, the per-level Step-tree
+  resolver, lifecycle/teardown, the value channel, sources, SSR dehydration, toolchain.
+- `docs/research/` — deferred features, dependency graphs, SSR dehydration research.
+- `docs/RELEASING.md` — release process.
+
+## Mental model
+
+A **scope** declares *which data go where* (inputs via `prop<T>()`, then `.load({…})`
+levels resolved as a visible waterfall). An **island** mounts a scope — pairs it with a
+component plus loading/error slots, resolves the data, and provides the resolved props to
+its subtree. A **route** is an island bound to a URL. Components receive clean,
+fully-resolved props — no loading-state juggling.
+
+```
+scope({ inputs }).load({ data }).provide(factory?)   →  a Scope (a plain value)
+island({ scope, component, loading, error })         →  a component
+route(path, name, component, { scope, … })           →  the same, on a URL
+useScope(scope)                                       →  read what it provides, below
+```
+
+Design intent (the "why"): the author dislikes hook-style data loading (react-query/SWR)
+that makes components manage loading states and re-declare types. rati resolves declarative
+typed specs into fully-loaded props, with types inferred end-to-end from backend types.
+Resolution is all-or-nothing — a half-resolved bag is incoherent. Naming is deliberately
+plain English mapped to concepts React devs already know; **avoid coining new terms** in
+the public API (the internal engine name `mandala` is the lone exception, and stays
+internal — callers only ever see `island`/`route`).
+
+## Workflow
+
+- Clarify and ask for information you need.
+- Run commands from the repo root; target a workspace with `vp run <pkg>#<script>`
+  (e.g. `vp run rati#typecheck`).
+- Verify changes with **type-check and lint**: `vp run rati#typecheck` (tsgo — the
+  authoritative type gate) **and** `vp lint`. `vp check` runs format + lint (no type-check).
+- Create atomic commits as you work, on the current branch. **Conventional Commits style is
+  forbidden** — match the existing history (plain imperative sentences).
+- Keep `docs/*.md` in sync with behavior changes.
+
+## Restricted actions
+
+- **Don't publish.** `scripts/release.sh` (the `release` script) bumps the version, tags,
+  and runs `yarn npm publish`. Never run it — releasing is the maintainer's call (see
+  `docs/RELEASING.md`). `--dry-run` is the only safe form, and still: leave it to the user.
+- **Don't run `vp lint --fix` blindly.** oxlint's `no-unnecessary-type-assertion` autofix
+  disagrees with tsgo (it ignores `noUncheckedIndexedAccess` and strips load-bearing
+  generic casts), so it can break the typecheck — that rule is off in the config for this
+  reason, and tsgo is the authoritative gate. Other autofixes (e.g. consistent-type-imports)
+  are safe.
+- Don't remove `console.*` or commented-out code; preserve comments that explain *why*
+  (update/amend your own when reasonable). Offer fixes if they touch the current scope.
+
+## Toolchain — Vite+ (`vp`)
+
+rati runs on **Vite+** (the `vp` CLI bundling Vite/Rolldown, Vitest, oxlint, oxfmt). All
+lint/format config lives in the root `vite.config.ts` `lint`/`fmt` blocks — there is no
+eslint/prettier. Node is pinned to **26** via `devEngines.runtime`. Type-checking is
+**tsgo** (`@typescript/native-preview`, the TypeScript 7 native compiler) — there is no
+`typescript` dependency.
+
+```bash
+vp run rati#build         # vite lib bundle + tsgo emits dist/*.d.ts
+vp run rati#typecheck     # tsgo --noEmit (src); rati#typecheck:test for the test tree
+vp run rati#test          # Vitest (runtime + *.test-d.ts type tests via the tsgo checker)
+vp lint                   # oxlint   (vp lint --type-aware for the type-aware pass)
+vp fmt                    # oxfmt
+vp check                  # fmt + lint (NOT type-check)
+```
+
+Pre-commit hooks (`.vite-hooks/` + `prepare: vp config`) run `vp staged` (fmt + lint on the
+staged files) on every commit.
+
+## Source layout (`packages/rati/src`)
+
+Public barrel: `main.ts` (the only entry; the published surface). Internals — see
+`docs/internals.md §Source layout`:
+
+- `scope/` — `scope.ts` (the declarative spec builder) and `source.ts` (the Source state
+  machine: pending → ready/error).
+- `mandala/` — the engine ("one engine, two faces"): `mandala.tsx`, `resolver.tsx` (the
+  per-level Step tree), `channel.ts` (the scope-keyed value channel + `useScope`),
+  `boundary.tsx`, `hydration.tsx` (SSR). Internal.
+- `island/island.ts` — the public `island()` wrapper.
+- `router/` — `route.tsx`, `store.ts` (WebRouterStore), `Router`/`Link`/`Navigate`,
+  `useRouteContext`, `prepareRoute`, `history`, `scrollRestoration`, `lazy`.
+- `data/` — `remoteData` (debounced loader + race-guard), `apiUtils`, `ActiveData*`
+  (mutable MobX drafts).
+- `stores/` — `RootStore`, `GlobalStore`. `types/` — `generic.ts`. `util/` — `utils.ts`.
+
+## Key patterns
+
+- **MobX decorators** (`@observable`/`@action`/`@computed`) compile via
+  `@babel/plugin-proposal-decorators` (oxc can't lower native decorators yet) — see
+  `vite.config.ts`/`vitest.config.ts`. Use the MobX `observer` pattern for components.
+- **`rati-dev` export condition** exposes `src/main.ts` so consumers (Jnana, the examples)
+  type-check and bundle rati's *source* in dev — edits are picked up with no build. The
+  published `import`/`types` conditions point at `dist/`.
+- **Lint policy** (root `vite.config.ts`, derived from Jnana, adapted for a generics-heavy
+  framework): the type-machinery rules — `no-explicit-any`, `no-non-null-assertion`,
+  `no-empty-object-type`, `no-redundant-type-constituents` — are **`warn`** (they fire on
+  intentional generic constraints like `Scope<any>`, the `RatiUserTypes {}` augmentation
+  interface, `arr[i]!`). `no-unnecessary-type-assertion` is **off** (see Restricted
+  actions). Everything else is strict; React rules apply repo-wide.
+- **oxfmt does not format Markdown** (it corrupts snake_case next to emphasis) — `**/*.md`
+  is excluded in the `fmt` block; edit docs by hand.
+- rati uses **relative imports** (no `#` path alias).
+
+## Style
+
+- One React component per file; prefer composable components and short files.
+- Import order is oxfmt-enforced (see `fmt.importOrder`). No barrel exports beyond `main.ts`.
+- No excessive variable shortening (`rows.map((row) => …)`, not `(r) => …`).
+
+## Examples — current status
+
+`examples/demo` and `examples/ssr` are **out of date** against rati's API: they still use
+the removed `createView`/`viewParam` view vocabulary from the view→scope refactor. Their
+tooling is migrated to Vite+, but the source needs rewriting to the current `scope`/`island`
+API before they typecheck/build/lint. Until then `vp lint` is not green repo-wide — the
+residual errors are all under `examples/`; the `rati` package itself is clean.
