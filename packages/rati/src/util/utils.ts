@@ -1,3 +1,7 @@
+export function sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function deepEqual(a: unknown, b: unknown): boolean {
     if (a === b) return true;
     if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) {

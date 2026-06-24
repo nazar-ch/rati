@@ -1,4 +1,4 @@
-export { sleep } from './util/stuff';
+export { sleep } from './util/utils';
 
 export { ActiveData, ActiveApiData } from './data/ActiveData';
 export { type ActiveDataInstanceType } from './data/ActiveDataInstanceType';
