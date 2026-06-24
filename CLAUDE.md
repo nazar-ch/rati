@@ -133,10 +133,17 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
 `examples/demo` and `examples/ssr` are on the current `scope`/`island`/`route` API and both
 typecheck, build, and lint — so `vp lint` is green repo-wide (the `rati` package emits only
 the intentional type-machinery warnings). `demo` is a client-only SPA showing plain route
-components, route params, and `scope().load(…)` waterfalls (incl. a store class). `ssr` is an
-SSR app: a route's scope is an island that resolves at render time, so the server uses
-`react-dom/static` `prerender` (not `renderToString`, which can't await the island's
+components, route params, and `scope().load(…)` waterfalls (incl. a store class). `ssr` is a
+server-rendered **feature gallery** — a page per concept (async loads + dehydration, a
+`prop`→`hook`→dependent waterfall, the `useRouteContext` value channel, a MobX store as a
+class load, a `Source`-backed live clock, and an error-slot + `retry`), each foregrounding its
+server/client behavior.
+
+The SSR mechanism: a route's scope is an island that resolves at render time, so the server
+uses `react-dom/static` `prerender` (not `renderToString`, which can't await the island's
 Suspense) and dehydrates the resolved promise values through `IslandHydrationProvider`; the
-client feeds them back so it rehydrates without re-running the loads. Server-only data must be
-an **async** load to be dehydrated (a sync load isn't serialized and would mismatch on
-hydration).
+client feeds them back so it rehydrates without re-running the loads. Two consequences the
+gallery leans on: server-only data must be an **async** load to be dehydrated (a sync load
+isn't serialized and would mismatch on hydration), and a `Source` stays *pending* under SSR
+(its `attach` runs from an effect, which `prerender` doesn't run) — so source-backed pages
+ship their loading slot in the HTML and come alive only after hydration.
