@@ -11,7 +11,7 @@ From the repo root, on a clean `main` that's in sync with origin:
 
 Flags:
 
-- `--dry-run` — bump package.json in memory, run `npm publish --dry-run`, then revert.
+- `--dry-run` — bump package.json in memory, run `yarn npm publish --dry-run`, then revert.
   No commit, tag, publish, or push.
 - `--yes` — skip the confirmation prompt.
 - `--otp <code>` — pass a 2FA one-time code (only if your token doesn't bypass 2FA).
@@ -25,8 +25,8 @@ under `latest`. This keeps `npm install rati` on the last stable release.
 ## If a publish fails
 
 Tests and build run *before* the version bump, so the usual failure window is the network
-call to npm. If `npm publish` fails, the version commit and tag exist locally but were not
-pushed. Undo them and retry:
+call to the registry. If `yarn npm publish` fails, the version commit and tag exist locally
+but were not pushed. Undo them and retry:
 
 ```sh
 git tag -d v<version>
