@@ -8,6 +8,8 @@ import {
     type WebRouterHydratedState,
     WebRouterStore,
 } from 'rati';
+import { RegionContext } from './appContext';
+import { Layout } from './components/Layout';
 import { routes } from './routes';
 
 /**
@@ -58,9 +60,15 @@ export function createApp({
     function App() {
         return (
             <RootStoreProvider rootStore={root}>
-                <IslandHydrationProvider collect={collectIslandData} data={islandData}>
-                    <Router />
-                </IslandHydrationProvider>
+                {/* Region is injected here (server and client alike) and read inside the
+                    product scope via hook(() => useContext(RegionContext)). */}
+                <RegionContext.Provider value="US">
+                    <IslandHydrationProvider collect={collectIslandData} data={islandData}>
+                        <Layout>
+                            <Router />
+                        </Layout>
+                    </IslandHydrationProvider>
+                </RegionContext.Provider>
             </RootStoreProvider>
         );
     }

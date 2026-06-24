@@ -12,6 +12,8 @@
         "typecheck": "tsgo --noEmit -p tsconfig.json && tsgo --noEmit -p tsconfig.node.json"
     },
     "dependencies": {
+        "mobx": "^6.15.0",
+        "mobx-react-lite": "^4.1.1",
         "rati": "workspace:*",
         "react": "^19.2.5",
         "react-dom": "^19.2.5"
