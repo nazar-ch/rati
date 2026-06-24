@@ -55,7 +55,7 @@ export function remoteData<F extends (...args: any) => Promise<any>>(
         indicatePendingAfterTimeoutMs = 200,
         debounceWaitMs,
         raceGuard,
-    }: RemoteDataOptions = {}
+    }: RemoteDataOptions = {},
 ): RemoteDataFunction<F> {
     let invokeTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let indicatePendingTimeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -83,17 +83,18 @@ export function remoteData<F extends (...args: any) => Promise<any>>(
     }
 
     const apiFunction = function (this: ThisParameterType<F>, ...args: Parameters<F>) {
-        const context = this;
         const localRequestId = (state.requestId += 1);
 
         return new Promise<ReturnType<F>>((resolve, reject) => {
             state.setBusy(true);
 
-            const invokeFunction = function () {
+            // Arrow so it inherits `this` (the apiFunction receiver) lexically — it's also
+            // used as a setTimeout callback, which would otherwise rebind `this`.
+            const invokeFunction = () => {
                 invokeTimeoutId = undefined;
                 lastInvokeTime = Date.now();
                 if (!isImmediate) {
-                    const result = func.apply(context, args);
+                    const result = func.apply(this, args);
 
                     state.promises.forEach(({ resolve }) => resolve(result as ReturnType<F>));
                     state.clearPromises();
@@ -119,11 +120,11 @@ export function remoteData<F extends (...args: any) => Promise<any>>(
                 state.indicatePending,
                 indicatePendingAfterTimeoutMs < invokeTime
                     ? invokeTime
-                    : indicatePendingAfterTimeoutMs
+                    : indicatePendingAfterTimeoutMs,
             );
 
             if (shouldCallNow) {
-                const result = func.apply(context, args);
+                const result = func.apply(this, args);
                 return resolve(result);
             }
             state.pushPromise({ resolve, reject });
@@ -139,7 +140,7 @@ export function remoteData<F extends (...args: any) => Promise<any>>(
                     return result;
                 }
             })
-            .catch((error) => {
+            .catch((error: unknown) => {
                 if (isCurrentRequest(localRequestId) && state.promises.length === 0) {
                     state.setBusy(false);
                 }

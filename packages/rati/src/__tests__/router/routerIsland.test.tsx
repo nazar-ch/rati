@@ -28,7 +28,7 @@ function renderWithRouter(routes: readonly GenericRouteType[]) {
     const result = render(
         <GenericStoresContext.Provider value={stores}>
             <Router Loading={() => <div>route loading…</div>} />
-        </GenericStoresContext.Provider>
+        </GenericStoresContext.Provider>,
     );
     return { router, ...result };
 }
@@ -50,8 +50,7 @@ describe('route + islands', () => {
     test('an island route resolves its waterfall from path params', async () => {
         const label = deferred<string>();
         const Product = island({
-            scope: scope({ productId: prop<string>() })
-                    .load({ label: () => label.promise }),
+            scope: scope({ productId: prop<string>() }).load({ label: () => label.promise }),
             component: ({ label }) => <div>product {label}</div>,
             loading: IslandLoading,
         });
@@ -78,15 +77,15 @@ describe('route + islands', () => {
 
         const Product = island({
             scope: scope({ productId: prop<string>() }).load({
-                    res: ({ productId }): Source<{ productId: string }> => ({
-                        [SourceSymbol]: true,
-                        state: { status: 'ready', value: { productId } },
-                        attach() {
-                            log.push(`attach:${productId}`);
-                            return () => log.push(`detach:${productId}`);
-                        },
-                    }),
+                res: ({ productId }): Source<{ productId: string }> => ({
+                    [SourceSymbol]: true,
+                    state: { status: 'ready', value: { productId } },
+                    attach() {
+                        log.push(`attach:${productId}`);
+                        return () => log.push(`detach:${productId}`);
+                    },
                 }),
+            }),
             component: ({ res }) => <div>product {res.productId}</div>,
             loading: IslandLoading,
         });
@@ -176,8 +175,9 @@ describe('route + islands', () => {
     test('useRouteContext reads a route island context by route name', async () => {
         // The scope ends in `.provide()`; route builds the island, so there is no
         // island component to import — the subtree reads the context by route name.
-        const productScope = scope({ productId: prop<string>() })
-            .provide(({ productId }) => ({ label: `#${productId}` }));
+        const productScope = scope({ productId: prop<string>() }).provide(({ productId }) => ({
+            label: `#${productId}`,
+        }));
 
         const Deep: FC = () => {
             const { label } = useRouteContext('product');
@@ -232,7 +232,7 @@ describe('island auto-context', () => {
 
         const Child: FC = () => {
             const props = useScope(productScope);
-            return <div>{String(props)}</div>;
+            return <div>{JSON.stringify(props)}</div>;
         };
 
         class Boundary extends Component<{ children: ReactNode }, { message: string | null }> {
@@ -255,10 +255,10 @@ describe('island auto-context', () => {
             render(
                 <Boundary>
                     <Child />
-                </Boundary>
+                </Boundary>,
             );
             expect(
-                await screen.findByText(/caught: .*no island for this scope is above/)
+                await screen.findByText(/caught: .*no island for this scope is above/),
             ).toBeTruthy();
         } finally {
             consoleError.mockRestore();

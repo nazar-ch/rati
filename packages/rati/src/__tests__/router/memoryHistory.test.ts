@@ -92,7 +92,7 @@ describe('createMemoryHistory', () => {
         try {
             // @ts-expect-error — intentional override for the test
             globalThis.window = undefined;
-            // @ts-expect-error
+            // @ts-expect-error — intentional override for the test
             globalThis.document = undefined;
 
             const history = createMemoryHistory({ url: '/x?y=z#w' });

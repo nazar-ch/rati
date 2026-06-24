@@ -13,7 +13,7 @@ export abstract class ActiveData<T> {
         TRawData extends TActiveDataClass['prototype']['__dataType'],
     >(
         this: TActiveDataClass,
-        rawData: TRawData
+        rawData: TRawData,
     ): Expand<
         Omit<TActiveDataClass['prototype'], 'data' | '__dataType'> &
             Readonly<Omit<TRawData, keyof TActiveDataClass>>
@@ -33,7 +33,7 @@ export abstract class ActiveData<T> {
         return deepMergeReplaceArrays(
             {} as T,
             this.originalData,
-            this.draft as Partial<T>
+            this.draft as Partial<T>,
         ) as ReadonlyDeep<T>;
     }
 
@@ -57,7 +57,7 @@ type ApiResult<T extends ApiFactory> = Awaited<ReturnType<ReturnType<T>>>;
 export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
     protected constructor(
         rawData: ApiResult<TConstructorApiFactory>,
-        protected remoteDataLoader: ReturnType<TConstructorApiFactory>
+        protected remoteDataLoader: ReturnType<TConstructorApiFactory>,
     ) {
         this.rawData = rawData;
     }
@@ -70,7 +70,7 @@ export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
     >(
         this: SActiveDataClass,
         remoteDataFactory: SRemoteDataFactory,
-        apiParams: ApiParams<SRemoteDataFactory>
+        apiParams: ApiParams<SRemoteDataFactory>,
     ): Promise<
         Expand<
             Omit<SActiveDataClass['prototype'], 'data' | '__dataType'> &
@@ -102,7 +102,7 @@ export abstract class ActiveApiData<TConstructorApiFactory extends ApiFactory> {
         return deepMergeReplaceArrays(
             {} as ApiResult<TConstructorApiFactory>,
             this.rawData,
-            this.draft as Partial<ApiResult<TConstructorApiFactory>>
+            this.draft as Partial<ApiResult<TConstructorApiFactory>>,
             // @ts-expect-error FIXME
         ) as ReadonlyDeep<ClassTData>;
     }
@@ -144,6 +144,5 @@ function extendInstance<T>(instance: any, data: T) {
             });
         }
     }
-    // @ts-ignore
     return instance;
 }

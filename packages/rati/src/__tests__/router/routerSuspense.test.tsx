@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vite-plus/test';
-import { lazy, FC } from 'react';
+import { lazy, type FC } from 'react';
 import { act, render, screen, cleanup } from '@testing-library/react';
 import { WebRouterStore } from '../../router/store';
 import { route } from '../../router/route';
@@ -26,7 +26,7 @@ function renderWithRouter({ routes }: RenderRouterOptions) {
     const result = render(
         <GenericStoresContext.Provider value={stores}>
             <Router Loading={() => <div data-testid="loading">loading…</div>} />
-        </GenericStoresContext.Provider>
+        </GenericStoresContext.Provider>,
     );
     return { router, ...result };
 }

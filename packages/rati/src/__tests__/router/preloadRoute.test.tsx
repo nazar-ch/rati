@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
-import { FC } from 'react';
+import { type FC } from 'react';
 import { act, render, fireEvent, cleanup } from '@testing-library/react';
 import { WebRouterStore } from '../../router/store';
 import { route } from '../../router/route';
@@ -87,7 +87,7 @@ describe('<Link prefetch>', () => {
                 <Link href={opts.href} prefetch={opts.prefetch}>
                     go
                 </Link>
-            </GenericStoresContext.Provider>
+            </GenericStoresContext.Provider>,
         );
         return { router, ...utils };
     }

@@ -2,7 +2,7 @@ import { observer } from 'mobx-react-lite';
 import { createContext, memo, type PropsWithChildren, useCallback, useContext } from 'react';
 
 import { type NameToRoute, type GenericRouteType, type UserRoutes } from './route';
-import { WebRouterStore } from './store';
+import { type WebRouterStore } from './store';
 import { useWebRouter } from '../stores/RootStore';
 import { computed } from 'mobx';
 
@@ -60,23 +60,23 @@ const GenericAnchor = observer(function GenericAnchor({
             event.preventDefault();
             webRouter.navigate(href);
         },
-        [href, userOnClick, webRouter]
+        [href, userOnClick, webRouter],
     );
 
     const handleMouseEnter = useCallback(
         (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
             if (userOnMouseEnter) userOnMouseEnter(event);
-            if (prefetch) webRouter.preloadRoute(href);
+            if (prefetch) void webRouter.preloadRoute(href);
         },
-        [href, prefetch, userOnMouseEnter, webRouter]
+        [href, prefetch, userOnMouseEnter, webRouter],
     );
 
     const handleTouchStart = useCallback(
         (event: React.TouchEvent<HTMLAnchorElement>) => {
             if (userOnTouchStart) userOnTouchStart(event);
-            if (prefetch) webRouter.preloadRoute(href);
+            if (prefetch) void webRouter.preloadRoute(href);
         },
-        [href, prefetch, userOnTouchStart, webRouter]
+        [href, prefetch, userOnTouchStart, webRouter],
     );
 
     return (
@@ -84,7 +84,7 @@ const GenericAnchor = observer(function GenericAnchor({
             {...props}
             href={`${href}`}
             aria-current={isActive ? 'page' : undefined}
-            className={[className || null, isActive ? activeClassName ?? 'active' : null]
+            className={[className || null, isActive ? (activeClassName ?? 'active') : null]
                 .filter((item) => item)
                 .join(' ')}
             onClick={handleOnClick}
@@ -126,7 +126,7 @@ export const LinkContextProvider = memo(function LinkContextProvider({
 });
 
 export const ContextualLink = observer(function ContextualAnchor(
-    props: PropsWithChildren<RatiLinkBaseProps & GenericAnchorProps>
+    props: PropsWithChildren<RatiLinkBaseProps & GenericAnchorProps>,
 ) {
     const linkContext = useLinkContext();
 
@@ -163,7 +163,7 @@ const LinkContext = createContext<LinkContextStore<any> | null>(null);
 class LinkContextStore<T extends readonly GenericRouteType[]> {
     constructor(
         private webRouter: WebRouterStore<readonly GenericRouteType[]>,
-        private to: NameToRoute<T> | string
+        private to: NameToRoute<T> | string,
     ) {}
 
     @computed get isActive() {

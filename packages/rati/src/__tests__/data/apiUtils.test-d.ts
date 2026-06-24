@@ -25,7 +25,7 @@ describe('responseKey()', () => {
     test('requires the API call arguments when invoked', () => {
         const getB = responseKey(apiCall, 'b');
         // @ts-expect-error - apiCall requires { x: string }
-        getB();
+        void getB();
     });
 
     test('rejects functions whose return type is not an indexable object', () => {

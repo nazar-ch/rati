@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
-import { FC } from 'react';
+import { type FC } from 'react';
 import { act, render, screen, cleanup } from '@testing-library/react';
 import { Suspense } from 'react';
 import { lazy } from '../../router/lazy';
@@ -22,9 +22,9 @@ describe('lazy()', () => {
         const factory = vi.fn(async () => ({ default: (() => null) as FC }));
         const Component = lazy(factory);
 
-        Component.preload();
-        Component.preload();
-        Component.preload();
+        void Component.preload();
+        void Component.preload();
+        void Component.preload();
 
         expect(factory).toHaveBeenCalledOnce();
     });
@@ -44,7 +44,7 @@ describe('lazy()', () => {
             render(
                 <Suspense fallback={<div data-testid="loading">loading</div>}>
                     <Component />
-                </Suspense>
+                </Suspense>,
             );
         });
 

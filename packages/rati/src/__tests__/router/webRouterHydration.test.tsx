@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vite-plus/test';
-import { WebRouterStore, WebRouterHydratedState } from '../../router/store';
+import { WebRouterStore, type WebRouterHydratedState } from '../../router/store';
 import { route } from '../../router/route';
 import { createMemoryHistory } from '../../router/history';
 

@@ -71,7 +71,8 @@ export function promiseSource<T>(promise: Promise<T>): Source<T> {
     const state = observable.box<SourceState<T>>({ status: 'pending' }, { deep: false });
     void promise.then(
         (value) => runInAction(() => state.set({ status: 'ready', value })),
-        (reason) => runInAction(() => state.set({ status: 'error', error: toSourceError(reason) }))
+        (reason: unknown) =>
+            runInAction(() => state.set({ status: 'error', error: toSourceError(reason) })),
     );
     return {
         [SourceSymbol]: true,
@@ -92,7 +93,11 @@ export function toSource<T>(value: T | Promise<T> | Source<T>): Source<T> {
 /** Maps an arbitrary thrown/rejected reason to the unified SourceError. */
 export function toSourceError(reason: unknown): SourceError {
     if (reason instanceof NotAvailableError) {
-        return { code: reason.code ?? 'not-available', message: reason.message, cause: reason.cause };
+        return {
+            code: reason.code ?? 'not-available',
+            message: reason.message,
+            cause: reason.cause,
+        };
     }
     if (reason instanceof Error) return { code: 'failed', message: reason.message, cause: reason };
     return { code: 'failed', cause: reason };
