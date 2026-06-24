@@ -1,3 +1,5 @@
+import { navTrace } from '../util/navTrace';
+
 export type Action = 'PUSH' | 'REPLACE' | 'POP';
 
 export interface Location {
@@ -76,11 +78,13 @@ export function createBrowserHistory(): History {
         push(to, state = null) {
             const internal: InternalState = { usr: state, key: newKey() };
             window.history.pushState(internal, '', to);
+            navTrace(`history.push → ${to} (URL bar set)`);
             emit('PUSH');
         },
         replace(to, state = null) {
             const internal: InternalState = { usr: state, key: newKey() };
             window.history.replaceState(internal, '', to);
+            navTrace(`history.replace → ${to}`);
             emit('REPLACE');
         },
         listen(listener) {

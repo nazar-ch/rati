@@ -4,6 +4,7 @@ import { createContext, memo, type PropsWithChildren, useCallback, useContext } 
 import { type NameToRoute, type GenericRouteType, type UserRoutes } from './route';
 import { type WebRouterStore } from './store';
 import { useWebRouter } from '../stores/RootStore';
+import { navTraceStart } from '../util/navTrace';
 import { computed } from 'mobx';
 
 type GenericAnchorProps = Omit<
@@ -58,6 +59,7 @@ const GenericAnchor = observer(function GenericAnchor({
             if (userOnClick) userOnClick(event);
             if (!shouldHandleLinkClick(event)) return;
             event.preventDefault();
+            navTraceStart(`click → ${href}`);
             webRouter.navigate(href);
         },
         [href, userOnClick, webRouter],

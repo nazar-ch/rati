@@ -1,5 +1,6 @@
 import { observable, action, computed } from 'mobx';
 import { createBrowserHistory, type History, type Location } from './history';
+import { navTrace } from '../util/navTrace';
 import { installScrollRestoration, type ScrollRestorationOptions } from './scrollRestoration';
 import { GlobalStore } from '../stores/GlobalStore';
 import type { GenericRouteType, NameToRoute } from './route';
@@ -291,6 +292,7 @@ export class WebRouterStore<
                 // skipped above will be rerendered
                 this.pathCounter,
             ) ?? null;
+        navTrace(`setPath → activeRoute=${this.activeRoute?.name ?? 'none'}`);
     }
 
     /**

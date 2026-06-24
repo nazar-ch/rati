@@ -1,6 +1,7 @@
 import React, { type ComponentType, type FC, Suspense, useDeferredValue } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useWebRouter } from '../stores/RootStore';
+import { navTrace } from '../util/navTrace';
 
 export const Router: FC<{
     // router: WebRouterStore<any[] | readonly any[]>;
@@ -15,6 +16,11 @@ export const Router: FC<{
     // fallback. mobx-react-lite reads via useSyncExternalStore, so
     // startTransition wouldn't take effect here — useDeferredValue does.
     const activeRoute = useDeferredValue(router.activeRoute);
+
+    // The deferred value lags `router.activeRoute` by one low-priority render. The
+    // gap between `setPath` and this mark showing the *new* route name is the
+    // useDeferredValue deferral — a large gap means the old page lingered.
+    navTrace(`Router render → ${activeRoute?.name ?? 'none'} (deferred)`);
 
     if (!activeRoute) {
         return null;

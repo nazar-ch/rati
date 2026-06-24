@@ -10,6 +10,7 @@ import {
 } from '../scope/scope';
 import { isSource, type Source } from '../scope/source';
 import { is } from '../util/utils';
+import { navTrace, navTraceEnabled } from '../util/navTrace';
 
 /*
     The mandala's resolution mechanics: compile a scope's levels into a nested tree of
@@ -174,6 +175,9 @@ const Step = observer(function Step({
     // unmount runs dispose (deeper) before detach (shallower) — the load-bearing
     // dispose-before-detach order, structural now.
     useEffect(() => {
+        if (sources.length && navTraceEnabled()) {
+            navTrace(`level ${index} source attach (post-paint) [${dataKeys.join(',')}]`);
+        }
         for (const entry of sources) if (!entry.detach) entry.detach = entry.source.attach();
         return () => {
             for (let i = sources.length - 1; i >= 0; i--) {
@@ -219,6 +223,7 @@ const Step = observer(function Step({
     }
 
     if (pending) {
+        if (navTraceEnabled()) navTrace(`level ${index} render loading slot (pending)`);
         const Loading = shared.loading;
         return <Loading params={shared.params} />;
     }
@@ -289,6 +294,7 @@ function ProvideLeaf({
     // order. Keyed by `cacheToken`: rebuilds for a new run (param change / StrictMode
     // remount), not on per-render churn. `resolved` is read from the rebuild render.
     useLayoutEffect(() => {
+        navTrace('leaf .provide() built — component renders next');
         const value = provideDef.factory(resolved);
         setBuilt({ value });
         return () => {

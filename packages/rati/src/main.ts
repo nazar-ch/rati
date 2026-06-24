@@ -1,4 +1,5 @@
 export { sleep } from './util/utils';
+export { navTrace, navTraceStart, navTraceEnabled } from './util/navTrace';
 
 export { ActiveData, ActiveApiData } from './data/ActiveData';
 export { type ActiveDataInstanceType } from './data/ActiveDataInstanceType';
