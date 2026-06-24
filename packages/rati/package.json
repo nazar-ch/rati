@@ -1,6 +1,6 @@
 {
     "name": "rati",
-    "version": "0.4.9-alpha.1",
+    "version": "0.5.0",
     "description": "TypeScript frontend framework for React & MobX",
     "author": "Nazar Chobaniuk",
     "license": "MIT",
