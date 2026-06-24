@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import type React from 'react';
-import { shouldHandleLinkClick } from '../router/Link';
+import { shouldHandleLinkClick } from '../../router/Link';
 
 beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');

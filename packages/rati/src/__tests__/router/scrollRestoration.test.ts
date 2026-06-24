@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createBrowserHistory } from '../router/history';
-import { installScrollRestoration } from '../router/scrollRestoration';
+import { createBrowserHistory } from '../../router/history';
+import { installScrollRestoration } from '../../router/scrollRestoration';
 
 beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');

@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
-import { WebRouterStore } from '../router/store';
-import { route } from '../router/route';
+import { WebRouterStore } from '../../router/store';
+import { route } from '../../router/route';
 
 const NoopComponent = () => null;
 

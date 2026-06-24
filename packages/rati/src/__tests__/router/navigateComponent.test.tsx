@@ -1,12 +1,12 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { StrictMode, type FC } from 'react';
 import { act, render, screen, cleanup } from '@testing-library/react';
-import { WebRouterStore } from '../router/store';
-import { route } from '../router/route';
-import { Router } from '../router/Router';
-import { Navigate } from '../router/Navigate';
-import { GenericStoresContext } from '../stores/RootStore';
-import { createBrowserHistory } from '../router/history';
+import { WebRouterStore } from '../../router/store';
+import { route } from '../../router/route';
+import { Router } from '../../router/Router';
+import { Navigate } from '../../router/Navigate';
+import { GenericStoresContext } from '../../stores/RootStore';
+import { createBrowserHistory } from '../../router/history';
 
 const Home: FC = () => <Navigate to="/dashboard" />;
 const Dashboard: FC = () => <div data-testid="dashboard">dashboard</div>;

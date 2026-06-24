@@ -1,9 +1,9 @@
 import { describe, test, expect, vi } from 'vitest';
-import { WebRouterStore } from '../router/store';
-import { route } from '../router/route';
-import { createMemoryHistory } from '../router/history';
-import { prepareRoute } from '../router/prepareRoute';
-import { lazy } from '../router/lazy';
+import { WebRouterStore } from '../../router/store';
+import { route } from '../../router/route';
+import { createMemoryHistory } from '../../router/history';
+import { prepareRoute } from '../../router/prepareRoute';
+import { lazy } from '../../router/lazy';
 
 const NoopComponent = () => null;
 const HomeComponent = () => <div>home</div>;

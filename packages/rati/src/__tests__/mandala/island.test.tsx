@@ -2,10 +2,10 @@ import { describe, test, expect, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { observable, runInAction } from 'mobx';
 import { createContext, StrictMode, useContext, type FC } from 'react';
-import { scope, prop, hook } from '../scope/scope';
-import { NotAvailableError, SourceSymbol, type Source, type SourceState } from '../scope/source';
-import { island } from '../island/island';
-import { useScope, useOptionalScope } from '../mandala/channel';
+import { scope, prop, hook } from '../../scope/scope';
+import { NotAvailableError, SourceSymbol, type Source, type SourceState } from '../../scope/source';
+import { island } from '../../island/island';
+import { useScope, useOptionalScope } from '../../mandala/channel';
 
 const Loading: FC = () => <div>loading...</div>;
 

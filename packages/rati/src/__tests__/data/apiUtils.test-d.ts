@@ -1,5 +1,5 @@
 import { describe, test, expectTypeOf } from 'vitest';
-import { responseKey } from '../data/apiUtils';
+import { responseKey } from '../../data/apiUtils';
 
 const apiCall = async (_v: { x: string }) => ({
     a: '1',

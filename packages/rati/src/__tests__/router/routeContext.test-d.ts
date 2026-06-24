@@ -1,7 +1,7 @@
 import { describe, test, expectTypeOf } from 'vitest';
-import { route } from '../router/route';
-import { scope, prop, type ScopeComponent } from '../scope/scope';
-import { useRouteContext } from '../router/useRouteContext';
+import { route } from '../../router/route';
+import { scope, prop, type ScopeComponent } from '../../scope/scope';
+import { useRouteContext } from '../../router/useRouteContext';
 
 // Register the app's route table the way an app does — `RatiUserTypes['routes'] =
 // typeof routes`, the same augmentation `Link`'s `to` reads. `useRouteContext(name)`
@@ -28,7 +28,7 @@ const typedRoutes = [
     route('/', 'home', () => null),
 ] as const;
 
-declare module '../router/route' {
+declare module '../../router/route' {
     interface RatiUserTypes {
         routes: typeof typedRoutes;
     }

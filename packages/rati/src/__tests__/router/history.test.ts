@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest';
-import { createBrowserHistory } from '../router/history';
+import { createBrowserHistory } from '../../router/history';
 
 beforeEach(() => {
     // jsdom persists URL state across tests; reset to a known starting point.

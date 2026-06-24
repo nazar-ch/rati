@@ -2,13 +2,13 @@ import { describe, test, expect } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { prerender } from 'react-dom/static';
 import type { ReactElement } from 'react';
-import { WebRouterStore } from '../router/store';
-import { route, type GenericRouteType } from '../router/route';
-import { RootStore, RootStoreProvider } from '../stores/RootStore';
-import { Router } from '../router/Router';
-import { createMemoryHistory } from '../router/history';
-import { prepareRoute } from '../router/prepareRoute';
-import { scope, type ScopeComponent } from '../scope/scope';
+import { WebRouterStore } from '../../router/store';
+import { route, type GenericRouteType } from '../../router/route';
+import { RootStore, RootStoreProvider } from '../../stores/RootStore';
+import { Router } from '../../router/Router';
+import { createMemoryHistory } from '../../router/history';
+import { prepareRoute } from '../../router/prepareRoute';
+import { scope, type ScopeComponent } from '../../scope/scope';
 
 // react-dom/static `prerender` awaits Suspense before producing HTML, so an island
 // route's promise-backed scope resolves server-side (renderToString does not).

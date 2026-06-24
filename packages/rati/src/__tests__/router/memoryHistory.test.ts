@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vitest';
-import { createMemoryHistory } from '../router/history';
+import { createMemoryHistory } from '../../router/history';
 
 describe('createMemoryHistory', () => {
     test('defaults to "/" when no initial URL is provided', () => {

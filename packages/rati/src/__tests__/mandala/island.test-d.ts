@@ -1,7 +1,7 @@
 import { describe, test, expectTypeOf } from 'vitest';
-import { scope, prop, hook, type ScopeParams, type ScopeProps } from '../scope/scope';
-import { type Source } from '../scope/source';
-import { useOptionalScope, useScope } from '../mandala/channel';
+import { scope, prop, hook, type ScopeParams, type ScopeProps } from '../../scope/scope';
+import { type Source } from '../../scope/source';
+import { useOptionalScope, useScope } from '../../mandala/channel';
 
 class TitleStore {
     constructor(_params: { id: string }) {}

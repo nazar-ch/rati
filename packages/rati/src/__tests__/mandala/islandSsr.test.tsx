@@ -3,13 +3,13 @@ import { prerender } from 'react-dom/static';
 import { hydrateRoot } from 'react-dom/client';
 import { act, cleanup } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { scope, prop } from '../scope/scope';
-import { SourceSymbol, type Source } from '../scope/source';
+import { scope, prop } from '../../scope/scope';
+import { SourceSymbol, type Source } from '../../scope/source';
 import {
     island,
     createIslandHydrationCollector,
     IslandHydrationProvider,
-} from '../island/island';
+} from '../../island/island';
 
 afterEach(cleanup);
 

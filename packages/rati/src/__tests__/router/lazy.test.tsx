@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FC } from 'react';
 import { act, render, screen, cleanup } from '@testing-library/react';
 import { Suspense } from 'react';
-import { lazy } from '../router/lazy';
+import { lazy } from '../../router/lazy';
 
 beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');

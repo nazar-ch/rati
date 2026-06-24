@@ -1,15 +1,15 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Component, type FC, type ReactNode } from 'react';
 import { act, render, screen, cleanup } from '@testing-library/react';
-import { WebRouterStore } from '../router/store';
-import { route, type GenericRouteType } from '../router/route';
-import { Router } from '../router/Router';
-import { GenericStoresContext } from '../stores/RootStore';
-import { scope, prop, type ScopeComponent } from '../scope/scope';
-import { SourceSymbol, type Source } from '../scope/source';
-import { island } from '../island/island';
-import { useScope } from '../mandala/channel';
-import { useRouteContext } from '../router/useRouteContext';
+import { WebRouterStore } from '../../router/store';
+import { route, type GenericRouteType } from '../../router/route';
+import { Router } from '../../router/Router';
+import { GenericStoresContext } from '../../stores/RootStore';
+import { scope, prop, type ScopeComponent } from '../../scope/scope';
+import { SourceSymbol, type Source } from '../../scope/source';
+import { island } from '../../island/island';
+import { useScope } from '../../mandala/channel';
+import { useRouteContext } from '../../router/useRouteContext';
 
 // The 'product' route's context type is registered globally via the app-routes
 // augmentation in `routeContext.test-d.ts` (`RatiUserTypes['routes']`), so the

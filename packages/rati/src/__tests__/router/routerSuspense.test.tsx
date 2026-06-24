@@ -1,10 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { lazy, FC } from 'react';
 import { act, render, screen, cleanup } from '@testing-library/react';
-import { WebRouterStore } from '../router/store';
-import { route } from '../router/route';
-import { Router } from '../router/Router';
-import { GenericStoresContext } from '../stores/RootStore';
+import { WebRouterStore } from '../../router/store';
+import { route } from '../../router/route';
+import { Router } from '../../router/Router';
+import { GenericStoresContext } from '../../stores/RootStore';
 
 const HomePage: FC = () => <div data-testid="home">home</div>;
 

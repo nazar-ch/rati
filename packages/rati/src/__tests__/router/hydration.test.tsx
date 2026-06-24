@@ -2,14 +2,14 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { prerender } from 'react-dom/static';
 import { hydrateRoot } from 'react-dom/client';
-import { WebRouterStore } from '../router/store';
-import { route } from '../router/route';
-import { RootStore, RootStoreProvider } from '../stores/RootStore';
-import { Router } from '../router/Router';
-import { createBrowserHistory, createMemoryHistory } from '../router/history';
-import { prepareRoute } from '../router/prepareRoute';
-import { scope, type ScopeComponent } from '../scope/scope';
-import { createIslandHydrationCollector, IslandHydrationProvider } from '../island/island';
+import { WebRouterStore } from '../../router/store';
+import { route } from '../../router/route';
+import { RootStore, RootStoreProvider } from '../../stores/RootStore';
+import { Router } from '../../router/Router';
+import { createBrowserHistory, createMemoryHistory } from '../../router/history';
+import { prepareRoute } from '../../router/prepareRoute';
+import { scope, type ScopeComponent } from '../../scope/scope';
+import { createIslandHydrationCollector, IslandHydrationProvider } from '../../island/island';
 import { act } from '@testing-library/react';
 
 async function prerenderToString(element: React.ReactElement): Promise<string> {
