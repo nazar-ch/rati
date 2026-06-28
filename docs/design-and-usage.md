@@ -112,6 +112,21 @@ router.replace('/auth/login');               // replace (back skips the current 
 router.setSearchParams({ q: 'x' });          // update the query string
 ```
 
+`navigate`/`replace` also take `{ keepCurrentRoute, state }`:
+
+```tsx
+// Shallow: update the URL but keep the mounted route (no re-resolve). replace()
+// when it shouldn't grow the back stack (editor tabs); navigate() when it should
+// (e.g. switching focus between split panels — back/forward then steps the focus).
+router.replace('/editor/fileB', { keepCurrentRoute: true });
+router.navigate('/users/1', { keepCurrentRoute: true, state: { panelId } });
+
+// Per-entry state survives back/forward and is read via router.state. A
+// navigation that changes only state (same URL) still re-resolves the route, so
+// stepping between two entries that share a URL is visible to route-keyed consumers.
+router.navigate('/users/1', { state: { panelId } });
+```
+
 ---
 
 ## Scopes — declarative data

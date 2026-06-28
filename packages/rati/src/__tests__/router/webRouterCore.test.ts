@@ -170,6 +170,78 @@ describe('WebRouterStore navigation', () => {
         router.dispose();
     });
 
+    test('navigate({ keepCurrentRoute: true }) grows the back stack but keeps the route mounted', async () => {
+        window.history.replaceState(null, '', '/dashboard');
+        const router = new WebRouterStore({}, routes);
+        await Promise.resolve();
+        const before = router.activeRoute;
+        const startLength = window.history.length;
+
+        router.navigate({ name: 'user', userId: '1' }, { keepCurrentRoute: true });
+        await Promise.resolve();
+
+        expect(window.location.pathname).toBe('/users/1');
+        expect(router.path).toBe('/users/1');
+        // Shallow push: a new history entry (unlike a keepCurrentRoute replace)...
+        expect(window.history.length).toBe(startLength + 1);
+        // ...but the mounted route is untouched (skip marker suppressed the resolve).
+        expect(router.activeRoute).toBe(before);
+        router.dispose();
+    });
+
+    test('navigate({ keepCurrentRoute, state }) stamps the entry and exposes the state', async () => {
+        window.history.replaceState(null, '', '/dashboard');
+        const router = new WebRouterStore({}, routes);
+        await Promise.resolve();
+        const before = router.activeRoute;
+
+        router.navigate({ name: 'user', userId: '1' }, {
+            keepCurrentRoute: true,
+            state: { panelId: 'p0' },
+        });
+        await Promise.resolve();
+
+        expect(router.activeRoute).toBe(before);
+        expect((router.state as { panelId?: string }).panelId).toBe('p0');
+        router.dispose();
+    });
+
+    test('a state-only change on the same path re-resolves the route', async () => {
+        window.history.replaceState(null, '', '/users/1');
+        const router = new WebRouterStore({}, routes);
+        await Promise.resolve();
+        const before = router.activeRoute;
+
+        // Same URL, different per-entry state — models stepping between two panels
+        // that share a page. The route must re-key so route-keyed consumers react.
+        router.navigate('/users/1', { state: { panelId: 'p1' } });
+        await Promise.resolve();
+
+        expect(router.path).toBe('/users/1');
+        expect(router.activeRoute?.name).toBe('user');
+        expect(router.activeRoute).not.toBe(before);
+        expect((router.state as { panelId?: string }).panelId).toBe('p1');
+        router.dispose();
+    });
+
+    test('a same-path navigation with equal state does not re-resolve', async () => {
+        window.history.replaceState(null, '', '/users/1');
+        const router = new WebRouterStore({}, routes);
+        await Promise.resolve();
+
+        router.navigate('/users/1', { state: { panelId: 'p0' } });
+        await Promise.resolve();
+        const afterFirst = router.activeRoute;
+
+        // Re-navigating to the same URL with an equal-by-value state is a no-op for
+        // resolution (guards the StrictMode/mount-race re-fire and needless remounts).
+        router.navigate('/users/1', { state: { panelId: 'p0' } });
+        await Promise.resolve();
+
+        expect(router.activeRoute).toBe(afterFirst);
+        router.dispose();
+    });
+
     test('history.push() triggers a route resolution', async () => {
         const router = new WebRouterStore({}, routes);
         await Promise.resolve();
