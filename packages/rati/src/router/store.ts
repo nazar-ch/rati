@@ -71,6 +71,31 @@ function stripBasename(pathname: string, basename: string): string {
     return pathname;
 }
 
+/**
+ * Shallow value-equality for per-entry history `state`. Used to decide whether a
+ * same-URL navigation changed its `state` and so should re-resolve the route
+ * (see {@link WebRouterStore.setPath}). Reference equality is wrong here: POP
+ * restores `state` as a freshly-deserialized object, and StrictMode re-reads
+ * `history.state` into a new object too — both must compare equal to their prior
+ * value. A shallow compare matches `state`'s documented purpose (flat UI-local
+ * context like `{ panelId }`); deeply-nested changes are out of scope by design.
+ */
+function shallowEqualState(a: unknown, b: unknown): boolean {
+    if (a === b) return true;
+    if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) {
+        return false;
+    }
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    for (const key of aKeys) {
+        if ((a as Record<string, unknown>)[key] !== (b as Record<string, unknown>)[key]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 export class WebRouterStore<
     T extends readonly GenericRouteType[] = readonly GenericRouteType[],
 > extends GlobalStore<any> {
@@ -224,6 +249,10 @@ export class WebRouterStore<
      * `{ state }`, or `null`. The browser persists it per entry, so it survives
      * back/forward. Use it to carry UI-local context that shouldn't live in the
      * URL itself — e.g. which panel a navigation targets.
+     *
+     * A navigation that changes only `state` (same URL, different value) still
+     * re-resolves the active route, so consumers that route off `state` react to
+     * back/forward between two entries sharing a URL. See {@link setPath}.
      */
     get state(): unknown {
         return this._state;
@@ -275,19 +304,25 @@ export class WebRouterStore<
             const { state } = location;
             const pathname = stripBasename(location.pathname, this.basename);
             const currentPathCounter = this.pathCounter++;
+            const nextState = state ?? null;
+            const stateChanged = !shallowEqualState(this._state, nextState);
 
             // Search, hash and state always update so observers see them, even on
             // hash-only or query-only navigations (or skipped shallow replaces) that
             // leave the route unchanged.
             this._search = location.search;
             this._hash = location.hash;
-            this._state = state ?? null;
+            this._state = nextState;
 
-            // Skip resolution only when the URL didn't change AND we already have
-            // a resolved route. Otherwise we'd skip on the initial mount race or
-            // on StrictMode re-fires where _path was set but activeRoute wasn't
-            // yet committed.
-            if (this._path === pathname && this.activeRoute) {
+            // Skip resolution only when the URL didn't change, the per-entry state
+            // is equal, AND we already have a resolved route. The path/route guard
+            // covers the initial mount race and StrictMode re-fires (where _path was
+            // set but activeRoute wasn't yet committed). The state guard is what
+            // makes a state-only change re-resolve: stepping back/forward between two
+            // entries that share a URL but carry different `state` (e.g. the same
+            // page open in two panels) must re-key the active route so consumers
+            // routing off it react — otherwise the entry change is invisible to them.
+            if (this._path === pathname && this.activeRoute && !stateChanged) {
                 return;
             }
 
@@ -341,6 +376,32 @@ export class WebRouterStore<
     }
 
     /**
+     * Push (`navigate`) or replace (`replace`) a history entry, optionally
+     * keeping the current route mounted. Shared core of {@link navigate} and
+     * {@link replace} so the skip-marker assembly lives in one place.
+     */
+    private pushOrReplace(
+        mode: 'push' | 'replace',
+        to: NameToRoute<T> | string,
+        options: { keepCurrentRoute?: boolean; state?: Record<string, unknown> },
+    ) {
+        const path = typeof to === 'string' ? to : this.getPath(to);
+        // The skip marker is consumed by the very next `setPath` (the synchronous
+        // emit from this push/replace) to suppress re-resolution. It embeds the
+        // current `pathCounter`, so a later POP back to this entry — where the
+        // counter has moved on — finds it stale and re-resolves normally.
+        const skip = options.keepCurrentRoute
+            ? { skip: `${this.pathCounter}/${this.sessionId}` }
+            : undefined;
+        const state = skip || options.state ? { ...skip, ...options.state } : null;
+        if (mode === 'push') {
+            this.history.push(path, state);
+        } else {
+            this.history.replace(path, state);
+        }
+    }
+
+    /**
      * Navigate to `to` by pushing a new history entry. The route re-resolves
      * and re-renders; browser back returns to the previous URL.
      *
@@ -348,10 +409,22 @@ export class WebRouterStore<
      * the hood. For programmatic redirects where the previous URL must not be
      * reachable via back (post-login, auth-gate, canonicalization), use
      * `replace()`.
+     *
+     * Pass `{ keepCurrentRoute: true }` for a *shallow push*: grow the back
+     * stack and update the URL, but keep the currently mounted route component
+     * in place (no re-resolve). Use when a history-worthy change leaves the
+     * shown route valid — e.g. switching focus between split panels that each
+     * already hold their content, where back/forward should step the focus.
+     *
+     * Pass `{ state }` to attach user state to the entry (readable via `state`,
+     * survives back/forward). Coexists with `keepCurrentRoute`'s internal skip
+     * marker.
      */
-    navigate(to: NameToRoute<T> | string, options: { state?: Record<string, unknown> } = {}) {
-        const path = typeof to === 'string' ? to : this.getPath(to);
-        this.history.push(path, options.state ?? null);
+    navigate(
+        to: NameToRoute<T> | string,
+        options: { keepCurrentRoute?: boolean; state?: Record<string, unknown> } = {},
+    ) {
+        this.pushOrReplace('push', to, options);
     }
 
     /**
@@ -365,9 +438,9 @@ export class WebRouterStore<
      * Pass `{ keepCurrentRoute: true }` to update the URL without re-resolving
      * the route — the currently mounted route component stays mounted. Useful
      * when the same route owns sub-state reflected in the URL (an editor
-     * swapping files via tabs, a media player changing tracks). Always pairs
-     * with replace semantics by design — a "shallow" change isn't a real
-     * navigation, so it shouldn't grow the back stack either.
+     * swapping files via tabs, a media player changing tracks). `keepCurrentRoute`
+     * is independent of push vs replace: replace (here) when the shallow change
+     * shouldn't grow the back stack; `navigate({ keepCurrentRoute })` when it should.
      *
      * Pass `{ state }` to attach user state to the entry (readable via `state`,
      * survives back/forward). Coexists with `keepCurrentRoute`'s internal skip
@@ -377,12 +450,7 @@ export class WebRouterStore<
         to: NameToRoute<T> | string,
         options: { keepCurrentRoute?: boolean; state?: Record<string, unknown> } = {},
     ) {
-        const path = typeof to === 'string' ? to : this.getPath(to);
-        const skip = options.keepCurrentRoute
-            ? { skip: `${this.pathCounter}/${this.sessionId}` }
-            : undefined;
-        const state = skip || options.state ? { ...skip, ...options.state } : null;
-        this.history.replace(path, state);
+        this.pushOrReplace('replace', to, options);
     }
 
     getActiveRoute(currentPath: string, _stores: any, pathCounter: number) {
