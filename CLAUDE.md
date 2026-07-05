@@ -13,7 +13,7 @@ Yarn-workspaces monorepo: `packages/rati` (the published `rati` package) plus
 They are the source of truth and are kept current. Keep them in sync when you change
 behavior they describe.
 
-- `docs/design-and-usage.md` — public API + mental model (scope / prop / load / provide /
+- `docs/design-and-usage.md` — public API + mental model (scope / input / load / provide /
   hook / source / island / route / useScope), app setup, routing, SSR.
 - `docs/internals.md` — source layout, the `mandala` engine, the per-level Step-tree
   resolver, lifecycle/teardown, the value channel, sources, SSR dehydration, toolchain.
@@ -22,7 +22,7 @@ behavior they describe.
 
 ## Mental model
 
-A **scope** declares *which data go where* (inputs via `prop<T>()`, then `.load({…})`
+A **scope** declares *which data go where* (inputs via `input<T>()`, then `.load({…})`
 levels resolved as a visible waterfall). An **island** mounts a scope — pairs it with a
 component plus loading/error slots, resolves the data, and provides the resolved props to
 its subtree. A **route** is an island bound to a URL. Components receive clean,
@@ -98,18 +98,22 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
   per-level Step tree), `channel.ts` (the scope-keyed value channel + `useScope`),
   `boundary.tsx`, `hydration.tsx` (SSR). Internal.
 - `island/island.ts` — the public `island()` wrapper.
-- `router/` — `route.tsx`, `store.ts` (WebRouterStore), `Router`/`Link`/`Navigate`,
+- `router/` — `route.tsx`, `store.ts` (RouterStore), `Router`/`Link`/`Navigate`,
   `useRouteContext`, `prepareRoute`, `history`, `scrollRestoration`, `lazy`.
 - `data/` — the legacy MobX-coupled data layer (`remoteData` debounced loader + race-guard,
   `apiUtils`, `ActiveData*` mutable drafts), shipped via the `rati/mobx` entry, not core.
 - `mobx/` — the `rati/mobx` entry: `observableSource` (a MobX-derivation→`Source` adapter)
   plus the `data/` re-exports. The only code that touches MobX (an optional peer dep).
+- `ssr/index.ts` — the `rati/ssr` entry: the server-facing surface (`HydrationProvider`,
+  `createHydrationCollector`, `prepareRoute` + the `Hydration`/`HydrationData` types),
+  re-exported from `mandala/hydration.tsx` and `router/prepareRoute.ts`.
+- `debug/index.ts` — the `rati/debug` entry: `navTrace` and friends (from `util/navTrace.ts`).
 - `stores/` — `RootStore`, `GlobalStore`. `types/` — `generic.ts`. `util/` — `utils.ts`.
 
 ## Key patterns
 
 - **Reactivity = `useSyncExternalStore`.** Core is MobX-free: a `Source` is a
-  `subscribe`/`getSnapshot` pair, `WebRouterStore` is a plain external store, and components
+  `subscribe`/`getSnapshot` pair, `RouterStore` is a plain external store, and components
   read both through uSES (no `observer`). Optional MobX bindings (`observableSource`) live in
   `rati/mobx`.
 - **MobX decorators** (`@observable`/`@action`/`@computed`) survive only in the `data/` layer
@@ -141,14 +145,15 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
 typecheck, build, and lint — so `vp lint` is green repo-wide (the `rati` package emits only
 the intentional type-machinery warnings). `demo` is a client-only SPA showing plain route
 components, route params, and `scope().load(…)` waterfalls (incl. a store class). `ssr` is a
-server-rendered **feature gallery** — a page per concept (async loads + dehydration, a
-`prop`→`hook`→dependent waterfall, the `useRouteContext` value channel, a MobX store as a
+server-rendered **feature gallery** — a page per concept (async loads + dehydration, an
+`input`→`hook`→dependent waterfall, the `useRouteContext` value channel, a MobX store as a
 class load, a `Source`-backed live clock, and an error-slot + `retry`), each foregrounding its
 server/client behavior.
 
 The SSR mechanism: a route's scope is an island that resolves at render time, so the server
 uses `react-dom/static` `prerender` (not `renderToString`, which can't await the island's
-Suspense) and dehydrates the resolved promise values through `IslandHydrationProvider`; the
+Suspense) and dehydrates the resolved promise values through `HydrationProvider` (from the
+`rati/ssr` entry); the
 client feeds them back so it rehydrates without re-running the loads. Two consequences the
 gallery leans on: server-only data must be an **async** load to be dehydrated (a sync load
 isn't serialized and would mismatch on hydration), and a `Source` stays *pending* under SSR

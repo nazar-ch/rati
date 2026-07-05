@@ -19,7 +19,7 @@ bindings live in `rati/mobx`.
 - A **route** is the same thing bound to a URL: `route(...)` builds an island specialized
   to a path, fed the path params.
 
-One vocabulary, all plain English: **scope, prop, load, provide, hook, source, island,
+One vocabulary, all plain English: **scope, input, load, provide, hook, source, island,
 route.**
 
 ```
@@ -34,10 +34,10 @@ useScope(scope)                                        →  read what it provide
 ## App setup
 
 ```tsx
-import { RootStore, RootStoreProvider, WebRouterStore, Router } from 'rati';
+import { RootStore, RootStoreProvider, RouterStore, Router } from 'rati';
 import { routes } from './routes';
 
-const router = new WebRouterStore({}, routes);
+const router = new RouterStore({}, routes);
 const root = new RootStore({ router });
 
 function App() {
@@ -49,7 +49,7 @@ function App() {
 }
 ```
 
-`WebRouterStore` owns history, the active route, and navigation. `<Router/>` renders the
+`RouterStore` owns history, the active route, and navigation. `<Router/>` renders the
 active route's component (with its optional `wrapper`). `RootStore` is the store root;
 extend it with your own stores and expose typed hooks via `createUseStoresHook`.
 
@@ -106,7 +106,7 @@ import { Link } from 'rati';
 params must be supplied. Programmatic navigation goes through the router:
 
 ```tsx
-const router = useWebRouter();
+const router = useRouter();
 router.navigate({ name: 'home' });           // push
 router.replace('/auth/login');               // replace (back skips the current URL)
 router.setSearchParams({ q: 'x' });          // update the query string
@@ -131,15 +131,15 @@ router.navigate('/users/1', { state: { panelId } });
 
 ## Scopes — declarative data
 
-Build a scope head-first: the head declares **inputs** with `prop<T>()`; each `.load({…})`
+Build a scope head-first: the head declares **inputs** with `input<T>()`; each `.load({…})`
 adds a dependent level that sees the prior levels' resolved values.
 
 ```ts
-import { scope, prop, hook } from 'rati';
+import { scope, input, hook } from 'rati';
 
 export const pageScope = scope({
-        space: prop<string>(),          // inputs (island props / route params), diffed by value
-        pageId: prop<Base64Uuid>(),
+        space: input<string>(),          // inputs (island props / route params), diffed by value
+        pageId: input<Base64Uuid>(),
     })
     .load({ stores: hook(() => useStores()) })                 // DI — a hook load (see below)
     .load({ spaceId: ({ space, stores }) => resolveId(stores, space) })   // dependent level
@@ -162,7 +162,7 @@ A `.load()` entry is one of:
 | `hook(fn)` | a hook load — see below | `fn`'s return (a `Source<T>` unwraps to `T`) |
 
 Keys **within** a level resolve in parallel; levels resolve **in sequence** — that's the
-waterfall, expressed by *where* a prop is declared.
+waterfall, expressed by *where* an entry is declared.
 
 ### `.provide()` — what the subtree reads
 
@@ -179,7 +179,7 @@ React hook. Use it for dependency injection (read stores/services from context) 
 adapt external hook-based data libs (Apollo, react-query, SWR) into a `Source`:
 
 ```ts
-scope({ id: prop<Uuid>() })
+scope({ id: input<Uuid>() })
     .load({ stores: hook(() => useStores()) })
     .load({ user: hook(({ id }) => fromApollo(USER_DOC, { id })) });   // returns a Source<User>
 ```
@@ -191,17 +191,17 @@ bare function load that calls a hook is a bug — it would be cached and its hoo
 
 ## Islands
 
-`island()` builds a standalone unit from a scope. Its props are exactly the scope's
-`prop()` inputs:
+`island()` builds a standalone unit from a scope. Its props are exactly the scope's inputs
+(declared with `input()`):
 
 ```tsx
 import { island } from 'rati';
 
 const UserCard = island({
-    scope: userScope,        // scope({ userId: prop<string>() }).load({ user: … })
+    scope: userScope,        // scope({ userId: input<string>() }).load({ user: … })
     component: UserBody,     // receives the clean resolved props
-    loading: Spinner,        // receives { params } (the scope inputs)
-    error: ErrorCard,        // receives { params, error: SourceError, retry }
+    loading: Spinner,        // receives { inputs } (the scope inputs)
+    error: ErrorCard,        // receives { inputs, error: SourceError, retry }
 });
 
 // <UserCard userId="42" />
@@ -245,14 +245,14 @@ inferred from that route's scope — no separate registration.
 
 ## Types
 
-Read prop and param types straight off the scope value — no hand-written prop types,
+Read prop and input types straight off the scope value — no hand-written prop types,
 inferred end to end:
 
 ```ts
-import type { ScopeProps, ScopeParams, ScopeComponent } from 'rati';
+import type { ScopeProps, ScopeInputs, ScopeComponent } from 'rati';
 
 type Props = ScopeProps<typeof pageScope>;     // the clean resolved props
-type Params = ScopeParams<typeof pageScope>;   // the inputs (island props / slot `params`)
+type Inputs = ScopeInputs<typeof pageScope>;   // the inputs (island props / slot `inputs`)
 
 const PageBody: ScopeComponent<typeof pageScope> = (props) => { … };
 ```
@@ -318,17 +318,18 @@ and dehydrates their values so the client hydrates without re-fetching or re-sus
 **Server:**
 
 ```tsx
-import { prepareRoute, IslandHydrationProvider, createIslandHydrationCollector } from 'rati';
+import { RouterStore, RootStoreProvider, Router, createMemoryHistory } from 'rati';
+import { prepareRoute, HydrationProvider, createHydrationCollector } from 'rati/ssr';
 import { prerender } from 'react-dom/static';
 
-const router = new WebRouterStore({}, routes, { history: createMemoryHistory({ url }) });
+const router = new RouterStore({}, routes, { history: createMemoryHistory({ url }) });
 const prepared = await prepareRoute(router);          // routing snapshot for the client
-const collector = createIslandHydrationCollector();
+const collector = createHydrationCollector();
 
 const { prelude } = await prerender(
-    <IslandHydrationProvider collect={collector.collect}>
+    <HydrationProvider collect={collector.collect}>
         <RootStoreProvider rootStore={root}><Router /></RootStoreProvider>
-    </IslandHydrationProvider>
+    </HydrationProvider>
 );
 // embed `prepared.hydratedState` (routing) and `collector.data` (island data) in the HTML
 ```
@@ -338,16 +339,16 @@ const { prelude } = await prerender(
 ```tsx
 import { hydrateRoot } from 'react-dom/client';
 
-const router = new WebRouterStore({}, routes, { hydratedState });   // seeds the active route
+const router = new RouterStore({}, routes, { hydratedState });   // seeds the active route
 hydrateRoot(container,
-    <IslandHydrationProvider data={islandData}>
+    <HydrationProvider data={islandData}>
         <RootStoreProvider rootStore={root}><Router /></RootStoreProvider>
-    </IslandHydrationProvider>
+    </HydrationProvider>
 );
 ```
 
 `hydratedState` makes the first client render match the server's active route synchronously;
-`IslandHydrationProvider data={…}` lets each island short-circuit its dehydrated promise
+`HydrationProvider data={…}` lets each island short-circuit its dehydrated promise
 values. Both providers render no DOM, so mounting them on both sides keeps the trees
 identical.
 
@@ -358,7 +359,7 @@ identical.
 The app mounts under a `basename`:
 
 ```ts
-new WebRouterStore({}, routes, { basename: '/admin' });
+new RouterStore({}, routes, { basename: '/admin' });
 ```
 
 Route definitions stay rooted at `/`; the basename is stripped before matching and

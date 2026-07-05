@@ -14,11 +14,11 @@ src/
     channel.ts      the value channel + useScope / useOptionalScope / useScopeRead
     boundary.tsx    the error boundary
     hydration.tsx   SSR promise dehydration
-  island/    island.ts — public island() wrapper + Island* / IslandHydration* aliases
-  router/    route.tsx (route() + route/param types), store.ts (WebRouterStore),
+  island/    island.ts — public island() wrapper + Island* / Hydration* aliases
+  router/    route.tsx (route() + route/param types), store.ts (RouterStore),
              Router, Link, Navigate, useRouteContext, prepareRoute, history,
              scrollRestoration, lazy
-  scope/     scope.ts (scope/prop/load/provide/hook + scope types), source.ts
+  scope/     scope.ts (scope/input/load/provide/hook + scope types), source.ts
   data/      remoteData, apiUtils, ActiveData (REST/data helpers)
   stores/    RootStore, GlobalStore (store roots)
   util/      utils.ts
@@ -70,7 +70,7 @@ mandala component's `useRef` — **not** on the Step's fiber. A Step that `use()
 promise suspends, and React discards the suspended render's fiber; a Step-local cell would be
 rebuilt on the retry, re-run its load, and re-suspend on a brand-new promise forever. Holding
 the bucket on the committed mandala ref makes the load run once. The bucket array is rebuilt
-only when the inner tree remounts (`treeKey` = params version + retry counter).
+only when the inner tree remounts (`treeKey` = inputs version + retry counter).
 
 ### Lifecycle & teardown ordering (structural)
 
@@ -85,9 +85,9 @@ effect phases:
   built over detach. A store built over a grabbed resource is torn down while that grab is
   still live.
 
-A param change (by value) bumps `treeKey`, remounting the inner tree under a `<Fragment
-key>`: React tears the old run down (children-first) and resolves the new params from scratch;
-same-params source transitions re-render in place, keeping promise/source identity.
+An inputs change (by value) bumps `treeKey`, remounting the inner tree under a `<Fragment
+key>`: React tears the old run down (children-first) and resolves the new inputs from scratch;
+same-inputs source transitions re-render in place, keeping promise/source identity.
 
 ## The value channel (`mandala/channel.ts`)
 
@@ -126,24 +126,24 @@ framework-owned registry, keyed `mandalaId (useId) → scopeKey → value`:
 
 - **Server.** Under `react-dom/static` `prerender`, each `Step` that unwraps a promise with
   `use()` calls `collect(...)`. `useId()` is stable by tree position across server/client.
-- **Client.** `IslandHydrationProvider data={…}` feeds the registry back; on first mount a
+- **Client.** `HydrationProvider data={…}` feeds the registry back; on first mount a
   Step short-circuits a dehydrated key to a value cell — skipping the load (no re-fetch) and
   `use()` (no re-suspend) — so hydration renders the server HTML synchronously.
 - Only *promises* are serialized; *sources* stay pending under SSR and resolve on the client.
   The mechanism is router-orthogonal (a route is just a mandala), so route SSR and standalone
-  island SSR participate the same way. Public exports are the `IslandHydration*` aliases in
+  island SSR participate the same way. Public exports are the `Hydration*` aliases in
   `island/island.ts`.
 
 The routing snapshot is separate: `prepareRoute(router)` (`router/prepareRoute.ts`) drives a
-memory-history router to its matched route and returns `WebRouterHydratedState`; the client
-seeds it via `WebRouterStoreOptions.hydratedState`.
+memory-history router to its matched route and returns `RouterHydratedState`; the client
+seeds it via `RouterStoreOptions.hydratedState`.
 
 ## Router (`router/`)
 
-`WebRouterStore` (`store.ts`) owns history, the active route, basename
+`RouterStore` (`store.ts`) owns history, the active route, basename
 handling, and navigation (`navigate`/`replace`/`setSearchParams`/`preloadRoute`). It is a
 plain external store — a listener `Set` plus `subscribe`/`getSnapshot` (a version counter);
-`useWebRouter` reads it through `useSyncExternalStore`, so every consumer re-renders on a
+`useRouter` reads it through `useSyncExternalStore`, so every consumer re-renders on a
 change. `route()`
 (`route.tsx`) is a thin wrapper over `createMandala` plus the route/param **types**:
 
