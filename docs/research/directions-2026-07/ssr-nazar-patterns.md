@@ -72,14 +72,16 @@ nazar derives the response status from a route-name convention
 `prepareRoute` already knows whether only the `*` catch-all matched; expose it on
 `PreparedRoute` (e.g. `matchedCatchAll: boolean`, letting the app map it to a status).
 
-## 5. Server-side redirects — note only, wait for need
+## 5. Server-side redirects — adopt (maintainer-confirmed)
 
 `Navigate` is client-only. nazar's one redirect (`/talk` → Calendly) is *external* and
 handled at the HTTP layer — the right place for it. But an internal redirect route
 (`route('/settings', …, () => <Navigate to="…"/>)`, as in the demo app) would today
-SSR the pre-redirect page and hop on the client. If a consumer hits this for real, the
-honest fix is a route-level `redirectTo` option that `prepareRoute` reports (so the server
-can 30x before rendering) — not sniffing `<Navigate>` out of a render. No pull yet.
+SSR the pre-redirect page and hop on the client. The honest fix is a route-level
+`redirectTo` option that `prepareRoute` reports (so the server can 30x before rendering)
+and that the client router honors like a `<Navigate>` — not sniffing `<Navigate>` out of
+a render. External URLs stay at the HTTP layer. Confirmed for the public-prep batch
+(CORE-6 in [public-prep-tasks.md](../../public-prep-tasks.md)).
 
 ## 6. Example & docs fixes that fall out
 

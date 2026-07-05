@@ -44,6 +44,11 @@ independent.
   serving; document in `docs/design-and-usage.md` (and the public guide's SSR section if
   it fits): the whole-document pattern (hydrate `document`, injected tags outside the
   React tree) and the per-request lifecycle (`router.dispose()`).
+- **CORE-6 — Route-level redirects.** A `redirectTo` option on `route()` for internal
+  redirects: `prepareRoute` reports it (e.g. `redirect: { to, permanent? }`) so a server
+  can respond 30x before rendering, and the client router honors it like a `<Navigate>`.
+  External URLs stay at the HTTP layer. Migrate the demo app's `<Navigate>`-only settings
+  route to it. Spec: ssr-nazar-patterns §5.
 
 ## Batch B — documentation
 
