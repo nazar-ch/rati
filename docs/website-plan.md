@@ -38,6 +38,10 @@ pain the reader has personally caused ("you've written this component"). No excl
 marks, no mascot antics, no superheroes; wit lives in precision, not decoration. Code is
 always real and always typed.
 
+**ASCII props.** Draft ASCII art (parrot marks, wordmarks, boards, trains, concept
+diagrams) lives in [`assets/ascii/`](../assets/ascii/README.md) — raw material for the
+404 page, loading placeholders, README, and anywhere a plain-text mark fits the voice.
+
 **Words we use / avoid.**
 
 - Use: *data layer, declarative, resolved props, typed end-to-end, scope, island, route,
