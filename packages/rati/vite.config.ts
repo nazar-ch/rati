@@ -17,10 +17,16 @@ export default defineConfig({
     build: {
         emptyOutDir: true,
         lib: {
-            // Two entries: the MobX-free core and the optional `rati/mobx` bindings.
-            // Rolldown hoists the shared core modules into a common chunk, so
-            // SourceSymbol (and friends) keep one identity across both.
-            entry: { main: 'src/main.ts', 'mobx/index': 'src/mobx/index.ts' },
+            // Entries: the MobX-free core, the optional `rati/mobx` bindings, the
+            // server-facing `rati/ssr` surface, and the `rati/debug` tooling. Rolldown
+            // hoists the shared core modules into a common chunk, so SourceSymbol (and
+            // friends) keep one identity across all of them.
+            entry: {
+                main: 'src/main.ts',
+                'mobx/index': 'src/mobx/index.ts',
+                'ssr/index': 'src/ssr/index.ts',
+                'debug/index': 'src/debug/index.ts',
+            },
             // the proper extensions will be added
             fileName: (_format, entryName) => `${entryName}.js`,
             formats: ['es'],

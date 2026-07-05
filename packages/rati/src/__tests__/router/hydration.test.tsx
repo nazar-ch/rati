@@ -9,7 +9,7 @@ import { Router } from '../../router/Router';
 import { createBrowserHistory, createMemoryHistory } from '../../router/history';
 import { prepareRoute } from '../../router/prepareRoute';
 import { scope, type ScopeComponent } from '../../scope/scope';
-import { createIslandHydrationCollector, IslandHydrationProvider } from '../../island/island';
+import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
 import { act } from '@testing-library/react';
 
 async function prerenderToString(element: React.ReactElement): Promise<string> {
@@ -135,13 +135,13 @@ describe('SSR + hydration', () => {
         });
         const serverRoot = new RootStore({ router: serverRouter }, { isReady: true });
         const prepared = await prepareRoute(serverRouter);
-        const collector = createIslandHydrationCollector();
+        const collector = createHydrationCollector();
         const html = await prerenderToString(
-            <IslandHydrationProvider collect={collector.collect}>
+            <HydrationProvider collect={collector.collect}>
                 <RootStoreProvider rootStore={serverRoot}>
                     <Router />
                 </RootStoreProvider>
-            </IslandHydrationProvider>,
+            </HydrationProvider>,
         );
         serverRouter.dispose();
 
@@ -164,11 +164,11 @@ describe('SSR + hydration', () => {
         await act(async () => {
             root = hydrateRoot(
                 container,
-                <IslandHydrationProvider data={collector.data}>
+                <HydrationProvider data={collector.data}>
                     <RootStoreProvider rootStore={clientRoot}>
                         <Router />
                     </RootStoreProvider>
-                </IslandHydrationProvider>,
+                </HydrationProvider>,
             );
         });
 

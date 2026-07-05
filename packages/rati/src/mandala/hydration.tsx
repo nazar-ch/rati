@@ -21,8 +21,8 @@ import { createContext, useMemo, type ReactNode } from 'react';
 
     The mandala engine owns this end to end — it is orthogonal to the router. A route is
     just a mandala, so route SSR participates for free; a standalone island SSR'd without
-    a router participates the same way. (The public SSR API re-exports these under
-    `IslandHydration*` names — see island/island.ts.)
+    a router participates the same way. (These are the public SSR surface, re-exported
+    from the `rati/ssr` entry — see ssr/index.ts.)
 */
 
 // mandalaId (useId) -> scope key -> resolved promise value.

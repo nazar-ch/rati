@@ -1,4 +1,5 @@
-import { sleep, Link } from 'rati';
+import { Link } from 'rati';
+import { sleep } from './util';
 
 export function Index() {
     // The click handler is async, but a DOM `onClick` must return `void` — so the

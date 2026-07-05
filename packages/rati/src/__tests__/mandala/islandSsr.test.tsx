@@ -5,11 +5,8 @@ import { act, cleanup } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { scope, prop } from '../../scope/scope';
 import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
-import {
-    island,
-    createIslandHydrationCollector,
-    IslandHydrationProvider,
-} from '../../island/island';
+import { island } from '../../island/island';
+import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
 
 afterEach(cleanup);
 
@@ -79,11 +76,11 @@ describe('island SSR dehydration', () => {
             loading: () => <div>loading</div>,
         });
 
-        const collector = createIslandHydrationCollector();
+        const collector = createHydrationCollector();
         await prerenderToString(
-            <IslandHydrationProvider collect={collector.collect}>
+            <HydrationProvider collect={collector.collect}>
                 <Island id="ssr" />
-            </IslandHydrationProvider>,
+            </HydrationProvider>,
         );
 
         // One island → one slice, holding the resolved promise value under its key.
@@ -107,11 +104,11 @@ describe('island SSR dehydration', () => {
         });
 
         // Server: render + collect. The promise runs exactly once.
-        const collector = createIslandHydrationCollector();
+        const collector = createHydrationCollector();
         const html = await prerenderToString(
-            <IslandHydrationProvider collect={collector.collect}>
+            <HydrationProvider collect={collector.collect}>
                 <Island id="ssr" />
-            </IslandHydrationProvider>,
+            </HydrationProvider>,
         );
         expect(html).toContain('hello ssr');
         expect(calls).toBe(1);
@@ -125,9 +122,9 @@ describe('island SSR dehydration', () => {
         await act(async () => {
             hydrateRoot(
                 container,
-                <IslandHydrationProvider data={collector.data}>
+                <HydrationProvider data={collector.data}>
                     <Island id="ssr" />
-                </IslandHydrationProvider>,
+                </HydrationProvider>,
             );
         });
 
@@ -152,11 +149,11 @@ describe('island SSR dehydration', () => {
             loading: () => <div>l</div>,
         });
 
-        const collector = createIslandHydrationCollector();
+        const collector = createHydrationCollector();
         const html = await prerenderToString(
-            <IslandHydrationProvider collect={collector.collect}>
+            <HydrationProvider collect={collector.collect}>
                 <Parent />
-            </IslandHydrationProvider>,
+            </HydrationProvider>,
         );
 
         expect(html).toContain('parent-data');

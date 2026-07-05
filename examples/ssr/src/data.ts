@@ -1,7 +1,7 @@
-import { sleep } from 'rati';
+import { sleep } from './util';
 
 // Fake "backend" calls — deterministic (same inputs → same output) so the SSR
-// payload a request dehydrates always matches what it rendered. `sleep` is rati's.
+// payload a request dehydrates always matches what it rendered.
 
 export interface Product {
     id: string;

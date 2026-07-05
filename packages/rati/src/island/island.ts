@@ -20,12 +20,6 @@ export function island<S extends Scope<any>>(config: IslandConfig<S>): IslandCom
     return createMandala(config, 'Island');
 }
 
-// The public SSR-dehydration surface: the mandala engine's hydration, island-branded.
-export {
-    HydrationProvider as IslandHydrationProvider,
-    createHydrationCollector as createIslandHydrationCollector,
-} from '../mandala/hydration';
-export type {
-    Hydration as IslandHydration,
-    HydrationData as IslandHydrationData,
-} from '../mandala/hydration';
+// The SSR-dehydration surface (`HydrationProvider`, `createHydrationCollector`) lives in
+// the `rati/ssr` entry — it is orthogonal to islands (route islands use it too), so it
+// carries no `Island` prefix. See ssr/index.ts and mandala/hydration.tsx.

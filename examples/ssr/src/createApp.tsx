@@ -1,13 +1,12 @@
 import {
     type History,
-    type IslandHydrationData,
-    IslandHydrationProvider,
     RootStore,
     RootStoreProvider,
     Router,
     type WebRouterHydratedState,
     WebRouterStore,
 } from 'rati';
+import { type HydrationData, HydrationProvider } from 'rati/ssr';
 import { RegionContext } from './appContext';
 import { Layout } from './components/Layout';
 import { routes } from './routes';
@@ -19,14 +18,14 @@ import { routes } from './routes';
  */
 export interface AppHydrationState {
     router: WebRouterHydratedState;
-    islands: IslandHydrationData;
+    islands: HydrationData;
 }
 
 export interface CreateAppOptions {
     history: History;
     hydratedState?: WebRouterHydratedState | undefined;
     /** Client: server-collected island data to rehydrate from, without re-running loads. */
-    islandData?: IslandHydrationData | undefined;
+    islandData?: HydrationData | undefined;
     /** Server: collector that records resolved island promise values during the prerender. */
     collectIslandData?: ((mandalaId: string, key: string, value: unknown) => void) | undefined;
 }
@@ -42,11 +41,11 @@ export interface CreatedApp {
  * history); the client creates one at hydration time (browser history seeded
  * from the snapshot the server embedded in the HTML).
  *
- * The island engine resolves a route's scope during the server render and
- * dehydrates its promise values through `IslandHydrationProvider`. The provider
- * is mounted on both the server and the client so the trees stay identical (and
- * each island's `useId` stable): the server passes `collect`, the client passes
- * the collected `data`.
+ * The mandala engine resolves a route's scope during the server render and
+ * dehydrates its promise values through `HydrationProvider` (rati/ssr). The
+ * provider is mounted on both the server and the client so the trees stay identical
+ * (and each island's `useId` stable): the server passes `collect`, the client
+ * passes the collected `data`.
  */
 export function createApp({
     history,
@@ -63,11 +62,11 @@ export function createApp({
                 {/* Region is injected here (server and client alike) and read inside the
                     product scope via hook(() => useContext(RegionContext)). */}
                 <RegionContext.Provider value="US">
-                    <IslandHydrationProvider collect={collectIslandData} data={islandData}>
+                    <HydrationProvider collect={collectIslandData} data={islandData}>
                         <Layout>
                             <Router />
                         </Layout>
-                    </IslandHydrationProvider>
+                    </HydrationProvider>
                 </RegionContext.Provider>
             </RootStoreProvider>
         );

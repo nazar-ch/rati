@@ -14,7 +14,7 @@ type ActiveRoute = NonNullable<GetActiveRoute>;
  * what the server entry serialized into the HTML response — the client passes it
  * back so the first paint reads the same active route as the server. This is the
  * *routing* snapshot only; a route's resolved scope data is dehydrated separately
- * by the mandala engine (see `IslandHydrationProvider`).
+ * by the mandala engine (see `HydrationProvider` in `rati/ssr`).
  */
 export interface WebRouterHydratedState {
     path: string;

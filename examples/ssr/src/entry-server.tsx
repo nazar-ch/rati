@@ -1,6 +1,7 @@
 import { prerender } from 'react-dom/static';
 import type { ReactElement } from 'react';
-import { createIslandHydrationCollector, createMemoryHistory, prepareRoute } from 'rati';
+import { createMemoryHistory } from 'rati';
+import { createHydrationCollector, prepareRoute } from 'rati/ssr';
 import { type AppHydrationState, createApp } from './createApp';
 
 export interface RenderResult {
@@ -29,7 +30,7 @@ async function prerenderToString(element: ReactElement): Promise<string> {
 
 export async function render(url: string): Promise<RenderResult> {
     const history = createMemoryHistory({ url });
-    const collector = createIslandHydrationCollector();
+    const collector = createHydrationCollector();
     const { router, App } = createApp({ history, collectIslandData: collector.collect });
 
     const prepared = await prepareRoute(router);
@@ -41,7 +42,7 @@ export async function render(url: string): Promise<RenderResult> {
         return { html: '', state: null, status: 404 };
     }
 
-    // Awaits the route's scope, so its resolved data lands in the HTML; the island
+    // Awaits the route's scope, so its resolved data lands in the HTML; the mandala
     // engine fills `collector.data` with each resolved promise value for the client.
     const html = await prerenderToString(<App />);
     router.dispose();

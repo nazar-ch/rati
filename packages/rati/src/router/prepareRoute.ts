@@ -25,8 +25,8 @@ export interface PreparedRoute {
  *
  * Scope *data* is not resolved here — a route's scope is an island that resolves at
  * render time, so a Suspense-awaiting server render (`react-dom/static`
- * `prerender`) resolves it and the island engine dehydrates the promise values
- * (see `IslandHydrationProvider`). This builds only the routing snapshot.
+ * `prerender`) resolves it and the mandala engine dehydrates the promise values
+ * (see `HydrationProvider` in `rati/ssr`). This builds only the routing snapshot.
  */
 export async function prepareRoute(router: WebRouterStore<any>): Promise<PreparedRoute | null> {
     await router.pendingNavigation;

@@ -1,8 +1,7 @@
-export { sleep } from './util/utils';
-export { navTrace, navTraceStart, navTraceEnabled } from './util/navTrace';
-
-// The MobX-coupled data layer (ActiveData / remoteData) moved to the `rati/mobx`
-// entry so core stays MobX-free — import it from there.
+// Opt-in debug tooling (`navTrace` and friends) lives in the `rati/debug` entry; the
+// MobX-coupled data layer (ActiveData / remoteData) in `rati/mobx`; the server-facing
+// SSR surface (`HydrationProvider`, `createHydrationCollector`, `prepareRoute`) in
+// `rati/ssr` — all kept out of the client-focused main barrel.
 
 export {
     RootStore,
@@ -52,7 +51,6 @@ export * from './types/generic';
 export { Link, ContextualLink, LinkContextProvider, useLinkContext } from './router/Link';
 export { lazy, type PreloadableLazyComponent } from './router/lazy';
 export { Navigate } from './router/Navigate';
-export { prepareRoute, type PreparedRoute } from './router/prepareRoute';
 
 export {
     type ChainableScope,
@@ -88,15 +86,7 @@ export {
 
 export { useScope, useOptionalScope } from './mandala/channel';
 
-export {
-    island,
-    type IslandComponent,
-    type IslandConfig,
-    IslandHydrationProvider,
-    createIslandHydrationCollector,
-    type IslandHydration,
-    type IslandHydrationData,
-} from './island/island';
+export { island, type IslandComponent, type IslandConfig } from './island/island';
 
 export { useRouteContext } from './router/useRouteContext';
 

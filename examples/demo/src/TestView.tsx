@@ -1,5 +1,6 @@
 import { type FC } from 'react';
-import { prop, scope, type ScopeComponent, sleep, useWebRouter } from 'rati';
+import { prop, scope, type ScopeComponent, useWebRouter } from 'rati';
+import { sleep } from './util';
 
 // A plain route component with no data of its own: it reads the router straight
 // off the global stores via rati's `useWebRouter()` hook (so it never has to
