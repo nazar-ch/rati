@@ -8,18 +8,14 @@ export {
     type RootStoreOptions,
     type GlobalStores,
     useGenericStores,
-    useWebRouter,
+    useRouter,
     RootStoreProvider,
     GenericStoresContext,
     createUseStoresHook,
 } from './stores/RootStore';
 export { GlobalStore } from './stores/GlobalStore';
 
-export {
-    WebRouterStore,
-    type WebRouterStoreOptions,
-    type WebRouterHydratedState,
-} from './router/store';
+export { RouterStore, type RouterStoreOptions, type RouterHydratedState } from './router/store';
 export {
     route,
     type RouteOptions,

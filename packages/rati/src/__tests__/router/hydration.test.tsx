@@ -2,7 +2,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vite-plus/tes
 import { renderToString } from 'react-dom/server';
 import { prerender } from 'react-dom/static';
 import { hydrateRoot } from 'react-dom/client';
-import { WebRouterStore } from '../../router/store';
+import { RouterStore } from '../../router/store';
 import { route } from '../../router/route';
 import { RootStore, RootStoreProvider } from '../../stores/RootStore';
 import { Router } from '../../router/Router';
@@ -48,7 +48,7 @@ afterEach(() => {
 
 async function ssrThenHydrate(url: string, routes: any) {
     // ----- Server -----
-    const serverRouter = new WebRouterStore({}, routes, {
+    const serverRouter = new RouterStore({}, routes, {
         history: createMemoryHistory({ url }),
     });
     const serverRoot = new RootStore({ router: serverRouter }, { isReady: true });
@@ -68,7 +68,7 @@ async function ssrThenHydrate(url: string, routes: any) {
     container.innerHTML = html;
     document.body.appendChild(container);
 
-    const clientRouter = new WebRouterStore({}, routes, {
+    const clientRouter = new RouterStore({}, routes, {
         history: createBrowserHistory(),
         hydratedState: prepared!.hydratedState,
     });
@@ -130,7 +130,7 @@ describe('SSR + hydration', () => {
         const routesWithScope = [route('/', 'home', Greeting, { scope: greetingScope })] as const;
 
         // ----- Server: prerender (awaits the promise) + collect its resolved value -----
-        const serverRouter = new WebRouterStore({}, routesWithScope, {
+        const serverRouter = new RouterStore({}, routesWithScope, {
             history: createMemoryHistory({ url: '/' }),
         });
         const serverRoot = new RootStore({ router: serverRouter }, { isReady: true });
@@ -154,7 +154,7 @@ describe('SSR + hydration', () => {
         container.innerHTML = html;
         document.body.appendChild(container);
 
-        const clientRouter = new WebRouterStore({}, routesWithScope, {
+        const clientRouter = new RouterStore({}, routesWithScope, {
             history: createBrowserHistory(),
             hydratedState: prepared!.hydratedState,
         });

@@ -4,7 +4,7 @@ import { installScrollRestoration, type ScrollRestorationOptions } from './scrol
 import { GlobalStore } from '../stores/GlobalStore';
 import type { GenericRouteType, NameToRoute } from './route';
 
-type GetActiveRoute = ReturnType<WebRouterStore<GenericRouteType[]>['getActiveRoute']>;
+type GetActiveRoute = ReturnType<RouterStore<GenericRouteType[]>['getActiveRoute']>;
 
 /** Activated route shape. */
 type ActiveRoute = NonNullable<GetActiveRoute>;
@@ -16,7 +16,7 @@ type ActiveRoute = NonNullable<GetActiveRoute>;
  * *routing* snapshot only; a route's resolved scope data is dehydrated separately
  * by the mandala engine (see `HydrationProvider` in `rati/ssr`).
  */
-export interface WebRouterHydratedState {
+export interface RouterHydratedState {
     path: string;
     search: string;
     hash: string;
@@ -25,7 +25,7 @@ export interface WebRouterHydratedState {
     routeParams: Record<string, string>;
 }
 
-export interface WebRouterStoreOptions {
+export interface RouterStoreOptions {
     /**
      * Inject a {@link History} instance instead of letting the store create
      * one. Pair with `createMemoryHistory({ url })` for server rendering or
@@ -51,7 +51,7 @@ export interface WebRouterStoreOptions {
      * snapshot and skips the initial `setPath`/`getActiveRoute` async work, so
      * the first client render matches the server HTML byte-for-byte.
      */
-    hydratedState?: WebRouterHydratedState | undefined;
+    hydratedState?: RouterHydratedState | undefined;
 }
 
 function normalizeBasename(basename: string | undefined): string {
@@ -74,7 +74,7 @@ function stripBasename(pathname: string, basename: string): string {
 /**
  * Shallow value-equality for per-entry history `state`. Used to decide whether a
  * same-URL navigation changed its `state` and so should re-resolve the route
- * (see {@link WebRouterStore.setPath}). Reference equality is wrong here: POP
+ * (see {@link RouterStore.setPath}). Reference equality is wrong here: POP
  * restores `state` as a freshly-deserialized object, and StrictMode re-reads
  * `history.state` into a new object too — both must compare equal to their prior
  * value. A shallow compare matches `state`'s documented purpose (flat UI-local
@@ -96,7 +96,7 @@ function shallowEqualState(a: unknown, b: unknown): boolean {
     return true;
 }
 
-export class WebRouterStore<
+export class RouterStore<
     T extends readonly GenericRouteType[] = readonly GenericRouteType[],
 > extends GlobalStore<any> {
     history: History;
@@ -135,7 +135,7 @@ export class WebRouterStore<
     constructor(
         stores: any,
         public routes: T,
-        options: WebRouterStoreOptions = {},
+        options: RouterStoreOptions = {},
     ) {
         super(stores);
 
@@ -169,7 +169,7 @@ export class WebRouterStore<
         }
     }
 
-    private seedFromHydratedState(state: WebRouterHydratedState) {
+    private seedFromHydratedState(state: RouterHydratedState) {
         const matched = this.routes.find((r) => r.name === state.activeRouteName);
         if (!matched) {
             // The hydrated route name doesn't exist in this client's route table

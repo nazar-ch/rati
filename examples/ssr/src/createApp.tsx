@@ -3,8 +3,8 @@ import {
     RootStore,
     RootStoreProvider,
     Router,
-    type WebRouterHydratedState,
-    WebRouterStore,
+    type RouterHydratedState,
+    RouterStore,
 } from 'rati';
 import { type HydrationData, HydrationProvider } from 'rati/ssr';
 import { RegionContext } from './appContext';
@@ -17,13 +17,13 @@ import { routes } from './routes';
  * values, so the first client render matches the server HTML without re-fetching.
  */
 export interface AppHydrationState {
-    router: WebRouterHydratedState;
+    router: RouterHydratedState;
     islands: HydrationData;
 }
 
 export interface CreateAppOptions {
     history: History;
-    hydratedState?: WebRouterHydratedState | undefined;
+    hydratedState?: RouterHydratedState | undefined;
     /** Client: server-collected island data to rehydrate from, without re-running loads. */
     islandData?: HydrationData | undefined;
     /** Server: collector that records resolved island promise values during the prerender. */
@@ -31,8 +31,8 @@ export interface CreateAppOptions {
 }
 
 export interface CreatedApp {
-    router: WebRouterStore<typeof routes>;
-    root: RootStore<{ router: WebRouterStore<typeof routes> }>;
+    router: RouterStore<typeof routes>;
+    root: RootStore<{ router: RouterStore<typeof routes> }>;
     App: () => React.ReactElement;
 }
 
@@ -53,7 +53,7 @@ export function createApp({
     islandData,
     collectIslandData,
 }: CreateAppOptions): CreatedApp {
-    const router = new WebRouterStore({}, routes, { history, hydratedState });
+    const router = new RouterStore({}, routes, { history, hydratedState });
     const root = new RootStore({ router }, { isReady: true });
 
     function App() {

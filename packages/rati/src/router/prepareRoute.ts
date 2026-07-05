@@ -1,13 +1,13 @@
-import type { WebRouterStore, WebRouterHydratedState } from './store';
+import type { RouterStore, RouterHydratedState } from './store';
 
 /**
  * The result of preparing a route on the server. The {@link hydratedState}
  * snapshot can be embedded in the SSR HTML response and passed back to the
- * client as `WebRouterStoreOptions.hydratedState`, so the first client render
+ * client as `RouterStoreOptions.hydratedState`, so the first client render
  * matches the server HTML without an async routing gap.
  */
 export interface PreparedRoute {
-    hydratedState: WebRouterHydratedState;
+    hydratedState: RouterHydratedState;
 }
 
 /**
@@ -28,7 +28,7 @@ export interface PreparedRoute {
  * `prerender`) resolves it and the mandala engine dehydrates the promise values
  * (see `HydrationProvider` in `rati/ssr`). This builds only the routing snapshot.
  */
-export async function prepareRoute(router: WebRouterStore<any>): Promise<PreparedRoute | null> {
+export async function prepareRoute(router: RouterStore<any>): Promise<PreparedRoute | null> {
     await router.pendingNavigation;
 
     const route = router.activeRoute;

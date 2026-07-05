@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from 'vite-plus/test';
-import { WebRouterStore } from '../../router/store';
+import { RouterStore } from '../../router/store';
 import { route } from '../../router/route';
 
 const NoopComponent = () => null;
@@ -13,10 +13,10 @@ beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');
 });
 
-describe('WebRouterStore search / hash exposure', () => {
+describe('RouterStore search / hash exposure', () => {
     test('exposes the raw search string and parsed URLSearchParams', async () => {
         window.history.replaceState(null, '', '/search?q=hello&page=2');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         expect(router.search).toBe('?q=hello&page=2');
         expect(router.searchParams.get('q')).toBe('hello');
@@ -26,14 +26,14 @@ describe('WebRouterStore search / hash exposure', () => {
 
     test('exposes the URL hash including the leading #', async () => {
         window.history.replaceState(null, '', '/search#section');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         expect(router.hash).toBe('#section');
         router.dispose();
     });
 
     test('search and hash default to empty string when absent', async () => {
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         expect(router.search).toBe('');
         expect(router.hash).toBe('');
@@ -42,7 +42,7 @@ describe('WebRouterStore search / hash exposure', () => {
 
     test('searchParams returns a fresh instance each access (immutable from caller PoV)', async () => {
         window.history.replaceState(null, '', '/?a=1');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         const first = router.searchParams;
         first.set('a', '999');
@@ -52,7 +52,7 @@ describe('WebRouterStore search / hash exposure', () => {
     });
 
     test('setSearchParams (default replace) updates the URL without growing history', async () => {
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         const startLength = window.history.length;
         router.setSearchParams({ q: 'kittens' });
         expect(window.location.search).toBe('?q=kittens');
@@ -63,7 +63,7 @@ describe('WebRouterStore search / hash exposure', () => {
     });
 
     test('setSearchParams with mode: "push" adds a history entry', () => {
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         const startLength = window.history.length;
         router.setSearchParams({ q: 'kittens' }, { mode: 'push' });
         expect(window.location.search).toBe('?q=kittens');
@@ -72,7 +72,7 @@ describe('WebRouterStore search / hash exposure', () => {
     });
 
     test('setSearchParams accepts a URLSearchParams instance', () => {
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         const params = new URLSearchParams();
         params.set('a', '1');
         params.append('a', '2');
@@ -84,7 +84,7 @@ describe('WebRouterStore search / hash exposure', () => {
 
     test('setSearchParams clears the search when given empty params', async () => {
         window.history.replaceState(null, '', '/?old=value');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         router.setSearchParams({});
         expect(window.location.search).toBe('');
@@ -94,7 +94,7 @@ describe('WebRouterStore search / hash exposure', () => {
 
     test('setSearchParams preserves the current pathname and hash', async () => {
         window.history.replaceState(null, '', '/search#section');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         router.setSearchParams({ q: 'x' });
         expect(window.location.pathname).toBe('/search');
@@ -105,7 +105,7 @@ describe('WebRouterStore search / hash exposure', () => {
 
     test('setSearchParams respects basename when building the URL', async () => {
         window.history.replaceState(null, '', '/admin/search');
-        const router = new WebRouterStore({}, routes, { basename: '/admin' });
+        const router = new RouterStore({}, routes, { basename: '/admin' });
         await Promise.resolve();
         router.setSearchParams({ q: 'x' });
         expect(window.location.pathname).toBe('/admin/search');
@@ -117,7 +117,7 @@ describe('WebRouterStore search / hash exposure', () => {
 
     test('search/hash observables update on hash-only navigation (same pathname)', async () => {
         window.history.replaceState(null, '', '/search?q=a');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         expect(router.search).toBe('?q=a');
 

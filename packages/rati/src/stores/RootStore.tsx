@@ -1,5 +1,5 @@
 import React, { type Context, useEffect, useState, useSyncExternalStore } from 'react';
-import { WebRouterStore } from '../router/store';
+import { RouterStore } from '../router/store';
 import { sleep } from '../util/utils';
 
 export interface RootStoreOptions {
@@ -88,7 +88,7 @@ export function createUseStoresHook<T extends GlobalStores = never>() {
 }
 
 export interface GlobalStores {
-    router?: WebRouterStore;
+    router?: RouterStore;
 }
 
 /** @internal */
@@ -97,24 +97,29 @@ export const useGenericStores = createUseStoresHook<GlobalStores>();
 const noopSubscribe = () => () => {};
 const noopGetSnapshot = () => 0;
 
-/** @internal */
-export function useWebRouter() {
+/**
+ * Read the app's router off the global stores and subscribe to it, so a component that
+ * navigates or reads `activeRoute` / `path` re-renders on navigation. This is the public
+ * way to reach the router programmatically — `Link`, `Router`, and app code all use it.
+ * Throws when no router is configured in the global stores.
+ */
+export function useRouter() {
     const { router } = useGenericStores();
-    const webRouter = router instanceof WebRouterStore ? router : null;
+    const routerStore = router instanceof RouterStore ? router : null;
 
     // Subscribe so any component reading the router (Link, Router, app code) re-renders
     // on navigation — this replaces the old mobx `observer` wrapping. A no-op
     // subscription when the router isn't configured keeps the rules of hooks intact;
     // the throw below turns that into a clear error.
     useSyncExternalStore(
-        webRouter?.subscribe ?? noopSubscribe,
-        webRouter?.getSnapshot ?? noopGetSnapshot,
-        webRouter?.getSnapshot ?? noopGetSnapshot,
+        routerStore?.subscribe ?? noopSubscribe,
+        routerStore?.getSnapshot ?? noopGetSnapshot,
+        routerStore?.getSnapshot ?? noopGetSnapshot,
     );
 
-    if (!webRouter) {
-        throw new Error('Please add WebRouter to the global stores to use link components');
+    if (!routerStore) {
+        throw new Error('Please add a RouterStore to the global stores to use link components');
     }
 
-    return webRouter;
+    return routerStore;
 }

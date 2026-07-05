@@ -1,18 +1,18 @@
 import React, { type ComponentType, type FC, Suspense, useDeferredValue } from 'react';
-import { useWebRouter } from '../stores/RootStore';
+import { useRouter } from '../stores/RootStore';
 import { navTrace } from '../util/navTrace';
 
 export const Router: FC<{
-    // router: WebRouterStore<any[] | readonly any[]>;
+    // router: RouterStore<any[] | readonly any[]>;
     DefaultWrapper?: ComponentType;
     Loading?: ComponentType;
 }> = ({ DefaultWrapper = EmptyWrapper, Loading = DefaultLoading }) => {
     // TODO: make this work with react native router too
-    const router = useWebRouter();
+    const router = useRouter();
 
     // Defer the active route so that a navigation to a still-loading lazy
     // route keeps showing the previous page instead of flashing the Suspense
-    // fallback. useWebRouter reads via useSyncExternalStore, so startTransition
+    // fallback. useRouter reads via useSyncExternalStore, so startTransition
     // wouldn't take effect here — useDeferredValue does.
     const activeRoute = useDeferredValue(router.activeRoute);
 

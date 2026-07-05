@@ -1,5 +1,5 @@
 import { useScopeRead } from '../mandala/channel';
-import { useWebRouter } from '../stores/RootStore';
+import { useRouter } from '../stores/RootStore';
 import type { UserRoutes, GenericRouteType, RouteContextNames, RouteContextValueOf } from './route';
 
 // Context-bearing route names, derived from the app's routes table
@@ -45,7 +45,7 @@ function scopeForRoute(routes: readonly GenericRouteType[], name: string): objec
  * hasn't augmented its routes.
  */
 export function useRouteContext<Name extends RouteContextName>(name: Name): RouteContextOf<Name> {
-    const router = useWebRouter();
+    const router = useRouter();
     const read = useScopeRead(scopeForRoute(router.routes, name as string));
     switch (read.status) {
         case 'value':

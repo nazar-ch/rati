@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
 import { type FC } from 'react';
 import { act, render, fireEvent, cleanup } from '@testing-library/react';
-import { WebRouterStore } from '../../router/store';
+import { RouterStore } from '../../router/store';
 import { route } from '../../router/route';
 import { lazy } from '../../router/lazy';
 import { Link } from '../../router/Link';
@@ -17,10 +17,10 @@ afterEach(() => {
     cleanup();
 });
 
-describe('WebRouterStore.preloadRoute', () => {
+describe('RouterStore.preloadRoute', () => {
     test('returns undefined for an eager (non-lazy) component', () => {
         const routes = [route('/', 'home', NoopComponent)];
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         expect(router.preloadRoute('/')).toBeUndefined();
         router.dispose();
     });
@@ -29,7 +29,7 @@ describe('WebRouterStore.preloadRoute', () => {
         const factory = vi.fn(async () => ({ default: NoopComponent }));
         const Page = lazy(factory);
         const routes = [route('/page', 'page', Page)];
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
 
         await router.preloadRoute('/page');
         await router.preloadRoute('/page');
@@ -43,7 +43,7 @@ describe('WebRouterStore.preloadRoute', () => {
         const factory = vi.fn(async () => ({ default: NoopComponent }));
         const Page = lazy(factory);
         const routes = [route('/users/:id', 'user', Page)];
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
 
         await router.preloadRoute('/users/42');
         expect(factory).toHaveBeenCalledOnce();
@@ -54,7 +54,7 @@ describe('WebRouterStore.preloadRoute', () => {
         const factory = vi.fn(async () => ({ default: NoopComponent }));
         const Page = lazy(factory);
         const routes = [route('/page', 'page', Page)];
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
 
         await router.preloadRoute('/page?q=1#section');
         expect(factory).toHaveBeenCalledOnce();
@@ -65,7 +65,7 @@ describe('WebRouterStore.preloadRoute', () => {
         const factory = vi.fn(async () => ({ default: NoopComponent }));
         const Page = lazy(factory);
         const routes = [route('/page', 'page', Page)];
-        const router = new WebRouterStore({}, routes, { basename: '/admin' });
+        const router = new RouterStore({}, routes, { basename: '/admin' });
 
         // Caller passes the URL-as-rendered (with basename), as `<Link>` does.
         await router.preloadRoute('/admin/page');
@@ -80,7 +80,7 @@ describe('<Link prefetch>', () => {
         prefetch: boolean;
         href: string;
     }) {
-        const router = new WebRouterStore({}, opts.routes);
+        const router = new RouterStore({}, opts.routes);
         const stores = { router };
         const utils = render(
             <GenericStoresContext.Provider value={stores}>

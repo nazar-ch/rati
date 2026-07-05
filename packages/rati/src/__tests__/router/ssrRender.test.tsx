@@ -2,7 +2,7 @@ import { describe, test, expect } from 'vite-plus/test';
 import { renderToString } from 'react-dom/server';
 import { prerender } from 'react-dom/static';
 import type { ReactElement } from 'react';
-import { WebRouterStore } from '../../router/store';
+import { RouterStore } from '../../router/store';
 import { route, type GenericRouteType } from '../../router/route';
 import { RootStore, RootStoreProvider } from '../../stores/RootStore';
 import { Router } from '../../router/Router';
@@ -44,7 +44,7 @@ const routes = [
 ] as const;
 
 function buildAppFor(url: string, routesArg: readonly GenericRouteType[] = routes) {
-    const router = new WebRouterStore({}, routesArg, {
+    const router = new RouterStore({}, routesArg, {
         history: createMemoryHistory({ url }),
     });
     const root = new RootStore({ router }, { isReady: true });
@@ -56,7 +56,7 @@ function buildAppFor(url: string, routesArg: readonly GenericRouteType[] = route
     return { router, root, App };
 }
 
-describe('renderToString with WebRouterStore + memory history', () => {
+describe('renderToString with RouterStore + memory history', () => {
     test('renders the matched static route', async () => {
         const { router, App } = buildAppFor('/');
         await prepareRoute(router);

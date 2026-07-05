@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vite-plus/test';
 import { lazy, type FC } from 'react';
 import { act, render, screen, cleanup } from '@testing-library/react';
-import { WebRouterStore } from '../../router/store';
+import { RouterStore } from '../../router/store';
 import { route } from '../../router/route';
 import { Router } from '../../router/Router';
 import { GenericStoresContext } from '../../stores/RootStore';
@@ -21,7 +21,7 @@ interface RenderRouterOptions {
 }
 
 function renderWithRouter({ routes }: RenderRouterOptions) {
-    const router = new WebRouterStore({}, routes);
+    const router = new RouterStore({}, routes);
     const stores = { router };
     const result = render(
         <GenericStoresContext.Provider value={stores}>

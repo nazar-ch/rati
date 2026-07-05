@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Link, useWebRouter } from 'rati';
+import { Link, useRouter } from 'rati';
 
 // Each entry's `to` is typed against the route table (the RatiUserTypes['routes']
 // augmentation in routes.tsx), so a wrong name or a missing param is a type error.
@@ -15,12 +15,12 @@ const LINKS = [
 
 /**
  * App chrome wrapped around the router (in `createApp`), so it renders once and
- * survives navigation. `useWebRouter()` subscribes via useSyncExternalStore, so
+ * survives navigation. `useRouter()` subscribes via useSyncExternalStore, so
  * reading `router.activeRoute` re-highlights the active link as you navigate — no
  * `observer` needed.
  */
 export function Layout({ children }: { children: ReactNode }) {
-    const router = useWebRouter();
+    const router = useRouter();
     const active = router.activeRoute?.name;
     return (
         <div className="shell">

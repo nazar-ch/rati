@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
 import { Component, type FC, type ReactNode } from 'react';
 import { act, render, screen, cleanup } from '@testing-library/react';
-import { WebRouterStore } from '../../router/store';
+import { RouterStore } from '../../router/store';
 import { route, type GenericRouteType } from '../../router/route';
 import { Router } from '../../router/Router';
 import { GenericStoresContext } from '../../stores/RootStore';
@@ -23,7 +23,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 function renderWithRouter(routes: readonly GenericRouteType[]) {
-    const router = new WebRouterStore({}, routes);
+    const router = new RouterStore({}, routes);
     const stores = { router };
     const result = render(
         <GenericStoresContext.Provider value={stores}>
@@ -56,7 +56,7 @@ describe('route + islands', () => {
         });
 
         window.history.replaceState(null, '', '/products/42');
-        let router!: WebRouterStore<readonly GenericRouteType[]>;
+        let router!: RouterStore<readonly GenericRouteType[]>;
         await act(async () => {
             ({ router } = renderWithRouter([
                 route('/products/:productId', 'product', Product),
@@ -122,7 +122,7 @@ describe('route + islands', () => {
             <div>scope says {greeting}</div>
         );
 
-        let router!: WebRouterStore<readonly GenericRouteType[]>;
+        let router!: RouterStore<readonly GenericRouteType[]>;
         await act(async () => {
             ({ router } = renderWithRouter([
                 route('/', 'home', HomeWithScope, {
@@ -151,7 +151,7 @@ describe('route + islands', () => {
         });
         const FailComponent: ScopeComponent<typeof failScope> = ({ data }) => <div>{data}</div>;
 
-        let router!: WebRouterStore<readonly GenericRouteType[]>;
+        let router!: RouterStore<readonly GenericRouteType[]>;
         await act(async () => {
             ({ router } = renderWithRouter([
                 route('/', 'home', FailComponent, {

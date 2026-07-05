@@ -1,8 +1,8 @@
 import { createContext, memo, type PropsWithChildren, useCallback, useContext } from 'react';
 
 import { type NameToRoute, type GenericRouteType, type UserRoutes } from './route';
-import { type WebRouterStore } from './store';
-import { useWebRouter } from '../stores/RootStore';
+import { type RouterStore } from './store';
+import { useRouter } from '../stores/RootStore';
 import { navTraceStart } from '../util/navTrace';
 
 type GenericAnchorProps = Omit<
@@ -50,7 +50,7 @@ const GenericAnchor = function GenericAnchor({
     onTouchStart: userOnTouchStart,
     ...props
 }: PropsWithChildren<RatiGenericAnchorProps>) {
-    const webRouter = useWebRouter();
+    const router = useRouter();
 
     const handleOnClick = useCallback(
         (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
@@ -58,25 +58,25 @@ const GenericAnchor = function GenericAnchor({
             if (!shouldHandleLinkClick(event)) return;
             event.preventDefault();
             navTraceStart(`click → ${href}`);
-            webRouter.navigate(href);
+            router.navigate(href);
         },
-        [href, userOnClick, webRouter],
+        [href, userOnClick, router],
     );
 
     const handleMouseEnter = useCallback(
         (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
             if (userOnMouseEnter) userOnMouseEnter(event);
-            if (prefetch) void webRouter.preloadRoute(href);
+            if (prefetch) void router.preloadRoute(href);
         },
-        [href, prefetch, userOnMouseEnter, webRouter],
+        [href, prefetch, userOnMouseEnter, router],
     );
 
     const handleTouchStart = useCallback(
         (event: React.TouchEvent<HTMLAnchorElement>) => {
             if (userOnTouchStart) userOnTouchStart(event);
-            if (prefetch) void webRouter.preloadRoute(href);
+            if (prefetch) void router.preloadRoute(href);
         },
-        [href, prefetch, userOnTouchStart, webRouter],
+        [href, prefetch, userOnTouchStart, router],
     );
 
     return (
@@ -101,10 +101,10 @@ export const Link = function Link({
     href,
     ...props
 }: PropsWithChildren<RatiRegularAnchorProps<UserRoutes>>) {
-    const webRouter = useWebRouter();
+    const router = useRouter();
 
-    const resolvedHref = to ? webRouter.getPath(to) : href!;
-    const isActive = webRouter.isPath(resolvedHref);
+    const resolvedHref = to ? router.getPath(to) : href!;
+    const isActive = router.isPath(resolvedHref);
 
     return <GenericAnchor {...props} {...{ isActive, href: resolvedHref }} />;
 };
@@ -116,10 +116,10 @@ export const LinkContextProvider = memo(function LinkContextProvider({
     children: React.ReactNode;
     to: NameToRoute<UserRoutes> | string;
 }) {
-    const webRouter = useWebRouter();
+    const router = useRouter();
 
     return (
-        <LinkContext.Provider value={new LinkContextStore(webRouter, to)}>
+        <LinkContext.Provider value={new LinkContextStore(router, to)}>
             {children}
         </LinkContext.Provider>
     );
@@ -130,7 +130,7 @@ export const ContextualLink = function ContextualAnchor(
 ) {
     // Subscribe to the router so active state re-renders on navigation — the
     // LinkContextStore getters derive from it. Replaces the old mobx `observer`.
-    useWebRouter();
+    useRouter();
     const linkContext = useLinkContext();
 
     return (
@@ -165,16 +165,16 @@ const LinkContext = createContext<LinkContextStore<any> | null>(null);
 
 class LinkContextStore<T extends readonly GenericRouteType[]> {
     constructor(
-        private webRouter: WebRouterStore<readonly GenericRouteType[]>,
+        private router: RouterStore<readonly GenericRouteType[]>,
         private to: NameToRoute<T> | string,
     ) {}
 
     get isActive() {
-        return this.webRouter.isPath(this.href);
+        return this.router.isPath(this.href);
     }
 
     get href() {
-        return this.webRouter.getPath(this.to);
+        return this.router.getPath(this.to);
     }
 }
 

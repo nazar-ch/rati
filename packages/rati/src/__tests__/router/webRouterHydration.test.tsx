@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vite-plus/test';
-import { WebRouterStore, type WebRouterHydratedState } from '../../router/store';
+import { RouterStore, type RouterHydratedState } from '../../router/store';
 import { route } from '../../router/route';
 import { createMemoryHistory } from '../../router/history';
 
@@ -13,16 +13,16 @@ const baseRoutes = [
     route('*', 'notFound', NoopComponent),
 ] as const;
 
-describe('WebRouterStore with hydratedState', () => {
+describe('RouterStore with hydratedState', () => {
     test('seeds path/search/hash synchronously', () => {
-        const hydratedState: WebRouterHydratedState = {
+        const hydratedState: RouterHydratedState = {
             path: '/users/42',
             search: '?tab=posts',
             hash: '#bio',
             activeRouteName: 'user',
             routeParams: { userId: '42' },
         };
-        const router = new WebRouterStore({}, baseRoutes, {
+        const router = new RouterStore({}, baseRoutes, {
             history: createMemoryHistory({ url: '/users/42?tab=posts#bio' }),
             hydratedState,
         });
@@ -38,7 +38,7 @@ describe('WebRouterStore with hydratedState', () => {
     });
 
     test('populates activeRoute with the route definition', () => {
-        const router = new WebRouterStore({}, baseRoutes, {
+        const router = new RouterStore({}, baseRoutes, {
             history: createMemoryHistory({ url: '/' }),
             hydratedState: {
                 path: '/',
@@ -55,7 +55,7 @@ describe('WebRouterStore with hydratedState', () => {
 
     test('falls back to URL matching when activeRouteName is unknown', async () => {
         // Server and client routes drifted: hydrated name doesn't exist here.
-        const router = new WebRouterStore({}, baseRoutes, {
+        const router = new RouterStore({}, baseRoutes, {
             history: createMemoryHistory({ url: '/users/42' }),
             hydratedState: {
                 path: '/users/42',
@@ -73,7 +73,7 @@ describe('WebRouterStore with hydratedState', () => {
 
     test('re-resolves activeRoute on a subsequent navigation', async () => {
         const history = createMemoryHistory({ url: '/users/42' });
-        const router = new WebRouterStore({}, baseRoutes, {
+        const router = new RouterStore({}, baseRoutes, {
             history,
             hydratedState: {
                 path: '/users/42',

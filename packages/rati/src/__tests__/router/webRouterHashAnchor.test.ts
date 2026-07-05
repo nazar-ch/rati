@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
-import { WebRouterStore } from '../../router/store';
+import { RouterStore } from '../../router/store';
 import { route } from '../../router/route';
 
 const NoopComponent = () => null;
@@ -25,10 +25,10 @@ function flushScrollRestoration() {
     vi.advanceTimersByTime(32);
 }
 
-describe('WebRouterStore hash anchor navigation', () => {
+describe('RouterStore hash anchor navigation', () => {
     test('scrolls to anchor element when navigating to a hash on the current page', async () => {
         window.history.replaceState(null, '', '/article');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
 
         const target = document.createElement('div');
@@ -46,7 +46,7 @@ describe('WebRouterStore hash anchor navigation', () => {
 
     test('updates the hash observable without re-rendering the route', async () => {
         window.history.replaceState(null, '', '/article');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
 
         // Capture the active route before the hash change.

@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from 'vite-plus/test';
-import { WebRouterStore } from '../../router/store';
+import { RouterStore } from '../../router/store';
 import { route } from '../../router/route';
 
 const NoopComponent = () => null;
@@ -16,9 +16,9 @@ beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');
 });
 
-describe('WebRouterStore route matching', () => {
+describe('RouterStore route matching', () => {
     test('matches the root route on initial load', async () => {
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('home');
         expect(router.path).toBe('/');
@@ -27,7 +27,7 @@ describe('WebRouterStore route matching', () => {
 
     test('matches a static route from the URL', async () => {
         window.history.replaceState(null, '', '/dashboard');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('dashboard');
         router.dispose();
@@ -35,7 +35,7 @@ describe('WebRouterStore route matching', () => {
 
     test('extracts a single path parameter', async () => {
         window.history.replaceState(null, '', '/users/42');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('user');
         expect(router.activeRoute?.routeParams).toEqual({ userId: '42' });
@@ -44,7 +44,7 @@ describe('WebRouterStore route matching', () => {
 
     test('extracts multiple path parameters', async () => {
         window.history.replaceState(null, '', '/users/42/posts/abc');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('userPost');
         expect(router.activeRoute?.routeParams).toEqual({ userId: '42', postId: 'abc' });
@@ -53,7 +53,7 @@ describe('WebRouterStore route matching', () => {
 
     test('falls through to the wildcard catch-all when nothing matches', async () => {
         window.history.replaceState(null, '', '/no/such/route');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('notFound');
         router.dispose();
@@ -62,7 +62,7 @@ describe('WebRouterStore route matching', () => {
     test('leaves activeRoute null when no route matches and no catch-all is defined', async () => {
         const noCatchAll = [route('/known', 'known', NoopComponent)] as const;
         window.history.replaceState(null, '', '/unknown');
-        const router = new WebRouterStore({}, noCatchAll);
+        const router = new RouterStore({}, noCatchAll);
         await Promise.resolve();
         expect(router.activeRoute).toBeFalsy();
         router.dispose();
@@ -70,22 +70,22 @@ describe('WebRouterStore route matching', () => {
 
     test('matches paths with or without a trailing slash', async () => {
         window.history.replaceState(null, '', '/dashboard/');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('dashboard');
         router.dispose();
     });
 });
 
-describe('WebRouterStore.getPath', () => {
+describe('RouterStore.getPath', () => {
     test('returns the path verbatim for parameterless routes', () => {
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         expect(router.getPath({ name: 'dashboard' })).toBe('/dashboard');
         router.dispose();
     });
 
     test('substitutes params into the path', () => {
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         expect(router.getPath({ name: 'user', userId: '42' })).toBe('/users/42');
         expect(router.getPath({ name: 'userPost', userId: '42', postId: 'abc' })).toBe(
             '/users/42/posts/abc',
@@ -94,16 +94,16 @@ describe('WebRouterStore.getPath', () => {
     });
 
     test('returns string arguments verbatim', () => {
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         expect(router.getPath('/raw/url?x=1#y')).toBe('/raw/url?x=1#y');
         router.dispose();
     });
 });
 
-describe('WebRouterStore.isPath', () => {
+describe('RouterStore.isPath', () => {
     test('matches the current path', async () => {
         window.history.replaceState(null, '', '/dashboard');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         expect(router.isPath('/dashboard')).toBe(true);
         expect(router.isPath('/users/1')).toBe(false);
@@ -111,9 +111,9 @@ describe('WebRouterStore.isPath', () => {
     });
 });
 
-describe('WebRouterStore navigation', () => {
+describe('RouterStore navigation', () => {
     test('navigate() pushes a new history entry and resolves the route', async () => {
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         const startLength = window.history.length;
 
@@ -129,7 +129,7 @@ describe('WebRouterStore navigation', () => {
     });
 
     test('replace() updates the URL via history.replace', async () => {
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         const startLength = window.history.length;
 
@@ -145,7 +145,7 @@ describe('WebRouterStore navigation', () => {
     });
 
     test('replace() accepts a string URL', async () => {
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         router.replace('/dashboard');
         await Promise.resolve();
@@ -155,7 +155,7 @@ describe('WebRouterStore navigation', () => {
 
     test('replace({ keepCurrentRoute: true }) updates the URL but keeps the current route mounted', async () => {
         window.history.replaceState(null, '', '/dashboard');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         const before = router.activeRoute;
 
@@ -172,7 +172,7 @@ describe('WebRouterStore navigation', () => {
 
     test('navigate({ keepCurrentRoute: true }) grows the back stack but keeps the route mounted', async () => {
         window.history.replaceState(null, '', '/dashboard');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         const before = router.activeRoute;
         const startLength = window.history.length;
@@ -191,14 +191,17 @@ describe('WebRouterStore navigation', () => {
 
     test('navigate({ keepCurrentRoute, state }) stamps the entry and exposes the state', async () => {
         window.history.replaceState(null, '', '/dashboard');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         const before = router.activeRoute;
 
-        router.navigate({ name: 'user', userId: '1' }, {
-            keepCurrentRoute: true,
-            state: { panelId: 'p0' },
-        });
+        router.navigate(
+            { name: 'user', userId: '1' },
+            {
+                keepCurrentRoute: true,
+                state: { panelId: 'p0' },
+            },
+        );
         await Promise.resolve();
 
         expect(router.activeRoute).toBe(before);
@@ -208,7 +211,7 @@ describe('WebRouterStore navigation', () => {
 
     test('a state-only change on the same path re-resolves the route', async () => {
         window.history.replaceState(null, '', '/users/1');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         const before = router.activeRoute;
 
@@ -226,7 +229,7 @@ describe('WebRouterStore navigation', () => {
 
     test('a same-path navigation with equal state does not re-resolve', async () => {
         window.history.replaceState(null, '', '/users/1');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
 
         router.navigate('/users/1', { state: { panelId: 'p0' } });
@@ -243,7 +246,7 @@ describe('WebRouterStore navigation', () => {
     });
 
     test('history.push() triggers a route resolution', async () => {
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
 
         router.history.push('/dashboard');
@@ -254,7 +257,7 @@ describe('WebRouterStore navigation', () => {
 
     test('does not re-resolve the route when navigating to the same pathname', async () => {
         window.history.replaceState(null, '', '/dashboard');
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         const before = router.activeRoute;
 
@@ -267,9 +270,9 @@ describe('WebRouterStore navigation', () => {
     });
 });
 
-describe('WebRouterStore.dispose', () => {
+describe('RouterStore.dispose', () => {
     test('stops responding to history changes after dispose', async () => {
-        const router = new WebRouterStore({}, routes);
+        const router = new RouterStore({}, routes);
         await Promise.resolve();
         router.dispose();
 

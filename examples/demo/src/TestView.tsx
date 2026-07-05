@@ -1,12 +1,12 @@
 import { type FC } from 'react';
-import { input, scope, type ScopeComponent, useWebRouter } from 'rati';
+import { input, scope, type ScopeComponent, useRouter } from 'rati';
 import { sleep } from './util';
 
 // A plain route component with no data of its own: it reads the router straight
-// off the global stores via rati's `useWebRouter()` hook (so it never has to
+// off the global stores via rati's `useRouter()` hook (so it never has to
 // import the app's store module, which would cycle through the route list).
 export const SimpleTest: FC = () => {
-    const router = useWebRouter();
+    const router = useRouter();
     return <div>simple test view - {router.path}</div>;
 };
 
