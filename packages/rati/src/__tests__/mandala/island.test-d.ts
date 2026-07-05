@@ -1,5 +1,5 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
-import { scope, prop, hook, type ScopeParams, type ScopeProps } from '../../scope/scope';
+import { scope, input, hook, type ScopeInputs, type ScopeProps } from '../../scope/scope';
 import { type Source } from '../../scope/source';
 import { useOptionalScope, useScope } from '../../mandala/channel';
 
@@ -9,7 +9,7 @@ class TitleStore {
 }
 
 // A representative scope: two params, a function level, and a class level.
-const pageScope = scope({ id: prop<string>(), revision: prop<number>() })
+const pageScope = scope({ id: input<string>(), revision: input<number>() })
     .load({ name: async ({ id }) => `name:${id}` })
     .load({ store: TitleStore });
 
@@ -23,15 +23,15 @@ describe('scope type helpers', () => {
         }>();
     });
 
-    test('ScopeParams collects only the prop() inputs', () => {
-        expectTypeOf<ScopeParams<typeof pageScope>>().toEqualTypeOf<{
+    test('ScopeInputs collects only the input() inputs', () => {
+        expectTypeOf<ScopeInputs<typeof pageScope>>().toEqualTypeOf<{
             id: string;
             revision: number;
         }>();
     });
 
-    test('ScopeProps unwraps a Source<T> prop to its ready value T', () => {
-        const liveScope = scope({ id: prop<string>() }).load({
+    test('ScopeProps unwraps a Source<T> input to its ready value T', () => {
+        const liveScope = scope({ id: input<string>() }).load({
             live: (): Source<number> => undefined as unknown as Source<number>,
         });
 
@@ -42,7 +42,7 @@ describe('scope type helpers', () => {
     });
 
     test('a hook() load resolves to its return type (Source unwrapped); not an input', () => {
-        const hookScope = scope({ id: prop<string>() })
+        const hookScope = scope({ id: input<string>() })
             .load({ stores: hook(() => ({ prefix: 'p' })) })
             .load({ live: hook((): Source<number> => undefined as unknown as Source<number>) })
             .load({ greeting: ({ stores, id }) => `${stores.prefix}:${id}` });
@@ -55,11 +55,11 @@ describe('scope type helpers', () => {
         }>();
 
         // hook loads aren't inputs.
-        expectTypeOf<ScopeParams<typeof hookScope>>().toEqualTypeOf<{ id: string }>();
+        expectTypeOf<ScopeInputs<typeof hookScope>>().toEqualTypeOf<{ id: string }>();
     });
 
     test('.provide() factory receives the fully resolved scope, typed', () => {
-        scope({ id: prop<string>(), revision: prop<number>() })
+        scope({ id: input<string>(), revision: input<number>() })
             .load({ name: async ({ id }) => `${id}` })
             .provide((resolved) => {
                 expectTypeOf(resolved).toEqualTypeOf<{
@@ -71,8 +71,8 @@ describe('scope type helpers', () => {
             });
     });
 
-    test('useScope returns the .provide() value type off the scope; the value is not a prop', () => {
-        const ctxScope = scope({ id: prop<string>() })
+    test('useScope returns the .provide() value type off the scope; the value is not a input', () => {
+        const ctxScope = scope({ id: input<string>() })
             .load({ name: async ({ id }) => `name:${id}` })
             .provide(({ name }) => ({ heading: name.toUpperCase() }));
 

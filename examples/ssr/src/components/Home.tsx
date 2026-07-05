@@ -11,8 +11,8 @@ const FEATURES = [
     },
     {
         to: { name: 'product', productId: '1' },
-        title: 'Waterfall · params · hook DI',
-        tags: ['prop', 'hook', '.load waterfall'],
+        title: 'Waterfall · inputs · hook DI',
+        tags: ['input', 'hook', '.load waterfall'],
         blurb: 'A :productId feeds a multi-level waterfall, and a hook() injects the region — the reason there is no env to thread.',
     },
     {

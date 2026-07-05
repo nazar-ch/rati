@@ -1,6 +1,6 @@
 import { Fragment, Suspense, useContext, useEffect, useId, useReducer, useRef } from 'react';
 import type { ComponentType, FC } from 'react';
-import type { Scope, ScopeParams, ScopeProps } from '../scope/scope';
+import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope';
 import type { SourceError } from '../scope/source';
 import { deepEqual } from '../util/utils';
 import { buildTree, flattenLevels, type Bucket, type Shared } from './resolver';
@@ -21,7 +21,7 @@ import { HydrationContext } from './hydration';
 */
 
 type MandalaFallbackProps<S extends Scope<any>> = {
-    params: ScopeParams<S>;
+    inputs: ScopeInputs<S>;
     retry: () => void;
 };
 
@@ -36,7 +36,7 @@ export type MandalaConfig<S extends Scope<any>> = {
      * Shown while the scope resolves — also the `<Suspense>` fallback for a pending
      * promise entry. Defaults to rendering nothing.
      */
-    loading?: ComponentType<{ params: ScopeParams<S> }>;
+    loading?: ComponentType<{ inputs: ScopeInputs<S> }>;
 
     /**
      * Rendered on any failure. not-available / forbidden / failed all arrive here as a
@@ -46,7 +46,7 @@ export type MandalaConfig<S extends Scope<any>> = {
     error?: ComponentType<MandalaFallbackProps<S> & { error: SourceError }>;
 };
 
-export type MandalaComponent<S extends Scope<any>> = FC<ScopeParams<S>> & {
+export type MandalaComponent<S extends Scope<any>> = FC<ScopeInputs<S>> & {
     /**
      * Forwarded from a `lazy()` component the mandala wraps, so the mandala is a
      * transparent entry point: the router's `<Link prefetch>` / `prepareRoute` preload
@@ -56,7 +56,7 @@ export type MandalaComponent<S extends Scope<any>> = FC<ScopeParams<S>> & {
     preload?: () => Promise<unknown>;
 };
 
-const DefaultLoading: FC<{ params: unknown }> = () => null;
+const DefaultLoading: FC<{ inputs: unknown }> = () => null;
 
 /**
  * Build a mandala component from a scope + component + slots. `kindLabel` is the public
@@ -72,12 +72,12 @@ export function createMandala<S extends Scope<any>>(
     // so a descendant reading by scope resolves the nearest one's value.
     const scopeKey = config.scope as object;
     const Channel = registerScopeChannel(scopeKey);
-    const Loading = (config.loading ?? DefaultLoading) as ComponentType<{ params: unknown }>;
+    const Loading = (config.loading ?? DefaultLoading) as ComponentType<{ inputs: unknown }>;
     const levels = flattenLevels(config.scope as Scope);
 
     // Plain function component: source reactivity now lives in each Step's
     // useSyncExternalStore, so the mandala no longer needs to be an observer.
-    const Mandala = function Mandala(params: ScopeParams<S>) {
+    const Mandala = function Mandala(inputs: ScopeInputs<S>) {
         // Stable across server render and client hydration by tree position, so it keys
         // this mandala's slice of the SSR dehydration registry (see hydration.tsx).
         const mandalaId = useId();
@@ -86,24 +86,24 @@ export function createMandala<S extends Scope<any>>(
         // Retry re-mounts the inner tree (fresh promises/sources) on error-slot retry.
         const [retry, bumpRetry] = useReducer((count: number) => count + 1, 0);
 
-        // Bump a version when params change by value, so the inner tree remounts — React
+        // Bump a version when inputs change by value, so the inner tree remounts — React
         // tears the old one down (children first: the `.provide()` value disposes before
-        // its sources detach) and resolves the new params from scratch. Source transitions
-        // (same params) re-render in place, keeping promise/source identity.
-        const initialParamsRef = useRef(params);
-        const paramsRef = useRef(params);
+        // its sources detach) and resolves the new inputs from scratch. Source transitions
+        // (same inputs) re-render in place, keeping promise/source identity.
+        const initialInputsRef = useRef(inputs);
+        const inputsRef = useRef(inputs);
         const versionRef = useRef(0);
-        if (!deepEqual(paramsRef.current, params)) {
-            paramsRef.current = params;
+        if (!deepEqual(inputsRef.current, inputs)) {
+            inputsRef.current = inputs;
             versionRef.current += 1;
         }
         const treeKey = `${versionRef.current}:${retry}`;
 
         // Seed from server-resolved values only on this mandala's *first* resolution: a
-        // retry must re-fetch, and a params change wants the new params' data. The
-        // post-hydration source re-render keeps (retry 0, initial params), consistent
+        // retry must re-fetch, and an inputs change wants the new inputs' data. The
+        // post-hydration source re-render keeps (retry 0, initial inputs), consistent
         // with the server HTML.
-        const firstMount = retry === 0 && deepEqual(params, initialParamsRef.current);
+        const firstMount = retry === 0 && deepEqual(inputs, initialInputsRef.current);
         const hydrationSlice = firstMount ? hydration.data?.[mandalaId] : undefined;
 
         // Bound to this mandala's id; present only on the server (client has no `collect`),
@@ -144,7 +144,7 @@ export function createMandala<S extends Scope<any>>(
             component: config.component as ComponentType<any>,
             channel: Channel,
             loading: Loading,
-            params,
+            inputs,
             buckets: cacheRef.current.buckets,
             collect,
             hydration: hydrationSlice,
@@ -154,15 +154,15 @@ export function createMandala<S extends Scope<any>>(
             <MandalaErrorBoundary
                 errorSlot={
                     config.error as
-                        | ComponentType<{ params: unknown; error: SourceError; retry: () => void }>
+                        | ComponentType<{ inputs: unknown; error: SourceError; retry: () => void }>
                         | undefined
                 }
-                params={params}
+                inputs={inputs}
                 retry={bumpRetry}
                 resetKey={treeKey}
             >
-                <Suspense fallback={<Loading params={params} />}>
-                    <Fragment key={treeKey}>{buildTree(levels, 0, params, shared)}</Fragment>
+                <Suspense fallback={<Loading inputs={inputs} />}>
+                    <Fragment key={treeKey}>{buildTree(levels, 0, inputs, shared)}</Fragment>
                 </Suspense>
             </MandalaErrorBoundary>
         );

@@ -2,7 +2,7 @@ import { describe, test, expect } from 'vite-plus/test';
 import type { FC, ReactNode } from 'react';
 import { route } from '../../router/route';
 import { group } from '../../router/group';
-import { scope, prop } from '../../scope/scope';
+import { scope, input } from '../../scope/scope';
 
 const Page: FC = () => null;
 const ScopedPage: FC<{ id: string }> = () => null;
@@ -12,7 +12,7 @@ const Loading: FC = () => null;
 const ErrorSlot: FC = () => null;
 const OtherError: FC = () => null;
 
-const idScope = () => scope({ id: prop<string>() });
+const idScope = () => scope({ id: input<string>() });
 
 describe('group', () => {
     test('applies the wrapper to children that lack one', () => {

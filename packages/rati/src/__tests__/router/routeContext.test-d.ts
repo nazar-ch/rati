@@ -1,6 +1,6 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
 import { route } from '../../router/route';
-import { scope, prop, type ScopeComponent } from '../../scope/scope';
+import { scope, input, type ScopeComponent } from '../../scope/scope';
 import { useRouteContext } from '../../router/useRouteContext';
 
 // Register the app's route table the way an app does — `RatiUserTypes['routes'] =
@@ -11,14 +11,14 @@ import { useRouteContext } from '../../router/useRouteContext';
 
 // A providing route: its scope ends in `.provide()`, so the carried context is the
 // provided value.
-const productScope = scope({ productId: prop<string>() }).provide(({ productId }) => ({
+const productScope = scope({ productId: input<string>() }).provide(({ productId }) => ({
     label: `#${productId}`,
 }));
 const ProductBody: ScopeComponent<typeof productScope> = () => null;
 
 // A scope without `.provide()`: the carried context is the resolved props
 // (provide-by-default), exactly what `useScope` would return under the island.
-const profileScope = scope({ userId: prop<string>() }).load({ name: async () => 'n' });
+const profileScope = scope({ userId: input<string>() }).load({ name: async () => 'n' });
 const ProfileBody: ScopeComponent<typeof profileScope> = () => null;
 
 const typedRoutes = [

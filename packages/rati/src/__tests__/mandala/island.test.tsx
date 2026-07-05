@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { createContext, StrictMode, useContext, type FC } from 'react';
-import { scope, prop, hook } from '../../scope/scope';
+import { scope, input, hook } from '../../scope/scope';
 import { NotAvailableError, SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
 import { useScope, useOptionalScope } from '../../mandala/channel';
@@ -65,7 +65,7 @@ describe('island', () => {
         // dependent level then resolves off the first level's value.
         const name = deferred<string>();
         const Island = island({
-            scope: scope({ id: prop<string>() })
+            scope: scope({ id: input<string>() })
                 .load({ name: () => name.promise })
                 .load({ label: async ({ name }) => `[${name}]` }),
             component: ({ label }) => <div>ready {label}</div>,
@@ -91,7 +91,7 @@ describe('island', () => {
         let calls = 0;
 
         const Island = island({
-            scope: scope({ id: prop<string>() })
+            scope: scope({ id: input<string>() })
                 .load({
                     prefix: hook(() => {
                         calls++;
@@ -123,14 +123,14 @@ describe('island', () => {
         const Lazy = Object.assign(() => <div>x</div>, { preload });
 
         const Island = island({
-            scope: scope({ id: prop<string>() }),
+            scope: scope({ id: input<string>() }),
             component: Lazy,
             loading: Loading,
         });
         expect((Island as { preload?: unknown }).preload).toBe(preload);
 
         const Plain = island({
-            scope: scope({ id: prop<string>() }),
+            scope: scope({ id: input<string>() }),
             component: () => <div>x</div>,
             loading: Loading,
         });
@@ -139,7 +139,7 @@ describe('island', () => {
 
     test('routes a failed source to the error slot with the unified code', async () => {
         const Island = island({
-            scope: scope({ id: prop<string>() }).load({
+            scope: scope({ id: input<string>() }).load({
                 page: async (): Promise<string> => {
                     throw new NotAvailableError('no such page', { code: 'not-available' });
                 },
@@ -160,7 +160,7 @@ describe('island', () => {
         let failures = 1;
 
         const Island = island({
-            scope: scope({ id: prop<string>() }).load({
+            scope: scope({ id: input<string>() }).load({
                 data: async ({ id }) => {
                     if (failures > 0) {
                         failures--;
@@ -195,7 +195,7 @@ describe('island', () => {
         const res = testSource<{ id: string }>(log, 'res');
 
         const Island = island({
-            scope: scope({ id: prop<string>() }).load({ res: () => res }),
+            scope: scope({ id: input<string>() }).load({ res: () => res }),
             component: ({ res: r }) => <div>ready {r.id}</div>,
             loading: Loading,
         });
@@ -216,7 +216,7 @@ describe('island', () => {
         const page = testSource<{ id: string }>(log, 'page');
 
         const Island = island({
-            scope: scope({ id: prop<string>() })
+            scope: scope({ id: input<string>() })
                 .load({ space: () => space })
                 .load({ page: () => page }),
             component: ({ page: p }) => <div>ready {p.id}</div>,
@@ -244,7 +244,7 @@ describe('island', () => {
         const tree = testSource<{ id: string }>(log, 'tree');
 
         const Island = island({
-            scope: scope({ id: prop<string>() })
+            scope: scope({ id: input<string>() })
                 .load({ spaceId: () => spaceId.promise })
                 .load({
                     tree: ({ spaceId }) => {
@@ -280,7 +280,7 @@ describe('island', () => {
         const res = testSource<{ id: string }>(log, 'res');
 
         const Island = island({
-            scope: scope({ id: prop<string>() }).load({ res: () => res }),
+            scope: scope({ id: input<string>() }).load({ res: () => res }),
             component: ({ res: r }) => <div>ready {r.id}</div>,
             loading: Loading,
         });
@@ -306,7 +306,7 @@ describe('island', () => {
         };
 
         const Island = island({
-            scope: scope({ id: prop<string>() }).load({ res: ({ id }) => sourceFor(id) }),
+            scope: scope({ id: input<string>() }).load({ res: ({ id }) => sourceFor(id) }),
             component: ({ res }) => <div>ready {res.id}</div>,
             loading: Loading,
         });
@@ -323,7 +323,7 @@ describe('island', () => {
     });
 
     test('builds the .provide() value from the resolved chain and provides it to the subtree', async () => {
-        const ctxScope = scope({ id: prop<string>() })
+        const ctxScope = scope({ id: input<string>() })
             .load({ name: async ({ id }) => `env:${id}` })
             .provide(({ name }) => ({ label: `<${name}>` }));
         const Island = island({
@@ -347,7 +347,7 @@ describe('island', () => {
         const log: string[] = [];
         const res = testSource<{ id: string }>(log, 'res');
 
-        const ctxScope = scope({ id: prop<string>() })
+        const ctxScope = scope({ id: input<string>() })
             .load({ res: () => res })
             .provide(({ res: r }) => {
                 log.push('context-mount');
@@ -393,7 +393,7 @@ describe('island', () => {
         };
 
         const Island = island({
-            scope: scope({ id: prop<string>() })
+            scope: scope({ id: input<string>() })
                 .load({ res: ({ id }) => sourceFor(id) })
                 .provide(({ res }) => {
                     log.push(`context-mount:${res.id}`);
@@ -425,7 +425,7 @@ describe('island', () => {
         const AppContext = createContext<{ label: string } | null>(null);
 
         const Island = island({
-            scope: scope({ id: prop<string>() }).provide(({ id }) => ({ label: `#${id}` }), {
+            scope: scope({ id: input<string>() }).provide(({ id }) => ({ label: `#${id}` }), {
                 provideTo: AppContext,
             }),
             component: () => <Consumer />,
@@ -444,7 +444,7 @@ describe('island', () => {
     });
 
     test('useOptionalScope returns the value when a context is provided above', async () => {
-        const ctxScope = scope({ id: prop<string>() }).provide(({ id }) => ({ label: `#${id}` }));
+        const ctxScope = scope({ id: input<string>() }).provide(({ id }) => ({ label: `#${id}` }));
         const Island = island({
             scope: ctxScope,
             component: () => <Consumer />,
@@ -461,7 +461,7 @@ describe('island', () => {
     });
 
     test('useOptionalScope returns undefined when rendered outside the island', () => {
-        const ctxScope = scope({ id: prop<string>() }).provide(({ id }) => ({ label: `#${id}` }));
+        const ctxScope = scope({ id: input<string>() }).provide(({ id }) => ({ label: `#${id}` }));
         // Build the island so the scope's channel exists, but render the reader with no
         // <Island> above it — a present scope with no provider in the tree.
         island({ scope: ctxScope, component: () => <div>page</div>, loading: Loading });
@@ -476,7 +476,7 @@ describe('island', () => {
     });
 
     test('provide-by-default: useScope returns the resolved props when the scope declares no .provide()', async () => {
-        const propsScope = scope({ id: prop<string>() });
+        const propsScope = scope({ id: input<string>() });
         const Island = island({
             scope: propsScope,
             component: () => <Consumer />,
@@ -523,7 +523,7 @@ describe('island', () => {
         const log: string[] = [];
         const makeSource = readySourceFactory(log);
 
-        const ctxScope = scope({ id: prop<string>() })
+        const ctxScope = scope({ id: input<string>() })
             .load({ res: () => makeSource() })
             .provide(({ res }) => {
                 log.push(`build:${res.id}`);
@@ -565,7 +565,7 @@ describe('island', () => {
         const AppContext = createContext<{ id: string } | null>(null);
 
         const Island = island({
-            scope: scope({ id: prop<string>() })
+            scope: scope({ id: input<string>() })
                 .load({ res: () => makeSource() })
                 .provide(({ res }) => ({ id: res.id }), { provideTo: AppContext }),
             component: () => <Consumer />,
@@ -591,8 +591,8 @@ describe('island', () => {
         const makeSource = readySourceFactory(log);
 
         const Island = island({
-            scope: scope({ id: prop<string>() }).load({ res: () => makeSource() }),
-            component: ({ res }) => <div>prop {res.id}</div>,
+            scope: scope({ id: input<string>() }).load({ res: () => makeSource() }),
+            component: ({ res }) => <div>input {res.id}</div>,
             loading: Loading,
         });
 
@@ -602,7 +602,7 @@ describe('island', () => {
             </StrictMode>,
         );
 
-        expect(await screen.findByText('prop src2')).toBeTruthy();
+        expect(await screen.findByText('input src2')).toBeTruthy();
         // Run #1's source was attached then detached; run #2's stays attached.
         expect(log).toContain('detach:src1');
         expect(log).not.toContain('detach:src2');
@@ -614,7 +614,7 @@ describe('island', () => {
         // so a by-scope reader under each gets that island's value — nearest wins, no
         // cross-talk. (Nesting two of the same scope is the only ambiguous case, and
         // then nearest-wins is the sane default.)
-        const sharedScope = scope({ id: prop<string>() }).provide(({ id }) => ({ tag: `#${id}` }));
+        const sharedScope = scope({ id: input<string>() }).provide(({ id }) => ({ tag: `#${id}` }));
         const First = island({
             scope: sharedScope,
             component: () => <Reader />,

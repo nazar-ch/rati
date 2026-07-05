@@ -5,7 +5,7 @@ import { WebRouterStore } from '../../router/store';
 import { route, type GenericRouteType } from '../../router/route';
 import { Router } from '../../router/Router';
 import { GenericStoresContext } from '../../stores/RootStore';
-import { scope, prop, type ScopeComponent } from '../../scope/scope';
+import { scope, input, type ScopeComponent } from '../../scope/scope';
 import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
 import { useScope } from '../../mandala/channel';
@@ -50,7 +50,7 @@ describe('route + islands', () => {
     test('an island route resolves its waterfall from path params', async () => {
         const label = deferred<string>();
         const Product = island({
-            scope: scope({ productId: prop<string>() }).load({ label: () => label.promise }),
+            scope: scope({ productId: input<string>() }).load({ label: () => label.promise }),
             component: ({ label }) => <div>product {label}</div>,
             loading: IslandLoading,
         });
@@ -76,7 +76,7 @@ describe('route + islands', () => {
         const log: string[] = [];
 
         const Product = island({
-            scope: scope({ productId: prop<string>() }).load({
+            scope: scope({ productId: input<string>() }).load({
                 res: ({ productId }): Source<{ productId: string }> => {
                     const state: SourceState<{ productId: string }> = {
                         status: 'ready',
@@ -182,7 +182,7 @@ describe('route + islands', () => {
     test('useRouteContext reads a route island context by route name', async () => {
         // The scope ends in `.provide()`; route builds the island, so there is no
         // island component to import — the subtree reads the context by route name.
-        const productScope = scope({ productId: prop<string>() }).provide(({ productId }) => ({
+        const productScope = scope({ productId: input<string>() }).provide(({ productId }) => ({
             label: `#${productId}`,
         }));
 
@@ -205,7 +205,7 @@ describe('route + islands', () => {
 
 describe('island auto-context', () => {
     test('useScope reads resolved props anywhere under the island', async () => {
-        const productScope = scope({ productId: prop<string>() }).load({
+        const productScope = scope({ productId: input<string>() }).load({
             label: async ({ productId }) => `#${productId}`,
         });
 
@@ -234,7 +234,7 @@ describe('island auto-context', () => {
     test('useScope throws a helpful error when rendered outside the island', async () => {
         // A valid island (so the scope's channel exists), but the reader is rendered with
         // no <Product> ancestor — so there is no provided value above it.
-        const productScope = scope({ productId: prop<string>() });
+        const productScope = scope({ productId: input<string>() });
         island({ scope: productScope, component: () => null, loading: IslandLoading });
 
         const Child: FC = () => {

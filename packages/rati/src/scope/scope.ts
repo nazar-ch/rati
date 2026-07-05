@@ -16,7 +16,7 @@ export const ScopeProvidesSymbol = Symbol();
 
 // Brands a load as a *hook load* (see `hook()`): the resolver runs it every render
 // in stable order and never caches it, so its function may call React hooks. A
-// symbol prop (not a name) so it survives minification, mirroring `ParamSymbol`.
+// symbol prop (not a name) so it survives minification, mirroring `InputSymbol`.
 export const HookSymbol = Symbol();
 
 /**
@@ -28,19 +28,19 @@ export const HookSymbol = Symbol();
  */
 export type HookLoad<T = unknown> = ((resolved: any) => T) & { readonly [HookSymbol]: true };
 
-// One entry of a scope's merged definition: a `prop()` input (head only), a `hook()`
+// One entry of a scope's merged definition: an `input()` marker (head only), a `hook()`
 // load, or a data load (function / promise / source / class / value). They're kept
 // apart at the builder surface — `scope({…})` takes inputs, `.load({…})` takes hooks
-// and data — but the merged definition carries all, so the resolver and prop/param
-// helpers see them. (A `HookLoad` is structurally a function, so the function member
-// covers it here; it's not listed separately to avoid polluting the contextual
-// `params` typing of plain function loads.)
+// and data — but the merged definition carries all, so the resolver and input helpers
+// see them. (A `HookLoad` is structurally a function, so the function member covers it
+// here; it's not listed separately to avoid polluting the contextual argument typing of
+// plain function loads.)
 type ScopeEntry =
     | ((...args: any) => any | Promise<any>)
     | { new (...args: any): any }
     | Promise<any>
     | Source<any>
-    | Prop<any>
+    | Input<any>
     | string;
 
 type GenericScopeDefinition = Record<string, ScopeEntry>;
@@ -82,7 +82,7 @@ export type Scope<
 type ResolveScopeDefinition<VD extends GenericScopeDefinition> = {
     // HookLoad is also a function, so it must be matched before the function branch.
     // A hook resolves like a function load: its Source<T> (or promise) unwraps to T.
-    [K in keyof VD]: VD[K] extends Prop<any>
+    [K in keyof VD]: VD[K] extends Input<any>
         ? VD[K]['value']
         : VD[K] extends HookLoad<infer R>
           ? UnwrapSource<Awaited<R>>
@@ -104,12 +104,12 @@ export type ScopeProps<S extends Scope<any>> = Simplify<
     ResolveScopeDefinition<ScopeDefinitions<S>>
 >;
 
-type ParamsOf<Defs extends GenericScopeDefinition> = ExcludeNever<{
-    [K in keyof Defs]: Defs[K] extends Prop<any> ? Defs[K]['value'] : never;
+type InputsOf<Defs extends GenericScopeDefinition> = ExcludeNever<{
+    [K in keyof Defs]: Defs[K] extends Input<any> ? Defs[K]['value'] : never;
 }>;
 
-/** The inputs a scope accepts (island props / slot `params`) — its `prop()` head. */
-export type ScopeParams<S extends Scope<any>> = Simplify<ParamsOf<ScopeDefinitions<S>>>;
+/** The inputs a scope accepts (island props / slot `inputs`) — its `input()` head. */
+export type ScopeInputs<S extends Scope<any>> = Simplify<InputsOf<ScopeDefinitions<S>>>;
 
 // The `.provide()` value a scope declares, or `unknown` when the chain has none.
 type ScopeProvided<S extends Scope<any>> = S extends Scope<any, infer P> ? P : never;
@@ -124,39 +124,39 @@ export type ScopeProvidesOf<S extends Scope<any>> =
 
 // ---------------------------------------------------------------------------------------
 
-type CreateScopeFunc = <P extends ParamsDefinition = {}>(params?: P) => ChainableScope<P>;
+type CreateScopeFunc = <P extends InputsDefinition = {}>(inputs?: P) => ChainableScope<P>;
 
-// The head takes inputs only — `prop()` markers (route params or host props). Data
+// The head takes inputs only — `input()` markers (route params or host props). Data
 // goes into `.load()`, never here.
-type ParamsDefinition = Record<string, Prop<any>>;
+type InputsDefinition = Record<string, Input<any>>;
 
 // A dependent level: each entry receives the prior levels' resolved values and
 // yields data — a `hook()` load, function, promise, source, class, or value. Not
-// `prop()`: inputs live in the `scope({…})` head, so a `prop()` here is a (type) error.
-// A `hook()` load satisfies the function member (a `HookLoad` is a function), so it's
-// accepted without a dedicated union member — which would otherwise widen the
-// contextual `params` type of plain function loads to `any`.
+// `input()`: inputs live in the `scope({…})` head, so an `input()` here is a (type)
+// error. A `hook()` load satisfies the function member (a `HookLoad` is a function),
+// so it's accepted without a dedicated union member — which would otherwise widen the
+// contextual argument type of plain function loads to `any`.
 type LoadDefinition<PrevDefs extends GenericScopeDefinition> = {
     [key: string]:
-        | ((params: Simplify<ResolveScopeDefinition<PrevDefs>>) => any | Promise<any>)
+        | ((resolved: Simplify<ResolveScopeDefinition<PrevDefs>>) => any | Promise<any>)
         | Promise<any>
         | Source<any>
-        | { new (params: Simplify<ResolveScopeDefinition<PrevDefs>>): any }
+        | { new (resolved: Simplify<ResolveScopeDefinition<PrevDefs>>): any }
         | string;
 };
 
 /**
  * Build a scope. The single entry form — always chainable:
  *
- *     scope({ space: prop<string>(), pageId: prop<Base64Uuid>() })  // inputs
- *         .load({ spaceId: ({ space }) => resolveSpaceId(space) })  // dependent level
- *         .load({ tree: ({ spaceId }) => trees.source(spaceId) })  // parallel level
- *         .provide(({ tree }) => new PageContext(tree));           // terminal (optional)
+ *     scope({ space: input<string>(), pageId: input<Base64Uuid>() })  // inputs
+ *         .load({ spaceId: ({ space }) => resolveSpaceId(space) })    // dependent level
+ *         .load({ tree: ({ spaceId }) => trees.source(spaceId) })     // parallel level
+ *         .provide(({ tree }) => new PageContext(tree));              // terminal (optional)
  *
  * `scope()` with no inputs is valid for a data-only scope: `scope().load({ … })`.
  */
-export const scope: CreateScopeFunc = <P extends ParamsDefinition = {}>(params?: P) =>
-    createScopeChain<P>(params ?? ({} as P), undefined);
+export const scope: CreateScopeFunc = <P extends InputsDefinition = {}>(inputs?: P) =>
+    createScopeChain<P>(inputs ?? ({} as P), undefined);
 
 export type ChainableScope<VD extends GenericScopeDefinition> = Scope<VD> & {
     load<NextDef extends LoadDefinition<VD>>(def: NextDef): ChainableScope<Simplify<VD & NextDef>>;
@@ -219,16 +219,16 @@ function createScopeChain<VD extends GenericScopeDefinition>(
 
 // ----------------------
 
-export const ParamSymbol = Symbol();
+export const InputSymbol = Symbol();
 
-export type Prop<T> = {
+export type Input<T> = {
     value: T;
-    [ParamSymbol]: true;
+    [InputSymbol]: true;
 };
 
-export function prop<T>(): Prop<T> {
+export function input<T>(): Input<T> {
     return {
-        [ParamSymbol]: true,
+        [InputSymbol]: true,
         value: null as T,
     };
 }

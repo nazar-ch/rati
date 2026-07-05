@@ -1,5 +1,5 @@
 import { type FC } from 'react';
-import { prop, scope, type ScopeComponent, useWebRouter } from 'rati';
+import { input, scope, type ScopeComponent, useWebRouter } from 'rati';
 import { sleep } from './util';
 
 // A plain route component with no data of its own: it reads the router straight
@@ -10,14 +10,14 @@ export const SimpleTest: FC = () => {
     return <div>simple test view - {router.path}</div>;
 };
 
-// A plain route component whose single prop is fed directly from the `:productId`
+// A plain route component whose single input is fed directly from the `:productId`
 // path param — no scope, no resolution.
 export const TestRouteParamsWithoutView: FC<{ productId: string }> = ({ productId }) => {
     return <div>route params, no scope: {productId}</div>;
 };
 
 // A data-only scope: no inputs, one async load. The island resolves `xx` and
-// hands it to the component as a fully-resolved prop.
+// hands it to the component as a fully-resolved input.
 export const simpleTestScope = scope().load({
     xx: async () => {
         await sleep(1000);
@@ -40,7 +40,7 @@ class SimpleTextStore {
 // A waterfall scope: a `productName` input, then an async `name` load that
 // depends on it, then a plain `first` value, then a `SimpleTextStore`
 // instantiated from the resolved props of the prior levels.
-export const complexTestScope = scope({ productName: prop<string>() })
+export const complexTestScope = scope({ productName: input<string>() })
     .load({
         name: async (params) => {
             await sleep(1000);

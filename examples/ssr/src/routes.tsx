@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { hook, prop, route, scope } from 'rati';
+import { hook, input, route, scope } from 'rati';
 import type { GenericRouteType } from 'rati';
 import { RegionContext } from './appContext';
 import { fetchProduct, fetchProfile, fetchReviews } from './data';
@@ -40,12 +40,12 @@ const aboutScope = scope().load({
 // A waterfall: the `productId` input, a `hook()` load that injects the region from
 // React context (the DI seam — no `env` to thread), then a dependent `product`
 // load, then `reviews` keyed off the resolved product. The promise levels dehydrate.
-const productScope = scope({ productId: prop<string>() })
+const productScope = scope({ productId: input<string>() })
     .load({ region: hook(() => useContext(RegionContext)) })
     .load({ product: ({ productId, region }) => fetchProduct(productId, region) })
     .load({ reviews: ({ product }) => fetchReviews(product.id) });
 
-const profileScope = scope({ userId: prop<string>() }).load({
+const profileScope = scope({ userId: input<string>() }).load({
     profile: ({ userId }) => fetchProfile(userId),
 });
 

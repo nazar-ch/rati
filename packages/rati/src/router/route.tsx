@@ -115,7 +115,7 @@ type MissingRouteParams<Missing extends PropertyKey> = {
     scope. Otherwise it's checked by param *name*: its required props must all be
     path params. Values are intentionally not pinned to the path's plain `string`
     — a component (typically an island) brands a URL segment via
-    `prop<Base64Uuid>()`, so a branded prop like `pageId: Base64Uuid` is
+    `input<Base64Uuid>()`, so a branded prop like `pageId: Base64Uuid` is
     accepted by name.
 */
 type RouteComponentGuard<Path extends string, TScope extends Scope<any> | undefined, Component> = [
@@ -184,7 +184,7 @@ export type RouteFoldInputs = {
  *     })
  *
  * A component built with `island` up front also works as-is with no `scope` — it is
- * already a mandala whose props are its scope's params, so the path params feed it
+ * already a mandala whose props are its scope's inputs, so the path params feed it
  * directly: `route('/spaces/:spaceId/pages/:pageId', 'page', PageIsland)`. A plain
  * component with no `scope` is rendered directly with the route params.
  */

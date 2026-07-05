@@ -21,9 +21,9 @@ function asSourceError(thrown: unknown): SourceError {
 // (the live tree key) clears the error on retry / param change.
 type ErrorBoundaryProps = {
     errorSlot:
-        | ComponentType<{ params: unknown; error: SourceError; retry: () => void }>
+        | ComponentType<{ inputs: unknown; error: SourceError; retry: () => void }>
         | undefined;
-    params: unknown;
+    inputs: unknown;
     retry: () => void;
     resetKey: unknown;
     children: ReactNode;
@@ -50,13 +50,13 @@ export class MandalaErrorBoundary extends Component<ErrorBoundaryProps, { error:
 
     override render() {
         if (this.state.error !== null) {
-            const { errorSlot: ErrorSlot, params, retry } = this.props;
+            const { errorSlot: ErrorSlot, inputs, retry } = this.props;
             if (!ErrorSlot) {
                 // No slot — propagate to the nearest outer ErrorBoundary.
                 throw this.state.error;
             }
             return (
-                <ErrorSlot params={params} error={asSourceError(this.state.error)} retry={retry} />
+                <ErrorSlot inputs={inputs} error={asSourceError(this.state.error)} retry={retry} />
             );
         }
         return this.props.children;

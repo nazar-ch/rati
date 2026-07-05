@@ -1,5 +1,5 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
-import { scope, prop, type ScopeParams, type ScopeProps } from '../../scope/scope';
+import { scope, input, type ScopeInputs, type ScopeProps } from '../../scope/scope';
 
 class TestStore {
     constructor(_params: { productName: string }) {}
@@ -8,7 +8,7 @@ class TestStore {
 
 describe('scope', () => {
     test('resolves params, promises, functions, classes and plain values', () => {
-        const scopeDef = scope({ productName: prop<string>() }).load({
+        const scopeDef = scope({ productName: input<string>() }).load({
             count: Promise.resolve(1),
             load: async () => 'loaded',
             plain: 'plain',
@@ -23,7 +23,7 @@ describe('scope', () => {
     });
 
     test('passes resolved props of prior levels to functions and classes', () => {
-        const scopeDef = scope({ productName: prop<string>() })
+        const scopeDef = scope({ productName: input<string>() })
             .load({ id: async () => 7 })
             .load({
                 label: async (params) => {
@@ -41,20 +41,20 @@ describe('scope', () => {
         }>();
     });
 
-    test('collects prop() inputs from the head into ScopeParams', () => {
+    test('collects input() inputs from the head into ScopeInputs', () => {
         const scopeDef = scope({
-            productId: prop<number>(),
-            productName: prop<string>(),
+            productId: input<number>(),
+            productName: input<string>(),
         }).load({ load: async () => 'x' });
 
-        expectTypeOf<ScopeParams<typeof scopeDef>>().toEqualTypeOf<{
+        expectTypeOf<ScopeInputs<typeof scopeDef>>().toEqualTypeOf<{
             productId: number;
             productName: string;
         }>();
     });
 
     test('rejects loads whose params are not provided by prior levels', () => {
-        scope({ a: prop<number>() }).load({
+        scope({ a: input<number>() }).load({
             // @ts-expect-error - `b` is not provided by the prior levels
             broken: (params: { b: string }) => params.b,
         });
@@ -63,7 +63,7 @@ describe('scope', () => {
 
 describe('scope().load()', () => {
     test('accumulates resolved props across dependent levels', () => {
-        const scopeDef = scope({ productName: prop<string>() })
+        const scopeDef = scope({ productName: input<string>() })
             .load({
                 name: async (params) => {
                     expectTypeOf(params).toEqualTypeOf<{ productName: string }>();
@@ -78,13 +78,13 @@ describe('scope().load()', () => {
             store: TestStore;
         }>();
 
-        expectTypeOf<ScopeParams<typeof scopeDef>>().toEqualTypeOf<{
+        expectTypeOf<ScopeInputs<typeof scopeDef>>().toEqualTypeOf<{
             productName: string;
         }>();
     });
 
     test('supports chains deeper than the old recursion limit of 9', () => {
-        const scopeDef = scope({ v1: prop<number>() })
+        const scopeDef = scope({ v1: input<number>() })
             .load({ v2: async () => 2 })
             .load({ v3: async () => 3 })
             .load({ v4: async () => 4 })
@@ -104,11 +104,11 @@ describe('scope().load()', () => {
             });
 
         expectTypeOf<ScopeProps<typeof scopeDef>['sum']>().toEqualTypeOf<number>();
-        expectTypeOf<ScopeParams<typeof scopeDef>>().toEqualTypeOf<{ v1: number }>();
+        expectTypeOf<ScopeInputs<typeof scopeDef>>().toEqualTypeOf<{ v1: number }>();
     });
 
     test('rejects dependent loads whose params are not provided by prior levels', () => {
-        scope({ a: prop<number>() }).load({
+        scope({ a: input<number>() }).load({
             // @ts-expect-error - `b` is not provided by the prior levels
             broken: (params: { b: string }) => params.b,
         });

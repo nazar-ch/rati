@@ -2,7 +2,7 @@ import { use, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStor
 import type { ComponentType, Context, ReactNode } from 'react';
 import {
     isHookLoad,
-    ParamSymbol,
+    InputSymbol,
     type HookLoad,
     type Scope,
     type ScopeProvideDef,
@@ -83,7 +83,7 @@ type Cell =
 
 // Classify a *data entry* (the value written in the scope definition).
 function classifyEntry(entry: unknown, prev: Record<string, unknown>, key: string): Cell {
-    if (is.object(entry) && ParamSymbol in entry) return { kind: 'value', value: prev[key] };
+    if (is.object(entry) && InputSymbol in entry) return { kind: 'value', value: prev[key] };
     if (is.promise(entry)) return { kind: 'promise', promise: entry };
     if (isSource(entry)) return { kind: 'source', source: entry };
     if (is.class(entry)) return { kind: 'value', value: new entry(prev) };
@@ -113,8 +113,8 @@ export type Shared = {
     scope: Scope;
     component: ComponentType<any>;
     channel: Context<unknown>;
-    loading: ComponentType<{ params: unknown }>;
-    params: unknown;
+    loading: ComponentType<{ inputs: unknown }>;
+    inputs: unknown;
     // Per-level data-cell caches, held on the mandala's committed ref (see Bucket).
     buckets: Bucket[];
     // Server only: record a resolved promise value for dehydration. Undefined on client.
@@ -264,7 +264,7 @@ function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: Step
     if (pending) {
         if (navTraceEnabled()) navTrace(`level ${index} render loading slot (pending)`);
         const Loading = shared.loading;
-        return <Loading params={shared.params} />;
+        return <Loading inputs={shared.inputs} />;
     }
     return children(resolved);
 }
@@ -295,7 +295,7 @@ function Leaf({ resolved, shared }: LeafProps) {
             component={Component}
             channel={channel}
             loading={shared.loading}
-            params={shared.params}
+            inputs={shared.inputs}
             cacheToken={shared.buckets}
         />
     );
@@ -306,8 +306,8 @@ type ProvideLeafProps = {
     resolved: Record<string, unknown>;
     component: ComponentType<any>;
     channel: Context<unknown>;
-    loading: ComponentType<{ params: unknown }>;
-    params: unknown;
+    loading: ComponentType<{ inputs: unknown }>;
+    inputs: unknown;
     // The mandala's bucket array — a new identity whenever the cache is rebuilt (param
     // change / StrictMode remount), and stable across plain re-renders + live source
     // updates. Used as the rebuild key so the provided value tracks the surviving run
@@ -321,7 +321,7 @@ function ProvideLeaf({
     component: Component,
     channel,
     loading: Loading,
-    params,
+    inputs,
     cacheToken,
 }: ProvideLeafProps) {
     const [built, setBuilt] = useState<{ value: unknown } | null>(null);
@@ -349,7 +349,7 @@ function ProvideLeaf({
         // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by cacheToken
     }, [cacheToken]);
 
-    if (!built) return <Loading params={params} />;
+    if (!built) return <Loading inputs={inputs} />;
 
     let content: ReactNode = (
         <channel.Provider value={built.value}>

@@ -3,7 +3,7 @@ import { prerender } from 'react-dom/static';
 import { hydrateRoot } from 'react-dom/client';
 import { act, cleanup } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { scope, prop } from '../../scope/scope';
+import { scope, input } from '../../scope/scope';
 import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
 import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
@@ -28,7 +28,7 @@ async function prerenderToString(element: ReactElement): Promise<string> {
 describe('island SSR (prerender)', () => {
     test('resolves a promise-backed scope server-side', async () => {
         const Island = island({
-            scope: scope({ id: prop<string>() }).load({
+            scope: scope({ id: input<string>() }).load({
                 greeting: async ({ id }) => `hello ${id}`,
             }),
             component: ({ greeting }) => <div>{greeting}</div>,
@@ -52,7 +52,7 @@ describe('island SSR (prerender)', () => {
             attach: () => () => {},
         };
         const Island = island({
-            scope: scope({ id: prop<string>() }).load({ data: () => pending }),
+            scope: scope({ id: input<string>() }).load({ data: () => pending }),
             component: () => <div>ready</div>,
             loading: () => <div>loading slot</div>,
         });
@@ -69,7 +69,7 @@ describe('island SSR (prerender)', () => {
 describe('island SSR dehydration', () => {
     test('collects each resolved promise value, keyed by island id then chain key', async () => {
         const Island = island({
-            scope: scope({ id: prop<string>() }).load({
+            scope: scope({ id: input<string>() }).load({
                 greeting: async ({ id }) => `hello ${id}`,
             }),
             component: ({ greeting }) => <div>{greeting}</div>,
@@ -93,7 +93,7 @@ describe('island SSR dehydration', () => {
     test('rehydrates from the server data without re-running the promise', async () => {
         let calls = 0;
         const Island = island({
-            scope: scope({ id: prop<string>() }).load({
+            scope: scope({ id: input<string>() }).load({
                 greeting: async ({ id }: { id: string }) => {
                     calls++;
                     return `hello ${id}`;

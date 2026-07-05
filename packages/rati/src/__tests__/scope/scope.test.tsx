@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
 import { render, screen, cleanup, act } from '@testing-library/react';
-import { scope, prop, type Scope } from '../../scope/scope';
+import { scope, input, type Scope } from '../../scope/scope';
 import { island } from '../../island/island';
 
 afterEach(cleanup);
@@ -39,7 +39,7 @@ async function resolveThroughIsland(
 
 describe('scope resolution through the island engine', () => {
     test('resolves params, raw promises, functions and plain values', async () => {
-        const scopeDef = scope({ productName: prop<string>() }).load({
+        const scopeDef = scope({ productName: input<string>() }).load({
             count: Promise.resolve(1),
             load: async () => 'loaded',
             plain: 'plain',
@@ -56,7 +56,7 @@ describe('scope resolution through the island engine', () => {
     });
 
     test('resolves dependent levels, instantiating classes from prior levels', async () => {
-        const scopeDef = scope({ productName: prop<string>() })
+        const scopeDef = scope({ productName: input<string>() })
             .load({ id: async () => 7 })
             .load({
                 label: async (params) => `${params.productName}#${params.id}`,
@@ -72,7 +72,7 @@ describe('scope resolution through the island engine', () => {
     test('resolves dependent levels in waterfall order', async () => {
         const order: string[] = [];
 
-        const scopeDef = scope({ productName: prop<string>() })
+        const scopeDef = scope({ productName: input<string>() })
             .load({
                 name: async (params) => {
                     order.push('name');

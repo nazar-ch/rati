@@ -1,7 +1,7 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
 import { type ComponentType, type FC } from 'react';
 import { route } from '../../router/route';
-import { scope, prop, type ScopeComponent } from '../../scope/scope';
+import { scope, input, type ScopeComponent } from '../../scope/scope';
 import { island } from '../../island/island';
 
 const TestFC: FC = () => null;
@@ -10,7 +10,7 @@ const EmptyScope = scope();
 
 describe('route()', () => {
     const ProductIsland = island({
-        scope: scope({ productId: prop<string>() }),
+        scope: scope({ productId: input<string>() }),
         component: () => null,
         loading: () => null,
     });
@@ -41,14 +41,14 @@ describe('route()', () => {
         route('/shop/:productId', 'product', ProductIsland);
     });
 
-    test('feeds an island whose params are branded (URL string refined by prop)', () => {
+    test('feeds an island whose params are branded (URL string refined by input)', () => {
         type PageId = string & { readonly __brand: 'PageId' };
         const BrandedIsland = island({
-            scope: scope({ pageId: prop<PageId>() }),
+            scope: scope({ pageId: input<PageId>() }),
             component: () => null,
             loading: () => null,
         });
-        // The path yields a plain string; the island brands it via prop(), so it's
+        // The path yields a plain string; the island brands it via input(), so it's
         // accepted by param name even though `pageId` is a branded string.
         route('/pages/:pageId', 'page', BrandedIsland);
     });

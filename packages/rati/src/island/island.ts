@@ -3,8 +3,8 @@ import { createMandala, type MandalaComponent, type MandalaConfig } from '../man
 
 /**
  * An island component: a self-contained UI unit that resolves its own data from a scope
- * and renders, with loading/error slots. Its props are the scope's `prop()` inputs.
- * Read what it provides anywhere in its subtree with `useScope(scope)`.
+ * and renders, with loading/error slots. Its props are the scope's inputs (its `input()`
+ * head). Read what it provides anywhere in its subtree with `useScope(scope)`.
  */
 export type IslandComponent<S extends Scope<any>> = MandalaComponent<S>;
 
