@@ -29,6 +29,9 @@ implemented or committed to.
 - [stores-and-router.md](./stores-and-router.md) — the stores-container pattern: what it
   buys, what it costs, the router-induced dependency cycles, and options for resolving
   them (with a recommendation).
+- [ssr-nazar-patterns.md](./ssr-nazar-patterns.md) — what nazar.ch (the first real rati
+  SSR consumer) had to hand-roll, ranked for absorption: title management, hydration
+  payload serialization, a `prerender` helper, match status for HTTP codes.
 
 ## Standing constraints (from the project's design intent)
 

@@ -185,7 +185,9 @@ compose. That would also give `.extend()`/layout-scope work a sanctioned sharing
 
 Noted as direction, deliberately not designed — Jnana needs neither (it is fully
 interactive and doesn't even need SSR); these ride on the `examples/ssr` gallery until a
-real consumer exists.
+real consumer exists. (A real SSR consumer now does exist — see
+[ssr-nazar-patterns.md](./ssr-nazar-patterns.md) for the concrete helpers it argues for;
+§2/§3 there are the same pieces the SSG script below needs.)
 
 - **SSG** is the near step and is mostly a build script over existing pieces:
   enumerate static routes (paths without params, plus enumerated param values), run
