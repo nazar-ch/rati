@@ -27,6 +27,10 @@ implemented or committed to.
   (the `reconcileItems` generalization), pages-as-queries pagination, mutations with optimistic
   propagation, and staged-edit forms (`form`/`field`). Second revision, incorporating the
   omni-admin archaeology (`forms.ts`, `Chunks.ts` — a legacy-rati consumer).
+- [mandala-refresh-and-ssr-sources.md](./mandala-refresh-and-ssr-sources.md) — **implemented**:
+  selective scope refresh (`useScopeControls`, the `data()` load marker, read-set cascades)
+  and SSR-capable sources (the `Source.ssr` marker, loader vs live-seeded hydration); settled
+  design + implementation map + checkpoint items.
 - [stores-and-router.md](./stores-and-router.md) — the stores-container pattern: what it
   buys, what it costs, the router-induced dependency cycles, and options for resolving
   them (with a recommendation).
