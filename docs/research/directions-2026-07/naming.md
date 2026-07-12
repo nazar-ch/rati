@@ -124,7 +124,8 @@ client half keeps living in the main barrel — decide when building.
 ## 5. Data-layer names (`rati/mobx`, legacy)
 
 Superseded wholesale by the companion package ([data-package.md](./data-package.md)) — its
-vocabulary is `query` / `mutation` / `collection`. Specific legacy names, for the record:
+vocabulary is `query` / `mutation` / `collection` / `pagedCollection` / `form` / `field`.
+Specific legacy names, for the record:
 
 - **`remoteData`** — the name says nothing about the debounce/race-guard behavior that is
   its actual identity. Dies with the migration.

@@ -22,10 +22,11 @@ implemented or committed to.
   (pending-after-timeout, stale indication) and the SSG / RSC direction note.
 - [naming.md](./naming.md) — a review of every public-API name, with verdicts and a
   summary table of recommended renames.
-- [data-package.md](./data-package.md) — design options for the companion data package
-  that replaces the legacy `data/` layer and Jnana's `FetchStore`: refreshable + reactive
-  queries, optimistic changes, keyed collections (the `reconcileItems` generalization),
-  pagination.
+- [data-package.md](./data-package.md) — the companion data package that replaces the legacy
+  `data/` layer and Jnana's `FetchStore`: refreshable + reactive queries, keyed collections
+  (the `reconcileItems` generalization), pages-as-queries pagination, mutations with optimistic
+  propagation, and staged-edit forms (`form`/`field`). Second revision, incorporating the
+  omni-admin archaeology (`forms.ts`, `Chunks.ts` — a legacy-rati consumer).
 - [stores-and-router.md](./stores-and-router.md) — the stores-container pattern: what it
   buys, what it costs, the router-induced dependency cycles, and options for resolving
   them (with a recommendation).

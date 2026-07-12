@@ -171,7 +171,7 @@ store-facing surface typed off `RatiUserTypes`).
 ## 5. Data layer
 
 See [data-package.md](./data-package.md) — the companion package (`query` / `mutation` /
-`collection` / pagination) replacing `data/` and Jnana's `FetchStore`.
+`collection` / `pagedCollection` / `form`) replacing `data/` and Jnana's `FetchStore`.
 
 One rati-core item belongs here: **`ResourceContainer` may migrate into rati** (from
 `jnana/frontend/src/common/resources/`). It is framework-shaped already — generic,

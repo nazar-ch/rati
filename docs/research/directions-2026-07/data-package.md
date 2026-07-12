@@ -1,32 +1,87 @@
-# The companion data package — design options
+# The companion data package — design
 
-Design for the successor of the legacy `data/` layer (`remoteData`, `ActiveData`,
-`apiUtils`, today shipped via `rati/mobx`) and of Jnana's `FetchStore` family. These
-primitives served a CRUD web app well (that app is gone); Jnana re-grew a leaner version
-(`FetchStore` + ad-hoc optimistic updates + `JnanaList.reconcileItems`). This doc distills
-both generations into one package.
+The successor of the legacy `data/` layer (`remoteData`, `ActiveData`, `apiUtils`, shipped via
+`rati/mobx`) and of Jnana's `FetchStore` family. Second revision: the first pass distilled the two
+live generations; this one adds the omni-admin archaeology — the `FormStore`/`FieldStore` forms
+layer and the `Chunks.ts` pagination layer — and turns the options into one coherent design.
+**Forms are in scope for the first iteration**; the earlier draft deferred them.
+
+## What each generation contributes
+
+- **Legacy rati `data/`** — `remoteData`: debounce with coalesced promises, the race guard, the
+  pending-indication delay (a presentation concern, rehomed to the mandala). `ActiveData`: the
+  draft-over-baseline *idea* (right, for forms) wrapped in the wrong execution (`defineProperty`
+  getters over a deep merge, `__dataType` gymnastics, documented merge ambiguity).
+- **omni-admin `forms.ts`** — instance-owned form stores with self-contained field boxes (value +
+  validation + binding props) and a typed `values` aggregate. Right skeleton; wrong taxonomy (a
+  class per widget kind with a hand-written conditional-type dispatch table), stringly validation,
+  no dirty/baseline story.
+- **omni-admin `Chunks.ts`** — pagination as an array of independently loadable, independently
+  observable chunk objects: per-chunk load state, "has more" represented structurally (an unloaded
+  tail chunk), and cursor-anchor + relative-offset addressing for random access over cursor APIs.
+  No race guard, no error state, no refresh — the state machinery didn't survive; the topology
+  ideas do.
+- **Jnana** — `FetchStore`: the lean refreshable unit (race guard, honest reset) that conflates
+  first-load and reload in one `isLoading`. `SpacesListStore`: the optimistic
+  patch/recover-by-refresh choreography, hand-rolled per method. `JobsListStore`: composition over
+  inheritance (six stores) and the reactive-params need (manual `load()` after every setter).
+  `JnanaList.reconcileItems`: identity-stable reconciliation — the data layer should own what the
+  list solved at the view layer.
 
 ## Ground rules
 
-- **A companion package, not core.** Working name **`rati-data`** (alternatives:
-  `rati-remote`, `rati-crud` — both narrower than the content). Peer-deps: `rati`, `mobx`.
-  MobX is fine here — this package is *for* MobX-shaped apps; core stays uSES-only.
-- **Instance-owned data.** Each query/collection is an object living in the app's store
-  graph; sharing happens by sharing the instance. No keyed shared cache, no normalized
-  store — deliberately out of scope to keep the design iterable. (The ref-counting layer,
+- **A companion package, not core.** Working name **`rati-data`** — still right with forms in
+  scope: a form is staged data. Peer-deps: `rati`, `mobx`. MobX is fine here — this package is
+  *for* MobX-shaped apps; core stays uSES-only. New code uses plain observable objects from
+  factories (no decorators — don't extend the `@babel/plugin-proposal-decorators` debt the legacy
+  `data/` layer carries).
+- **Instance-owned data.** Each query/collection/form is an object living in the app's store
+  graph; sharing happens by sharing the instance. No keyed shared cache, no normalized store —
+  deliberately out of scope to keep the design iterable. (The ref-counting layer,
   `ResourceContainer`, may move to rati core separately — see
   [improvements.md §5](./improvements.md).)
 - **Phases are data; presentation is the mandala's.** The package reports honest phases
-  (`loading` vs `refreshing`, timestamps). Pending-indication delay
-  (`indicatePendingAfterTimeoutMs`) and stale-content display live in the island
-  ([improvements.md §2](./improvements.md)) — the package never owns a timer that exists
-  only to decide what a user sees.
-- **Bridges to core via `Source`.** Every primitive exposes a `source()` (built on
-  `observableSource`), so a scope's `.load()` can await first readiness and the island's
-  loading/error slots cover the initial load. After that, components observe the instance
-  directly — fine-grained MobX reactivity, no island re-resolution.
+  (`loading` vs `refreshing`, per-page phases, `isSubmitting`). Pending-indication delay
+  (`loadingDelayMs`) and stale-content display live in the island
+  ([improvements.md §2](./improvements.md)) — the package never owns a timer that exists only to
+  decide what a user sees.
+- **One error shape.** Everything that fails — query, page, mutation, form submit — normalizes to
+  `SourceError` (`toSourceError`), so the same `code` switch works everywhere and the island error
+  slot and in-content error states speak one language.
+- **Composition, not inheritance.** Factories return plain observable objects; domain stores hold
+  them as fields (the `JobsListStore` lesson). No exported base classes; a store that wants to
+  *be* a query exposes delegating members.
+- **Bridges to core via `Source`.** Read-side primitives expose `source()` (built on
+  `observableSource`) so a scope's `.load()` can await first readiness and the island's
+  loading/error slots cover the initial load. After that, components observe the instance directly
+  — fine-grained MobX reactivity, no island re-resolution. Decisions folded in (previously open):
+  `source()` yields **the instance**, not the raw value — pending until the first `ready`, then
+  ready forever with that same reference; later refreshes and refresh errors are the instance's
+  own observable state and never re-trip the island. `attach()` triggers `load()` (ensure
+  semantics); `detach` does nothing — the store owns the data's lifetime, not the island.
+- **Plain-English naming** (the core policy applies): `query`, `mutation`, `collection`,
+  `pagedCollection`, `form`, `field` — words React developers already know from the ecosystem.
+- **Testability by construction.** Every primitive is driven by a producer function, so a deferred
+  promise fake can walk any primitive through every phase in tests — no module mocking (pairs with
+  the `rati/testing` direction, [improvements.md §7](./improvements.md)).
 
-## 1. `query` — the refreshable unit (FetchStore matured)
+## The shape: five primitives, one lifecycle
+
+Data in an app has four moments; each primitive owns exactly one, plus one for fetch topology:
+
+| Moment | Primitive | Replaces |
+| --- | --- | --- |
+| Read one value | `query` | `FetchStore`, `remoteData` reads |
+| Read a keyed set | `collection` | `FetchStore<T[]>` + `reconcileItems` + ad-hoc patching |
+| Read in pages | `pagedCollection` | `Chunks.ts`, `JobsListStore`'s growing `limit` |
+| Stage local edits | `form` + `field` | `FormStore`/`FieldStore`, `ActiveData` drafts |
+| Write | `mutation` | `remoteData` writes + hand-rolled optimistic choreography |
+
+Optimism is deliberately **two-sided** and has no primitive of its own: *before* submit it is the
+form (staged edits nobody else sees; cancel = discard); *after* submit it is the mutation's
+optimistic patch against collections (expected truth every observer sees early). See §6.
+
+## 1. `query` — the refreshable unit
 
 The atom: one async producer, one current value, honest phases, race-guarded.
 
@@ -34,64 +89,142 @@ The atom: one async producer, one current value, honest phases, race-guarded.
 type QueryPhase = 'idle' | 'loading' | 'ready' | 'refreshing' | 'error';
 
 interface Query<T> {
-    readonly data: T | undefined;          // survives refresh — stale until replaced
+    readonly data: T | undefined;      // last good value; survives refresh AND refresh failure
     readonly phase: QueryPhase;
-    readonly error: SourceError | null;
-    readonly isPending: boolean;           // loading || refreshing
-    load(): Promise<void>;                 // first load or re-load; deduped while in flight
-    refresh(): Promise<void>;              // like load(), but phase = 'refreshing' (data kept)
-    reset(): void;
-    source(): Source<Query<T>>;            // pending until first 'ready'; then this instance
+    readonly error: SourceError | null; // may coexist with stale data (failed refresh)
+    readonly isPending: boolean;        // loading || refreshing
+    load(): Promise<void>;              // ensure: fetches only from idle/error; dedupes in flight
+    refresh(): Promise<void>;           // explicit re-fetch; data stays visible; dedupes in flight
+    reset(): void;                      // back to idle; drops data and error
+    source(): Source<Query<T>>;         // pending until first ready, then this instance
 }
 
 function query<T>(producer: (signal: AbortSignal) => Promise<T>, options?: QueryOptions): Query<T>;
 ```
 
-Decisions folded in:
+Decisions:
 
-- **`data` survives `refresh()`** — the single biggest UX difference from `FetchStore`,
-  which nulls nothing but conflates "first load" and "reload" in one `isLoading`. The
-  `loading`/`refreshing` split is exactly what the mandala's stale-display needs.
-- **Race guard built in** (the `requestId` pattern `FetchStore` and `remoteData` both
-  carry) — not an option, an invariant. `AbortSignal` passed to the producer so superseded
-  requests can actually be cancelled, mirroring the core proposal for scope loads.
-- **Errors normalize to `SourceError`** (`toSourceError`), so a query error and an island
-  error are the same shape and the same `code` switch works everywhere.
-- **Debounce as an option** — `remoteData`'s real value was coalescing keystroke-driven
-  calls with all callers receiving the final result. That survives as
-  `options.debounce: { waitMs, maxWaitMs }`; the pending-indication half of `remoteData`
-  does not (mandala's job).
+- **`load()` and `refresh()` are a real pair now** (the first revision blurred them): `load()` is
+  idempotent *ensure* — it fetches from `idle` or `error`, no-ops when `ready`, and returns the
+  in-flight promise while pending. `refresh()` is the only re-fetch. Scopes and `attach()` call
+  `load()`; mutations and user gestures call `refresh()`. This kills the `FetchStore` conflation
+  at the API level, not just in the phase enum.
+- **Pending phase is derived from data presence**: `data === undefined ? 'loading' : 'refreshing'`
+  — so a retry after a failed first load shows `loading`, a re-fetch over stale data shows
+  `refreshing`, and the mandala's stale-display story gets exactly the signal it needs.
+- **Refresh failure keeps stale data** (previously open — decided): `phase: 'error'`, `error` set,
+  `data` retained. The staleness presentation needs both; a component shows the stale list plus an
+  error badge.
+- **Race guard is an invariant, not an option** (the `requestId` pattern all three generations
+  carry). The producer receives an `AbortSignal` so superseded requests can actually cancel,
+  mirroring the core abort proposal ([improvements.md §1](./improvements.md)).
+- **Debounce as an option** — `remoteData`'s coalescing of keystroke-driven calls survives as
+  `options.debounce: { waitMs, maxWaitMs }`; its pending-indication half does not (mandala's job).
+- **Reactive parameters, opt-in** — `options.reactive: true` tracks the producer's observable
+  reads (MobX reaction over its synchronous prefix) and re-runs on change as a `refresh()`,
+  debounced. This is the type-ahead case `remoteData` was built for and the fix for
+  `JobsListStore`'s manual `load()`-after-every-setter. Implicit refetching must never be the
+  default in a package whose ethos is explicitness.
 
-**Composition vs inheritance.** Jnana uses both today (`SpacesListStore extends
-FetchStore`; `JobsListStore` composes six of them). Recommendation: design for
-**composition** — `query()` returns a plain observable object, and a domain store holds
-queries as fields. Subclassing couples the domain store's API to the primitive's and breaks
-down the moment a store needs two queries (as `JobsListStore` proves). No class export
-needed; a store that wants to *be* a query can still expose delegating members.
+## 2. `collection` — keyed items, reconciliation, nested reactivity
 
-**Reactive parameters** — the "reactive" requirement. `JobsListStore` re-reads
-`this.limit`/`this.filter` inside its producers but must call `load()` manually after each
-setter. Option: an `autorun` mode where the producer's observable reads are tracked and a
-change re-runs it (debounced):
+The generalization of `JnanaList.reconcileItems`. A refresh returns fresh JSON; naive replacement
+destroys object identity, so rows re-render wholesale and selection/DnD/refs churn. The data layer
+solves it once, underneath every view:
 
 ```ts
-const jobs = query((signal) => api.jobs.$get({ query: { limit: String(this.limit) } }, { signal }), {
-    reactive: true,           // MobX reaction over the producer's own observable reads
-    debounce: { waitMs: 150 },
-});
-// setLimit(500) → jobs re-fetches by itself; phase = 'refreshing'
+interface Collection<T, Item = T> {
+    readonly items: readonly Item[];        // stable identities across refreshes
+    readonly query: Query<readonly T[]>;    // the underlying fetch (phase / refresh / reset)
+    getByKey(key: string): Item | undefined;
+    patchItem(key: string, patch: (item: Item) => Item | void): void;  // optimistic edits
+    upsert(raw: T): void;                   // server-pushed single-item update
+    insert(raw: T, at?: number): void;
+    remove(key: string): void;
+    source(): Source<Collection<T, Item>>;
+}
+
+function collection<T, Item = T>(options: {
+    fetch: (signal: AbortSignal) => Promise<readonly T[]>;
+    key: (raw: T) => string;
+    equals?: (a: T, b: T) => boolean;       // default: comparer.shallow (as JnanaList)
+    into?: (raw: T, prev: Item | undefined) => Item;
+}): Collection<T, Item>;
 ```
 
-This is the one genuinely new capability over `FetchStore` and it composes with everything
-else (a reactive query over a search-input observable *is* the type-ahead case `remoteData`
-was built for). Keep it opt-in: implicit refetching must never be the default in a package
-whose ethos is explicitness. Caveat to document: the tracked reads are the producer's
-synchronous prefix (same rule as any MobX reaction).
+Reconcile-on-refresh, mirroring `reconcileItems`: match new rows to existing items by `key`;
+unchanged rows (per `equals`) **keep their item instance untouched**; changed rows update the
+existing instance's observable fields **in place**, so only observers of that item re-render —
+that is the nested reactivity. Order comes from the fresh result. The array reference swaps only
+when membership/order/identity actually moved (the "don't churn on no-op recompute" rule).
 
-## 2. `mutation` — imperative operations with visible state
+- **`upsert` is in v1** (previously open — decided): it is the reconciler applied to one row, it
+  is cheap, and Jnana's sync layer will push single-item updates. Optimistic patches and
+  server-push updates go through the same two entry points (`patchItem`/`upsert`), so there is one
+  identity story.
+- **`into`** wraps rows in app classes with behavior, preserving instances across refreshes
+  (`into: (raw, prev) => prev ? prev.update(raw) : new SpaceRow(raw)`) — validated twice over by
+  `Chunks.ts`'s `itemTransform` and `JnanaList`'s item cache. Per-item UI state (expanded,
+  editing) lives on the item and survives refresh.
+- **Relation to `JnanaList`**: the list keeps its own `JnanaListItem` cache (visible tree rows are
+  a view concern — expansion, level, posinset), but its accessors read a collection's stable
+  items, so the two-layer identity churn collapses to one.
 
-The write-side half of `remoteData`'s `PublicState` (`isPending`, `buttonProps`), without
-the debounce entanglement:
+## 3. `pagedCollection` — pages are queries
+
+`Chunks.ts`'s lasting idea: the page, not the list, is the unit of load state. Its execution
+lacked race guards, error state, and refresh — but all of that is exactly what `query` already
+is. So the composition: **a paged collection is a collection whose fetch topology is an array of
+queries.** No third state machine; per-page phase, stale-on-refresh, abort, and `SourceError` come
+for free:
+
+```ts
+interface PagedCollection<T, Item = T> {
+    readonly items: readonly Item[];                    // reconciled concat of loaded pages
+    readonly pages: ReadonlyArray<Query<readonly T[]>>; // per-page phase / error / refresh
+    readonly hasMore: boolean;                          // derived: an unloaded tail page exists
+    loadMore(): Promise<void>;                          // tail page .load()
+    refresh(): Promise<void>;                           // re-fetch loaded pages, re-anchoring
+    reset(): void;
+    source(): Source<PagedCollection<T, Item>>;
+}
+
+function pagedCollection<T, C = string>(options: {
+    fetchPage: (cursor: C | null, signal: AbortSignal)
+        => Promise<{ items: readonly T[]; nextCursor: C | null }>;
+    key: (raw: T) => string;
+    equals?: (a: T, b: T) => boolean;
+    into?: (raw: T, prev: Item | undefined) => Item;
+}): PagedCollection<T>;
+```
+
+- **One identity map under all pages** — pages own fetch topology; the collection reconciler owns
+  item identity. A page refresh updates items in place; an item appearing on a different page
+  after refresh keeps its instance.
+- **Structural has-more** (from `Chunks.ts`): a `nextCursor` in a page result materializes an
+  unloaded tail page; `hasMore` derives from its existence. The tail page's `loading` phase *is*
+  the load-more spinner row; a failed `loadMore()` is that page's `error` — an inline retry row
+  that doesn't poison the rest of the list.
+- **Page k anchors on page k−1**: each page's producer reads its predecessor's `nextCursor` at
+  fetch time. `refresh()` re-runs loaded pages sequentially, re-anchoring as it goes — depth,
+  scroll position, and item identities survive; the reconciler absorbs rows that moved across page
+  boundaries. Cursor drift under heavy concurrent mutation is real but bounded (each refreshed
+  page yields a fresh anchor for the next); a truncating `restart` variant is the fallback if
+  drift proves visible in practice (open question).
+- **Numbered pages and sparse random access are extensions, not a second implementation.** The
+  page array generalizes to an index-addressed sparse array (placeholder pages for a known
+  `total`, skeleton rows, load-on-scroll), and `Chunks.ts`'s cursor-anchor + relative-offset
+  technique — fetch `{ after: nearestLoadedAnchor, offset: target − anchorPosition }`, pure-offset
+  as the anchor-zero special case — is the recorded addressing scheme for random access over
+  cursor APIs. Not v1; the admin tables' visible need is load-more.
+- **Reactive filter params invalidate cursors**: a filter change can't re-anchor. A reactive
+  paged collection resets to the first page on tracked-param change (open question on the exact
+  contract).
+
+## 4. `mutation` — imperative operations with visible state
+
+The write half of `remoteData` without the debounce entanglement, plus the optimistic choreography
+`SpacesListStore` hand-rolls per method:
 
 ```ts
 interface Mutation<Args extends unknown[], R> {
@@ -100,133 +233,172 @@ interface Mutation<Args extends unknown[], R> {
     readonly error: SourceError | null;
 }
 
+function mutation<Args extends unknown[], R>(
+    perform: (...args: Args) => Promise<R>,
+    options?: {
+        optimistic?: (...args: Args) => void;     // applied synchronously before the request
+        refreshes?: () => ReadonlyArray<{ refresh(): Promise<void> }>;
+        onError?: 'refresh' | ((...args: Args) => void);   // default 'refresh'
+    },
+): Mutation<Args, R>;
+
 const rename = mutation(
     async (spaceId: UuidString, title: string) => {
         const res = await apiClient.spaces[':spaceId'].$patch({ param: { spaceId }, json: { title } });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
     },
-    { refreshes: () => [spacesQuery] },     // settle → refresh (not load: stale data stays up)
+    {
+        optimistic: (spaceId, title) => spaces.patchItem(spaceId, (s) => ({ ...s, title })),
+        refreshes: () => [spaces],
+    },
 );
 ```
 
-- `refreshes` declares the read-side dependents — replacing the `await this.load()` calls
-  sprinkled through `SpacesListStore` — and runs **refresh**, so lists don't blank.
-- `buttonProps`-style helpers (`disabled` while pending) can ship as a tiny adapter rather
-  than living on the primitive; the delayed-indication half is again the UI's business.
+- **`refreshes` declares the read-side dependents** — replacing the `await this.load()` calls
+  sprinkled through `SpacesListStore` — and runs **refresh**, so lists show stale content instead
+  of blanking.
+- **`onError: 'refresh'`** (re-fetch truth from the `refreshes` list) is the honest default for
+  shared data — it is what Jnana already does and needs no inverse-patch bookkeeping. A callback
+  is the escape hatch for offline-ish flows that must roll back locally.
+- The error normalizes to `SourceError` and the call still **rethrows**, so callers (a form's
+  submit, see §5) can react; `mutation.error` exists for UI that watches the operation itself
+  (a toolbar button's error badge). `buttonProps`-style helpers stay a tiny UI adapter, not
+  primitive surface; the delayed-indication half is the mandala's.
+- Concurrency: calls run independently; `isPending` is true while any is in flight. Coalescing /
+  serialization (the legacy debounce-for-writes) waits for a real need (open question).
 
-## 3. Optimistic changes — three options
+## 5. `form` and `field` — staged edits
 
-The Jnana pattern (`SpacesListStore.rename`): patch the local array in place, fire the
-request, on failure re-fetch and rethrow. The old `ActiveData` pattern: a `draft` overlay
-deep-merged over `originalData` via property magic.
-
-- **Option A — patch + recover on the owning primitive (recommended).** Optimism is a
-  property of a *mutation against a collection/query*, expressed as a plain patch:
-
-  ```ts
-  const rename = mutation(renameRequest, {
-      optimistic: (spaceId: UuidString, title: string) =>
-          spaces.patchItem(spaceId, (s) => ({ ...s, title })),   // applied immediately
-      onError: 'refresh',                                        // or a rollback fn
-  });
-  ```
-
-  `onError: 'refresh'` (re-fetch truth) is the honest default for shared data — it is what
-  Jnana already does, and it needs no inverse-patch bookkeeping. A `rollback` callback is
-  the escape hatch for offline-ish flows. Simple, typeable, and the patch reuses the same
-  `patchItem` used for server-push updates.
-
-- **Option B — draft overlay (`ActiveData` modernized).** Keep server truth and local
-  edits separate (`value` = merge(original, draft); `commit()`/`revert()`). Assessment:
-  the *idea* is right for **forms** (edit screens with cancel), but `ActiveData`'s
-  execution — `defineProperty` getters over a deep merge, `__dataType` type gymnastics,
-  the documented deep-merge ambiguity — should not be ported. If the form need returns, a
-  small explicit `draft(entity)` helper (no property magic, field-level boxes) is the
-  shape. **Not in v1.**
-
-- **Option C — leave optimism to app code.** Always possible since data is instance-owned
-  (mutate the observable, catch, refresh). Rejected as the *design*: the try/catch/refresh
-  choreography is exactly the boilerplate worth owning, and Option A is small.
-
-## 4. `collection` — keyed items, reconciliation, nested reactivity
-
-The generalization of `JnanaList.reconcileItems` — the requirement bundle "keeping state
-after refreshes" + "nested reactivity". The problem: a refresh returns fresh JSON; naive
-replacement (`this.data = result`) destroys object identity, so row components re-render
-wholesale, memoized item wrappers rebuild, selection/DnD/refs churn. `JnanaList` solves it
-at the view layer (keyed item cache + `nodesEqual`); the *data* layer should solve it once,
-underneath every view:
+The distillation of omni-admin's `forms.ts` (instance-owned field boxes — right) and `ActiveData`
+(baseline + draft — right idea, wrong machinery). One generic field, no widget-class taxonomy, no
+deep merge, no property magic: **the form is the draft** — fields enumerate the edited set
+explicitly, the baseline lives per field, dirty is a comparison, not an overlay.
 
 ```ts
-interface Collection<T, Item = T> {
-    readonly items: readonly Item[];        // stable identities across refreshes
-    readonly query: Query<readonly T[]>;    // the underlying fetch (phase/refresh/reset)
-    patchItem(key: string, patch: (item: Item) => void | Item): void;  // optimistic edits
-    insert(raw: T, at?: number): void;
-    remove(key: string): void;
-    getByKey(key: string): Item | undefined;
-    source(): Source<Collection<T, Item>>;
+type Validator<T> = (value: T) => string | undefined;
+// shipped validator kit: required(msg?), minLength(n), maxLength(n), min(n), max(n), pattern(re, msg?)
+
+interface Field<T> {
+    value: T;                            // observable, widget-facing
+    setValue(value: T): void;            // action; re-validates if currently invalid
+    readonly errors: readonly string[];
+    readonly isInvalid: boolean;
+    readonly isDirty: boolean;           // vs baseline (default Object.is; equals option)
+    validate(): boolean;
+    reset(): void;                       // back to baseline
+    readonly props: {                    // React Aria Components-shaped
+        value: T;
+        onChange: (value: T) => void;
+        isInvalid: boolean;
+        errorMessage: string | undefined;
+    };
 }
 
-function collection<T>(options: {
-    fetch: (signal: AbortSignal) => Promise<readonly T[]>;
-    key: (raw: T) => string;
-    equals?: (a: T, b: T) => boolean;       // default: comparer.shallow (as JnanaList)
-}): Collection<T>;
+function field<T>(initial: T, options?: {
+    validate?: Validator<T> | readonly Validator<T>[];
+    equals?: (a: T, b: T) => boolean;
+}): Field<T>;
+
+interface Form<F extends Record<string, Field<any>>> {
+    readonly fields: F;
+    readonly values: { [K in keyof F]: F[K] extends Field<infer T> ? T : never };
+    readonly isDirty: boolean;           // any field dirty
+    readonly isSubmitting: boolean;
+    readonly error: SourceError | null;  // form-level (non-field) submit error
+    validate(): boolean;
+    reset(): void;                       // all fields to baseline; clears errors
+    commit(): void;                      // baseline = current values (after a successful save)
+    submit(handler: (values: Values<F>) => Promise<void>): () => Promise<void>;
+}
+
+function form<F extends Record<string, Field<any>>>(fields: F): Form<F>;
 ```
 
-Reconcile-on-refresh, mirroring `reconcileItems`: match new rows to existing items by
-`key`; unchanged (per `equals`) rows **keep their item instance untouched**; changed rows
-update the existing instance's observable fields **in place** (not replaced), so only
-observers of that item re-render — that is the nested reactivity. Order comes from the
-fresh result. The array reference swaps only when membership/order/identity changed (the
-same "don't churn on no-op recompute" rule `reconcileItems` applies).
+Decisions:
 
-**Item shape options:**
+- **One generic `field<T>`, zero widget subclasses.** The legacy class-per-widget taxonomy and its
+  hand-maintained conditional-type dispatch existed to fake per-field value types; a single
+  generic makes the `values` inference real and free. Widget kind is the component's business.
+- **The `value`/`validatedValue` split dissolves into the widget layer.** It was the right 2023
+  instinct for raw DOM inputs; with React Aria Components the widgets already speak domain types
+  (`NumberField` takes a `number` and owns the text buffer, `DatePicker` takes a date value), so
+  the field stores one type and `props` binds directly. A `parse`/`format` option is the recorded
+  v2 escape hatch if a raw-input case returns.
+- **Explicit validators, no implicit rules.** Required-by-default is gone (it was invisible magic,
+  and its truthiness rules conflated "required" with "must accept" for booleans). `validate:
+  required()` says what it does; the kit stays tiny and a validator is just a function.
+- **One validation-timing policy, no configuration**: validate on submit; a field that currently
+  has errors re-validates on every change, so errors disappear the moment the input becomes valid
+  (the legacy clear-on-change default, made honest — it re-checks instead of blindly clearing).
+  Touched/blur-based flows are out of v1.
+- **Baseline semantics distilled from `ActiveData`**: `field(space.title)` — building a form from
+  an entity *is* the draft; `isDirty` compares against baseline, `reset()` is cancel, `commit()`
+  re-baselines. `submit` commits automatically on success (the baseline tracks saved truth); a
+  handler that needs different behavior owns it explicitly.
+- **`submit` is the seam with `mutation`**: it validates (aborts if invalid), sets `isSubmitting`,
+  runs the handler (which typically awaits one or more mutations), and maps failures: a thrown
+  `FormError` (package-provided, carrying `{ fieldErrors?: Record<string, string>; message? }`)
+  distributes onto matching fields; anything else lands on `form.error` as a `SourceError`. The
+  API layer decides where a 422's payload becomes a `FormError` — the package only defines the
+  shape.
 
-- v1: items are observable copies of the raw rows (fields made observable, updated in
-  place). Covers `SpacesListStore`, admin lists.
-- Optional `into`: wrap rows in app classes with behavior, preserving instances across
-  refreshes — `into: (raw, prev) => prev ? prev.update(raw) : new SpaceRow(raw)`. This is
-  the hook that lets per-item UI state (expanded, editing) live on the item and survive a
-  refresh.
+**React 19 — one thin bridge, no architectural adoption.** The function `submit()` returns is
+action-compatible: usable as `<form action={store.save}>` (RAC's `Form` accepts `action`), which
+removes `onSubmit`/`preventDefault` ceremony and makes `useFormStatus().pending` work for generic
+submit buttons — it agrees with `isSubmitting` by construction since the action's promise is ours.
+The rest of the React 19 form stack is deliberately not used: `useActionState` duplicates state
+the store owns; `useOptimistic` puts optimistic state inside React where other observers of a
+collection can't see it — it fights instance-owned data; uncontrolled inputs + auto-reset conflict
+with store-controlled fields (controlled fields make React's auto-reset a no-op, so the bridge is
+safe).
 
-**Relation to `JnanaList`:** the list keeps its own `JnanaListItem` cache (it reconciles
-*visible tree rows*, a view concern — expansion, level, posinset), but its accessors read a
-`collection`'s stable items, so the two-layer identity churn (data identity + row identity)
-collapses to one. `isValueEqual` defaults stop mattering when the values themselves are
-stable.
+**v1 boundary, drawn on purpose**: flat field records only — no nested/array fields, no schema
+DSL (a zod adapter is possible later; a validator is already just a function), no async
+validators, no focus management, no wizard state. Forms are cheap to build badly and expensive to
+build well; past this line lives TanStack Form with less testing.
 
-## 5. Pagination — build on `collection`, smallest honest API
+## 6. Optimism — two sides of one submit
 
-Two shapes exist; don't build both up front:
+The first revision weighed three options for "optimistic changes"; the resolution is that optimism
+is two different things on either side of a write, and each already has an owner:
 
-- **Load-more / infinite** (recommended first — it matches the visible Jnana need: admin
-  jobs' growing `limit` is a poor man's load-more). `pagedCollection({ fetchPage(cursor,
-  signal), key })` keeps one reconciled `items` array, appends pages, exposes
-  `loadMore()` / `hasMore` / `phase`. Refresh re-fetches from the first page and
-  reconciles — scroll position and item identities survive because reconciliation, not
-  replacement, is the primitive underneath.
-- **Numbered pages** (offset/limit with `total`, `goToPage(n)`) — a thin variant where
-  `items` is the current page; add when an actual table UI needs it.
+- **Before submit — staged edits (the form).** Local, private, cancellable. Nothing else observes
+  them; cancel is `reset()`. This is `ActiveData`'s draft idea in its right home (old Option B,
+  distilled).
+- **After submit — optimistic propagation (the mutation).** `optimistic:` patches the owning
+  collection synchronously, so every observer sees expected truth early; `onError: 'refresh'`
+  recovers actual truth (old Option A, kept).
 
-Both are conveniences over `query` + `collection`; if the composition isn't clean, that's
-feedback on the primitives, which is why pagination should be designed *after* the two of
-them stabilize.
+They meet at exactly one point: submit = validate → fire mutation (optimistic patch applies) → on
+success `commit()` / on failure `FormError` → fields, collections refresh. Each side stays small
+because the other exists. (Old Option C — leave it to app code — remains rejected: the
+try/catch/refresh choreography is exactly the boilerplate worth owning.)
 
-## 6. Scope/island integration — the seam with core
+## 7. Scope/island integration — the seam with core
 
-First load through the island; live updates through MobX; refresh through the store:
+First load through the island; live updates through MobX; refresh through the store; forms never
+touch the island (they are synchronous local state seeded from data the island already resolved):
 
 ```ts
-// The store graph owns the instance (instance-owned, sharable):
+// The store graph owns the instances (instance-owned, sharable):
 class SpacesManagementStore {
     spaces = collection({ fetch: (signal) => fetchSpaces(signal), key: (s) => s.spaceId });
+
     rename = mutation(renameRequest, {
         optimistic: (id: UuidString, title: string) =>
             this.spaces.patchItem(id, (s) => ({ ...s, title })),
-        onError: 'refresh',
+        refreshes: () => [this.spaces],
     });
+}
+
+// A dialog store stages edits against one item:
+class RenameDialogStore {
+    constructor(private store: SpacesManagementStore, space: SpaceListItem) {
+        this.form = form({ title: field(space.title, { validate: required() }) });
+        this.save = this.form.submit(async ({ title }) => {
+            await this.store.rename(space.spaceId, title);
+        });
+    }
 }
 
 // The route scope awaits first readiness; the resolved prop is the collection itself:
@@ -241,26 +413,38 @@ const SpacesPage = observer(({ spaces }: ScopeProps<typeof spacesScope>) => (
 ```
 
 Division of labor: the island covers `loading`/`error` for the **first** resolution (with
-`loadingDelayMs` for flicker); the collection's `refreshing` phase drives the **stale**
-presentation (directly as above, or via the island's `keepStale` once a scope-level
-`refresh()` exists — [improvements.md §1–2](./improvements.md)). `not-available` vs
-`failed` distinctions ride on `SourceError.code` end to end.
+`loadingDelayMs` for flicker); the primitives' phases drive everything after — `refreshing` for
+stale display (directly, or via the island's `keepStale` once it exists —
+[improvements.md §2](./improvements.md)), per-page phases for pagination rows, `isSubmitting` for
+buttons. `not-available` vs `failed` rides on `SourceError.code` end to end. Under SSR the
+primitives stay pending (a `Source` attaches in effects), which is correct — this package is for
+the interactive app, not the SSR path.
 
-This composition — island resolves once, store refreshes forever — is the design's load-
-bearing test: if replacing `FetchStore` in `SpacesPage`, `SpaceMembersPage`, and the admin
-pages doesn't get *shorter*, the primitives are wrong.
+**The load-bearing tests** — if these don't get *shorter*, the primitives are wrong:
 
-## 7. Disposition of the legacy layer
+- Replacing `FetchStore` in `SpacesPage`, `SpaceMembersPage`, and the admin pages (read side).
+- Replacing `JobsListStore`'s six stores + manual `load()` calls with reactive queries.
+- Rebuilding omni-admin's `AclUserModalStore` shape — which needed `FormStore` + `remoteData` +
+  `ActiveData` simultaneously — with `form` + `mutation` + `collection` (write side).
+
+## 8. Disposition of the legacy layers
 
 | Legacy piece | Fate |
 | --- | --- |
-| `remoteData` debounce (coalesced promises) | `query`/`mutation` `debounce` option |
+| `remoteData` debounce (coalesced promises) | `query` `debounce` option |
 | `remoteData` race guard | invariant inside `query` |
-| `remoteData` `indicatePendingAfterTimeoutMs` / `PublicState.buttonProps` | mandala `loadingDelayMs` / tiny UI adapter |
-| `ActiveData` / `ActiveApiData` draft overlay | not ported; revisit as explicit `draft()` if a form need returns |
+| `remoteData` `indicatePendingAfterTimeoutMs` / `buttonProps` | mandala `loadingDelayMs` / tiny UI adapter |
+| `ActiveData` / `ActiveApiData` draft overlay | distilled into `form` baseline (`isDirty`/`reset`/`commit`); merge/property magic not ported |
 | `apiUtils` (`remoteDataKey`, `responseKey`) | not ported (app-level response plucking) |
+| omni `forms.ts` field boxes + typed `values` | `field`/`form`, one generic, inference made real |
+| omni `forms.ts` widget-class taxonomy, stringly validation | not ported (validator kit; RAC-shaped `props`) |
+| omni `forms.ts` `value`/`validatedValue` split | dissolved into RAC widgets; `parse` recorded as v2 escape hatch |
+| omni `Chunks.ts` chunk model, per-chunk load state | `pagedCollection` pages-as-queries |
+| omni `Chunks.ts` structural has-more | `hasMore` derived from the unloaded tail page |
+| omni `Chunks.ts` cursor-anchor + offset addressing | recorded for the numbered/sparse extension (not v1) |
 | `observableSource` | stays as the bridge (in `rati/mobx`, or re-exported by the package) |
 | Jnana `FetchStore` | replaced by `query` (+ `collection` where the data is a list) |
+| Jnana `JnanaList.reconcileItems` | stays view-level; reads a `collection`'s stable items underneath |
 
 Once the package exists, `rati/mobx`'s `data/` re-exports are deleted; the entry keeps only
 `observableSource` (or is itself absorbed by the package — one fewer entry point, decide at
@@ -268,14 +452,18 @@ extraction time).
 
 ## Open questions
 
-- Package location: separate repo vs a workspace here (`packages/rati-data`). A workspace
-  keeps the `rati-dev` source-consumption trick working for Jnana.
-- Does `source()` yield the instance (as sketched — components observe it) or the raw
-  value `T` (island re-resolves per refresh)? The instance is the recommendation; yielding
-  `T` would drag every refresh through the island and fight the stale-display story.
-- `reactive: true` scheduling: reaction-per-query vs one shared scheduler; interaction
-  with `debounce`.
-- Should `collection` support server-pushed single-item updates (`upsert(raw)`) in v1?
-  Cheap to add, and Jnana's sync layer will want it.
-- Error retention on refresh failure: keep stale `data` + set `error` (recommended — the
-  mandala/staleness story needs both), or clear data (FetchStore keeps it today too).
+- Package location: separate repo vs a workspace here (`packages/rati-data`). A workspace keeps
+  the `rati-dev` source-consumption trick working for Jnana.
+- Entry layout: one entry, or a `rati-data/form` subpath so data-only consumers don't see forms.
+- `reactive: true` scheduling: reaction-per-query vs a shared scheduler; interaction with
+  `debounce`.
+- `pagedCollection.refresh()` drift: is sequential re-anchoring enough in practice, or does a
+  truncating `restart` variant need to exist from day one? And the exact contract when reactive
+  filter params change (cursors invalid → reset to first page).
+- `upsert` racing an in-flight refresh: ordering guarantee (apply-after-settle vs
+  last-write-wins on the reconciler).
+- Mutation coalescing/serialization option (the legacy write-debounce) — wait for a real need.
+- `FormError` field keys: `Record<string, string>` vs typed `keyof Values` (typed is nicer,
+  but the error is usually constructed far from the form's type).
+- Async validators (server-side uniqueness checks) — out of v1; the seam would be a validator
+  returning a promise plus a per-field pending flag. Wait for need.
