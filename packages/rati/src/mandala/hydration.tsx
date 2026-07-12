@@ -41,9 +41,10 @@ export type Hydration = {
     data?: HydrationData | undefined;
     /** Client: server-dehydrated live-source seeds (`source.ssr.hydrate` inputs). */
     seeds?: HydrationData | undefined;
-    /** Server: record a resolved value / live-source seed during the prerender pass. */
+    /** Server: record a resolved value / live-source seed during the prerender pass.
+     * `kind` defaults to 'value' — a collector predating seeds keeps working. */
     collect?:
-        | ((mandalaId: string, key: string, value: unknown, kind: 'value' | 'seed') => void)
+        | ((mandalaId: string, key: string, value: unknown, kind?: 'value' | 'seed') => void)
         | undefined;
 };
 
@@ -75,7 +76,7 @@ export function HydrationProvider({
  * The client passes them back through {@link HydrationProvider}.
  */
 export function createHydrationCollector(): {
-    collect: (mandalaId: string, key: string, value: unknown, kind: 'value' | 'seed') => void;
+    collect: (mandalaId: string, key: string, value: unknown, kind?: 'value' | 'seed') => void;
     data: HydrationData;
     seeds: HydrationData;
 } {
@@ -84,7 +85,7 @@ export function createHydrationCollector(): {
     return {
         data,
         seeds,
-        collect(mandalaId, key, value, kind) {
+        collect(mandalaId, key, value, kind = 'value') {
             ((kind === 'seed' ? seeds : data)[mandalaId] ??= {})[key] = value;
         },
     };
