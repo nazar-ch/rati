@@ -1776,6 +1776,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"fast-check@npm:^4.8.0":
+  version: 4.9.0
+  resolution: "fast-check@npm:4.9.0"
+  dependencies:
+    pure-rand: "npm:^8.0.0"
+  checksum: 10/b549435b29f7b60bc93cb2b19c194c35804bff15aaeb723bc94c65fef5b06fb2c3652bcd98379e3257d461cb61c40d2f4b0001fcb6b515f1085ebbcc6163d1e5
+  languageName: node
+  linkType: hard
+
 "fdir@npm:^6.5.0":
   version: 6.5.0
   resolution: "fdir@npm:6.5.0"
@@ -2787,6 +2796,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"pure-rand@npm:^8.0.0":
+  version: 8.4.2
+  resolution: "pure-rand@npm:8.4.2"
+  checksum: 10/6c118f0ef4e1d5856cc9085a172c2e3c9b2b5009c9437d96df55515585847cc4a5c4abcdc5c62692f352b3343b6eebd694c8ff609705a1d45cf524dc429e20d1
+  languageName: node
+  linkType: hard
+
 "rati@workspace:*, rati@workspace:packages/rati":
   version: 0.0.0-use.local
   resolution: "rati@workspace:packages/rati"
@@ -2800,6 +2816,7 @@ __metadata:
     "@types/babel__core": "npm:^7"
     "@types/react": "npm:^19.2.17"
     "@types/react-dom": "npm:~19.2.3"
+    fast-check: "npm:^4.8.0"
     jsdom: "npm:^29.1.0"
     mobx: "npm:^6.16.1"
     react: "npm:^19.2.7"
