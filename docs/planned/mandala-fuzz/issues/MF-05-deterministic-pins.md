@@ -1,4 +1,4 @@
-# MF-05 — deterministic pins: the nine gaps from the strategy doc
+# MF-05 — deterministic pins: the gaps enumerated in the strategy doc
 
 area: packages/rati/src/__tests__/mandala
 needs: —
@@ -7,21 +7,26 @@ disposition: —
 ## Problem
 
 The 13 tests that landed with selective refresh + SSR sources cover happy paths and headline
-behaviors; nine specific gaps are enumerated in
+behaviors; the specific gaps (twelve pins as of this writing) are enumerated in
 [mandala-testing.md](../../../research/mandala-testing.md) §"Deterministic pins" — races
 (superseded refresh, remount mid-flight), semantics (transitive cascade with mid-chain cutoff,
-lazy read-set re-recording, hydrated-cell asymmetry, `equals` on cascade re-runs), and SSR /
-StrictMode edges. These guard the code that exists *today* and are independent of the fuzz
-harness — they can land first or in parallel.
+lazy read-set re-recording, hydrated-cell asymmetry, `equals` on cascade re-runs), SSR /
+StrictMode edges, and the Suspense-produced situations (re-suspension of committed content,
+unmount-while-suspended, the mid-tree source-pending asymmetry) cataloged in
+`packages/rati/src/__tests__/suspense-situations.md` — read that catalog first; it names each
+pin's contract and its altitude boundary. These pins guard the code that exists *today* and are
+independent of the fuzz harness — they can land first or in parallel.
 
 ## Scope
 
-1. Implement the nine pins from the strategy doc (its numbered list is the specification; read
-   the implementation note
+1. Implement the pins from the strategy doc (its numbered list is the specification; read the
+   implementation note
    `docs/research/directions-2026-07/mandala-refresh-and-ssr-sources.md` for the behaviors each
-   pins). Homes: `__tests__/mandala/scopeControls.test.tsx` (1–6, 9),
+   pins). Homes: `__tests__/mandala/scopeControls.test.tsx` (1–6, 9, 11–12),
    `__tests__/mandala/islandSsrSources.test.tsx` (7), a new
-   `__tests__/mandala/strictModeLifecycle.test.tsx` if 8 doesn't fit an existing file.
+   `__tests__/mandala/strictModeLifecycle.test.tsx` if 8 doesn't fit an existing file, and a
+   new `__tests__/mandala/suspenseEdges.test.tsx` for 10 (hook-load re-suspension) if it
+   doesn't fit `island.test.tsx`.
 2. Each pin carries a **kill note** — a comment naming the one-line source mutation that makes
    it fail — executed once at authoring and reverted (jnana discipline; keeps MF-04's register
    focused on the fuzz harness).

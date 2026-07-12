@@ -18,7 +18,11 @@ catches and example tests miss — invariant 6 of
 
 1. Extend the harness's controllable sources with a per-instance ledger (attach/detach counts +
    order); assert after every command: no entry attached twice concurrently, no detached source
-   still feeding renders.
+   still feeding renders. Keep the S8 boundary from
+   `packages/rati/src/__tests__/suspense-situations.md`: when a mid-tree source drops to
+   pending, whether deeper levels' sources stay attached through the window is the engine's
+   choice — the ledger asserts bounds (no double attach, balanced at teardown), never the
+   churn-free behavior itself.
 2. At final unmount (the `finally` of every run): every attach matched by a detach — a leak fails
    the run even when all mid-run asserts passed.
 3. A `.provide()` spec variant: the provided value records build/dispose; assert

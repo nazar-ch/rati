@@ -24,10 +24,14 @@ source can tell — never the mechanism. Concretely:
 - The no-blank promise: a selective refresh never drops content that was on screen.
 - Convergence: after everything settles, rendered values equal what a from-scratch resolution of
   the current inputs would produce — no stale derived value survives quiesce.
-- Producer run counts as **upper bounds** ("ran at most once per initial + explicit refresh +
-  upstream change"), plus "no spontaneous run while idle". Never exact counts — an engine that
-  gets *lazier* must stay green; only one that gets *sloppier* (refetch loops, lost cascades) may
-  fail.
+- Producer run counts, measured against **generations**: the contract is "at most one run per
+  producer per inner-tree generation, plus modeled refresh re-runs" — a generation being each
+  remount-inducing event that reached the producer's level (initial mount, an input change, a
+  retry, a full refresh; StrictMode's dev double-mount counts as two). The smoke property's
+  "exactly 1" is the one-generation special case; MF-02's model carries
+  `runCount == generations + modeledReruns`. Plus "no spontaneous run while idle". Never raw
+  exact counts — an engine that gets *lazier* must stay green; only one that gets *sloppier*
+  (refetch loops, lost cascades, Suspense replays re-running loads) may fail.
 - Lifecycle accounting at the source boundary: attach/detach balanced by teardown, no double
   attach of a live entry, `.provide()` dispose before its sources detach (observable by
   instrumenting the source/value the app hands in — still contract, not internals).
@@ -69,9 +73,23 @@ behaviors. The known gaps, in rough priority order (each is a small, focused tes
    old lifecycle; the swap/sweep rework needs its own).
 9. **`data()` equals on cascade re-runs** — the per-load comparer gates cascaded re-runs of the
    dependent itself, not only direct refreshes.
+10. **Re-suspension of committed content** — a `hook()` load returning a fresh pending promise
+    hides committed content (Offscreen semantics) and cycles the subtree's effects; ledger stays
+    balanced through hide/reveal, no double attach, content returns on settle, data producers
+    don't re-run ([suspense-situations.md](../../packages/rati/src/__tests__/suspense-situations.md) S4).
+11. **Unmount while suspended** — late settles into a discarded tree are inert (no throw, no
+    log-noise, ledger balanced with never-attached sources at 0/0) (S5).
+12. **Mid-tree source pending** — a committed source dropping to pending unmounts the levels
+    below (unlike S4's hide); on recovery the cached cells render again **without producer
+    re-runs**. Assert the loose contract only — whether deeper sources stay attached through the
+    window is the engine's choice, not a promise (S8).
 
 Each pin lands with a **kill note** (jnana discipline): the one-line source mutation that must
-make it fail, executed once at authoring and reverted.
+make it fail, executed once at authoring and reverted. The Suspense-produced situations behind
+pins 10–12 (and the test-harness rules they imply — the async-act mount requirement above all)
+are cataloged in
+[suspense-situations.md](../../packages/rati/src/__tests__/suspense-situations.md)
+(`packages/rati/src/__tests__/`), which lives with the tests.
 
 ## The fuzz foundation — model-based testing over generated scopes
 

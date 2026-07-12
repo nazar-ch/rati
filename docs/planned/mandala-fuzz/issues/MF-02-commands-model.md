@@ -30,7 +30,11 @@ after every command, fast-check shrinks failures to a minimal command sequence.
    refresh, identity stability for `stable` payloads, run-count **upper bounds** + no idle runs,
    `pending` agreement at quiesce points.
 4. The quiesce tail: settle everything held, flush, assert convergence (rendered ≡ model
-   recomputation); unmount in `finally`.
+   recomputation); unmount in `finally`. A generated fraction of runs **skips the quiesce
+   tail** and unmounts mid-flight: late settles must be inert and the ledger must balance
+   with never-attached sources at 0/0 — situation S5 of
+   `packages/rati/src/__tests__/suspense-situations.md` (read that catalog before writing
+   the commands; S2's async-act mount rule applies to every command's `act` usage).
 5. **Non-vacuity:** the sequence arbitrary guarantees ≥1 `refresh` of a `fresh` key (or the case
    is discarded via precondition), and a suite-level counter asserts refresh-with-change actually
    occurred across the run set.
