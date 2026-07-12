@@ -1,8 +1,8 @@
 # rati — internals
 
-Implementation notes for contributors. For the public API see
-[design-and-usage.md](./design-and-usage.md); for future-facing explorations see
-[research/](./research/).
+Implementation notes for contributors. The public API lives in
+[docs/public/](./public/guide.md) (the guide + [reference](./public/reference.md) — the
+website's source of truth); future-facing explorations are in [research/](./research/).
 
 ## Source layout
 
@@ -11,15 +11,18 @@ src/
   mandala/   the core renderable unit (the shared engine under island & route)
     mandala.tsx     createMandala() + MandalaConfig / MandalaComponent
     resolver.tsx    the scope → Step-tree waterfall (Step, Leaf, ProvideLeaf, buildTree)
+    refresh.ts      the cell model + RefreshController (selective refresh)
+    controls.ts     the controls channel + useScopeControls
     channel.ts      the value channel + useScope / useOptionalScope / useScopeRead
     boundary.tsx    the error boundary
-    hydration.tsx   SSR promise dehydration
+    hydration.tsx   SSR dehydration (values + live-source seeds)
+    ssrSource.ts    firstSettle — the server-side promise face of SSR-marked sources
   island/    island.ts — public island() wrapper + Island* / Hydration* aliases
   router/    route.tsx (route() + route/param types), store.ts (RouterStore),
              Router, Link, Navigate, useRouteContext, prepareRoute, history,
              scrollRestoration, lazy
-  scope/     scope.ts (scope/input/load/provide/hook + scope types), source.ts
-  data/      remoteData, apiUtils, ActiveData (REST/data helpers)
+  scope/     scope.ts (scope/input/load/provide/hook/data + scope types), source.ts
+  data/      remoteData, apiUtils, ActiveData (legacy REST/data helpers)
   stores/    RootStore, GlobalStore (store roots)
   util/      utils.ts
   types/     generic.ts
@@ -53,15 +56,19 @@ to its subtree, and owns the data lifecycle. That shared abstraction is the **ma
   a **data load** built once and cached. The Step runs all hook loads first, then resolves
   the data cells (`use(promise)`, source snapshot reads), so an early "pending" return is
   hook-order safe.
+- **Cells** (the model lives in `refresh.ts`): one per data key —
+  `value | promise | source` plus the refresh bookkeeping (read-set, `rerunnable`,
+  `equals`, `dirty`, the `refreshing` token, the `lastValue` stale baseline). Function and
+  class producers run against a read-tracking `Proxy` of the prior levels' values
+  (`trackReads`); the recorded read-set is what a selective refresh cascades along.
 - **Loading = Suspense + slot.** A pending *promise* suspends (the `<Suspense>` fallback is
   the loading slot); a pending *source* sets a pending flag → the loading slot.
 - **Errors = the boundary.** A rejected promise (`use()`) or a thrown source error reaches
   `MandalaErrorBoundary` → the `error` slot (switch on `error.code`), or rethrows to the
   nearest outer boundary when there's no slot.
 - **Live values = `useSyncExternalStore`.** Each Step subscribes to its level's sources
-  through one `useSyncExternalStore`; a ready `Source<T>` whose value updates flows to the
-  component reactively — only a *phase* change swaps slots. (Hook sources own their own
-  subscription.)
+  through one `useSyncExternalStore`, re-keyed when a cascade swaps a source (the level's
+  `sources` array is replaced). (Hook sources own their own subscription.)
 
 ### The bucket cache lives on the mandala's committed ref
 
@@ -69,25 +76,63 @@ A level's data cells (and its source list) are built once into a `Bucket` held o
 mandala component's `useRef` — **not** on the Step's fiber. A Step that `use()`s a pending
 promise suspends, and React discards the suspended render's fiber; a Step-local cell would be
 rebuilt on the retry, re-run its load, and re-suspend on a brand-new promise forever. Holding
-the bucket on the committed mandala ref makes the load run once. The bucket array is rebuilt
-only when the inner tree remounts (`treeKey` = inputs version + retry counter).
+the bucket on the committed mandala ref makes the load run once per inner-tree generation.
+The bucket array is rebuilt only when the inner tree remounts (`treeKey` = inputs version +
+retry counter). The full catalog of Suspense-produced situations this design answers is
+[suspense-situations.md](../packages/rati/src/__tests__/suspense-situations.md)
+(`packages/rati/src/__tests__/`).
 
 ### Lifecycle & teardown ordering (structural)
 
-The dispose-before-detach ordering that used to be hand-coded now falls out of React's
-effect phases:
-
-- A `Step` attaches its level's **data** sources in a **passive** effect, detaches on unmount.
-- The `.provide()` value (at the `Leaf`, the innermost level) is built and disposed
-  (`[Symbol.dispose]`) in a **layout** effect.
-- On unmount React flushes **all layout cleanups before any passive cleanup**, and unmounts
-  **children before parents** → the leaf's provided value disposes *before* the sources it was
-  built over detach. A store built over a grabbed resource is torn down while that grab is
-  still live.
+- A `Step` **attaches** its level's data sources in a **layout** effect — pre-paint, so a
+  synchronously-ready source flips to content in the same frame instead of flashing the
+  loading slot for one pass.
+- The **detach** side is a **passive** effect's cleanup, and it is swap-aware: it releases
+  entries the *live* bucket no longer holds (a cascade swapped the source out) and
+  everything when the bucket itself is stale (an inner-tree remount); entries the live
+  bucket still holds stay attached (a cleanup can't tell a deps-change from an unmount).
+  The mandala's own unmount cleanup runs a **sweep** over the buckets as the backstop, so
+  island teardown releases whatever is still attached.
+- The `.provide()` value (at the `Leaf`) is built and disposed (`[Symbol.dispose]`) in a
+  **layout** effect. On unmount React flushes **all layout cleanups before any passive
+  cleanup**, and unmounts **children before parents** → the leaf's provided value disposes
+  *before* the sources it was built over detach — the dispose-before-detach order, preserved
+  through the sweep (a passive cleanup) by the same phase rule.
 
 An inputs change (by value) bumps `treeKey`, remounting the inner tree under a `<Fragment
 key>`: React tears the old run down (children-first) and resolves the new inputs from scratch;
 same-inputs source transitions re-render in place, keeping promise/source identity.
+
+## Selective refresh (`mandala/refresh.ts` + `controls.ts`)
+
+`useScopeControls(scope)` reads a per-mandala-instance `RefreshController` off the
+**controls channel** — a second scope-keyed context registry next to the value channel,
+provided by the mandala around its whole inner tree. Design + decisions:
+[research/directions-2026-07/mandala-refresh-and-ssr-sources.md](./research/directions-2026-07/mandala-refresh-and-ssr-sources.md).
+The moving parts:
+
+- **Re-runs happen in render.** `refresh(key)` marks the cell dirty and triggers a bare
+  re-render; the Step's dirty pass (`processDirtyCells`) re-runs the producer where `prev`
+  naturally lives — with current upstream values, including values a cascade swapped in the
+  same pass (levels render top-down).
+- **Stale-while-refetch, no Suspense re-entry.** The old value keeps rendering while the
+  re-fetch is in flight (`lastValue` on the cell); on a *changed* settle the cell becomes a
+  **value cell**, so the new value renders synchronously — `use()` never sees a fresh
+  promise (which would suspend once even when settled) and the loading slot never flashes.
+- **The equals gate.** `deepEqual` by default (reference fast path), per-load override via
+  `data(fn, { equals })`. Equal → old value and identity kept, nothing downstream moves.
+- **Cascade by read-sets.** A changed key marks dirty every later-level cell whose recorded
+  reads contain it; promise re-runs settle through the controller (latest-token wins),
+  sync value re-runs gate-and-swap in the same render pass, and a dependent *source*
+  re-creation replaces the level's `sources` array (re-keying the Step's effects and uSES
+  subscription) with the pre-swap value bridging the new source's pending window.
+- **`.provide()` participates**: the factory's reads are tracked too; a changed consumed key
+  bumps a version that re-keys the build/dispose layout effect.
+- **The controller's stores.** `pending` (the keys in flight) is a uSES-shaped external
+  store; notifications are microtask-deferred because bookkeeping mutates during render.
+  Waiters resolve when their key settles; a remount (`treeCommitted`) settles everything
+  wholesale. Refresh failures keep the previous value, log, and resolve (fire-and-forget
+  callers must not trip unhandled rejections).
 
 ## The value channel (`mandala/channel.ts`)
 
@@ -107,6 +152,9 @@ identity**, not the component's:
   both; `useOptionalScope` returns `undefined` on `no-provider` and throws on `no-island`;
   `useRouteContext` reuses it with route-name messages. A per-scope label (the mandala's
   `displayName`) and the scope's load keys identify the scope in the message.
+- The **controls channel** (`controls.ts`) mirrors the same registry pattern for
+  `useScopeControls`, carrying the instance's `RefreshController` instead of the provided
+  value.
 
 ## Sources (`scope/source.ts`)
 
@@ -117,22 +165,30 @@ underlying work and returns a detach function. The unified `SourceError` collaps
 not-available / forbidden / failed into one shape with a machine-readable `code`. CRDT
 resources, REST loaders and promises all implement the interface, so the resolver is
 source-agnostic. `readySource` / `promiseSource` / `toSource` are the adapters; `toSourceError`
-normalizes thrown reasons.
+normalizes thrown reasons. The optional `ssr` marker (`SourceSSR<T>`) declares a source
+server-resolvable — see the next section.
 
-## SSR dehydration (`mandala/hydration.tsx`)
+## SSR dehydration (`mandala/hydration.tsx` + `ssrSource.ts`)
 
-Promise loads resolved on the server are carried to the client through a small,
-framework-owned registry, keyed `mandalaId (useId) → scopeKey → value`:
+Values resolved on the server are carried to the client through a small, framework-owned
+registry, keyed `mandalaId (useId) → scopeKey → value`, in two wire sections:
 
-- **Server.** Under `react-dom/static` `prerender`, each `Step` that unwraps a promise with
-  `use()` calls `collect(...)`. `useId()` is stable by tree position across server/client.
-- **Client.** `HydrationProvider data={…}` feeds the registry back; on first mount a
-  Step short-circuits a dehydrated key to a value cell — skipping the load (no re-fetch) and
-  `use()` (no re-suspend) — so hydration renders the server HTML synchronously.
-- Only *promises* are serialized; *sources* stay pending under SSR and resolve on the client.
-  The mechanism is router-orthogonal (a route is just a mandala), so route SSR and standalone
-  island SSR participate the same way. Public exports are the `Hydration*` aliases in
-  `island/island.ts`.
+- **`data` — plain values.** Promise loads, plus `ssr: true` **loader sources**: on the
+  server the resolver wraps a marked source's first settle into a promise (`firstSettle` —
+  attach during render, subscribe until non-pending, detach; exactly what the marker
+  authorizes) and pushes it through the ordinary `use()`/collect path. On the client a
+  `data` key short-circuits to a value cell — the load (or loader source) never runs.
+- **`seeds` — live-source seeds.** An `ssr: { hydrate, dehydrate? }` source dehydrates
+  `dehydrate(value)` into `seeds`; the client creates the source as usual and calls
+  `hydrate(data)` **before** attach, so its first snapshot is already ready — no pending
+  gap, no double fetch, live afterward.
+- Server resolution of marked sources is **gated on the collector being present**: resolving
+  without dehydration would hand the client ready HTML over a pending source — a guaranteed
+  hydration mismatch. Unmarked sources stay pending under SSR (fallback ships in the HTML).
+- `useId()` is stable by tree position across server/client; `collect(mandalaId, key,
+  value, kind?)` defaults `kind` to `'value'` (a pre-seeds collector signature keeps
+  working). The mechanism is router-orthogonal (a route is just a mandala); public exports
+  are the `Hydration*` names re-exported through `rati/ssr`.
 
 The routing snapshot is separate: `prepareRoute(router)` (`router/prepareRoute.ts`) drives a
 memory-history router to its matched route and returns `RouterHydratedState`; the client
@@ -165,6 +221,20 @@ change. `route()`
 - `useScope` keys on **scope object identity**; reusing one scope across two mandalas
   collapses them onto one channel (nearest wins). Give distinct scopes when two same-scope
   islands must be read independently from overlapping subtrees.
+- A data producer runs **at most once per inner-tree generation** (Suspense replays and
+  render discards never re-run it), plus explicitly modeled refresh re-runs — the contract
+  the fuzz suite's run-count invariant pins
+  ([research/mandala-testing.md](./research/mandala-testing.md)).
+
+## Testing
+
+Suites live in `packages/rati/src/__tests__/` (deterministic `mandala/`, `router/`, `scope/`
+plus the randomized `fuzz/`). The testing strategy — the contract-altitude rule, the
+deterministic pin list, the fuzz harness design — is
+[research/mandala-testing.md](./research/mandala-testing.md); the execution effort is
+[planned/mandala-fuzz/](./planned/mandala-fuzz/README.md). Suspense-facing testing rules
+(the async-act mount requirement above all) are cataloged in
+`packages/rati/src/__tests__/suspense-situations.md`.
 
 ## Toolchain
 

@@ -65,18 +65,38 @@ React hook. Use it for dependency injection (`hook(() => useStores())`) and for 
 hook-based data libraries. `fn` receives the resolved props so far. A `hook()` load owns
 its own subscription lifecycle; rati never attaches or detaches it.
 
+### `data(fn, options?)`
+
+Marks a function load with per-load options — the counterpart of `hook()`: `hook` says how
+a load runs, `data` says what it is (a cached data load) and configures it. A bare function
+load behaves exactly like `data(fn)` with no options.
+
+```ts
+scope().load({
+    members: data(({ spaceId }) => api.members.list(spaceId), {
+        equals: (a, b) => a.etag === b.etag,   // the refresh gate — see useScopeControls
+    }),
+});
+```
+
+`options.equals(previous, next)` gates `refresh(key)`: an equal re-fetch keeps the old
+value (and identity) and stops the downstream cascade. Defaults to deep equality; provide
+a cheaper discriminator for large payloads. Types: `DataLoad`, `DataLoadOptions`.
+
 ### Scope types
 
 ```ts
 type Props   = ScopeProps<typeof s>;      // resolved props (Source<T> unwraps to T)
 type Inputs  = ScopeInputs<typeof s>;     // the input() head
+type Keys    = ScopeLoadKeys<typeof s>;   // load keys (Props minus Inputs) — refresh(key)'s type
 type Value   = ScopeProvidesOf<typeof s>; // what useScope(s) returns
 const C: ScopeComponent<typeof s> = …;    // component typed to the resolved props
 ```
 
-Also exported: `Scope`, `ChainableScope`, `Input`, `HookLoad`, `ScopeProvideDef`, and the
-symbols `InputSymbol` / `ScopeSymbol` / `ScopeDefinitionsSymbol` / `ScopeProvidesSymbol`
-(advanced: identity checks and library-level introspection).
+Also exported: `Scope`, `ChainableScope`, `Input`, `HookLoad`, `DataLoad`,
+`DataLoadOptions`, `ScopeProvideDef`, and the symbols `InputSymbol` / `ScopeSymbol` /
+`ScopeDefinitionsSymbol` / `ScopeProvidesSymbol` (advanced: identity checks and
+library-level introspection).
 
 ---
 
@@ -107,6 +127,35 @@ resolved props. `useScope` throws outside such an island; `useOptionalScope` ret
 `undefined`. Islands built from the same scope share one channel; a reader gets the
 nearest one (React context semantics).
 
+### `useScopeControls(scope)`
+
+The nearest island's imperative controls, keyed by the scope like `useScope` (throws
+outside the island's subtree):
+
+```ts
+const { refresh, pending } = useScopeControls(stationScope);
+
+refresh(): Promise<void>;                      // whole scope — the retry mechanism
+refresh(key: ScopeLoadKeys<S>): Promise<void>; // one load, surgically
+pending: ReadonlySet<ScopeLoadKeys<S>>;        // keys currently re-fetching
+```
+
+`refresh()` with no key re-resolves everything (the loading slot shows again, same as the
+error slot's `retry`). `refresh(key)`:
+
+- re-runs that load with the current upstream values; the previous value **stays
+  rendered** while the re-fetch is in flight — no loading slot, no blank;
+- gates the result: an unchanged value (per the load's `equals` — deep by default, see
+  `data()`) keeps the old value and identity and stops there;
+- a changed value re-runs exactly the downstream loads whose producers read the key
+  (recorded at run time), cascading by the same rules;
+- targets **promise loads only** — sources are live and refresh themselves; hook loads run
+  every render; static entries have no producer (each warns and no-ops);
+- resolves when the key settles (its cascade may still be in flight — watch `pending`);
+  a failed re-fetch keeps the previous value, logs, and still resolves.
+
+Type: `ScopeControls<S>`.
+
 ---
 
 ## Sources
@@ -120,6 +169,7 @@ interface Source<T> {
     subscribe(onChange: () => void): () => void;
     getSnapshot(): SourceState<T>;    // must be reference-stable while unchanged
     attach(): () => void;             // start the work; returns a detach function
+    readonly ssr?: SourceSSR<T>;      // opt-in server resolution — see below
 }
 
 type SourceState<T> =
@@ -131,17 +181,46 @@ type SourceState<T> =
 | Export | Purpose |
 | --- | --- |
 | `readySource(value)` | a source that is already ready |
-| `promiseSource(promise)` | pending until the promise settles |
+| `promiseSource(promise, { ssr }?)` | pending until the promise settles |
 | `toSource(x)` | lift a value / promise / source (idempotent on sources) |
 | `isSource(x)` | type guard |
 | `toSourceError(reason)` | map a thrown value to a `SourceError` |
 | `NotAvailableError` | throw/reject with it → `error.code === 'not-available'` |
 | `SourceError` | `{ code: 'not-available' | 'failed', … }` — switch on `code` in error slots |
+| `SourceSSR` | the `ssr` marker type |
 | `SourceSymbol` | the brand symbol |
 
 Authoring rules: start the underlying work in `attach()` (not in the constructor), return
 its cleanup; keep `getSnapshot()` stable between changes; call the `subscribe` listeners
-after each state change. Under SSR a source stays pending (no effects run on the server).
+after each state change.
+
+### SSR-capable sources — the `ssr` marker
+
+By default a source stays pending under SSR (no effects run on the server). The marker
+authorizes the server to attach it *during render*, wait for its first settle through
+React's own Suspense mechanics, and dehydrate the result. One rule, two shapes:
+
+```ts
+type SourceSSR<T> =
+    | true                                    // a loader: promise semantics end to end
+    | {
+          dehydrate?: (value: T) => unknown;  // serialize for the wire (default: the value)
+          hydrate: (data: unknown) => void;   // client: seed the store, before attach()
+      };
+```
+
+- **`ssr: true`** — for loader-shaped sources whose ready value is JSON-safe. Dehydrates
+  as a plain value; the client hydrates the key to that value and never creates or
+  attaches the source.
+- **`ssr: { hydrate, dehydrate? }`** — for live sources that can be seeded. The server
+  ships `dehydrate(value)` in the *seeds* payload; the client creates the source as usual
+  and calls `hydrate(data)` before attaching, so its first snapshot is already ready —
+  no pending gap, no double fetch, fully live afterward.
+
+The marker is a promise of conduct: `attach()` is server-safe and the machine settles in a
+reasonable time (a hung source hangs the prerender, same as a hung promise load). Server
+resolution engages only under a `HydrationProvider` with a collector — resolving without
+dehydration would mismatch on the client.
 
 ---
 
@@ -190,7 +269,7 @@ new RouterStore(routes, options?);
 
 interface RouterStoreOptions {
     history?: History;                                   // default: browser history
-    basename?: string;                                   // mount prefix, e.g. '/admin'
+    basename?: string;                                   // mount prefix ('/admin'): stripped before matching, prepended to hrefs
     scrollRestoration?: false | ScrollRestorationOptions; // default: scroll-to-top on navigation
     hydratedState?: RouterHydratedState;                 // seed from a server render
 }
@@ -274,18 +353,20 @@ it on both sides so the trees match.)
 | Export | Purpose |
 | --- | --- |
 | `prepareRoute(router)` | drive a memory-history router to its matched route (preloading a lazy component); returns `{ hydratedState }` or `null` when nothing matched |
-| `createHydrationCollector()` | `{ collect, data }` — records islands' resolved promise values during `prerender` |
-| `HydrationProvider` | server: `collect={collector.collect}`; client: `data={islandData}` — islands then hydrate without re-running loads |
+| `createHydrationCollector()` | `{ collect, data, seeds }` — records islands' resolved values (and live-source seeds) during `prerender` |
+| `HydrationProvider` | server: `collect={collector.collect}`; client: `data={islandData}` `seeds={islandSeeds}` — islands then hydrate without re-running loads |
 | `Hydration`, `HydrationData`, `PreparedRoute`, `RouterHydratedState` | the payload types |
 
 The flow (see the guide's [Server rendering](./guide.md#server-rendering)): fresh
 `RouterStore` (memory history) + collector per request → `prepareRoute` →
 `prerender` from `react-dom/static` (it awaits Suspense; `renderToString` cannot) → embed
-`hydratedState` + `collector.data` in the HTML → the client seeds its `RouterStore` and
-`HydrationProvider` from them → `router.dispose()` on the server when done.
+`hydratedState` + `collector.data` + `collector.seeds` in the HTML → the client seeds its
+`RouterStore` and `HydrationProvider` from them → `router.dispose()` on the server when
+done.
 
-Only async load results are dehydrated; sources stay pending under SSR and come alive
-after hydration.
+Async load results and `ssr: true` sources dehydrate as values; `ssr: { hydrate }` sources
+dehydrate as seeds; unmarked sources stay pending under SSR and come alive after hydration
+(see [Sources §SSR-capable sources](#ssr-capable-sources--the-ssr-marker)).
 
 ---
 
@@ -296,7 +377,7 @@ MobX out of their bundle.
 
 | Export | Purpose |
 | --- | --- |
-| `observableSource(fn)` | adapt a MobX derivation to a `Source` — the bridge between MobX state and scope loads |
+| `observableSource(getState, attach?, { ssr }?)` | adapt a MobX derivation to a `Source` — the bridge between MobX state and scope loads; `ssr` forwards the [SSR marker](#ssr-capable-sources--the-ssr-marker) |
 
 The remaining exports (`ActiveData`, `ActiveApiData`, `remoteData`, `remoteDataKey`,
 `responseKey`) are a legacy data layer pending extraction to its own package; not

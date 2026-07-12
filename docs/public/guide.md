@@ -279,6 +279,51 @@ import { useRouteContext } from 'rati';
 const { station } = useRouteContext('station');
 ```
 
+## Refreshing
+
+Data goes stale: a mutation lands, the user hits "save", a panel wants fresher numbers. Any
+descendant of an island can re-resolve it — without tearing the screen down — through
+`useScopeControls`:
+
+```tsx
+import { useScopeControls } from 'rati';
+
+function MembersToolbar() {
+    const { refresh, pending } = useScopeControls(stationScope);
+
+    async function handleRemove(id: string) {
+        await api.members.remove(id);
+        await refresh('departures');          // re-run one load; the screen stays up
+    }
+
+    return <Toolbar busy={pending.has('departures')} onRemove={handleRemove} />;
+}
+```
+
+Two forms:
+
+- **`refresh()`** re-resolves the whole scope — the island goes back through its loading
+  slot, exactly like the error slot's `retry`.
+- **`refresh('departures')`** re-runs one load surgically. The previous data stays on
+  screen while the re-fetch is in flight (`pending` reports the keys, for dimming); when it
+  lands, downstream loads re-run **only if they read `departures` and its value actually
+  changed** — a re-fetch that returns equal data (compared deeply) keeps the old value and
+  identity, and nothing downstream moves. A failed re-fetch also keeps the previous data.
+
+Per-key refresh is for promise loads; sources are live and refresh themselves. For large
+payloads, tell rati what "changed" means instead of paying a deep compare — mark the load
+with `data()`:
+
+```ts
+import { data } from 'rati';
+
+scope().load({
+    departures: data(({ station }) => api.departures.list(station.id), {
+        equals: (a, b) => a.etag === b.etag,
+    }),
+});
+```
+
 ## Types, end to end
 
 You never write a prop type for loaded data — you read it off the scope:
@@ -316,7 +361,8 @@ and detaches on unmount, so the connection's lifetime is the screen's lifetime, 
 
 Writing a source is implementing three methods (`subscribe`, `getSnapshot`, `attach`) —
 see the [reference](./reference.md#sources). `readySource`, `promiseSource`, and
-`toSource` cover the common cases.
+`toSource` cover the common cases. A source that should resolve on the server too can opt
+in with its `ssr` marker — see [Server rendering](#server-rendering).
 
 ## `hook()` — context, and other data libraries
 
@@ -371,14 +417,14 @@ const { prelude } = await prerender(
         <App router={router} />
     </HydrationProvider>,
 );
-// embed prepared.hydratedState + collector.data in the HTML
+// embed prepared.hydratedState + collector.data + collector.seeds in the HTML
 ```
 
 ```tsx
 // client
 const router = new RouterStore(routes, { hydratedState });
 hydrateRoot(container,
-    <HydrationProvider data={islandData}>
+    <HydrationProvider data={islandData} seeds={islandSeeds}>
         <App router={router} />
     </HydrationProvider>,
 );
@@ -387,9 +433,22 @@ hydrateRoot(container,
 Two consequences worth knowing:
 
 - Server data must be an **async** load to be dehydrated (a sync value isn't serialized).
-- **Sources stay pending under SSR** — they're live connections, and the server runs no
-  effects. A source-backed screen ships its loading slot in the HTML and comes alive on
-  hydration. That's usually exactly right for live data.
+- **Sources stay pending under SSR** by default — they're live connections, and the server
+  runs no effects. A source-backed screen ships its loading slot in the HTML and comes
+  alive on hydration. That's usually exactly right for live data.
+
+A source that *can* resolve on the server opts in with its `ssr` marker — one rule, two
+shapes:
+
+- **`ssr: true`** — a loader in source clothing. The server resolves it like a promise and
+  dehydrates the value; on the client the key hydrates as that value and the loader never
+  runs at all.
+- **`ssr: { hydrate, dehydrate? }`** — a live source that can be **seeded**. The server
+  dehydrates `dehydrate(value)` (a *seed*, carried in `collector.seeds`); the client
+  creates the source as usual, feeds the seed to `hydrate()` before attaching, and the
+  source starts already-ready — server HTML, no second fetch, fully live afterward.
+
+A live source that can't seed simply stays unmarked and keeps the default behavior.
 
 ## App setup
 

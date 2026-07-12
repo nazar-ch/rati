@@ -2,7 +2,7 @@
 
 > **Exploratory / future feature.** Not implemented and not committed to. The
 > shipping model is the **scope chain** (`scope()` / `.load()`) over reactive sources
-> — see [design-and-usage.md](../design-and-usage.md). This doc explores the
+> — see [the public guide](../public/guide.md). This doc explores the
 > *generalization* of the chain into a free dependency graph, focused on what the
 > **types** would look like, so we can decide if/when it's worth adding. Nothing
 > here changes current behavior.

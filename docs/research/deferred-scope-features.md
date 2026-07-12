@@ -2,7 +2,7 @@
 
 Designed (or sketched) but intentionally **not built** — each waits for a real need so the
 shape can be pinned by a concrete use case rather than guessed. See
-[design-and-usage.md](../design-and-usage.md) for what ships today.
+[the public guide](../public/guide.md) for what ships today.
 
 ## `.live({ … })` — a progressive prop (designed)
 

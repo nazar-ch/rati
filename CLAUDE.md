@@ -13,12 +13,17 @@ Yarn-workspaces monorepo: `packages/rati` (the published `rati` package) plus
 They are the source of truth and are kept current. Keep them in sync when you change
 behavior they describe.
 
-- `docs/design-and-usage.md` — public API + mental model (scope / input / load / provide /
-  hook / source / island / route / useScope), app setup, routing, SSR.
-- `docs/internals.md` — source layout, the `mandala` engine, the per-level Step-tree
-  resolver, lifecycle/teardown, the value channel, sources, SSR dehydration, toolchain.
-- `docs/research/` — deferred features, dependency graphs, SSR dehydration research.
-- `docs/RELEASING.md` — release process.
+- `docs/public/` — the **guide** + **reference**: the public API + mental model (scope /
+  input / load / provide / hook / data / source / island / route / useScope /
+  useScopeControls), app setup, routing, SSR. The website renders these — they are the
+  main station for anything user-facing; new public surface documents here, nowhere else.
+- `docs/internals.md` — contributor internals only: source layout, the `mandala` engine,
+  the resolver/refresh machinery, lifecycle/teardown, channels, SSR dehydration, testing
+  pointers, toolchain.
+- `docs/research/` — deferred features, design directions, testing strategy.
+- `docs/planned/` — committed efforts (jnana-style records; status derives from git —
+  `<ID>:` commit subjects, `Closes:` trailers).
+- `docs/RELEASING.md` — release process; `docs/website-plan.md` — the public site.
 
 ## Mental model
 

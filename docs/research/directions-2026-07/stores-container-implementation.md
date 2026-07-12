@@ -114,7 +114,7 @@ so its body is unchanged.
 
 ### 6. Barrel + docs
 
-Update `main.ts`, `docs/design-and-usage.md` (app-setup snippet: `new RouterStore(routes)`,
+Update `main.ts`, `docs/public/guide.md` + `reference.md` (app-setup snippet: `new RouterStore(routes)`,
 `StoresProvider`, `createStoresHook`), `docs/internals.md`, `CLAUDE.md`, and the two examples.
 
 ## Jnana changes

@@ -1,10 +1,11 @@
 # Selective scope refresh & SSR-capable sources — implementation notes
 
-**Status: implemented** (`useScopeControls` + `data()` + `Source.ssr`, with test coverage in
-`__tests__/mandala/scopeControls.test.tsx` and `__tests__/mandala/islandSsrSources.test.tsx`).
-The canonical docs (`design-and-usage.md`, `internals.md`) and the examples are deliberately
-**not** updated yet — that, the `data()` rename, and the public-surface review are the next
-checkpoint. This note records the settled design and maps it onto the code.
+**Status: implemented and documented** (`useScopeControls` + `data()` + `Source.ssr`, with test
+coverage in `__tests__/mandala/scopeControls.test.tsx` and
+`__tests__/mandala/islandSsrSources.test.tsx`; public docs in `docs/public/guide.md` +
+`reference.md`, internals in `docs/internals.md`). Still pending: the examples gallery, the
+`data()` rename, and a `rati/mobx` convenience for query-backed seeds. This note records the
+settled design and maps it onto the code.
 
 ## 1. Selective refresh — `useScopeControls`
 
@@ -122,5 +123,5 @@ deliberately *not* auto-marked (its value may be non-serializable — flag for t
 - Refresh failures only log; no error state on the controls yet.
 - `useScopeControls` does not yet expose `phase`/`isStale` — that half arrives with `keepStale` /
   `loadingDelayMs` (improvements.md §2), and the error-slot `retry` could then fold in too.
-- Canonical docs (`design-and-usage.md`, `internals.md`), the examples gallery, and a
-  `rati/mobx`-level convenience for query-backed seeds are all deferred to the checkpoint.
+- Docs are done (public guide/reference + internals, 2026-07-12); the examples gallery and a
+  `rati/mobx`-level convenience for query-backed seeds remain deferred.

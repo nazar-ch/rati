@@ -41,7 +41,7 @@ independent.
   `document.title`, seq dedupe). Title-only — no meta tags. Decide placement (core barrel
   vs `rati/ssr` for the server read) during implementation; document in both public docs.
 - **CORE-5 — SSR example & docs fixes.** Add `Content-Type` to `examples/ssr`'s static
-  serving; document in `docs/design-and-usage.md` (and the public guide's SSR section if
+  serving; document in the public guide's SSR section (`docs/public/guide.md`, if
   it fits): the whole-document pattern (hydrate `document`, injected tags outside the
   React tree) and the per-request lifecycle (`router.dispose()`).
 - **CORE-6 — Route-level redirects.** A `redirectTo` option on `route()` for internal

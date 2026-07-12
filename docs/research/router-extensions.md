@@ -3,7 +3,7 @@
 Forward-looking, intentionally **not built** — each waits for a real need so the shape is
 pinned by a concrete use case. What ships today: `route()` and `group()` (see
 [`router/group.tsx`](../../packages/rati/src/router/group.tsx) and
-[design-and-usage.md](../design-and-usage.md)).
+[the public guide](../public/guide.md)).
 
 ## The invariant everything here preserves
 
