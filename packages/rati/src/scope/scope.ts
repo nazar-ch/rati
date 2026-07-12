@@ -111,6 +111,13 @@ type InputsOf<Defs extends GenericScopeDefinition> = ExcludeNever<{
 /** The inputs a scope accepts (island props / slot `inputs`) — its `input()` head. */
 export type ScopeInputs<S extends Scope<any>> = Simplify<InputsOf<ScopeDefinitions<S>>>;
 
+/** The load keys of a scope — everything resolved minus the inputs (what `refresh(key)` accepts). */
+export type ScopeLoadKeys<S extends Scope<any>> = Exclude<
+    keyof ScopeProps<S>,
+    keyof ScopeInputs<S>
+> &
+    string;
+
 // The `.provide()` value a scope declares, or `unknown` when the chain has none.
 type ScopeProvided<S extends Scope<any>> = S extends Scope<any, infer P> ? P : never;
 
@@ -250,6 +257,56 @@ export function hook<T>(fn: (resolved: any) => T): HookLoad<T> {
 
 export const isHookLoad = (entry: unknown): entry is HookLoad =>
     typeof entry === 'function' && (entry as { [HookSymbol]?: true })[HookSymbol] === true;
+
+// ----------------------
+
+// Brands a load as a *data load with options* (see `data()`). A symbol prop so it
+// survives minification, mirroring `HookSymbol`.
+export const DataSymbol = Symbol();
+
+export type DataLoadOptions<T = unknown> = {
+    /**
+     * The refresh gate: when `refresh(key)` re-runs this load, the new value is compared
+     * to the old one — equal keeps the old value (and identity) and stops the downstream
+     * cascade. Defaults to deep equality; provide a cheaper discriminator for large
+     * payloads (`(a, b) => a.etag === b.etag`).
+     */
+    equals?: (previous: T, next: T) => boolean;
+};
+
+/**
+ * A data load carrying per-load options — a plain function load plus configuration the
+ * resolver reads (today: the `equals` refresh gate). Create one with {@link data}.
+ */
+export type DataLoad<T = unknown> = ((resolved: any) => T) & {
+    readonly [DataSymbol]: true;
+    readonly dataOptions: DataLoadOptions;
+};
+
+/**
+ * Mark a function load as a *data load with options* — the counterpart of {@link hook}:
+ * `hook()` says how a load runs (as a hook, every render), `data()` says what a load is
+ * (a cached data load) and attaches per-load options. A bare function load behaves
+ * exactly like `data(fn)` with no options.
+ *
+ *     scope().load({
+ *         members: data(({ spaceId }) => fetchMembers(spaceId), {
+ *             equals: (a, b) => a.etag === b.etag,
+ *         }),
+ *     });
+ */
+export function data<T>(
+    fn: (resolved: any) => T,
+    options: DataLoadOptions<Awaited<UnwrapSource<Awaited<T>>>> = {},
+): DataLoad<T> {
+    const marked = fn as typeof fn & { [DataSymbol]?: true; dataOptions?: DataLoadOptions };
+    marked[DataSymbol] = true;
+    marked.dataOptions = options as DataLoadOptions;
+    return marked as DataLoad<T>;
+}
+
+export const isDataLoad = (entry: unknown): entry is DataLoad =>
+    typeof entry === 'function' && (entry as { [DataSymbol]?: true })[DataSymbol] === true;
 
 // ----------------------
 

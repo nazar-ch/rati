@@ -5,6 +5,8 @@ import type { SourceError } from '../scope/source';
 import { deepEqual } from '../util/utils';
 import { buildTree, flattenLevels, type Bucket, type Shared } from './resolver';
 import { registerScopeChannel, setScopeLabel } from './channel';
+import { registerScopeControlsChannel } from './controls';
+import { RefreshController, sweepDetach } from './refresh';
 import { MandalaErrorBoundary } from './boundary';
 import { HydrationContext } from './hydration';
 
@@ -72,6 +74,7 @@ export function createMandala<S extends Scope<any>>(
     // so a descendant reading by scope resolves the nearest one's value.
     const scopeKey = config.scope as object;
     const Channel = registerScopeChannel(scopeKey);
+    const ControlsChannel = registerScopeControlsChannel(scopeKey);
     const Loading = (config.loading ?? DefaultLoading) as ComponentType<{ inputs: unknown }>;
     const levels = flattenLevels(config.scope as Scope);
 
@@ -105,11 +108,13 @@ export function createMandala<S extends Scope<any>>(
         // with the server HTML.
         const firstMount = retry === 0 && deepEqual(inputs, initialInputsRef.current);
         const hydrationSlice = firstMount ? hydration.data?.[mandalaId] : undefined;
+        const seedsSlice = firstMount ? hydration.seeds?.[mandalaId] : undefined;
 
         // Bound to this mandala's id; present only on the server (client has no `collect`),
         // where each Step records its resolved promise for the wire.
         const collect = hydration.collect
-            ? (key: string, value: unknown) => hydration.collect!(mandalaId, key, value)
+            ? (key: string, value: unknown, kind: 'value' | 'seed') =>
+                  hydration.collect!(mandalaId, key, value, kind)
             : undefined;
 
         // Per-level data-cell caches, rebuilt when the inner tree remounts (treeKey
@@ -123,8 +128,29 @@ export function createMandala<S extends Scope<any>>(
             };
         }
 
-        // A bare re-render trigger (does not change treeKey), used by the effect below.
+        // A bare re-render trigger (does not change treeKey), used by the effects below
+        // and by the refresh controller (dirty cells / swapped values re-render in place).
         const [, forceRebuild] = useReducer((count: number) => count + 1, 0);
+
+        // The instance's refresh controller — the value behind `useScopeControls`. Wired
+        // every render so it always sees the current run's buckets; created once so the
+        // channel value (and the hook's verbs) stay referentially stable.
+        const controllerRef = useRef<RefreshController | null>(null);
+        controllerRef.current ??= new RefreshController();
+        const controller = controllerRef.current;
+        controller.wire({
+            levels,
+            buckets: cacheRef.current.buckets,
+            treeKey,
+            notify: forceRebuild,
+            fullRefresh: bumpRetry,
+        });
+
+        // A committed remount (inputs change / retry) tears the old cells down —
+        // outstanding refresh bookkeeping settles wholesale.
+        useEffect(() => {
+            controller.treeCommitted(treeKey);
+        }, [controller, treeKey]);
 
         // Drop the cache on unmount so a StrictMode remount (mount → cleanup → mount)
         // rebuilds a fresh run instead of reusing the torn-down one's cells/sources. On
@@ -132,9 +158,14 @@ export function createMandala<S extends Scope<any>>(
         // run — the mandala used to get this re-render for free as a mobx `observer`; now
         // it's explicit. The subtree then reads the surviving run's identities. A real
         // (production) mount runs once with the cache non-null, so it adds no render there.
+        // The sweep is the sources' unmount backstop: Step cleanups keep entries their
+        // live bucket still holds (they can't tell a source swap from an unmount), so the
+        // final detach of everything still attached happens here — after the leaf's
+        // layout-phase dispose, preserving the dispose-before-detach order.
         useEffect(() => {
             if (cacheRef.current === null) forceRebuild();
             return () => {
+                sweepDetach(cacheRef.current?.buckets);
                 cacheRef.current = null;
             };
         }, []);
@@ -146,25 +177,34 @@ export function createMandala<S extends Scope<any>>(
             loading: Loading,
             inputs,
             buckets: cacheRef.current.buckets,
+            currentBuckets: () => cacheRef.current?.buckets ?? null,
+            controller: collect ? undefined : controller,
             collect,
             hydration: hydrationSlice,
+            seeds: seedsSlice,
         };
 
         return (
-            <MandalaErrorBoundary
-                errorSlot={
-                    config.error as
-                        | ComponentType<{ inputs: unknown; error: SourceError; retry: () => void }>
-                        | undefined
-                }
-                inputs={inputs}
-                retry={bumpRetry}
-                resetKey={treeKey}
-            >
-                <Suspense fallback={<Loading inputs={inputs} />}>
-                    <Fragment key={treeKey}>{buildTree(levels, 0, inputs, shared)}</Fragment>
-                </Suspense>
-            </MandalaErrorBoundary>
+            <ControlsChannel.Provider value={controller}>
+                <MandalaErrorBoundary
+                    errorSlot={
+                        config.error as
+                            | ComponentType<{
+                                  inputs: unknown;
+                                  error: SourceError;
+                                  retry: () => void;
+                              }>
+                            | undefined
+                    }
+                    inputs={inputs}
+                    retry={bumpRetry}
+                    resetKey={treeKey}
+                >
+                    <Suspense fallback={<Loading inputs={inputs} />}>
+                        <Fragment key={treeKey}>{buildTree(levels, 0, inputs, shared)}</Fragment>
+                    </Suspense>
+                </MandalaErrorBoundary>
+            </ControlsChannel.Provider>
         );
     } as MandalaComponent<S>;
 

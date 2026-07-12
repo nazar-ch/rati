@@ -43,6 +43,37 @@ export type SourceState<T> =
 export const SourceSymbol = Symbol('rati.source');
 
 /**
+ * Declares a source SSR-capable. Under a Suspense-awaiting server render the resolver
+ * attaches the marked source *during render*, wraps its first settle into a promise
+ * (React's own wait mechanics — `use()`/Suspense), and dehydrates the ready value. The
+ * marker is a promise of conduct: `attach()` is server-safe and the state machine
+ * settles in a reasonable timeframe — the same trust extended to any promise load (a
+ * hung one hangs the prerender; budgets belong to the prerender helper).
+ *
+ * Two shapes, one rule — loaders say `true`, live sources provide `hydrate`:
+ *
+ *   - `ssr: true` — "a loader in source clothing". Promise semantics end to end: the
+ *     ready value (which must be JSON-serializable) is dehydrated; on the client the
+ *     key short-circuits to that value and the source is never created nor attached —
+ *     exactly how promise loads hydrate today.
+ *   - `ssr: { hydrate, dehydrate? }` — a live source that can be seeded. The server
+ *     dehydrates `dehydrate(value)` (defaults to the value itself); the client calls
+ *     `hydrate(data)` on the freshly created source *before* attaching, so its first
+ *     snapshot is already ready — no gap, no double fetch, fully live afterward.
+ *
+ * A live source that cannot seed simply stays unmarked: pending HTML, client
+ * resolution — the previous behavior.
+ */
+export type SourceSSR<T> =
+    | true
+    | {
+          /** Serialize the ready value for the wire. Defaults to the value itself. */
+          dehydrate?: (value: T) => unknown;
+          /** Seed the underlying store from the wire value, before `attach()`. */
+          hydrate: (data: unknown) => void;
+      };
+
+/**
  * A reactive 3-state data source, shaped for React's `useSyncExternalStore`: the
  * island subscribes with `subscribe(onChange)` and reads the current state with
  * `getSnapshot()`, so a transition re-renders. `getSnapshot()` must return a
@@ -59,6 +90,8 @@ export interface Source<T> {
     subscribe(onChange: () => void): () => void;
     getSnapshot(): SourceState<T>;
     attach(): () => void;
+    /** SSR capability marker — see {@link SourceSSR}. Absent: pending under SSR. */
+    readonly ssr?: SourceSSR<T> | undefined;
 }
 
 export function isSource(value: unknown): value is Source<unknown> {
@@ -78,8 +111,13 @@ export function readySource<T>(value: T): Source<T> {
     };
 }
 
-/** Adapts an in-flight promise to a source: pending → ready / error. */
-export function promiseSource<T>(promise: Promise<T>): Source<T> {
+/**
+ * Adapts an in-flight promise to a source: pending → ready / error.
+ *
+ * Not SSR-capable by default (the value may be non-serializable); a promise of
+ * JSON-safe data can opt in with `{ ssr: true }` — it is a loader by construction.
+ */
+export function promiseSource<T>(promise: Promise<T>, options?: { ssr?: SourceSSR<T> }): Source<T> {
     // Hand-rolled subscribable: a listener set + a single stored state object whose
     // identity changes only on transition, so `getSnapshot` stays uSES-stable.
     let state: SourceState<T> = { status: 'pending' };
@@ -104,6 +142,7 @@ export function promiseSource<T>(promise: Promise<T>): Source<T> {
         },
         getSnapshot: () => state,
         attach: () => noopDetach,
+        ...(options?.ssr !== undefined && { ssr: options.ssr }),
     };
 }
 

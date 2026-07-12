@@ -1,5 +1,5 @@
 import { _allowStateReadsEnd, _allowStateReadsStart, reaction } from 'mobx';
-import { SourceSymbol, type Source, type SourceState } from '../scope/source';
+import { SourceSymbol, type Source, type SourceSSR, type SourceState } from '../scope/source';
 
 /*
     Adapt a MobX observable derivation to a rati `Source` (the `rati/mobx` surface).
@@ -22,6 +22,7 @@ import { SourceSymbol, type Source, type SourceState } from '../scope/source';
 export function observableSource<T>(
     getState: () => SourceState<T>,
     attach: () => () => void = () => () => {},
+    options?: { ssr?: SourceSSR<T> },
 ): Source<T> {
     let cached: SourceState<T> | undefined;
     const getSnapshot = (): SourceState<T> => {
@@ -47,6 +48,7 @@ export function observableSource<T>(
         // when they change; `getSnapshot` then hands uSES the (memoized) new state.
         subscribe: (onChange) => reaction(getState, onChange),
         attach,
+        ...(options?.ssr !== undefined && { ssr: options.ssr }),
     };
 }
 

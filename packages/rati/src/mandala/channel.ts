@@ -31,7 +31,8 @@ export function setScopeLabel(scope: object, label: string): void {
 
 // A best-effort identifier for a scope in error messages: the rendering component's
 // displayName when a mandala was built from the scope, else the scope's own load keys.
-function describeScope(scope: object): string {
+// Shared with the controls channel (controls.ts).
+export function describeScope(scope: object): string {
     const label = scopeLabels.get(scope);
     if (label) return label;
     const def = (scope as Scope).definition;

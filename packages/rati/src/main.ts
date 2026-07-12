@@ -60,6 +60,10 @@ export {
     input,
     hook,
     type HookLoad,
+    data,
+    type DataLoad,
+    type DataLoadOptions,
+    type ScopeLoadKeys,
     type ScopeProvideDef,
     InputSymbol,
     ScopeSymbol,
@@ -78,9 +82,11 @@ export {
     type Source,
     type SourceState,
     type SourceError,
+    type SourceSSR,
 } from './scope/source';
 
 export { useScope, useOptionalScope } from './mandala/channel';
+export { useScopeControls, type ScopeControls } from './mandala/controls';
 
 export { island, type IslandComponent, type IslandConfig } from './island/island';
 

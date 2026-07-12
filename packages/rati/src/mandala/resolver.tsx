@@ -1,15 +1,36 @@
-import { use, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import {
+    use,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useReducer,
+    useRef,
+    useState,
+    useSyncExternalStore,
+} from 'react';
 import type { ComponentType, Context, ReactNode } from 'react';
 import {
+    isDataLoad,
     isHookLoad,
     InputSymbol,
     type HookLoad,
     type Scope,
     type ScopeProvideDef,
 } from '../scope/scope';
-import { isSource, type Source, type SourceState } from '../scope/source';
-import { is } from '../util/utils';
+import { isSource, type SourceState } from '../scope/source';
+import { is, deepEqual } from '../util/utils';
 import { navTrace, navTraceEnabled } from '../util/navTrace';
+import {
+    makeProducedCell,
+    makeStaticCell,
+    trackReads,
+    type Bucket,
+    type Cell,
+    type CellBody,
+    type EqualsFn,
+    type RefreshController,
+} from './refresh';
+import { firstSettle } from './ssrSource';
 
 /*
     The mandala's resolution mechanics: compile a scope's levels into a nested tree of
@@ -29,9 +50,12 @@ import { navTrace, navTraceEnabled } from '../util/navTrace';
         (react-dom/static `prerender`) awaits it. Rejections throw to the mandala's
         ErrorBoundary → the error slot.
       - a *source* entry (a reactive `pending | ready | error` state machine) is read
-        observably; pending renders the loading slot (no server resolution — sources
-        stay pending under SSR and resolve on the client), error throws to the slot.
-        A ready source returning to pending drops back to loading, live.
+        observably; pending renders the loading slot, error throws to the slot. A ready
+        source returning to pending drops back to loading, live. Under SSR an unmarked
+        source stays pending (no server resolution); a source carrying the `ssr` marker
+        is resolved server-side through the promise path (see `firstSettle`) and its
+        value dehydrated — as a plain value for a loader (`ssr: true`), or as a seed the
+        client feeds to `source.ssr.hydrate` before attaching (a live source).
       - a *hook* load (`hook(fn)`) runs every render so `fn` may call any React hook;
         it's the seam that lets a level read its own deps (`use(StoresContext)`) — the
         reason `env` is gone. Its result is classified like a function load. rati never
@@ -41,6 +65,10 @@ import { navTrace, navTraceEnabled } from '../util/navTrace';
     and detaches on unmount; a param change remounts the inner tree, so React tears the
     old one down (children first → the leaf's `.provide()` value disposes before the
     sources it was built over detach) and mounts a fresh one.
+
+    Selective refresh (`useScopeControls().refresh(key)`) re-runs single cells in place —
+    the model and controller live in refresh.ts; the render-side halves (dirty re-runs,
+    stale rendering, source swaps) live here.
 */
 
 // ---------------------------------------------------------------------------------------
@@ -73,40 +101,45 @@ function partition(level: Scope['definition']): { hookKeys: string[]; dataKeys: 
     return parts;
 }
 
-// One resolved cell. Props/classes/plain values resolve instantly; a function is
-// called with the prior levels' ready values and its result re-classified; a promise
-// is unwrapped with `use()`; a source is read observably.
-type Cell =
-    | { kind: 'value'; value: unknown }
-    | { kind: 'promise'; promise: Promise<unknown> }
-    | { kind: 'source'; source: Source<unknown> };
-
-// Classify a *data entry* (the value written in the scope definition).
+// Classify a *data entry* (the value written in the scope definition) into a cell.
+// Function/class producers run against a read-tracking proxy of the prior levels'
+// values — the recorded read-set is what a selective refresh cascades along.
 function classifyEntry(entry: unknown, prev: Record<string, unknown>, key: string): Cell {
-    if (is.object(entry) && InputSymbol in entry) return { kind: 'value', value: prev[key] };
-    if (is.promise(entry)) return { kind: 'promise', promise: entry };
-    if (isSource(entry)) return { kind: 'source', source: entry };
-    if (is.class(entry)) return { kind: 'value', value: new entry(prev) };
-    if (is.function(entry)) return classifyResult((entry as (p: unknown) => unknown)(prev));
-    return { kind: 'value', value: entry };
+    if (is.object(entry) && InputSymbol in entry) {
+        return makeStaticCell({ kind: 'value', value: prev[key] });
+    }
+    if (is.promise(entry)) return makeStaticCell({ kind: 'promise', promise: entry });
+    if (isSource(entry)) return makeStaticCell({ kind: 'source', source: entry });
+    if (is.class(entry)) {
+        const { proxy, reads } = trackReads(prev);
+        return makeProducedCell(
+            classifyResult(new (entry as new (p: unknown) => unknown)(proxy)),
+            reads,
+            undefined,
+        );
+    }
+    if (is.function(entry)) {
+        const equals = isDataLoad(entry)
+            ? (entry.dataOptions.equals as EqualsFn | undefined)
+            : undefined;
+        const { proxy, reads } = trackReads(prev);
+        return makeProducedCell(
+            classifyResult((entry as (p: unknown) => unknown)(proxy)),
+            reads,
+            equals,
+        );
+    }
+    return makeStaticCell({ kind: 'value', value: entry });
 }
 
-// Classify the *result* of a function/hook load (already called).
-function classifyResult(result: unknown): Cell {
+// Classify the *result* of a function/class/hook load (already called).
+function classifyResult(result: unknown): CellBody {
     if (is.promise(result)) return { kind: 'promise', promise: result };
     if (isSource(result)) return { kind: 'source', source: result };
     return { kind: 'value', value: result };
 }
 
 // ---------------------------------------------------------------------------------------
-
-type SourceEntry = { source: Source<unknown>; detach: (() => void) | null };
-
-// One level's data cells, built once. Lives on the mandala's committed ref (not the
-// Step's fiber) so it survives a `use()` suspension: a suspended render is discarded,
-// which would otherwise re-build the cell — re-running its load and re-suspending on a
-// brand-new promise forever. Built per level here; the load side effect runs once.
-export type Bucket = { cells: Map<string, Cell>; sources: SourceEntry[]; built: boolean };
 
 // Shared, render-stable inputs threaded down the Step tree.
 export type Shared = {
@@ -117,11 +150,155 @@ export type Shared = {
     inputs: unknown;
     // Per-level data-cell caches, held on the mandala's committed ref (see Bucket).
     buckets: Bucket[];
+    // Live view of the mandala's committed cache — lets a Step's teardown tell a source
+    // swap (its bucket is still current) from a stale run (remount/unmount).
+    currentBuckets: () => Bucket[] | null;
+    // The instance's refresh controller (undefined on the server — nothing refreshes).
+    controller: RefreshController | undefined;
     // Server only: record a resolved promise value for dehydration. Undefined on client.
-    collect: ((key: string, value: unknown) => void) | undefined;
+    collect: ((key: string, value: unknown, kind: 'value' | 'seed') => void) | undefined;
     // Client only: server-resolved promise values to rehydrate from (scope key -> value).
     hydration: Record<string, unknown> | undefined;
+    // Client only: server-dehydrated live-source seeds (scope key -> hydrate() input).
+    seeds: Record<string, unknown> | undefined;
 };
+
+// Build one cell — the hydration short-circuit, the live-source seeding, and the
+// server-side promotion of SSR-marked sources to the promise path all live here.
+function buildCell(
+    level: Scope['definition'],
+    key: string,
+    prev: Record<string, unknown>,
+    shared: Shared,
+): Cell {
+    // A value dehydrated from the server short-circuits the entry: skip the load (no
+    // re-fetch) and `use()` (no re-suspend), so hydration renders the server HTML
+    // synchronously. Promise loads and loader sources (`ssr: true`) land here — for the
+    // latter the producer never runs client-side either: promise semantics end to end.
+    if (shared.hydration && key in shared.hydration) {
+        const entry = level[key];
+        return {
+            kind: 'value',
+            value: shared.hydration[key],
+            // The producer didn't run, so there's no read-set yet; a direct
+            // refresh(key) can still re-run it (and records the reads then).
+            reads: null,
+            rerunnable: is.function(entry) || is.class(entry),
+            equals: isDataLoad(entry) ? (entry.dataOptions.equals as EqualsFn) : undefined,
+            dirty: false,
+            refreshing: null,
+            lastValue: undefined,
+            hasValue: false,
+        };
+    }
+
+    const cell = classifyEntry(level[key], prev, key);
+
+    // A live-source seed: feed the server value to the freshly created source before
+    // anything reads or attaches it, so its first snapshot is already ready — no
+    // pending gap, no double fetch, fully live afterward.
+    if (shared.seeds && key in shared.seeds) {
+        if (cell.kind === 'source' && cell.source.ssr && cell.source.ssr !== true) {
+            try {
+                cell.source.ssr.hydrate(shared.seeds[key]);
+            } catch (error) {
+                console.error(`[rati] hydration seed for '${key}' failed to apply`, error);
+            }
+        } else {
+            console.warn(
+                `[rati] hydration seed for '${key}' does not match a seedable live source; ignoring.`,
+            );
+        }
+    }
+
+    // Server + `ssr` marker: resolve the source through React's own wait mechanics —
+    // its first settle wrapped into a promise (attached during render, which is what
+    // the marker authorizes). Dehydrates as a plain value for a loader (`ssr: true`),
+    // or through `dehydrate` as a seed for a live source. Gated on the collector: a
+    // prerender without a HydrationProvider couldn't carry the value over, and a
+    // server-resolved-but-unhydratable source would mismatch on the client.
+    if (cell.kind === 'source' && shared.collect && cell.source.ssr) {
+        const ssr = cell.source.ssr;
+        return {
+            ...cell,
+            kind: 'promise',
+            promise: firstSettle(cell.source),
+            dehydrate:
+                ssr !== true && ssr.dehydrate
+                    ? (ssr.dehydrate as (value: unknown) => unknown)
+                    : undefined,
+            collectAs: ssr === true ? 'value' : 'seed',
+        };
+    }
+
+    return cell;
+}
+
+// Render-time halves of a selective refresh: re-run dirty cells against the current
+// `prev` (fresh upstream values — including values a cascade swapped in this very
+// pass, since levels render top-down). A promise re-run keeps the old value rendered
+// and settles through the controller; a sync value re-run gates and swaps here; a
+// source re-run swaps the source (new `sources` identity re-keys the Step's effects).
+function processDirtyCells(
+    level: Scope['definition'],
+    dataKeys: string[],
+    bucket: Bucket,
+    prev: Record<string, unknown>,
+    index: number,
+    controller: RefreshController,
+): void {
+    for (const key of dataKeys) {
+        const cell = bucket.cells.get(key);
+        if (!cell?.dirty) continue;
+        cell.dirty = false;
+        if (!cell.rerunnable) continue;
+
+        const next = classifyEntry(level[key], prev, key);
+        cell.reads = next.reads;
+
+        if (next.kind === 'promise') {
+            const token = controller.nextToken();
+            cell.refreshing = { token };
+            controller.trackRefresh(index, key, next.promise, token);
+            continue;
+        }
+
+        // The producer stopped yielding a source — the old one leaves the bucket (the
+        // detach effect releases entries the current array no longer holds).
+        if (cell.kind === 'source' && next.kind !== 'source') {
+            bucket.sources = bucket.sources.filter((entry) => entry.source !== cell.source);
+        }
+
+        if (next.kind === 'value') {
+            const equals = cell.equals ?? deepEqual;
+            if (!(cell.hasValue && equals(cell.lastValue, next.value))) {
+                bucket.cells.set(key, {
+                    ...next,
+                    equals: cell.equals,
+                    lastValue: cell.lastValue,
+                    hasValue: cell.hasValue,
+                });
+                controller.valueChanged(index, key);
+            }
+            controller.syncSettled(key);
+        } else {
+            // Source swap: keep the pre-swap value rendered until the new source's
+            // first ready (`swapped`), and re-key the level's source machinery.
+            const swapped: Cell = {
+                ...next,
+                equals: cell.equals,
+                lastValue: cell.lastValue,
+                hasValue: cell.hasValue,
+                swapped: true,
+            };
+            bucket.cells.set(key, swapped);
+            bucket.sources = bucket.sources
+                .filter((entry) => !(cell.kind === 'source' && entry.source === cell.source))
+                .concat({ source: next.source, detach: null });
+            controller.sourceSwapped(key);
+        }
+    }
+}
 
 type StepProps = {
     level: Scope['definition'];
@@ -147,19 +324,16 @@ function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: Step
     const bucket = shared.buckets[index]!;
     if (!bucket.built) {
         for (const key of dataKeys) {
-            // A value dehydrated from the server short-circuits the entry: skip the
-            // load (no re-fetch) and `use()` (no re-suspend), so hydration renders the
-            // server HTML synchronously. Only promises are ever dehydrated.
-            const cell =
-                shared.hydration && key in shared.hydration
-                    ? ({ kind: 'value', value: shared.hydration[key] } as Cell)
-                    : classifyEntry(level[key], prev, key);
+            const cell = buildCell(level, key, prev, shared);
             if (cell.kind === 'source') bucket.sources.push({ source: cell.source, detach: null });
             bucket.cells.set(key, cell);
         }
         bucket.built = true;
+    } else if (shared.controller) {
+        processDirtyCells(level, dataKeys, bucket, prev, index, shared.controller);
     }
-    const { cells: dataCells, sources } = bucket;
+    const dataCells = bucket.cells;
+    const sources = bucket.sources;
 
     // Attach (layout) and detach (passive) are split across two effects on purpose.
     //
@@ -189,8 +363,16 @@ function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: Step
 
     useEffect(() => {
         return () => {
+            // A source swap replaces the array ([sources] re-keys this effect): the
+            // swap's leavers detach here, but entries the live bucket still holds must
+            // stay attached. A stale bucket (inner-tree remount) detaches everything;
+            // plain unmount leaves the live entries to the mandala's sweep (a cleanup
+            // can't tell deps-change from unmount).
+            const currentBuckets = shared.currentBuckets();
+            const bucketIsLive = currentBuckets?.[index] === bucket;
             for (let i = sources.length - 1; i >= 0; i--) {
                 const entry = sources[i]!;
+                if (bucketIsLive && bucket.sources.includes(entry)) continue;
                 if (entry.detach) {
                     try {
                         entry.detach();
@@ -204,12 +386,13 @@ function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: Step
     }, [sources]);
 
     // Re-render this level when any of its data sources transitions. One uSES per Step
-    // subscribes to all the level's sources at once (their count is fixed for this
-    // mount). The snapshot is the array of source states, rebuilt only when one changes
-    // identity — so it stays referentially stable between transitions (uSES requires
-    // that). Sources only emit from `attach()` (the effect above), so the subscription
-    // is live before any transition. Hook sources aren't here: a hook owns its own
-    // subscription (it runs every render and may call its own hooks).
+    // subscribes to all the level's sources at once (the array identity changes only on
+    // a source swap, which re-keys the subscription). The snapshot is the array of
+    // source states, rebuilt only when one changes identity — so it stays referentially
+    // stable between transitions (uSES requires that). Sources only emit from
+    // `attach()` (the effect above), so the subscription is live before any transition.
+    // Hook sources aren't here: a hook owns its own subscription (it runs every render
+    // and may call its own hooks).
     const sourceStore = useMemo(() => {
         let snapshot = sources.map((entry) => entry.source.getSnapshot());
         const changed = () => {
@@ -236,7 +419,7 @@ function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: Step
     // Hook loads first (every render, stable order — they may call React hooks), then
     // the cached data cells. `use()` in the resolve pass below is loop/early-return
     // safe, so the hook-call sequence is identical every render.
-    const cells: [string, Cell][] = [];
+    const cells: [string, Cell | CellBody][] = [];
     for (const key of hookKeys) {
         cells.push([key, classifyResult((level[key] as HookLoad)(prev))]);
     }
@@ -250,14 +433,43 @@ function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: Step
         } else if (cell.kind === 'promise') {
             const value = use(cell.promise);
             // Render-time write, but only on the server (client has no `collect`) and
-            // idempotent per key — the established SSR data-collection pattern.
-            shared.collect?.(key, value);
+            // idempotent per key — the established SSR data-collection pattern. A
+            // live-source cell ships `dehydrate(value)` as a seed instead of the value.
+            if (shared.collect) {
+                const cellDehydrate = 'dehydrate' in cell ? cell.dehydrate : undefined;
+                shared.collect(
+                    key,
+                    cellDehydrate ? cellDehydrate(value) : value,
+                    ('collectAs' in cell ? cell.collectAs : undefined) ?? 'value',
+                );
+            }
             resolved[key] = value;
         } else {
             const state = cell.source.getSnapshot();
             if (state.status === 'error') throw state.error;
-            if (state.status === 'pending') pending = true;
-            else resolved[key] = state.value;
+            if (state.status === 'pending') {
+                // A cascade-swapped source still warming up keeps the pre-swap value
+                // rendered instead of dropping the level to the loading slot. A live
+                // source that itself returns to pending still drops to loading — that
+                // behavior is the source's own contract, unchanged.
+                if ('swapped' in cell && cell.swapped && cell.hasValue) {
+                    resolved[key] = cell.lastValue;
+                } else {
+                    pending = true;
+                }
+            } else {
+                if ('swapped' in cell && cell.swapped) {
+                    cell.swapped = false;
+                    shared.controller?.sourceReady(key);
+                }
+                resolved[key] = state.value;
+            }
+        }
+        // Remember what this pass handed down — the stale baseline a refresh renders
+        // while re-fetching and the old side of its equals gate.
+        if ('rerunnable' in cell && key in resolved) {
+            cell.lastValue = resolved[key];
+            cell.hasValue = true;
         }
     }
 
@@ -297,6 +509,7 @@ function Leaf({ resolved, shared }: LeafProps) {
             loading={shared.loading}
             inputs={shared.inputs}
             cacheToken={shared.buckets}
+            controller={shared.controller}
         />
     );
 }
@@ -313,6 +526,7 @@ type ProvideLeafProps = {
     // updates. Used as the rebuild key so the provided value tracks the surviving run
     // without deep-comparing `resolved` (which holds live store instances).
     cacheToken: unknown;
+    controller: RefreshController | undefined;
 };
 
 function ProvideLeaf({
@@ -323,18 +537,26 @@ function ProvideLeaf({
     loading: Loading,
     inputs,
     cacheToken,
+    controller,
 }: ProvideLeafProps) {
     const [built, setBuilt] = useState<{ value: unknown } | null>(null);
+    // Bumped when a selective refresh changes a key the factory consumed — the effect
+    // below re-keys, so the stale value disposes and a fresh one builds.
+    const [version, bumpVersion] = useReducer((count: number) => count + 1, 0);
+    const readsRef = useRef<ReadonlySet<string> | null>(null);
 
     // Build the value, dispose it on teardown / rebuild. A *layout* effect so that, on
     // unmount, this dispose runs in the commit's layout phase — before the *passive*
     // effect that detaches the sources it was built over (React flushes all layout
     // cleanups before any passive cleanup). That's the load-bearing dispose-before-detach
     // order. Keyed by `cacheToken`: rebuilds for a new run (param change / StrictMode
-    // remount), not on per-render churn. `resolved` is read from the rebuild render.
+    // remount), not on per-render churn — plus `version` for selective refresh.
+    // `resolved` is read from the rebuild render.
     useLayoutEffect(() => {
         navTrace('leaf .provide() built — component renders next');
-        const value = provideDef.factory(resolved);
+        const { proxy, reads } = trackReads(resolved);
+        const value = provideDef.factory(proxy);
+        readsRef.current = reads;
         setBuilt({ value });
         return () => {
             const dispose = (value as Partial<Disposable> | undefined)?.[Symbol.dispose];
@@ -346,8 +568,15 @@ function ProvideLeaf({
                 }
             }
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by cacheToken
-    }, [cacheToken]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by cacheToken + version
+    }, [cacheToken, version]);
+
+    useEffect(() => {
+        if (!controller) return undefined;
+        return controller.subscribeChanged((key) => {
+            if (readsRef.current?.has(key)) bumpVersion();
+        });
+    }, [controller]);
 
     if (!built) return <Loading inputs={inputs} />;
 
@@ -387,3 +616,7 @@ export function buildTree(
         </Step>
     );
 }
+
+// Bucket re-export: the model moved to refresh.ts with the controller; mandala.tsx and
+// the tests import it from here, the resolver's home turf.
+export type { Bucket } from './refresh';
