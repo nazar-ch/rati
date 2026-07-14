@@ -1,13 +1,23 @@
 import type { RouterStore, RouterHydratedState } from './store';
 
 /**
- * The result of preparing a route on the server. The {@link hydratedState}
- * snapshot can be embedded in the SSR HTML response and passed back to the
- * client as `RouterStoreOptions.hydratedState`, so the first client render
- * matches the server HTML without an async routing gap.
+ * The server's routing decision object. {@link hydratedState} is embedded in the SSR
+ * HTML response and passed back to the client as `RouterStoreOptions.hydratedState`,
+ * so the first client render matches the server HTML without an async routing gap;
+ * {@link matchedCatchAll} and {@link redirect} carry what the response should be
+ * before any rendering happens.
  */
 export interface PreparedRoute {
     hydratedState: RouterHydratedState;
+    /** True when only the `*` catch-all matched — map it to a 404 status. */
+    matchedCatchAll: boolean;
+    /**
+     * Present when a route-level `redirect` was followed during matching: respond
+     * 301/302 (per `permanent`) with `to` instead of rendering. `hydratedState` then
+     * describes the redirect *target* — usable if the server renders it anyway.
+     * `permanent` is true only when every followed hop was permanent.
+     */
+    redirect?: { to: string; permanent: boolean };
 }
 
 /**
@@ -39,6 +49,7 @@ export async function prepareRoute(router: RouterStore<any>): Promise<PreparedRo
         await preload();
     }
 
+    const hops = router.redirectHops;
     return {
         hydratedState: {
             path: router.path,
@@ -47,5 +58,14 @@ export async function prepareRoute(router: RouterStore<any>): Promise<PreparedRo
             activeRouteName: route.name,
             routeParams: route.routeParams,
         },
+        matchedCatchAll: route.path === '*',
+        ...(hops.length > 0
+            ? {
+                  redirect: {
+                      to: hops[hops.length - 1]!.to,
+                      permanent: hops.every((hop) => hop.permanent),
+                  },
+              }
+            : {}),
     };
 }

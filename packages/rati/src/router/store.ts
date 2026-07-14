@@ -4,6 +4,9 @@ import { installScrollRestoration, type ScrollRestorationOptions } from './scrol
 import { GlobalStore } from '../stores/GlobalStore';
 import type { GenericRouteType, NameToRoute } from './route';
 
+// Redirect chains longer than this are treated as a cycle (see setPath).
+const MAX_REDIRECT_DEPTH = 10;
+
 type GetActiveRoute = ReturnType<RouterStore<GenericRouteType[]>['getActiveRoute']>;
 
 /** Activated route shape. */
@@ -194,6 +197,7 @@ export class RouterStore<
             wrapperComponent: matched.wrapperComponent,
             path: matched.path,
             routeParams: state.routeParams,
+            redirect: matched.redirect,
             pathCounter: this.pathCounter,
         };
         this.emitChange();
@@ -294,6 +298,14 @@ export class RouterStore<
 
     activeRoute: ActiveRoute | null = null;
 
+    /**
+     * The route-level redirects the *current* navigation followed, oldest first —
+     * reset when a fresh navigation starts. `prepareRoute` reads it to report the 30x;
+     * on the client it is normally invisible (the history entry was replaced).
+     */
+    redirectHops: { from: string; to: string; permanent: boolean }[] = [];
+    private redirectDepth = 0;
+
     private pathCounter: number = 0;
     private readonly sessionId = globalThis.crypto?.randomUUID
         ? globalThis.crypto.randomUUID()
@@ -303,6 +315,9 @@ export class RouterStore<
         try {
             const { state } = location;
             const pathname = stripBasename(location.pathname, this.basename);
+            // A fresh navigation clears the previous one's redirect trail; a nested
+            // setPath (redirect being followed) appends to the current trail instead.
+            if (this.redirectDepth === 0) this.redirectHops = [];
             const currentPathCounter = this.pathCounter++;
             const nextState = state ?? null;
             const stateChanged = !shallowEqualState(this._state, nextState);
@@ -338,7 +353,7 @@ export class RouterStore<
                 return;
             }
 
-            this.activeRoute =
+            const matched =
                 this.getActiveRoute(
                     this.path,
                     this.stores as any,
@@ -346,6 +361,37 @@ export class RouterStore<
                     // skipped above will be rerendered
                     this.pathCounter,
                 ) ?? null;
+
+            // A route-level redirect is followed here, before the route ever renders:
+            // resolve the target, record the hop (prepareRoute's 30x input), and
+            // `replace` — the history listener fires synchronously, so the nested
+            // setPath resolves the target route before this frame returns. The depth
+            // guard breaks redirect cycles by rendering the last route instead.
+            if (matched?.redirect && this.redirectDepth < MAX_REDIRECT_DEPTH) {
+                const { to, permanent = false } = matched.redirect;
+                const target = typeof to === 'function' ? to(matched.routeParams) : to;
+                const targetPath =
+                    typeof target === 'string'
+                        ? target
+                        : this.getPath(target as NameToRoute<T>) + this._search + this._hash;
+                this.redirectHops.push({ from: pathname, to: targetPath, permanent });
+                this.redirectDepth++;
+                try {
+                    this.replace(targetPath);
+                } finally {
+                    this.redirectDepth--;
+                }
+                return;
+            }
+            if (matched?.redirect) {
+                console.error(
+                    `[rati] redirect loop detected at "${pathname}" ` +
+                        `(${this.redirectHops.map((hop) => hop.from).join(' → ')}) — ` +
+                        `rendering the route's component instead of following further.`,
+                );
+            }
+
+            this.activeRoute = matched;
             navTrace(`setPath → activeRoute=${this.activeRoute?.name ?? 'none'}`);
         } finally {
             // One notification per setPath regardless of which return ran —
@@ -454,7 +500,7 @@ export class RouterStore<
     }
 
     getActiveRoute(currentPath: string, _stores: any, pathCounter: number) {
-        for (const { pathRe, path, name, component, wrapperComponent } of this.routes) {
+        for (const { pathRe, path, name, component, wrapperComponent, redirect } of this.routes) {
             let result;
 
             if (pathRe) {
@@ -472,6 +518,7 @@ export class RouterStore<
                     routeParams: (result.groups as any) ?? {},
                     path,
                     wrapperComponent,
+                    redirect,
                     pathCounter,
                 };
             }

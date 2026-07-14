@@ -72,7 +72,26 @@ function buildPathRe(path: string): RegExp | null {
     return path === '*' ? null : new RegExp(pathReString);
 }
 
-export type RouteOptions<TScope extends Scope<any> | undefined> = {
+/** A redirect destination: a route reference (`{ name, …params }`) or a literal path. */
+export type RedirectTarget = { name: string } & Record<string, string>;
+
+/**
+ * A route-level internal redirect. The client router follows it like a `<Navigate>`
+ * (history `replace`, no back-stack entry); on the server `prepareRoute` reports it so
+ * the response can be a real 30x before anything renders. External URLs don't belong
+ * here — redirect those at the HTTP layer.
+ *
+ * An object target resolves through the route table and keeps the current search and
+ * hash (the alias-route expectation); a string target is used verbatim. A function
+ * receives the matched params — the legacy-path shape (`/old/:id` → `/new/:id`).
+ */
+export type RouteRedirect<Path extends string = string> = {
+    to: string | RedirectTarget | ((params: ExtractRouteParams<Path>) => string | RedirectTarget);
+    /** Advisory for the server: respond 301/308 instead of 302/307. */
+    permanent?: boolean;
+};
+
+export type RouteOptions<TScope extends Scope<any> | undefined, Path extends string = string> = {
     /**
      * Data the route resolves before the component renders. When present, `route`
      * folds it together with the component into a mandala (see below), so resolution
@@ -97,6 +116,12 @@ export type RouteOptions<TScope extends Scope<any> | undefined> = {
      * alongside `scope`.
      */
     error?: TScope extends Scope<any> ? MandalaConfig<TScope>['error'] : undefined;
+    /**
+     * Declare this route a redirect — see {@link RouteRedirect}. The component never
+     * renders on the happy path (pass `() => null`); it shows only if a redirect loop
+     * is detected and following stops.
+     */
+    redirect?: RouteRedirect<Path>;
 };
 
 // The required (non-optional) keys of an object type.
@@ -197,7 +222,7 @@ export function route<
     path: Path,
     name: Name,
     component: Component & RouteComponentGuard<Path, TScope, Component>,
-    options: RouteOptions<TScope> = {},
+    options: RouteOptions<TScope, Path> = {},
 ) {
     const scopeOption = options.scope;
 
@@ -225,6 +250,7 @@ export function route<
         // route-context types are derived from this field's type — so the context type
         // comes straight from the route definition.
         scope: scopeOption as TScope extends Scope<any> ? TScope : undefined,
+        redirect: options.redirect as RouteRedirect | undefined,
         ...(scopeOption !== undefined
             ? {
                   foldInputs: {
@@ -244,6 +270,7 @@ export type GenericRouteType = {
     component: any;
     wrapperComponent?: ComponentType | undefined;
     scope?: Scope<any> | undefined;
+    redirect?: RouteRedirect | undefined;
     // Retained fold inputs so `group` can re-derive the mandala with shared slots; present
     // only on scope-bearing routes. Read by `group`, not by the router.
     foldInputs?: RouteFoldInputs | undefined;

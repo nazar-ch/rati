@@ -19,6 +19,8 @@ export { RouterStore, type RouterStoreOptions, type RouterHydratedState } from '
 export {
     route,
     type RouteOptions,
+    type RouteRedirect,
+    type RedirectTarget,
     type NameToRoute,
     type ExtractRouteParams,
     type GenericRouteType,
