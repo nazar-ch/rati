@@ -6,43 +6,22 @@ import { createServer as createHttpServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve, join } from 'node:path';
+import { dirname, extname, resolve, join } from 'node:path';
 import { existsSync, createReadStream } from 'node:fs';
+import type { RenderAppResult } from 'rati/ssr';
 import type { ViteDevServer } from 'vite-plus';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isProd = process.env['NODE_ENV'] === 'production';
 const port = Number(process.env['PORT']) || 3000;
 
+type RenderFn = (url: string) => Promise<RenderAppResult>;
+
 interface Loader {
     resolveTemplate(url: string): Promise<string>;
-    loadServerEntry(): Promise<{ render: (url: string) => Promise<RenderResult> }>;
+    loadServerEntry(): Promise<{ render: RenderFn }>;
     middleware: ViteDevServer['middlewares'] | null;
     fixStack(err: unknown): unknown;
-}
-
-// FIXME: deduplicate
-export interface RenderResult {
-    html: string;
-    /** Snapshot to embed in the HTML so the client can hydrate without re-fetching. */
-    state: unknown;
-    /** 200 for matched routes, 404 when no route (including the catch-all) matches. */
-    status: 200 | 404;
-}
-
-// `</script>` and `<!--` would break the inline script tag, and U+2028 /
-// U+2029 are valid in JSON but illegal in JS source — escape all five.
-const LINE_SEP = String.fromCharCode(0x2028);
-const PARA_SEP = String.fromCharCode(0x2029);
-function escapeJsonForScript(value: unknown): string {
-    return JSON.stringify(value)
-        .replace(/</g, '\\u003c')
-        .replace(/>/g, '\\u003e')
-        .replace(/&/g, '\\u0026')
-        .split(LINE_SEP)
-        .join('\\u2028')
-        .split(PARA_SEP)
-        .join('\\u2029');
 }
 
 async function loadDev(): Promise<Loader> {
@@ -60,7 +39,7 @@ async function loadDev(): Promise<Loader> {
         },
         async loadServerEntry() {
             return vite.ssrLoadModule('/src/entry-server.tsx') as Promise<{
-                render: (url: string) => Promise<RenderResult>;
+                render: RenderFn;
             }>;
         },
         middleware: vite.middlewares,
@@ -91,12 +70,31 @@ async function loadProd(): Promise<Loader> {
     };
 }
 
+// Static assets need a correct Content-Type — a browser rejects a
+// `<script type="module">` served without a JavaScript MIME type.
+const MIME_TYPES: Record<string, string> = {
+    '.js': 'text/javascript',
+    '.mjs': 'text/javascript',
+    '.css': 'text/css',
+    '.html': 'text/html; charset=utf-8',
+    '.json': 'application/json',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.woff2': 'font/woff2',
+    '.map': 'application/json',
+    '.txt': 'text/plain; charset=utf-8',
+};
+
 function tryServeStatic(req: IncomingMessage, res: ServerResponse): boolean {
     if (!isProd || !req.url) return false;
     const filePath = join(__dirname, 'dist/client', req.url.split('?')[0]!);
     if (!filePath.startsWith(join(__dirname, 'dist/client'))) return false;
     if (!existsSync(filePath) || filePath.endsWith('/')) return false;
-    res.writeHead(200);
+    const contentType = MIME_TYPES[extname(filePath)];
+    res.writeHead(200, contentType ? { 'Content-Type': contentType } : {});
     createReadStream(filePath).pipe(res);
     return true;
 }
@@ -121,15 +119,32 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
             return;
         }
 
-        const template = await loader.resolveTemplate(url);
         const { render } = await loader.loadServerEntry();
-        const { html, state, status } = await render(url);
+        const result = await render(url);
 
+        // A route-level redirect responds before anything rendered.
+        if (result.kind === 'redirect') {
+            res.writeHead(result.status, { Location: result.to });
+            res.end();
+            return;
+        }
+        // Unreachable with a `*` catch-all in the table; kept for completeness.
+        if (result.kind === 'no-match') {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('Not found');
+            return;
+        }
+
+        const template = await loader.resolveTemplate(url);
         const body = template
-            .replace('<!--app-html-->', html)
-            .replace('<!--app-state-->', escapeJsonForScript(state));
+            .replace('<!--app-head-->', result.headTags)
+            .replace('<!--app-html-->', result.html)
+            .replace('<!--app-state-->', result.stateScript);
 
-        res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' });
+        // result.status already encodes the baseline policy: catch-all → 404,
+        // not-available load → 404, failed load → 500 (the HTML still carries the
+        // loading slot; the client retries the load after hydration).
+        res.writeHead(result.status, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(body);
     } catch (err) {
         loader.fixStack(err);

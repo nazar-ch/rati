@@ -1,3 +1,5 @@
+import { Title } from 'rati';
+
 export interface AboutProps {
     serverTime: string;
     fact: string;
@@ -6,6 +8,7 @@ export interface AboutProps {
 export function About({ serverTime, fact }: AboutProps) {
     return (
         <article className="page">
+            <Title>About</Title>
             <h1>Async loads · dehydration</h1>
             <p className="lead">
                 The about scope is two async loads in one level. They resolve on the server before
@@ -23,8 +26,8 @@ export function About({ serverTime, fact }: AboutProps) {
 
             <div className="note">
                 <span className="badge server">server</span> Open <em>View Source</em>: both values
-                appear in the HTML and again under <code>window.__RATI_STATE__</code> — that second
-                copy is what the client hydrates from.
+                appear in the HTML and again inside the <code>#__rati-hydration</code> JSON script
+                tag — that second copy is what the client hydrates from.
             </div>
         </article>
     );

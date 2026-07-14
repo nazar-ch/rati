@@ -3,7 +3,9 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>rati feature gallery</title>
+        <!-- headTags() lands here: the <title> (store default when no page declares
+             one) and any page <Meta> tags, read after prerender. -->
+        <!--app-head-->
         <style>
             :root {
                 --bg: #0f1115;
@@ -284,9 +286,9 @@
     </head>
     <body>
         <div id="root"><!--app-html--></div>
-        <script>
-            window.__RATI_STATE__ = <!--app-state-->;
-        </script>
+        <!-- serializeHydration() emits a complete inert JSON script tag — no window
+             global, no execution, no placement constraint. -->
+        <!--app-state-->
         <script type="module" src="/src/entry-client.tsx"></script>
     </body>
 </html>

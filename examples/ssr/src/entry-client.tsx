@@ -1,18 +1,17 @@
 import { hydrateRoot } from 'react-dom/client';
 import { createBrowserHistory } from 'rati';
-import { type AppHydrationState, createApp } from './createApp';
+import { readHydration } from 'rati/ssr';
+import { createApp } from './createApp';
 
-declare global {
-    interface Window {
-        __RATI_STATE__: AppHydrationState | null;
-    }
-}
+// The server serialized the routing snapshot + island data into an inert JSON script
+// tag; readHydration() parses it (null on a client-only boot or a version mismatch —
+// the app then simply resolves from scratch).
+const state = readHydration();
 
-const state = window.__RATI_STATE__ ?? null;
 const { App } = createApp({
     history: createBrowserHistory(),
     hydratedState: state?.router,
-    islandData: state?.islands,
+    hydration: state ? { data: state.data, seeds: state.seeds } : undefined,
 });
 
 hydrateRoot(document.getElementById('root')!, <App />);

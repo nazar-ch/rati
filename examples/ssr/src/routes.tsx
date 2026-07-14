@@ -9,7 +9,7 @@ import { Flaky } from './components/Flaky';
 import { Home } from './components/Home';
 import { Live } from './components/Live';
 import { NotFound } from './components/NotFound';
-import { ProductPage } from './components/Product';
+import { ProductError, ProductPage } from './components/Product';
 import { ProfilePage } from './components/Profile';
 
 declare module 'rati' {
@@ -52,10 +52,19 @@ const profileScope = scope({ userId: input<string>() }).load({
 export const routes = [
     route('/', 'home', Home),
     route('/about', 'about', About, { scope: aboutScope }),
-    route('/products/:productId', 'product', ProductPage, { scope: productScope }),
+    route('/products/:productId', 'product', ProductPage, {
+        scope: productScope,
+        error: ProductError,
+    }),
     route('/profile/:userId', 'profile', ProfilePage, { scope: profileScope }),
     route('/counter', 'counter', Counter),
     route('/live', 'live', Live),
     route('/flaky', 'flaky', Flaky),
+    // A route-level redirect: the legacy /store/:id path maps its param onto the
+    // product route. The client follows it with a history replace; the server
+    // responds 301 before rendering anything (see prepareRoute / renderApp).
+    route('/store/:productId', 'store', () => null, {
+        redirect: { to: ({ productId }) => ({ name: 'product', productId }), permanent: true },
+    }),
     route('*', 'notFound', NotFound),
 ] as const satisfies GenericRouteType[];

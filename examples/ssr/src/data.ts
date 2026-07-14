@@ -1,3 +1,4 @@
+import { NotAvailableError } from 'rati';
 import { sleep } from './util';
 
 // Fake "backend" calls — deterministic (same inputs → same output) so the SSR
@@ -32,7 +33,11 @@ const CATALOG: Record<string, { name: string; priceCents: number }> = {
 export async function fetchProduct(id: string, region: string): Promise<Product> {
     // Pretend this hits a regional catalog service.
     await sleep(120);
-    const entry = CATALOG[id] ?? { name: `Unknown product ${id}`, priceCents: 0 };
+    const entry = CATALOG[id];
+    // The data-driven 404: the route matched, the entity doesn't exist. The error
+    // slot receives code 'not-available'; under SSR the collector records it and
+    // renderApp derives a 404 response status from it.
+    if (!entry) throw new NotAvailableError(`Product ${id} does not exist`);
     // A small regional adjustment so `region` (injected via hook) visibly matters.
     const priceCents = region === 'EU' ? Math.round(entry.priceCents * 1.1) : entry.priceCents;
     return { id, name: entry.name, priceCents, region };
