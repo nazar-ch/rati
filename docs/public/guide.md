@@ -403,32 +403,33 @@ under React's `prerender`, waits for the islands' data, and **dehydrates** the r
 values into the HTML. The client feeds them back and hydrates without re-running a single
 load.
 
+The whole per-request loop is one call — and the client boot mirrors it:
+
 ```tsx
 // server
-import { prepareRoute, HydrationProvider, createHydrationCollector } from 'rati/ssr';
-import { prerender } from 'react-dom/static';
+import { renderApp } from 'rati/ssr';
 
-const router = new RouterStore(routes, { history: createMemoryHistory({ url }) });
-const prepared = await prepareRoute(router);
-const collector = createHydrationCollector();
-
-const { prelude } = await prerender(
-    <HydrationProvider collect={collector.collect}>
-        <App router={router} />
-    </HydrationProvider>,
-);
-// embed prepared.hydratedState + collector.data + collector.seeds in the HTML
+const result = await renderApp({ url, createApp });
+// → { kind: 'rendered', html, status, headTags, stateScript, … }
+//   | { kind: 'redirect', to, status } | { kind: 'no-match' }
 ```
 
 ```tsx
 // client
-const router = new RouterStore(routes, { hydratedState });
-hydrateRoot(container,
-    <HydrationProvider data={islandData} seeds={islandSeeds}>
-        <App router={router} />
-    </HydrationProvider>,
-);
+import { readHydration } from 'rati/ssr';
+
+const state = readHydration();
+const { App } = createApp({
+    history: createBrowserHistory(),
+    hydratedState: state?.router,
+    hydration: state ? { data: state.data, seeds: state.seeds } : undefined,
+});
+hydrateRoot(container, <App />);
 ```
+
+The operational half — the server entry, document titles and meta, response statuses
+and load failures, route-level redirects, the payload contract, and
+bring-your-own-server notes — is the [server rendering guide](./ssr.md).
 
 Two consequences worth knowing:
 

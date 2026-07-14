@@ -242,6 +242,18 @@ route('/station/:stationId', 'station', Board, {
 });
 ```
 
+A route can declare itself an internal **redirect** (`RouteRedirect`): the client
+router follows it with a history `replace`; on the server `prepareRoute` reports it so
+the response is a real 30x before rendering. Targets: `{ name, …params }` (resolved
+through the table, current search/hash kept), a literal path string, or
+`(params) => target` for legacy param paths. `permanent: true` advises a 301.
+
+```ts
+route('/settings', 'settings', () => null, {
+    redirect: { to: { name: 'settings-profile' }, permanent: true },
+});
+```
+
 Routes live in a plain `as const` array. Register its type once for app-wide typed links
 and route reads:
 
@@ -345,28 +357,49 @@ The container is app-owned — a plain class whose fields are your stores. rati 
 
 ---
 
-## `rati/ssr`
+## Head
 
-Everything a server entry needs. (`HydrationProvider` renders on the client too — mount
-it on both sides so the trees match.)
+Document metadata that needs **dedupe by depth** — the title and per-page meta. The
+deepest live declaration per slot wins (a page beats a layout default); on the client
+`HeadProvider` syncs `document.title` and the managed `<meta>` tags on hydration and
+every navigation; on the server the winners are read after prerender (`headTags` in
+`rati/ssr`, done for you by `renderApp`). Tags that don't need dedupe use native React
+19 hoisting or the HTML shell — see the [server rendering guide](./ssr.md#titles-and-meta).
 
 | Export | Purpose |
 | --- | --- |
-| `prepareRoute(router)` | drive a memory-history router to its matched route (preloading a lazy component); returns `{ hydratedState }` or `null` when nothing matched |
-| `createHydrationCollector()` | `{ collect, data, seeds }` — records islands' resolved values (and live-source seeds) during `prerender` |
-| `HydrationProvider` | server: `collect={collector.collect}`; client: `data={islandData}` `seeds={islandSeeds}` — islands then hydrate without re-running loads |
-| `Hydration`, `HydrationData`, `PreparedRoute`, `RouterHydratedState` | the payload types |
+| `createHeadStore(options?)` | one store per rendered tree (per request on the server); options: `defaultTitle`, `titleTemplate(title)` |
+| `<HeadProvider store?>` | provides the store + owns the client document sync; `store` may be omitted in a client-only app |
+| `<Title>{string}</Title>` | declare the document title (template applies) |
+| `useTitle(title)` | hook form; `null`/`undefined` declares nothing |
+| `<Meta name="…" content>` / `<Meta property="…" content>` | declare a deduped meta tag (standard / Open Graph) |
+| `HeadStore`, `HeadSnapshot`, `MetaTag`, `MetaProps`, `HeadStoreOptions` | the types; `store.snapshot(mode)` exposes the winners for custom sinks |
 
-The flow (see the guide's [Server rendering](./guide.md#server-rendering)): fresh
-`RouterStore` (memory history) + collector per request → `prepareRoute` →
-`prerender` from `react-dom/static` (it awaits Suspense; `renderToString` cannot) → embed
-`hydratedState` + `collector.data` + `collector.seeds` in the HTML → the client seeds its
-`RouterStore` and `HydrationProvider` from them → `router.dispose()` on the server when
-done.
+---
+
+## `rati/ssr`
+
+The server-facing surface. (`HydrationProvider` and `readHydration` run on the client —
+mount the provider on both sides so the trees match.) The full flow with code:
+[server rendering guide](./ssr.md).
+
+| Export | Purpose |
+| --- | --- |
+| `renderApp({ url, createApp, … })` | the whole per-request loop: memory history → `createApp` → `prepareRoute` → prerender → dispose. Returns `{ kind: 'rendered', html, status, headTags, stateScript, hydration, errors, matchedCatchAll }` \| `{ kind: 'redirect', to, permanent, status }` \| `{ kind: 'no-match', status }` |
+| `renderToHtml(node, { bootstrapModules?, onError? })` | drain `react-dom/static` `prerender` to a string (it awaits Suspense; `renderToString` cannot) |
+| `serializeHydration(state)` | the payload as an inert `application/json` script tag (CSP-friendly, placement-free); warns outside production about values that don't survive JSON |
+| `readHydration()` | client: parse the embedded payload; `null` → resolve from scratch |
+| `headTags(store)` | the head store's winners as escaped HTML — call after prerender |
+| `prepareRoute(router)` | drive a memory-history router to its match (preloading a lazy component); returns `{ hydratedState, matchedCatchAll, redirect? }` or `null` when nothing matched |
+| `createHydrationCollector()` | `{ collect, collectError, data, seeds, errors }` — records islands' resolved values, live-source seeds, and failed loads during prerender |
+| `HydrationProvider` | server: `collect`/`collectError`; client: `data`/`seeds` — islands then hydrate without re-running loads |
+| `HydrationState`, `HydrationError`, `Hydration`, `HydrationData`, `PreparedRoute`, `RouterHydratedState`, `HYDRATION_SCRIPT_ID` | the payload/decision types |
 
 Async load results and `ssr: true` sources dehydrate as values; `ssr: { hydrate }` sources
 dehydrate as seeds; unmarked sources stay pending under SSR and come alive after hydration
-(see [Sources §SSR-capable sources](#ssr-capable-sources--the-ssr-marker)).
+(see [Sources §SSR-capable sources](#ssr-capable-sources--the-ssr-marker)). A load that
+*rejects* is recorded in `errors` — statuses derive from it (`not-available` → 404); the
+HTML degrades to the loading slot and the client retries the load after hydration.
 
 ---
 

@@ -15,13 +15,19 @@ src/
     controls.ts     the controls channel + useScopeControls
     channel.ts      the value channel + useScope / useOptionalScope / useScopeRead
     boundary.tsx    the error boundary
-    hydration.tsx   SSR dehydration (values + live-source seeds)
+    hydration.tsx   SSR dehydration (values + live-source seeds + error recording)
+    hydrationDiagnostics.ts  the client-side unclaimed-payload watchdog
     ssrSource.ts    firstSettle — the server-side promise face of SSR-marked sources
   island/    island.ts — public island() wrapper + Island* / Hydration* aliases
-  router/    route.tsx (route() + route/param types), store.ts (RouterStore),
+  head/      store.ts (HeadStore/createHeadStore), HeadProvider, Title/useTitle/Meta,
+             useHeadTag (shared registration), domSync (client title/meta reconciler),
+             context
+  router/    route.tsx (route() + route/param/redirect types), store.ts (RouterStore),
              Router, Link, Navigate, useRouteContext, prepareRoute, history,
              scrollRestoration, lazy
   scope/     scope.ts (scope/input/load/provide/hook/data + scope types), source.ts
+  ssr/       index.ts (the rati/ssr entry) + renderApp, renderToHtml, payload
+             (serializeHydration/readHydration), headTags
   data/      remoteData, apiUtils, ActiveData (legacy REST/data helpers)
   stores/    RootStore, GlobalStore (store roots)
   util/      utils.ts
@@ -189,10 +195,43 @@ registry, keyed `mandalaId (useId) → scopeKey → value`, in two wire sections
   value, kind?)` defaults `kind` to `'value'` (a pre-seeds collector signature keeps
   working). The mechanism is router-orthogonal (a route is just a mandala); public exports
   are the `Hydration*` names re-exported through `rati/ssr`.
+- **Error recording.** A promise load that rejects under a collected render never reaches
+  the error slot — server rendering has no error-boundary recovery; React emits the loading
+  slot with a client-retry marker and the prerender *resolves* (pinned in
+  `islandSsrErrors.test.tsx`). The Step attaches a once-per-promise rejection recorder
+  (WeakSet-guarded) when `collectError` is present; the collector's `errors` carries
+  `{ mandalaId, key, error: SourceError }` — the server's status input (`not-available` →
+  404). `asSourceError` (scope/source.ts) is the shared normalization with the boundary.
+- **Claim watchdog** (`hydrationDiagnostics.ts`): on a rehydrating client, `buildCell`
+  claims each consumed `data`/`seeds` slice; slices still unclaimed a grace period after
+  the last claim get one console.warn — the loud version of "the trees drifted, the useId
+  keys shifted, SSR silently turned itself off".
 
 The routing snapshot is separate: `prepareRoute(router)` (`router/prepareRoute.ts`) drives a
-memory-history router to its matched route and returns `RouterHydratedState`; the client
-seeds it via `RouterStoreOptions.hydratedState`.
+memory-history router to its matched route and returns the server's decision object:
+`RouterHydratedState` (seeded back via `RouterStoreOptions.hydratedState`),
+`matchedCatchAll`, and the followed `redirect`, if any.
+
+## The rati/ssr entry (`ssr/`)
+
+`renderApp` (`ssr/renderApp.tsx`) composes the per-request loop — memory history → the
+app factory → `prepareRoute` → `renderToHtml` → dispose — into the decision object the
+public docs describe (`docs/public/ssr.md`); `renderToHtml` is the `prerender` stream
+drain; `payload.ts` owns the wire format (versioned `HydrationState`, the inert JSON
+script tag, the dev round-trip warning); `headTags.ts` is the head store's post-prerender
+read-back (escaped, `data-rati-head`-marked so the client reconciler adopts the tags).
+`react-dom/static` is imported statically — it has browser builds, and `sideEffects:
+false` keeps it tree-shaken out of client bundles that touch only `readHydration`.
+
+## Head management (`head/`)
+
+The store is registration-sequence based: declarations `set()` during render (so a
+prerender sees them — effects never run there), the client effect `commit()`s them, and
+client winners count only committed entries so a render React abandoned can't leak a
+title; a value update keeps its seq, so deepest-registered keeps winning. One store per
+tree, enforced by a null context default (no module-global fallback — that's a
+cross-request leak on the server). `domSync.ts` reconciles `document.title` plus the
+`data-rati-head`-marked metas from `HeadProvider`'s effect.
 
 ## Router (`router/`)
 

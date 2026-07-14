@@ -120,6 +120,40 @@ only for a slow **first** load.
 `not-available`) — would remove boilerplate retry buttons for transient network failures.
 Wait for a real need; noted because the retry counter already exists.
 
+### Per-island SSR opt-out (`ssr: false`)
+
+Under `prerender` every promise load gates TTFB — there is no "this island is below the
+fold / expensive / personalized, ship its loading slot instead". An island/route-level
+`ssr: false` would skip starting its loads on a collected render, emit the loading slot,
+and resolve client-side — the mirror of the source `ssr: true` marker, completing the
+matrix. Mechanically small (the mandala checks the option when `collect` is present and
+renders the loading slot without building promise cells). This is also the sanctioned
+pressure valve for the deliberate non-goal of streaming SSR: `prerender` stays
+all-or-nothing; islands that shouldn't block opt out. Pick up with the loading-state
+batch above.
+
+### SSR error surfacing (options; baseline shipped 2026-07)
+
+What shipped: rejected loads are recorded by the collector (`errors` → status mapping,
+`not-available` → 404), the HTML degrades to the loading slot with React's client-retry
+marker, and the client re-runs the load on hydration (self-healing, no mismatch —
+pinned by experiment in `islandSsrErrors.test.tsx`). Options beyond that, if a real
+consumer wants them:
+
+- **Dehydrate the error.** Carry the normalized `SourceError` in a third wire section so
+  the client renders the *error slot* immediately (with `retry`) instead of re-running
+  the load. Requires catching at the resolver level (the boundary never runs
+  server-side) and a hydrate-to-error path in `buildCell`. Trade-off: deterministic
+  first paint vs. losing the self-healing retry — probably a per-island choice, e.g.
+  `ssrErrors: 'retry' (default) | 'dehydrate'`.
+- **Disable the automatic client retry.** Today React's boundary-abandonment mechanism
+  *is* the retry; suppressing it means the same dehydrate-the-error machinery (the
+  client must render something other than a re-running load). The two options are one
+  feature with two defaults.
+- **Richer status policy hooks.** `renderApp` exposes `errors`/`matchedCatchAll` raw, so
+  apps already can; a `deriveStatus` callback option would formalize it if the inline
+  derivation stops being enough.
+
 ## 3. Router
 
 ### Already sketched (cross-reference)
@@ -191,10 +225,12 @@ real consumer exists. (A real SSR consumer now does exist — see
 
 - **SSG** is the near step and is mostly a build script over existing pieces:
   enumerate static routes (paths without params, plus enumerated param values), run
-  `prepareRoute` + `prerender` per URL, emit HTML + the two hydration payloads. Framework
-  work is small: a route-table walker (`staticPaths` per param route) and a stable,
-  versioned dehydration format. The existing consequence "server data must be an async
-  load; sources stay pending under SSR" carries over unchanged.
+  `renderApp` per URL (the 2026-07 SSR baseline shipped it — one call returning html +
+  status + headTags + the versioned payload tag, deliberately the SSG per-URL loop), and
+  write the files. Remaining framework work: a route-table walker (`staticPaths` per
+  param route). The existing consequence "server data must be an async load; sources
+  stay pending under SSR" carries over unchanged. SSG still needs its own design pass
+  before commitment.
 - **RSC** maps naturally in principle — a scope's promise-load waterfall is exactly what a
   server component resolves, and the `hook()`/source loads are exactly what stays client —
   but adopting it means a bundler/runtime contract far beyond rati's current size. Treat it

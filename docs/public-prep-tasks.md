@@ -19,6 +19,15 @@ keep `docs/*.md` in sync with behavior changes; never publish.
 
 ## Batch A — rati core (from the nazar.ch SSR review)
 
+> **Done 2026-07-14**, executed as one SSR-baseline round rather than per-task (deltas
+> per item recorded in ssr-nazar-patterns.md; the public surface in docs/public/ssr.md).
+> Beyond the letter of the tasks: CORE-1 shipped as an inert JSON script tag (not the
+> window global) plus integrity diagnostics; CORE-2 also produced `renderApp` (the
+> composed per-request loop); CORE-3 grew collector error recording (data-driven
+> 404/500); CORE-4 includes `<Meta>` + `useTitle` with the template in store config.
+> Follow-ups (server kit, consumer migrations, remaining tests) live in the
+> ssr-baseline-remains effort (docs/planned/ssr-baseline-remains/).
+
 All grounded in
 [ssr-nazar-patterns.md](./research/directions-2026-07/ssr-nazar-patterns.md); mutually
 independent.

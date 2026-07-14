@@ -1,5 +1,13 @@
 # SSR patterns from nazar.ch — what's worth absorbing
 
+> **Status 2026-07-14: absorbed.** §1–§5 shipped in rati (with deltas noted inline per
+> section); §6's example fixes landed with them. The public surface is documented in
+> [docs/public/ssr.md](../../public/ssr.md); what the implementation round added beyond
+> this list (collector error recording → status mapping, payload integrity diagnostics)
+> and the deferred options live in [improvements.md](./improvements.md). Remaining:
+> migrating nazar.ch and the jnana website onto the new surface (tracked in the
+> ssr-baseline-remains effort).
+
 nazar.ch (`~/Sites/nazar.ch/site`) is the first real rati SSR consumer outside the
 `examples/ssr` gallery: a whole-document-rendered site (React owns `<html>`), served by a
 hand-written Node server in dev and a Vercel serverless function in prod. Reviewed:
@@ -37,6 +45,16 @@ title-only — meta/OG tags wait for a real need (nazar injects those statically
 full head manager is a bigger commitment. Naming is plain English already: `Title`,
 `HeadProvider`.
 
+*Shipped with deltas:* `<Meta>` included after all (same store, kinds keyed by
+name/property — SEO meta is the reason most people SSR); `useTitle` hook form added
+(jnana's 24 `useDocumentTitle` call sites migrate 1:1, `null` tolerated); the suffix
+moved into `createHeadStore({ defaultTitle, titleTemplate })`; `TitleManager` folded
+into `HeadProvider`; the module-global context default replaced by a null default that
+throws (the cross-request clobber the comments warned about, made structural); client
+winners gated on effect-confirmed entries so abandoned concurrent renders can't leak;
+server read-back is `headTags(store)` — the extension point for future head kinds.
+Everything that doesn't need dedupe stays on native React 19 hoisting, documented.
+
 ## 2. One hydration payload + safe serialization — adopt
 
 rati hands the server *two* payloads (the router's `hydratedState`, the collector's island
@@ -56,6 +74,12 @@ standardizes the payload shape — which the SSG direction
 ([improvements.md §6](./improvements.md)) independently wants ("a stable, versioned
 dehydration format").
 
+*Shipped with one better idea:* an inert `<script type="application/json">` tag instead
+of the window global — never executes (no CSP inline-script exemption), and the
+before-`</body>` ordering contract disappears (a deferred module entry always sees the
+parsed tag). Versioned (`v: 1`); plus integrity diagnostics — a dev-time JSON
+round-trip warning and a client watchdog for payload slices no island claimed.
+
 ## 3. `prerender`-to-string helper — adopt (small)
 
 Every server entry re-writes the same ReadableStream drain loop over `react-dom/static`
@@ -65,12 +89,22 @@ stays a peer import — ends that. Together with §2 a minimal server entry beco
 `prepareRoute` → `renderToHtml` → `serializeHydration`, which is also exactly the loop an
 SSG build script runs per URL.
 
+*Shipped, plus the composition:* `renderApp({ url, createApp })` folds the whole
+per-request loop into one call returning the response decision object — an entry-server
+is now a one-liner (`examples/ssr`), and the SSG per-URL loop is the same call.
+
 ## 4. Match status for HTTP codes — adopt (tiny)
 
 nazar derives the response status from a route-name convention
 (`activeRouteName === 'notFound'` → 404) — brittle, and every server will need it.
 `prepareRoute` already knows whether only the `*` catch-all matched; expose it on
 `PreparedRoute` (e.g. `matchedCatchAll: boolean`, letting the app map it to a status).
+
+*Shipped, and extended:* `matchedCatchAll` covers only routing-level 404s; the
+implementation round added the **data-driven** kind — rejected loads are recorded by
+the hydration collector (`errors`, normalized `SourceError`), so `NotAvailableError`
+from a load ("the route matched, the entity doesn't exist") derives 404 and other
+failures 500. `renderApp` encodes that policy; the raw signals stay exposed.
 
 ## 5. Server-side redirects — adopt (maintainer-confirmed)
 
@@ -82,6 +116,12 @@ SSR the pre-redirect page and hop on the client. The honest fix is a route-level
 and that the client router honors like a `<Navigate>` — not sniffing `<Navigate>` out of
 a render. External URLs stay at the HTTP layer. Confirmed for the public-prep batch
 (CORE-6 in [public-prep-tasks.md](../../public-prep-tasks.md)).
+
+*Shipped* as `route(…, { redirect: { to, permanent? } })` — object targets resolve
+through the table and keep search/hash, function targets map matched params (the
+legacy-path shape), the store follows synchronously via history `replace` with a
+depth-guarded cycle break, and `prepareRoute`/`renderApp` report `{ to, permanent }`
+for the 30x.
 
 ## 6. Example & docs fixes that fall out
 
