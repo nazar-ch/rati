@@ -98,11 +98,13 @@ function warnNonRoundTripping(state: HydrationState): void {
         ['seeds', state.seeds],
     ] as const;
     for (const [section, registry] of sections) {
-        for (const [mandalaId, slice] of Object.entries(registry ?? {})) {
+        for (const [mandalaId, slice] of Object.entries(registry)) {
             for (const [key, value] of Object.entries(slice)) {
                 let survives: boolean;
                 try {
-                    const json: string | undefined = JSON.stringify(value);
+                    // The lib type lies (`string`): stringify yields undefined for
+                    // undefined/function inputs, so the check is real.
+                    const json = JSON.stringify(value) as string | undefined;
                     survives = json !== undefined && deepEqual(value, JSON.parse(json));
                 } catch {
                     survives = false;
