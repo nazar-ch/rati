@@ -90,6 +90,18 @@ export { useScopeControls, type ScopeControls } from './mandala/controls';
 
 export { island, type IslandComponent, type IslandConfig } from './island/island';
 
+export {
+    createHeadStore,
+    HeadStore,
+    type HeadStoreOptions,
+    type HeadSnapshot,
+    type MetaTag,
+} from './head/store';
+export { HeadProvider } from './head/HeadProvider';
+export { Title } from './head/Title';
+export { useTitle } from './head/useTitle';
+export { Meta, type MetaProps } from './head/Meta';
+
 export { useRouteContext } from './router/useRouteContext';
 
 if (import.meta.env.DEV) {

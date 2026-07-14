@@ -24,3 +24,5 @@ export {
 } from '../mandala/hydration';
 
 export { prepareRoute, type PreparedRoute } from '../router/prepareRoute';
+
+export { headTags } from './headTags';
