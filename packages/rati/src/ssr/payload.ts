@@ -76,20 +76,23 @@ export function readHydration(options: { id?: string } = {}): HydrationState | n
 
     let parsed: unknown;
     try {
-        parsed = JSON.parse(element.textContent ?? '');
+        // textContent is nullable on Node in general; this element always has some.
+        parsed = JSON.parse((element.textContent as string | null) ?? '');
     } catch (error) {
         console.error(`[rati] hydration payload #${id} is not valid JSON`, error);
         return null;
     }
-    const state = parsed as HydrationState;
-    if (state.v !== 1) {
+    // Validate the version against the *unnarrowed* shape — the JSON is runtime input,
+    // whatever HydrationState's literal type claims.
+    const version = (parsed as { v?: unknown }).v;
+    if (version !== 1) {
         console.error(
-            `[rati] hydration payload #${id} has version ${String(state.v)}, expected 1 — ` +
+            `[rati] hydration payload #${id} has version ${String(version)}, expected 1 — ` +
                 `ignoring it (stale HTML meeting a newer client?)`,
         );
         return null;
     }
-    return state;
+    return parsed as HydrationState;
 }
 
 function warnNonRoundTripping(state: HydrationState): void {
