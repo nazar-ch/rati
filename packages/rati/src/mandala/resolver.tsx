@@ -161,6 +161,9 @@ export type Shared = {
     // the server can derive a response status (not-available → 404) — the render itself
     // degrades to the loading slot + React's client-retry marker without rati's help.
     collectError: ((key: string, error: SourceError) => void) | undefined;
+    // Client only, diagnostic: notes a hydration/seed slice as consumed, feeding the
+    // unclaimed-payload watchdog (hydrationDiagnostics.ts).
+    claim: ((key: string, section: 'data' | 'seeds') => void) | undefined;
     // Client only: server-resolved promise values to rehydrate from (scope key -> value).
     hydration: Record<string, unknown> | undefined;
     // Client only: server-dehydrated live-source seeds (scope key -> hydrate() input).
@@ -181,6 +184,7 @@ function buildCell(
     // latter the producer never runs client-side either: promise semantics end to end.
     if (shared.hydration && key in shared.hydration) {
         const entry = level[key];
+        shared.claim?.(key, 'data');
         return {
             kind: 'value',
             value: shared.hydration[key],
@@ -202,6 +206,7 @@ function buildCell(
     // anything reads or attaches it, so its first snapshot is already ready — no
     // pending gap, no double fetch, fully live afterward.
     if (shared.seeds && key in shared.seeds) {
+        shared.claim?.(key, 'seeds');
         if (cell.kind === 'source' && cell.source.ssr && cell.source.ssr !== true) {
             try {
                 cell.source.ssr.hydrate(shared.seeds[key]);

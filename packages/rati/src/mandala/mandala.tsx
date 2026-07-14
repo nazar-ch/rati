@@ -119,6 +119,9 @@ export function createMandala<S extends Scope<any>>(
         const collectError = hydration.collectError
             ? (key: string, error: SourceError) => hydration.collectError!(mandalaId, key, error)
             : undefined;
+        const claim = hydration.claim
+            ? (key: string, section: 'data' | 'seeds') => hydration.claim!(mandalaId, key, section)
+            : undefined;
 
         // Per-level data-cell caches, rebuilt when the inner tree remounts (treeKey
         // change). Held on the mandala's committed ref so a Step's `use()` suspension
@@ -184,6 +187,7 @@ export function createMandala<S extends Scope<any>>(
             controller: collect ? undefined : controller,
             collect,
             collectError,
+            claim,
             hydration: hydrationSlice,
             seeds: seedsSlice,
         };

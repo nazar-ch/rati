@@ -1,5 +1,6 @@
-import { createContext, useMemo, type ReactNode } from 'react';
+import { createContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { SourceError } from '../scope/source';
+import { createHydrationClaims } from './hydrationDiagnostics';
 
 /*
     SSR data hydration for mandalas (islands and routes).
@@ -58,6 +59,9 @@ export type Hydration = {
         | undefined;
     /** Server: record a promise load that rejected during the prerender pass. */
     collectError?: ((mandalaId: string, key: string, error: SourceError) => void) | undefined;
+    /** Client, diagnostic: notes a payload slice as consumed. Wired internally by
+     * HydrationProvider (see hydrationDiagnostics.ts); apps never set it. */
+    claim?: ((mandalaId: string, key: string, section: 'data' | 'seeds') => void) | undefined;
 };
 
 // Default is the empty registry: mandalas rendered with no provider above (jnana's SPA,
@@ -77,10 +81,17 @@ export function HydrationProvider({
     data,
     seeds,
     children,
-}: Hydration & { children: ReactNode }) {
+}: Omit<Hydration, 'claim'> & { children: ReactNode }) {
+    // Rehydrating client (payload present, not collecting): watch for payload slices
+    // no island ever claims — the loud version of "SSR silently turned itself off".
+    const [claims] = useState(() =>
+        !collect && (data || seeds) ? createHydrationClaims() : undefined,
+    );
+    useEffect(() => claims?.arm(data, seeds), [claims, data, seeds]);
+
     const value = useMemo<Hydration>(
-        () => ({ collect, collectError, data, seeds }),
-        [collect, collectError, data, seeds],
+        () => ({ collect, collectError, data, seeds, claim: claims?.claim }),
+        [collect, collectError, data, seeds, claims],
     );
     return <HydrationContext.Provider value={value}>{children}</HydrationContext.Provider>;
 }

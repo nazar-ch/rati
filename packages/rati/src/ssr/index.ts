@@ -27,3 +27,10 @@ export {
 export { prepareRoute, type PreparedRoute } from '../router/prepareRoute';
 
 export { headTags } from './headTags';
+
+export {
+    serializeHydration,
+    readHydration,
+    HYDRATION_SCRIPT_ID,
+    type HydrationState,
+} from './payload';
