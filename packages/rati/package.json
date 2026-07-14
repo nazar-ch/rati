@@ -71,10 +71,14 @@
     },
     "peerDependencies": {
         "mobx": "^6.15.0",
-        "react": "^19.2"
+        "react": "^19.2",
+        "react-dom": "^19.2"
     },
     "peerDependenciesMeta": {
         "mobx": {
+            "optional": true
+        },
+        "react-dom": {
             "optional": true
         }
     },

@@ -34,3 +34,12 @@ export {
     HYDRATION_SCRIPT_ID,
     type HydrationState,
 } from './payload';
+
+export { renderToHtml, type RenderToHtmlOptions } from './renderToHtml';
+export {
+    renderApp,
+    type RenderAppOptions,
+    type RenderAppSetup,
+    type RenderAppInstance,
+    type RenderAppResult,
+} from './renderApp';
