@@ -153,6 +153,22 @@ export function toSource<T>(value: T | Promise<T> | Source<T>): Source<T> {
     return readySource(value as T);
 }
 
+/**
+ * Maps a thrown/rejected reason that may already *be* a SourceError (a plain object
+ * with a string `code`) to the unified shape; anything else goes through
+ * {@link toSourceError}. The boundary and the SSR error collector share it.
+ */
+export function asSourceError(thrown: unknown): SourceError {
+    if (
+        is.object(thrown) &&
+        !(thrown instanceof Error) &&
+        typeof (thrown as { code?: unknown }).code === 'string'
+    ) {
+        return thrown as SourceError;
+    }
+    return toSourceError(thrown);
+}
+
 /** Maps an arbitrary thrown/rejected reason to the unified SourceError. */
 export function toSourceError(reason: unknown): SourceError {
     if (reason instanceof NotAvailableError) {

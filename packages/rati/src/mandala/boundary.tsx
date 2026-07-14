@@ -1,20 +1,6 @@
 import { Component } from 'react';
 import type { ComponentType, ErrorInfo, ReactNode } from 'react';
-import { toSourceError, type SourceError } from '../scope/source';
-import { is } from '../util/utils';
-
-function asSourceError(thrown: unknown): SourceError {
-    // A source error is already a SourceError (plain object with a string `code`); a
-    // promise rejection is a raw Error / value — map it through toSourceError.
-    if (
-        is.object(thrown) &&
-        !(thrown instanceof Error) &&
-        typeof (thrown as { code?: unknown }).code === 'string'
-    ) {
-        return thrown as SourceError;
-    }
-    return toSourceError(thrown);
-}
+import { asSourceError, type SourceError } from '../scope/source';
 
 // Catches a rejected promise (`use()`) or a thrown source error and renders the mandala's
 // error slot — or rethrows to the nearest outer boundary when there's no slot. `resetKey`

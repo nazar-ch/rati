@@ -1,4 +1,5 @@
 import { createContext, useMemo, type ReactNode } from 'react';
+import type { SourceError } from '../scope/source';
 
 /*
     SSR data hydration for mandalas (islands and routes).
@@ -36,6 +37,15 @@ import { createContext, useMemo, type ReactNode } from 'react';
 // mandalaId (useId) -> scope key -> dehydrated value (or live-source seed).
 export type HydrationData = Record<string, Record<string, unknown>>;
 
+/**
+ * One promise load that rejected during a collected server render. The render itself
+ * degrades gracefully without rati's help (React emits the loading slot with a
+ * client-retry marker; the client re-runs the load) — what the record adds is the
+ * *server's* knowledge: map `error.code === 'not-available'` to a 404, `failed` to
+ * the app's 5xx policy, before the degraded 200 goes out.
+ */
+export type HydrationError = { mandalaId: string; key: string; error: SourceError };
+
 export type Hydration = {
     /** Client: server-resolved values to rehydrate the matching mandalas from. */
     data?: HydrationData | undefined;
@@ -46,6 +56,8 @@ export type Hydration = {
     collect?:
         | ((mandalaId: string, key: string, value: unknown, kind?: 'value' | 'seed') => void)
         | undefined;
+    /** Server: record a promise load that rejected during the prerender pass. */
+    collectError?: ((mandalaId: string, key: string, error: SourceError) => void) | undefined;
 };
 
 // Default is the empty registry: mandalas rendered with no provider above (jnana's SPA,
@@ -61,11 +73,15 @@ export const HydrationContext = createContext<Hydration>({});
  */
 export function HydrationProvider({
     collect,
+    collectError,
     data,
     seeds,
     children,
 }: Hydration & { children: ReactNode }) {
-    const value = useMemo<Hydration>(() => ({ collect, data, seeds }), [collect, data, seeds]);
+    const value = useMemo<Hydration>(
+        () => ({ collect, collectError, data, seeds }),
+        [collect, collectError, data, seeds],
+    );
     return <HydrationContext.Provider value={value}>{children}</HydrationContext.Provider>;
 }
 
@@ -77,16 +93,24 @@ export function HydrationProvider({
  */
 export function createHydrationCollector(): {
     collect: (mandalaId: string, key: string, value: unknown, kind?: 'value' | 'seed') => void;
+    collectError: (mandalaId: string, key: string, error: SourceError) => void;
     data: HydrationData;
     seeds: HydrationData;
+    /** Loads that rejected during the render — the server's status-code input. */
+    errors: HydrationError[];
 } {
     const data: HydrationData = {};
     const seeds: HydrationData = {};
+    const errors: HydrationError[] = [];
     return {
         data,
         seeds,
+        errors,
         collect(mandalaId, key, value, kind = 'value') {
             ((kind === 'seed' ? seeds : data)[mandalaId] ??= {})[key] = value;
+        },
+        collectError(mandalaId, key, error) {
+            errors.push({ mandalaId, key, error });
         },
     };
 }

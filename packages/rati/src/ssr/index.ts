@@ -21,6 +21,7 @@ export {
     createHydrationCollector,
     type Hydration,
     type HydrationData,
+    type HydrationError,
 } from '../mandala/hydration';
 
 export { prepareRoute, type PreparedRoute } from '../router/prepareRoute';

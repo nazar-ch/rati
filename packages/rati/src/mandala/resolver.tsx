@@ -17,7 +17,7 @@ import {
     type Scope,
     type ScopeProvideDef,
 } from '../scope/scope';
-import { isSource, type SourceState } from '../scope/source';
+import { asSourceError, isSource, type SourceError, type SourceState } from '../scope/source';
 import { is, deepEqual } from '../util/utils';
 import { navTrace, navTraceEnabled } from '../util/navTrace';
 import {
@@ -157,6 +157,10 @@ export type Shared = {
     controller: RefreshController | undefined;
     // Server only: record a resolved promise value for dehydration. Undefined on client.
     collect: ((key: string, value: unknown, kind: 'value' | 'seed') => void) | undefined;
+    // Server only: record a promise load that rejected during the collected render, so
+    // the server can derive a response status (not-available → 404) — the render itself
+    // degrades to the loading slot + React's client-retry marker without rati's help.
+    collectError: ((key: string, error: SourceError) => void) | undefined;
     // Client only: server-resolved promise values to rehydrate from (scope key -> value).
     hydration: Record<string, unknown> | undefined;
     // Client only: server-dehydrated live-source seeds (scope key -> hydrate() input).
@@ -300,6 +304,11 @@ function processDirtyCells(
     }
 }
 
+// Rejection recording attaches once per promise: a suspended level re-renders on
+// resume and its cached cell (same promise identity) passes through here again —
+// without the guard every pass would stack another handler.
+const recordedRejections = new WeakSet<Promise<unknown>>();
+
 type StepProps = {
     level: Scope['definition'];
     index: number;
@@ -431,6 +440,13 @@ function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: Step
         if (cell.kind === 'value') {
             resolved[key] = cell.value;
         } else if (cell.kind === 'promise') {
+            if (shared.collectError && !recordedRejections.has(cell.promise)) {
+                recordedRejections.add(cell.promise);
+                const collectError = shared.collectError;
+                void cell.promise.then(undefined, (thrown: unknown) => {
+                    collectError(key, asSourceError(thrown));
+                });
+            }
             const value = use(cell.promise);
             // Render-time write, but only on the server (client has no `collect`) and
             // idempotent per key — the established SSR data-collection pattern. A
