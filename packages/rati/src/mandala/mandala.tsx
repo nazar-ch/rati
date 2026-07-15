@@ -129,7 +129,15 @@ export function createMandala<S extends Scope<any>>(
         // change). Held on the mandala's committed ref so a Step's `use()` suspension
         // can't discard a half-built cell (which would re-run its load forever).
         const cacheRef = useRef<{ key: string; buckets: Bucket[] } | null>(null);
+        // Buckets the line below replaced, awaiting the sweep in the commit effect. A Step
+        // torn down while its bucket was still live keeps its sources attached on purpose
+        // (it can't tell a source swap from an unmount — see the resolver's detach effect)
+        // and defers to a sweep; but a source erroring or a mid-tree source dropping to
+        // pending tears levels down with *no* remount, so without this the next generation
+        // would orphan that bucket and its still-attached sources would never detach.
+        const orphanedRef = useRef<Bucket[][]>([]);
         if (!cacheRef.current || cacheRef.current.key !== treeKey) {
+            if (cacheRef.current) orphanedRef.current.push(cacheRef.current.buckets);
             cacheRef.current = {
                 key: treeKey,
                 buckets: levels.map(() => ({ cells: new Map(), sources: [], built: false })),
@@ -155,9 +163,16 @@ export function createMandala<S extends Scope<any>>(
         });
 
         // A committed remount (inputs change / retry) tears the old cells down —
-        // outstanding refresh bookkeeping settles wholesale.
+        // outstanding refresh bookkeeping settles wholesale, and the generation it replaced
+        // releases whatever its Steps left attached. Off the render path on purpose: a
+        // discarded render must not detach. Idempotent both ways — the ordinary remount
+        // path has already detached through the Steps' own cleanups (by then the live
+        // buckets are the new ones), so this finds only what those deferred.
         useEffect(() => {
             controller.treeCommitted(treeKey);
+            const orphaned = orphanedRef.current;
+            orphanedRef.current = [];
+            for (const buckets of orphaned) sweepDetach(buckets);
         }, [controller, treeKey]);
 
         // Drop the cache on unmount so a StrictMode remount (mount → cleanup → mount)
@@ -174,6 +189,10 @@ export function createMandala<S extends Scope<any>>(
             if (cacheRef.current === null) forceRebuild();
             return () => {
                 sweepDetach(cacheRef.current?.buckets);
+                // An unmount racing a generation change can leave a bucket queued but
+                // unswept (the effect above never ran for it).
+                for (const buckets of orphanedRef.current) sweepDetach(buckets);
+                orphanedRef.current = [];
                 cacheRef.current = null;
             };
         }, []);

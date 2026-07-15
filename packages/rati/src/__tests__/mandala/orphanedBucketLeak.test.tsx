@@ -1,16 +1,15 @@
-import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
+import { describe, test, expect, afterEach } from 'vite-plus/test';
 import { render, screen, cleanup, act } from '@testing-library/react';
-import type { FC } from 'react';
 import { scope, input } from '../../scope/scope';
 import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
 
 /*
-    A source leaks when an inner-tree teardown is followed by a new generation — a *known
-    gap*, found by the MF-02 command property on its first run (it shrank to `reject(k3_1),
-    changeInput` on a 4-level scope). Effort README §Findings 2026-07-15.
+    A source must not leak when an inner-tree teardown is followed by a new generation —
+    found by the MF-02 command property on its first run (it shrank to `reject(k3_1),
+    changeInput` on a 4-level scope), then reduced to the two repros below and fixed.
 
-    The mechanism (resolver.tsx + mandala.tsx):
+    The mechanism the fix closes (resolver.tsx + mandala.tsx):
 
       1. A Step's detach effect deliberately keeps entries the *live* bucket still holds —
          it cannot tell a source swap from an unmount, so it defers to the mandala's sweep
@@ -19,17 +18,15 @@ import { island } from '../../island/island';
          Two ways in with no remount involved: a source erroring (the boundary swaps the
          subtree for the error slot), and a mid-tree source dropping to pending (S8 — the
          levels below unmount for real).
-      3. A following generation (retry / input change) makes `cacheRef.current` a *fresh*
-         bucket array. The old buckets — still holding attached sources — are dropped on the
-         floor, and `sweepDetach` on unmount only ever sees `cacheRef.current`.
+      3. A following generation (retry / input change) makes `cacheRef.current` a fresh
+         bucket array. Before the fix the old buckets — still holding attached sources —
+         were dropped on the floor, and `sweepDetach` on unmount only ever saw
+         `cacheRef.current`. Nothing detached them, ever.
 
-    Nothing detaches them. On the ordinary path there is no leak: a plain remount re-renders
-    the mandala first, so by the time the old Steps' cleanups run `currentBuckets()` already
-    points at the new array, `bucketIsLive` is false, and everything detaches.
-
-    Both tests assert the **contract** (attach/detach balanced by teardown, strategy doc
-    §Invariants 6) and are `test.fails`: they run, they are expected to fail, and the day the
-    engine is fixed vitest reports "expected to fail but passed" — flip them to `test()`.
+    The mandala now queues each replaced bucket array and sweeps it from the `treeCommitted`
+    effect. The ordinary remount path never needed it: the mandala re-renders before the old
+    Steps' cleanups run, so `currentBuckets()` already points at the new array, `bucketIsLive`
+    is false, and everything detaches through the Steps themselves.
 */
 
 afterEach(cleanup);
@@ -63,8 +60,8 @@ const balanced = (log: string[], id: string) =>
     log.filter((entry) => entry === `attach:${id}`).length ===
     log.filter((entry) => entry === `detach:${id}`).length;
 
-describe('orphaned bucket leak (known gap)', () => {
-    test.fails('a source attached before an error detaches once the tree is replaced', async () => {
+describe('teardown followed by a new generation releases its sources', () => {
+    test('a source attached before an error detaches once the tree is replaced', async () => {
         const log: string[] = [];
         const live = testSource<string>(log, 'live');
         const testScope = scope({ n: input<string>() }).load({ feed: () => live });
@@ -85,8 +82,8 @@ describe('orphaned bucket leak (known gap)', () => {
         });
         expect(screen.getByText('error failed')).toBeTruthy();
 
-        // A new generation: `cacheRef` becomes a fresh bucket array and the old one — still
-        // holding the attached source — is orphaned. The sweep on unmount never sees it.
+        // A new generation: `cacheRef` becomes a fresh bucket array, so the old one — still
+        // holding the attached source — must be swept as it is replaced.
         view.rerender(<Island n="b" />);
         await act(async () => {});
         view.unmount();
@@ -94,7 +91,7 @@ describe('orphaned bucket leak (known gap)', () => {
         expect(balanced(log, 'live'), `unbalanced: ${log.join(' ')}`).toBe(true);
     });
 
-    test.fails('a source under a pending mid-tree source detaches once the tree is replaced', async () => {
+    test('a source under a pending mid-tree source detaches once the tree is replaced', async () => {
         const log: string[] = [];
         const top = testSource<string>(log, 'top');
         const deep = testSource<string>(log, 'deep');
@@ -124,7 +121,7 @@ describe('orphaned bucket leak (known gap)', () => {
         });
         expect(screen.getByText('loading...')).toBeTruthy();
 
-        // A new generation orphans that bucket, `deep` included. No error involved.
+        // A new generation replaces that bucket, `deep` included. No error involved.
         view.rerender(<Island n="b" />);
         await act(async () => {});
         view.unmount();
