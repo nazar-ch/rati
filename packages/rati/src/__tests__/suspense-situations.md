@@ -39,8 +39,8 @@ generated settle orders exercise every interleaving).
 
 ## S4 — Re-suspension of committed content
 
-If a *committed* Step suspends again — reachable today only through a `hook()` load
-returning a fresh pending promise on a later render — React does not unmount the content:
+If a *committed* Step suspends again — through a `hook()` load returning a fresh pending
+promise on a later render (S11 is the other way in) — React does not unmount the content:
 it hides it (Offscreen semantics), destroys the subtree's effects, and re-runs them on
 reveal. The mandala's attach loop is idempotent by the `detach !== null` guard, so
 hide/reveal cycles must not double-attach or leak.
@@ -115,3 +115,41 @@ the HTML). There are no client-side retries of a server suspension — hydration
 short-circuits values/seeds instead.
 **Coverage:** `islandSsr.test.tsx`, `islandSsrSources.test.tsx`; error-path pin
 (strategy doc §pins #7).
+
+## S11 — A suspending remount hides the old content (test-facing)
+
+A new generation (input change / retry) re-keys the inner tree, and the fresh tree suspends
+on its first load. React does **not** unmount the outgoing content while it waits: it keeps
+it mounted and hides it — `style="display: none !important"` — and renders the fallback
+*next to it*. So mid-remount the DOM holds **both** slots:
+
+```html
+<div data-testid="content" style="display: none !important;">a0/bee</div>
+<div data-testid="loading">loading</div>
+```
+
+The user sees the loading slot; a test asking `querySelector('[data-testid=content]')` — or
+`screen.getByText` for a value that was on screen before — sees the stale one and calls it
+content. That is a **harness rule, not an engine contract**: read the slot through visibility
+(walk up from the marker looking for `display: none`), never through presence alone. The fuzz
+harness's `readSlot`/`readContent` do exactly that — without it, the command property called
+every suspending remount "content" and would have excused a genuine loading-slot flash.
+This is also the second way into S4's Offscreen semantics, so the hidden tree's effects are
+destroyed and re-run on reveal, and the ledger rules there apply.
+**Coverage:** `fuzz/scopeHarness.tsx` (`visibleNode`); the command property's slot invariant.
+
+## S12 — A suspended Step never commits, so its level's sources are inert
+
+The resolve loop suspends on the *first* pending promise it reaches, which discards the
+render — so the Step never commits, its layout effect never runs, and **its level's sources
+are never attached and never subscribed**. Two consequences, both latent rather than wrong:
+an errored source in a level that still has a promise in flight changes nothing on screen,
+and a promise rejection sitting behind an unsettled promise is not reached either. Both
+surface later, when the loop finally gets that far (React replays the Step body on each
+settle). *When* the engine notices is loop order — mechanism, so tests must not pin it: the
+fuzz alphabet only rejects a load where the answer is unambiguous (an in-flight re-fetch,
+which fails through the controller rather than through `use()`, or the last held load of a
+level). The related freeze is S8's: while a mid-tree source is pending the levels below are
+unmounted, so a swapped source's `pending` bookkeeping — done in render — cannot progress
+until it recovers.
+**Coverage:** `fuzz/model.ts` (`rejectable`, `settleable`); strategy-doc pin #11.

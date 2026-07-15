@@ -1,67 +1,59 @@
 import * as fc from 'fast-check';
-import type { FC } from 'react';
-import { scope, type Scope } from '../../scope/scope';
+import { useSyncExternalStore, type FC } from 'react';
+import { scope, input, type Scope } from '../../scope/scope';
 import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
+import { useScopeControls, type ScopeControls } from '../../mandala/controls';
 import { byLevel } from './arbitraries';
+import {
+    formatValue,
+    INPUT_KEY,
+    type DeclaredState,
+    type HarnessValue,
+    type KeyKind,
+    type KeyPayload,
+    type KeySpec,
+    type ScopeSpec,
+} from './model';
 
 /*
-    The generated-scope harness: a fast-check arbitrary over scope *specs*, a builder that
-    turns a spec into a real instrumented island, and a plain-JS reference model computing
-    what that island must show. Design record: docs/research/mandala-testing.md §"The fuzz
-    foundation"; the invariant altitude (contract only, no engine mechanics) binds everything
-    in here.
+    The generated-scope harness: a fast-check arbitrary over scope *specs*, and a builder
+    turning a spec into a real, instrumented island. The reference model this is measured
+    against lives in model.ts — React-free and engine-free on purpose; read its header for
+    the value formula and why the epoch is not a run counter.
 
-    The value formula is shared between the real producers and the model on purpose: the
-    formula is plumbing, the engine is the subject. Real producers compute from the resolved
-    bag the engine hands them; the model computes from its own state — if the engine delivers
-    wrong or stale upstream values, the two disagree and convergence fails.
+    Real producers compute from the resolved bag the *engine* hands them; the model computes
+    from its own state. The formula is shared, the state is not — so if the engine delivers
+    a producer wrong or stale upstream values, the two disagree and convergence fails.
 
     Shape knobs (FUZZ_LEVEL via byLevel): level count byLevel(4, 1), keys per level
-    byLevel(3, 1) — level 2 already generates scopes up to 6 levels × 5 keys.
+    byLevel(3, 1) — level 2 already generates scopes up to 6 levels x 5 keys.
 */
 
-export type KeyKind = 'value' | 'promise' | 'source';
-export type KeyPayload = 'fresh' | 'stable';
-
-export type KeySpec = {
-    key: string;
-    level: number;
-    kind: KeyKind;
-    /** Keys of strictly earlier levels this producer reads. */
-    reads: string[];
-    /** Re-run behavior: 'fresh' yields a new value each run, 'stable' a deep-equal one.
-     * (Inert until refresh enters the alphabet — MF-02.) */
-    payload: KeyPayload;
-    /** Settle priority: the harness settles the held key with the lowest value first. */
-    settleOrder: number;
-};
-
-export type ScopeSpec = { levels: KeySpec[][] };
-
-export const allKeys = (spec: ScopeSpec): KeySpec[] => spec.levels.flat();
-
-/** Values are objects (fresh reference per producer run) so equal-content re-fetches are
- * distinguishable from reference reuse — the shape the deepEqual gate exists for. */
-export type HarnessValue = { v: string };
-
-export function formatValue(key: string, gen: number, readValues: string[]): HarnessValue {
-    return { v: `${key}#${gen}(${readValues.join(',')})` };
-}
-
-// ---------------------------------------------------------------------------------------
-
-export function scopeSpecArb(): fc.Arbitrary<ScopeSpec> {
+/**
+ * `minLevels` lets a property insist on a real waterfall. The command property does: a
+ * single-level scope has no dependents, so it cannot express a cascade — the thing that
+ * property exists to search — and at the default budget fast-check's bias toward small
+ * inputs made single-level scopes common enough to trip its non-vacuity guard. The smoke
+ * property keeps the full range, single-level shapes included.
+ */
+export function scopeSpecArb({
+    minLevels = 1,
+}: { minLevels?: number } = {}): fc.Arbitrary<ScopeSpec> {
     const maxLevels = byLevel(4, 1);
     const maxKeysPerLevel = byLevel(3, 1);
     return fc
-        .array(fc.integer({ min: 1, max: maxKeysPerLevel }), { minLength: 1, maxLength: maxLevels })
+        .array(fc.integer({ min: 1, max: maxKeysPerLevel }), {
+            minLength: minLevels,
+            maxLength: Math.max(minLevels, maxLevels),
+        })
         .chain((keysPerLevel) => {
             const names = keysPerLevel.map((count, level) =>
                 Array.from({ length: count }, (_, i) => `k${level}_${i}`),
             );
             const perKey = keysPerLevel.flatMap((count, level) => {
-                const earlier = names.slice(0, level).flat();
+                // A producer may read the island's input plus every strictly-earlier key.
+                const earlier = [INPUT_KEY, ...names.slice(0, level).flat()];
                 return Array.from({ length: count }, () =>
                     fc.record({
                         kind: fc.constantFrom<KeyKind>('value', 'promise', 'source'),
@@ -77,7 +69,7 @@ export function scopeSpecArb(): fc.Arbitrary<ScopeSpec> {
             return fc.tuple(...perKey).map((defs) => {
                 let cursor = 0;
                 const levels: KeySpec[][] = names.map((levelNames, level) => {
-                    const earlier = names.slice(0, level).flat();
+                    const earlier = [INPUT_KEY, ...names.slice(0, level).flat()];
                     return levelNames.map((key) => {
                         const def = defs[cursor++]!;
                         return {
@@ -98,57 +90,132 @@ export function scopeSpecArb(): fc.Arbitrary<ScopeSpec> {
 // ---------------------------------------------------------------------------------------
 
 export type LedgerEntry = {
+    /** `key#n` — one entry per *source instance*, not per key: a cascade legitimately has
+     * the new source attached (layout phase) before the old detaches (passive cleanup), so
+     * per-key concurrency would read 2 on a correct swap. Per instance, >1 is a real
+     * double-attach. */
+    id: string;
     key: string;
     attaches: number;
     detaches: number;
-    /** Highest number of simultaneous attaches ever observed (must stay ≤ 1). */
     maxConcurrent: number;
 };
 
-type Held = { key: string; fire: () => void };
+type HeldEntry = {
+    key: string;
+    kind: 'promise' | 'source';
+    /** A newer producer run replaced this one (a superseded refresh, or a remount). Firing
+     * it must be inert — that is the refresh token guard's tripwire. */
+    superseded: boolean;
+    settle: () => void;
+    fail: () => void;
+};
+
+type Controllable = Source<HarnessValue> & {
+    /** Emit the value the formula says this source holds *now* — its first ready, and every
+     * later one after a `sourceBump` moves its epoch. */
+    ready: () => void;
+    pend: () => void;
+    restore: () => void;
+    fail: () => void;
+};
 
 export type BuiltHarness = {
-    Island: FC;
-    /** Keys currently held pending (unsettled deferreds / pending sources), sorted. */
+    /** Mounts the island and feeds it the declared input. */
+    Host: FC;
+    /** Keys with a live (non-superseded) first settle or re-fetch held. */
     held(): string[];
-    /** Fire one held key (resolve its deferred / ready its source). Caller wraps in act. */
+    /** Keys with a superseded entry still holdable — firing one must change nothing. */
+    staleHeld(): string[];
     settle(key: string): void;
+    reject(key: string): void;
+    settleStale(key: string): void;
+    sourcePend(key: string): void;
+    sourceRestore(key: string): void;
+    sourceError(key: string): void;
+    /** Re-emit `key`'s source at the epoch the declared state now holds — a live source
+     * moving by itself. The *model* owns epoch bumps (as it does for `refresh`), so this
+     * only emits; bumping here too would double-count and desync the two. */
+    sourceEmit(key: string): void;
+    /** Mark every outstanding entry superseded — a remount drops the cells behind them. */
+    supersedeAll(): void;
+    refresh(key: string): void;
+    refreshAll(): void;
+    /** The island's `pending` set, read through `useScopeControls` (the public surface). */
+    pending(): string[];
     runCounts(): ReadonlyMap<string, number>;
+    totalRuns(): number;
     ledger(): readonly LedgerEntry[];
+    /** The object identity last rendered for `key` — the equals gate's observable half. */
+    identityOf(key: string): HarnessValue | undefined;
 };
 
 export const CONTENT_TESTID = 'fuzz-content';
 export const LOADING_TESTID = 'fuzz-loading';
+export const ERROR_TESTID = 'fuzz-error';
 
-/** Parse the rendered dump back into key → HarnessValue. */
+/**
+ * The slot node, if it is actually *on screen*. Presence in the DOM is not enough: when a
+ * suspending update replaces a Suspense boundary's children, React keeps the old subtree
+ * mounted and hides it (`display: none`, Offscreen semantics) while rendering the fallback
+ * next to it — so mid-remount both the stale content and the loading slot are in the DOM.
+ * Reading the contract off `querySelector` alone would call that "content" and quietly
+ * excuse every loading-slot flash. See ../suspense-situations.md S11.
+ */
+function visibleNode(container: HTMLElement, testid: string): Element | null {
+    const node = container.querySelector(`[data-testid="${testid}"]`);
+    if (!node) return null;
+    // React hides the boundary's *children*, which are ancestors of these markers.
+    for (let el: Element | null = node; el && el !== container; el = el.parentElement) {
+        if (el instanceof HTMLElement && el.style.display === 'none') return null;
+    }
+    return node;
+}
+
+/** Parse the rendered dump back into key -> HarnessValue. */
 export function readContent(container: HTMLElement): Record<string, HarnessValue> | null {
-    const node = container.querySelector(`[data-testid="${CONTENT_TESTID}"]`);
+    const node = visibleNode(container, CONTENT_TESTID);
     if (!node?.textContent) return null;
     return JSON.parse(node.textContent) as Record<string, HarnessValue>;
 }
 
-export function buildHarness(spec: ScopeSpec): BuiltHarness {
-    const runCounts = new Map<string, number>();
-    const heldEntries: Held[] = [];
-    const ledgers = new Map<
-        string,
-        { attaches: number; detaches: number; depth: number; maxConcurrent: number }
-    >();
+/** Which slot the island is showing — the contract's headline observable. */
+export function readSlot(container: HTMLElement): 'loading' | 'content' | 'error' {
+    if (visibleNode(container, ERROR_TESTID)) return 'error';
+    if (visibleNode(container, CONTENT_TESTID)) return 'content';
+    return 'loading';
+}
 
-    const ledgerFor = (key: string) => {
-        let entry = ledgers.get(key);
-        if (!entry) {
-            entry = { attaches: 0, detaches: 0, depth: 0, maxConcurrent: 0 };
-            ledgers.set(key, entry);
-        }
-        return entry;
+export function buildHarness(spec: ScopeSpec, declared: DeclaredState): BuiltHarness {
+    const runCounts = new Map<string, number>();
+    const heldEntries: HeldEntry[] = [];
+    const liveSources = new Map<string, Controllable>();
+    const identities = new Map<string, HarnessValue>();
+    const ledgers = new Map<string, LedgerEntry & { depth: number }>();
+    let sourceInstances = 0;
+
+    const supersede = (key: string) => {
+        for (const entry of heldEntries) if (entry.key === key) entry.superseded = true;
     };
 
-    const controllableSource = (
-        key: string,
-    ): Source<HarnessValue> & { ready(v: HarnessValue): void } => {
+    const controllableSource = (key: string, recompute: () => HarnessValue): Controllable => {
+        const id = `${key}#${sourceInstances++}`;
+        const ledger: LedgerEntry & { depth: number } = {
+            id,
+            key,
+            attaches: 0,
+            detaches: 0,
+            maxConcurrent: 0,
+            depth: 0,
+        };
+        ledgers.set(id, ledger);
         let state: SourceState<HarnessValue> = { status: 'pending' };
+        let lastReady: HarnessValue | null = null;
         const listeners = new Set<() => void>();
+        const set = (next: SourceState<HarnessValue>) => {
+            state = next;
+            for (const listener of listeners) listener();
+        };
         return {
             [SourceSymbol]: true,
             getSnapshot: () => state,
@@ -159,7 +226,6 @@ export function buildHarness(spec: ScopeSpec): BuiltHarness {
                 };
             },
             attach() {
-                const ledger = ledgerFor(key);
                 ledger.attaches++;
                 ledger.depth++;
                 ledger.maxConcurrent = Math.max(ledger.maxConcurrent, ledger.depth);
@@ -168,160 +234,178 @@ export function buildHarness(spec: ScopeSpec): BuiltHarness {
                     ledger.depth--;
                 };
             },
-            ready(value) {
-                state = { status: 'ready', value };
-                for (const listener of listeners) listener();
+            ready() {
+                lastReady = recompute();
+                set({ status: 'ready', value: lastReady });
             },
+            pend: () => set({ status: 'pending' }),
+            // S8 recovery returns the *same* value on purpose: pin #12's contract is
+            // "recovery without producer re-runs", and an unchanged snapshot must move
+            // nothing. A live source emitting a genuinely new value is `sourceBump`.
+            restore: () => set({ status: 'ready', value: lastReady! }),
+            fail: () => set({ status: 'error', error: { code: 'failed', message: id } }),
         };
     };
 
     const makeProducer = (keySpec: KeySpec) => (bag: Record<string, unknown>) => {
-        const runs = (runCounts.get(keySpec.key) ?? 0) + 1;
-        runCounts.set(keySpec.key, runs);
-        const gen = keySpec.payload === 'stable' ? 0 : runs - 1;
-        const readValues = keySpec.reads.map((read) => (bag[read] as HarnessValue).v);
-        const value = formatValue(keySpec.key, gen, readValues);
+        runCounts.set(keySpec.key, (runCounts.get(keySpec.key) ?? 0) + 1);
+        const readValues = keySpec.reads.map((read) =>
+            read === INPUT_KEY ? (bag[read] as string) : (bag[read] as HarnessValue).v,
+        );
+        const value = formatValue(keySpec.key, declared.epochOf(keySpec.key), readValues);
+        // This run replaces whatever the last one left in flight.
+        supersede(keySpec.key);
         switch (keySpec.kind) {
             case 'value':
                 return value;
             case 'promise': {
-                let resolve!: (v: HarnessValue) => void;
-                const promise = new Promise<HarnessValue>((res) => {
+                let resolve!: (value: HarnessValue) => void;
+                let reject!: (reason: unknown) => void;
+                const promise = new Promise<HarnessValue>((res, rej) => {
                     resolve = res;
+                    reject = rej;
                 });
-                heldEntries.push({ key: keySpec.key, fire: () => resolve(value) });
+                // Register a rejection handler up front: a superseded promise's rejection
+                // reaches no `use()` and no controller, and would surface as an unhandled
+                // rejection that fails the worker rather than the property.
+                void promise.catch(() => {});
+                heldEntries.push({
+                    key: keySpec.key,
+                    kind: 'promise',
+                    superseded: false,
+                    settle: () => resolve(value),
+                    fail: () => reject(new Error(`fuzz: ${keySpec.key} rejected`)),
+                });
                 return promise;
             }
             case 'source': {
-                const source = controllableSource(keySpec.key);
-                heldEntries.push({ key: keySpec.key, fire: () => source.ready(value) });
+                // Recomputed rather than captured: a `sourceBump` moves this key's epoch and
+                // the source must then emit the new value without its producer re-running.
+                // Safe for the first ready too — only a *committed* source can be bumped, so
+                // the epoch cannot move between this run and that first settle.
+                const source = controllableSource(keySpec.key, () =>
+                    formatValue(keySpec.key, declared.epochOf(keySpec.key), readValues),
+                );
+                liveSources.set(keySpec.key, source);
+                heldEntries.push({
+                    key: keySpec.key,
+                    kind: 'source',
+                    superseded: false,
+                    settle: () => source.ready(),
+                    fail: () => source.fail(),
+                });
                 return source;
             }
         }
     };
 
-    let chain = scope() as { load: (def: Record<string, unknown>) => unknown };
+    let chain = scope({ [INPUT_KEY]: input<string>() }) as unknown as {
+        load: (def: Record<string, unknown>) => unknown;
+    };
     for (const level of spec.levels) {
         const def: Record<string, unknown> = {};
         for (const keySpec of level) def[keySpec.key] = makeProducer(keySpec);
         chain = chain.load(def) as typeof chain;
     }
+    const builtScope = chain as unknown as Scope;
 
-    const keys = allKeys(spec).map((keySpec) => keySpec.key);
-    const dumpKeys = [...keys].sort();
-    const Dump: FC<Record<string, unknown>> = (props) => (
-        <div data-testid={CONTENT_TESTID}>{JSON.stringify(props, [...dumpKeys, 'v'])}</div>
-    );
+    // Reads the island's controls from inside its subtree — rendered in every slot, since
+    // the mandala provides the controls channel around the whole inner tree.
+    const captured: { current: ScopeControls<Scope> | null } = { current: null };
+    const Probe: FC = () => {
+        captured.current = useScopeControls(builtScope);
+        return null;
+    };
+
+    const dumpKeys = spec.levels
+        .flat()
+        .map((keySpec) => keySpec.key)
+        .sort();
+
+    const Dump: FC<Record<string, unknown>> = (props) => {
+        for (const key of dumpKeys) identities.set(key, props[key] as HarnessValue);
+        return (
+            <div>
+                <div data-testid={CONTENT_TESTID}>{JSON.stringify(props, [...dumpKeys, 'v'])}</div>
+                <Probe />
+            </div>
+        );
+    };
+
     const Island = island({
-        scope: chain as unknown as Scope,
+        scope: builtScope,
         component: Dump,
-        loading: () => <div data-testid={LOADING_TESTID}>loading</div>,
-    }) as FC;
+        loading: () => (
+            <div>
+                <div data-testid={LOADING_TESTID}>loading</div>
+                <Probe />
+            </div>
+        ),
+        error: ({ error }) => (
+            <div>
+                <div data-testid={ERROR_TESTID}>{error.code}</div>
+                <Probe />
+            </div>
+        ),
+    }) as FC<{ n: string }>;
 
-    return {
-        Island,
-        held: () => heldEntries.map((entry) => entry.key).sort(),
-        settle(key) {
-            const index = heldEntries.findIndex((entry) => entry.key === key);
-            if (index === -1) throw new Error(`harness: settle('${key}') — not held`);
-            const [entry] = heldEntries.splice(index, 1);
-            entry!.fire();
-        },
-        runCounts: () => runCounts,
-        ledger: () =>
-            [...ledgers.entries()].map(([key, { attaches, detaches, maxConcurrent }]) => ({
-                key,
-                attaches,
-                detaches,
-                maxConcurrent,
-            })),
+    const Host: FC = () => {
+        const n = useSyncExternalStore(
+            declared.subscribeInput,
+            declared.inputValue,
+            declared.inputValue,
+        );
+        return <Island n={n} />;
     };
-}
 
-// ---------------------------------------------------------------------------------------
-
-/*
-    The reference model — the contract's semantics with no React and no engine imports:
-
-      - a level's producers run when every key of all earlier levels is ready (the waterfall);
-      - 'value' keys become ready at run; 'promise'/'source' keys are held until settled;
-      - each key's value follows the shared formula over the model's own read values.
-*/
-
-type ModelKeyState = {
-    spec: KeySpec;
-    status: 'unreached' | 'held' | 'ready';
-    value: HarnessValue | null;
-};
-
-export type ModelHarness = {
-    allReady(): boolean;
-    held(): string[];
-    /** The next key the settle policy picks (lowest settleOrder among held). */
-    nextToSettle(): string;
-    settle(key: string): void;
-    expectedValues(): Record<string, HarnessValue>;
-};
-
-export function createModel(spec: ScopeSpec): ModelHarness {
-    const keys = new Map<string, ModelKeyState>();
-    for (const keySpec of allKeys(spec)) {
-        keys.set(keySpec.key, { spec: keySpec, status: 'unreached', value: null });
-    }
-
-    const levelReady = (level: number): boolean =>
-        spec.levels
-            .slice(0, level)
-            .every((levelSpecs) =>
-                levelSpecs.every(({ key }) => keys.get(key)!.status === 'ready'),
-            );
-
-    const runReachable = () => {
-        for (let level = 0; level < spec.levels.length; level++) {
-            if (!levelReady(level)) break;
-            for (const keySpec of spec.levels[level]!) {
-                const state = keys.get(keySpec.key)!;
-                if (state.status !== 'unreached') continue;
-                const readValues = keySpec.reads.map((read) => keys.get(read)!.value!.v);
-                state.value = formatValue(keySpec.key, 0, readValues);
-                state.status = keySpec.kind === 'value' ? 'ready' : 'held';
-            }
+    const take = (key: string, superseded: boolean): HeldEntry => {
+        const index = heldEntries.findIndex(
+            (entry) => entry.key === key && entry.superseded === superseded,
+        );
+        if (index === -1) {
+            throw new Error(`harness: no ${superseded ? 'stale' : 'live'} entry held for '${key}'`);
         }
+        return heldEntries.splice(index, 1)[0]!;
     };
-    runReachable();
 
-    const held = () =>
-        [...keys.values()]
-            .filter((state) => state.status === 'held')
-            .map((state) => state.spec.key)
-            .sort();
+    const liveSource = (key: string): Controllable => {
+        const source = liveSources.get(key);
+        if (!source) throw new Error(`harness: no live source for '${key}'`);
+        return source;
+    };
 
     return {
-        allReady: () => [...keys.values()].every((state) => state.status === 'ready'),
-        held,
-        nextToSettle() {
-            const candidates = [...keys.values()].filter((state) => state.status === 'held');
-            candidates.sort(
-                (a, b) =>
-                    a.spec.settleOrder - b.spec.settleOrder || (a.spec.key < b.spec.key ? -1 : 1),
-            );
-            if (!candidates[0]) throw new Error('model: nothing held to settle');
-            return candidates[0].spec.key;
+        Host,
+        held: () =>
+            heldEntries
+                .filter((entry) => !entry.superseded)
+                .map((entry) => entry.key)
+                .sort(),
+        staleHeld: () =>
+            [
+                ...new Set(
+                    heldEntries.filter((entry) => entry.superseded).map((entry) => entry.key),
+                ),
+            ].sort(),
+        settle: (key) => take(key, false).settle(),
+        reject: (key) => take(key, false).fail(),
+        settleStale: (key) => take(key, true).settle(),
+        sourcePend: (key) => liveSource(key).pend(),
+        sourceRestore: (key) => liveSource(key).restore(),
+        sourceError: (key) => liveSource(key).fail(),
+        sourceEmit: (key) => liveSource(key).ready(),
+        supersedeAll: () => {
+            for (const entry of heldEntries) entry.superseded = true;
         },
-        settle(key) {
-            const state = keys.get(key);
-            if (!state || state.status !== 'held')
-                throw new Error(`model: settle('${key}') — not held`);
-            state.status = 'ready';
-            runReachable();
-        },
-        expectedValues() {
-            const values: Record<string, HarnessValue> = {};
-            for (const [key, state] of keys) {
-                if (state.value === null) throw new Error(`model: '${key}' has no value yet`);
-                values[key] = state.value;
-            }
-            return values;
-        },
+        // Fire-and-forget on purpose: the returned promise settles only when the key does,
+        // which is a *later* command's job. Refresh failures resolve (they log), so no
+        // rejection escapes.
+        refresh: (key) => void captured.current!.refresh(key),
+        refreshAll: () => void captured.current!.refresh(),
+        pending: () => [...(captured.current?.pending ?? [])].sort(),
+        runCounts: () => runCounts,
+        totalRuns: () => [...runCounts.values()].reduce((total, count) => total + count, 0),
+        ledger: () => [...ledgers.values()],
+        identityOf: (key) => identities.get(key),
     };
 }

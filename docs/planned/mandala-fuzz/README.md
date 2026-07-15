@@ -1,6 +1,7 @@
 # mandala-fuzz — randomized testing foundation for the mandala engine
 
-Status: planned 2026-07-12 — B1 (MF-01) cut, awaiting the calibration run + user review.
+Cut 2026-07-12. Per-item status derives from rati git (`git log --grep 'MF-'`) — never from
+this file; see Decisions below.
 
 The first slice of the "paranoid coverage for the whole rati surface" direction: a fast-check
 model-based fuzz suite over the mandala (generated scopes × event interleavings), plus the
@@ -45,9 +46,9 @@ Batching, dependencies, grading: [plan.md](./plan.md).
 ### 2026-07-15 (MF-02) — a source leaks when a teardown is followed by a new generation
 
 Found by the command property **on its first run** (shrunk to a 4-level scope +
-`reject(k3_1), changeInput`), then reduced to two hand-written repros. **Not fixed** — the
-fix decision is the user's. Pinned as contract-asserting `test.fails`:
-`packages/rati/src/__tests__/mandala/orphanedBucketLeak.test.tsx`.
+`reject(k3_1), changeInput`), then reduced to two hand-written repros. **Fixed** on the
+user's call — the ledger invariant (6) is MF-03's whole item and could not be encoded around
+it. Pinned by `packages/rati/src/__tests__/mandala/orphanedBucketLeak.test.tsx`.
 
 A Step's detach effect deliberately keeps entries the *live* bucket still holds — it cannot
 tell a source swap from an unmount, so it defers to the mandala's unmount sweep. So a Step
@@ -63,47 +64,58 @@ so `currentBuckets()` already points at the new array, `bucketIsLive` is false, 
 detaches. It is specifically *teardown-then-replace* that leaks — which is the plain
 error-slot → **retry** flow, and the plain "live source blipped, then navigate" flow.
 
-Sketch of a fix (the maintainer's call): sweep the outgoing buckets when the mandala swaps
-`cacheRef` for a new `treeKey` — the array is right there, and everything still attached in it
-is by definition last-generation. It wants to happen off the render path (a discarded render
-must not detach), so the `treeCommitted` effect that already keys on `treeKey` is the natural
-home.
-
-Cost to the fuzz suite: MF-02's ledger assert in the property `finally` is the strategy doc's
-invariant 6, and this leak trips it on any sequence that tears a level down and then remounts
-— see the record's `TODO` at that assert. Invariant 6 is MF-03's item; it cannot be encoded
-honestly until this is settled.
+The fix: the mandala queues each replaced bucket array and sweeps it from the `treeCommitted`
+effect — off the render path, since a discarded render must not detach. Idempotent against the
+ordinary remount path, which never had the bug (there the mandala re-renders before the old
+Steps' cleanups run, so `bucketIsLive` is already false and the Steps detach everything
+themselves; the sweep then finds only what they deferred).
 
 ### 2026-07-15 (MF-02) — a cascade stops at a source key
 
 Found while deciding the shape of MF-02's reference model (does the model's expected-value
-fixpoint hold through a source key?). Two behaviors, one root cause; **not fixed** — the fix
-decision is the user's, per every record's Boundaries.
+fixpoint hold through a source key?). Two behaviors, one root cause; **both fixed** on the
+user's call.
 
 `RefreshController.sourceReady()` (refresh.ts) calls `emitChanged` — so a `.provide()` factory
 whose reads contain the key rebuilds — but never `markDependents`, which is what marks the
 later-level cells whose producers read the key. The promise path (`settled()`) and the sync
 path (`valueChanged()`) both call it. Consequences:
 
-1. **A refresh cascade dies at a source.** `a → b(source) → c`: refreshing `a` with a changed
-   value re-creates `b` (its rendered value moves), but `c` never re-runs and keeps a value
-   derived from the old `b`. This contradicts the documented promise — "a changed value re-runs
+1. **A refresh cascade died at a source.** `a → b(source) → c`: refreshing `a` with a changed
+   value re-created `b` (its rendered value moved), but `c` never re-ran and kept a value
+   derived from the old `b` — contradicting the documented promise, "a changed value re-runs
    exactly the downstream loads whose producers read the key" (docs/public/reference.md
-   §refresh) — so it reads as a plain bug.
-2. **A live source's value change never reaches its readers.** `a(source)` going ready(v1) →
-   ready(v2) leaves `b: ({ a }) => derive(a)` rendering `derive(v1)` forever. Same cause;
-   **open question** whether it is a bug or the intended division of labor (derive inside the
-   source — an `observableSource` over a computed — rather than in a dependent load). Nothing
-   in docs/public, internals.md, or the refresh design record says either way. If it is
-   intentional it wants documenting; the waterfall reads as a derivation today.
+   §refresh).
+2. **A live source's value change never reached its readers.** `a(source)` going ready(v1) →
+   ready(v2) left `b: ({ a }) => derive(a)` rendering `derive(v1)` forever. Same cause. This
+   one was a genuine design question — derive *inside* the source (an `observableSource` over
+   a computed) may have been the intent — and the user's call was that the waterfall reads as
+   a derivation and should behave as one: deriving in a dependent load is not second-class.
 
-Pinned (contract-asserting, `test.fails` so the suite stays green and flips loudly when fixed):
-`packages/rati/src/__tests__/mandala/cascadeThroughSource.test.tsx`.
+The fix: the resolver runs every new source snapshot through the same equals gate as every
+other path and calls `valueChanged` when the value moves. Gated on the cell already having a
+value, so a *first* ready cascades nothing (the levels below have not run yet; the waterfall
+feeds them the value on its way down), and an S8 pending/ready blip recovering onto its old
+value moves nothing. `sourceReady()` lost its unconditional `emitChanged` and is bookkeeping
+only, so a swap settling on an equal value no longer rebuilds a `.provide()` it did not change.
 
-Cost to the fuzz suite: MF-02's spec arbitrary excludes source-kind keys from later levels'
-read-sets, since the model's convergence fixpoint cannot hold across the gap. Sources as
-cascade *targets* (the swap path) stay fully covered — only source-as-cascade-*origin* chains
-are out. Lift the restriction when the pins flip.
+Pinned by `packages/rati/src/__tests__/mandala/cascadeThroughSource.test.tsx`; documented in
+internals.md §the controls channel and docs/public/reference.md §Sources. The fuzz spec
+arbitrary reads source keys like any other.
+
+### 2026-07-15 (MF-02) — two observations left standing (no action)
+
+- **`pending` is stale in the error slot.** A cascade-swapped source that errors rather than
+  readies stays in `pending` (only the ready path removes it), and nothing clears it until a
+  retry's `treeCommitted`. Low impact — an app in the error slot has a torn-down tree — and
+  the contract says nothing about the window, so the command property simply does not assert
+  `pending` there rather than pin whichever way the engine leans.
+- **Kill #3 is caught but not on every seed.** With the refresh token guard removed from
+  `settled()`, the command property's superseded-settle invariant fires — reliably under a
+  refresh-heavy alphabet, and on roughly 3 of 5 seeds under the shipped one, even with the
+  targeted `refreshInFlight` command added for it. The invariant is encoded right; the hit
+  rate is alphabet tuning, and belongs to MF-04 with the rest of the kill audit (a pinned
+  `FUZZ_SEED` is the cheap answer if tuning does not settle it).
 
 ## Per-item conventions
 
