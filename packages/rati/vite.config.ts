@@ -18,13 +18,15 @@ export default defineConfig({
         emptyOutDir: true,
         lib: {
             // Entries: the MobX-free core, the optional `rati/mobx` bindings, the
-            // server-facing `rati/ssr` surface, and the `rati/debug` tooling. Rolldown
-            // hoists the shared core modules into a common chunk, so SourceSymbol (and
-            // friends) keep one identity across all of them.
+            // server-facing `rati/ssr` surface, the `rati/vite` plugin, and the
+            // `rati/debug` tooling. Rolldown hoists the shared core modules into a
+            // common chunk, so SourceSymbol (and friends) keep one identity across all
+            // of them. `rati/vite` shares nothing — it only type-imports the contract.
             entry: {
                 main: 'src/main.ts',
                 'mobx/index': 'src/mobx/index.ts',
                 'ssr/index': 'src/ssr/index.ts',
+                'vite/index': 'src/vite/index.ts',
                 'debug/index': 'src/debug/index.ts',
             },
             // the proper extensions will be added

@@ -2814,6 +2814,7 @@ __metadata:
     "@testing-library/react": "npm:^16.3.2"
     "@tsconfig/strictest": "npm:^2.0.8"
     "@types/babel__core": "npm:^7"
+    "@types/node": "npm:^26.0.1"
     "@types/react": "npm:^19.2.17"
     "@types/react-dom": "npm:~19.2.3"
     fast-check: "npm:^4.8.0"
@@ -2829,8 +2830,14 @@ __metadata:
   peerDependencies:
     mobx: ^6.15.0
     react: ^19.2
+    react-dom: ^19.2
+    vite: ^6.0.0 || ^7.0.0 || ^8.0.0
   peerDependenciesMeta:
     mobx:
+      optional: true
+    react-dom:
+      optional: true
+    vite:
       optional: true
   languageName: unknown
   linkType: soft

@@ -255,6 +255,24 @@ export default defineConfig({
                 },
             },
             {
+                // `rati/vite` is the Vite plugin: it runs in the Vite process (Node, not
+                // browser) and reads the app's template off disk.
+                //
+                // prefer-vite-plus-imports off: it rewrites `from 'vite'` to
+                // `'vite-plus'`, which is right for app code in a Vite+ project and wrong
+                // for a published package — `vite` is the peer rati declares, and a
+                // consumer on plain Vite has no `vite-plus` to import. The import is
+                // type-only either way, so nothing is bundled.
+                files: ['packages/rati/src/vite/**'],
+                rules: {
+                    'import/no-nodejs-modules': 'off',
+                    'vite-plus/prefer-vite-plus-imports': 'off',
+                },
+                env: {
+                    node: true,
+                },
+            },
+            {
                 // Test code: `!` is idiomatic (map.get(id)!, result!.x on values known-present
                 // by construction) and low-risk, so don't gate tests on no-non-null-assertion the
                 // way source is. Covers the co-located test tree (src/__tests__) and any
