@@ -237,6 +237,9 @@ real consumer exists. (A real SSR consumer now does exist — see
   as a compatibility constraint, not a feature: keep scope modules importable in
   server-only contexts (no DOM at module scope), keep promise-load results serializable,
   keep the load/hook split crisp. Those habits cost nothing now and keep the door open.
+  **Concretized 2026-07-15** in [../rsc-support.md](../rsc-support.md): the bundler/runtime
+  contract now exists off the shelf (`@vitejs/plugin-rsc`); the record maps what rati adds
+  and when to revisit.
 
 ## 7. DX & tooling (brief)
 
