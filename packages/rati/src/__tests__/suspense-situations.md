@@ -25,8 +25,20 @@ found by the smoke property's first run — an island mounted under testing-libr
 act (`render()` bare) **never** receives the retry at all: it stays on the loading slot
 forever. Mount inside `await act(async () => …)`; after a settle, flush one extra
 `await act(async () => {})` before asserting (a fixed flush count — never poll-until-green).
-**Coverage:** documented at the smoke property's mount site; every suite here follows the
-pattern. This is a harness rule, not an engine contract.
+
+The rule is about **any act that suspends**, not just the mount — MF-05's pin 10 relearned
+it one transition later. A source transition can suspend the tree without looking like it:
+a ready source lets the waterfall reach a level whose load `use()`es a promise React has
+not seen (an unsettled load, or a `hook()` load's fresh promise — S9: React suspends once
+even on an already-settled promise). Driven by a sync `act(() => source.set(…))` — which is
+what most `testSource` helpers here do — that retry is lost and the island sits on the
+loading slot forever, exactly like the bare-`render()` mount. Where a transition can reach
+a suspending level, drive it with `await act(async () => …)`; where it cannot (every level
+below resolves from cells already built), the sync helper is fine, which is why the older
+suites never tripped on this.
+**Coverage:** documented at the smoke property's mount site; `suspenseEdges.test.tsx`'s
+source helper drives async transitions for this reason. A harness rule, not an engine
+contract.
 
 ## S3 — Multiple pending promises in one level
 
