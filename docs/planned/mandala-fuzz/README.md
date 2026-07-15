@@ -40,6 +40,39 @@ MF-04 closes: execute the six planned harness kills, file the recipes, prove non
 
 Batching, dependencies, grading: [plan.md](./plan.md).
 
+## Findings
+
+### 2026-07-15 (MF-02) — a cascade stops at a source key
+
+Found while deciding the shape of MF-02's reference model (does the model's expected-value
+fixpoint hold through a source key?). Two behaviors, one root cause; **not fixed** — the fix
+decision is the user's, per every record's Boundaries.
+
+`RefreshController.sourceReady()` (refresh.ts) calls `emitChanged` — so a `.provide()` factory
+whose reads contain the key rebuilds — but never `markDependents`, which is what marks the
+later-level cells whose producers read the key. The promise path (`settled()`) and the sync
+path (`valueChanged()`) both call it. Consequences:
+
+1. **A refresh cascade dies at a source.** `a → b(source) → c`: refreshing `a` with a changed
+   value re-creates `b` (its rendered value moves), but `c` never re-runs and keeps a value
+   derived from the old `b`. This contradicts the documented promise — "a changed value re-runs
+   exactly the downstream loads whose producers read the key" (docs/public/reference.md
+   §refresh) — so it reads as a plain bug.
+2. **A live source's value change never reaches its readers.** `a(source)` going ready(v1) →
+   ready(v2) leaves `b: ({ a }) => derive(a)` rendering `derive(v1)` forever. Same cause;
+   **open question** whether it is a bug or the intended division of labor (derive inside the
+   source — an `observableSource` over a computed — rather than in a dependent load). Nothing
+   in docs/public, internals.md, or the refresh design record says either way. If it is
+   intentional it wants documenting; the waterfall reads as a derivation today.
+
+Pinned (contract-asserting, `test.fails` so the suite stays green and flips loudly when fixed):
+`packages/rati/src/__tests__/mandala/cascadeThroughSource.test.tsx`.
+
+Cost to the fuzz suite: MF-02's spec arbitrary excludes source-kind keys from later levels'
+read-sets, since the model's convergence fixpoint cannot hold across the gap. Sources as
+cascade *targets* (the swap path) stay fully covered — only source-as-cascade-*origin* chains
+are out. Lift the restriction when the pins flip.
+
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with the
