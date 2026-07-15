@@ -331,8 +331,10 @@ export default defineConfig({
         // `*word*` → `_word_`, and on a line mixing an un-backticked snake_case identifier with
         // underscore emphasis it mis-parses the delimiters (rewriting the literal underscore to
         // `*`). rati's docs use snake_case, so don't format Markdown at all. `**/dist`: built
-        // output. (Same caveat documented in Jnana.)
-        ignorePatterns: ['**/dist', '**/*.md'],
+        // output. (Same caveat documented in Jnana.) `.yarnrc.yml`: yarn owns and rewrites it
+        // in its own 2-space style, so formatting it just creates churn (found by the
+        // `scripts/ci.ts` fmt stage — the first thing to ever run `vp fmt --check` repo-wide).
+        ignorePatterns: ['**/dist', '**/*.md', '.yarnrc.yml'],
     },
     staged: {
         // Pre-commit gate (run by `vp staged` from .vite-hooks/pre-commit). Type-aware lint

@@ -361,6 +361,12 @@ deterministic pin list, the fuzz harness design — is
 (the async-act mount requirement above all) are cataloged in
 `packages/rati/src/__tests__/suspense-situations.md`.
 
+The whole gate runs as one command: `yarn ci` (`scripts/ci.ts`, plain Node over zx) — fmt,
+lint, typecheck (every workspace), the full test suite, the fuzz suites at a deep budget
+(default `FUZZ_RUNS=500`, override via env), and the builds. Every stage runs even when an
+earlier one fails; the summary aggregates. It stands in for hosted CI until a lane is worth
+wiring, at which point a job runs the same file unchanged.
+
 ## Toolchain
 
 rati runs on **Vite+** (`vp` — bundles Vite/Rolldown, Vitest, oxlint, oxfmt). Lint/format

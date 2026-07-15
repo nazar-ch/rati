@@ -55,6 +55,9 @@ internal — callers only ever see `island`/`route`).
   (e.g. `vp run rati#typecheck`).
 - Verify changes with **type-check and lint**: `vp run rati#typecheck` (tsgo — the
   authoritative type gate) **and** `vp lint`. `vp check` runs format + lint (no type-check).
+- The whole gate in one command: `yarn ci` (`scripts/ci.ts` — fmt / lint / typecheck /
+  test / deep fuzz / build, aggregated; a subset by stage name, `FUZZ_RUNS=…` to deepen
+  the randomized stage). It is the stand-in for hosted CI — run it before handing work over.
 - Create atomic commits as you work, on the current branch. **Conventional Commits style is
   forbidden** — match the existing history (plain imperative sentences).
 - Keep `docs/*.md` in sync with behavior changes.
