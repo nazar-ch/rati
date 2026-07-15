@@ -5,6 +5,7 @@ import { RegionContext } from './appContext';
 import { fetchProduct, fetchProfile, fetchReviews } from './data';
 import { About } from './components/About';
 import { Counter } from './components/Counter';
+import { Fallback, FallbackWrapper } from './components/Fallback';
 import { Flaky } from './components/Flaky';
 import { Home } from './components/Home';
 import { Live } from './components/Live';
@@ -68,6 +69,11 @@ export const routes = [
     route('/counter', 'counter', Counter),
     route('/live', 'live', Live),
     route('/flaky', 'flaky', Flaky),
+    // Throws during the server render from its `wrapper` — which the Router renders
+    // outside the route's island, so no boundary catches it and `renderApp` rejects
+    // rather than encoding it in a status. rati/server answers that with the CSR shell
+    // (assets, no payload), so the page still works in the browser.
+    route('/fallback', 'fallback', Fallback, { wrapper: FallbackWrapper }),
     route('/split', 'split', Split, { scope: splitScope }),
     // A route-level redirect: the legacy /store/:id path maps its param onto the
     // product route. The client follows it with a history replace; the server

@@ -45,6 +45,12 @@ const FEATURES = [
         tags: ['lazy', 'rati/vite'],
         blurb: 'A route in its own chunk: server-rendered whole, and the built page names the chunk in the head so the browser fetches it without waiting for hydration.',
     },
+    {
+        to: { name: 'fallback' },
+        title: 'The CSR fallback',
+        tags: ['rati/server', '500'],
+        blurb: 'A page that throws on the server: no payload to send, so the handler ships the shell with a 500 and the app boots in the browser anyway.',
+    },
 ] as const;
 
 export function Home() {

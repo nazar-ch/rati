@@ -1,4 +1,4 @@
-import { hydrateRoot } from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 import { createBrowserHistory } from 'rati';
 import { readHydration } from 'rati/ssr';
 import { createApp } from './createApp';
@@ -18,4 +18,11 @@ const { App } = createApp({
     hydration: state ? { data: state.data, seeds: state.seeds } : undefined,
 });
 
-hydrateRoot(document.getElementById('root')!, <App />);
+const root = document.getElementById('root')!;
+
+// No payload, no server HTML: this is the CSR shell rati/server falls back to when a
+// render throws (see the /fallback page), or a plain client-only boot. Hydrating an
+// empty root against a tree that renders something is a mismatch React would report and
+// then recover from by doing this anyway — so do this.
+if (state) hydrateRoot(root, <App />);
+else createRoot(root).render(<App />);

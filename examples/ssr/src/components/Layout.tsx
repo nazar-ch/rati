@@ -12,6 +12,7 @@ const LINKS = [
     { to: { name: 'live' }, label: 'Live' },
     { to: { name: 'flaky' }, label: 'Flaky' },
     { to: { name: 'split' }, label: 'Split' },
+    { to: { name: 'fallback' }, label: 'Fallback' },
 ] as const;
 
 /**

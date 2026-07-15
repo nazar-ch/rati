@@ -8,6 +8,12 @@ import { createApp } from './createApp';
 
 export type { RenderAppResult };
 
+// Re-exported for serve.ts: `virtual:rati/assets` exists only inside the build, and the
+// production server is a plain node script that was never part of one. It hands them to
+// createRequestHandler, which needs them for exactly one page — the shell it serves if
+// this render throws.
+export { assets };
+
 /**
  * The whole per-request loop is `renderApp`: memory history → a fresh app →
  * `prepareRoute` → prerender → dispose. The result is a decision object the server
