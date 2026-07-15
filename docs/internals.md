@@ -28,9 +28,12 @@ src/
   scope/     scope.ts (scope/input/load/provide/hook/data + scope types), source.ts
   ssr/       index.ts (the rati/ssr entry) + renderApp, renderToHtml, payload
              (serializeHydration/readHydration), headTags
-  vite/      index.ts (the rati/vite entry) + ratiSsr (the dev middleware), html
-             (template filling / whole-document splicing). Node-side, never bundled
-             into an app; type-imports the RenderAppResult contract and nothing else
+  vite/      index.ts (the rati/vite entry) + ratiSsr (the dev middleware + the
+             two-environment build), html (template filling / whole-document splicing),
+             assets (the virtual:rati/assets generator), lazyModules (the
+             specifier-recording transform), client.d.ts (types for the generated
+             module). Node-side, never bundled into an app; type-imports the
+             RenderAppResult contract and nothing else
   data/      remoteData, apiUtils, ActiveData (legacy REST/data helpers)
   stores/    RootStore, GlobalStore (store roots)
   util/      utils.ts
@@ -225,6 +228,39 @@ script tag, the dev round-trip warning); `headTags.ts` is the head store's post-
 read-back (escaped, `data-rati-head`-marked so the client reconciler adopts the tags).
 `react-dom/static` is imported statically — it has browser builds, and `sideEffects:
 false` keeps it tree-shaken out of client bundles that touch only `readHydration`.
+
+## The rati/vite entry (`vite/`)
+
+Two jobs, one plugin, coupled to the engine by nothing but the `render(url)` contract.
+
+**Dev** (`ratiSsr.ts`): a catch-all middleware installed *after* Vite's own (the
+`configureServer` return-a-hook form, so module/HMR requests never reach it),
+`ssrLoadModule`s the entry, maps the result kinds onto the response, and assembles
+through `html.ts`. `appType: 'custom'` drops the SPA middlewares. `hotUpdate` full-reloads
+only for modules the client graph doesn't have — a shared component is Fast Refresh's.
+
+**Build**: `config()` returns `builder: {}` (opting into the app builder) plus the two
+environments' outDir/manifest/input, and the `buildApp` hook builds client → ssr. The
+order is load-bearing, not a preference: `load('virtual:rati/assets')` in the ssr build
+inlines the hashes the client build just produced. The manifest is captured from the
+client `writeBundle` in memory, and the plugin is `sharedDuringBuild: true` so it is one
+instance across both environments — reading the written file instead would let an older
+build's manifest through, which is a page whose script 404s.
+
+`assets.ts` generates the module: a frozen literal (three values, no manifest and no
+lookup code in the server bundle), URLs under `config.base`, and per-route preload tags
+walking the manifest's static-import closure minus whatever the entry already brings.
+`devAssets` is the same shape with the source entry and no tags — Vite serves both
+through the module graph, so there is nothing to hash and nothing to preload.
+
+`lazyModules.ts` is the specifier transform (design record:
+`docs/research/directions-2026-07/ssr-server-kit.md` — the primary, not the `routeChunks`
+fallback). It parses with `parseSync` (which takes the filename: route tables are TSX,
+and the deprecated `parseAst` throws on them), matches only calls to a local bound to
+*rati's* `lazy` import, and appends the root-relative id — which is exactly how the
+client manifest keys a dynamic entry. It runs only in the ssr build (dev has no chunks;
+the client bundle has no reader) and returns `map: null`, since a one-line insertion
+after the code it follows moves nothing.
 
 ## Head management (`head/`)
 

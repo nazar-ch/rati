@@ -331,6 +331,12 @@ that changes only state still re-resolves).
 before rendering — whether the component is mounted bare or folded into a route. Type:
 `PreloadableLazyComponent`.
 
+It also carries a `.moduleId` — which module it imports, as the client manifest keys it.
+You never write it: [`rati/vite`](#rativite)'s transform appends it as a second argument
+at each call site, so a server render can name the route's chunk (`prepareRoute` surfaces
+it; `renderApp` turns it into a `modulepreload`). Without the plugin it is absent, and
+`lazy` behaves exactly as it always did.
+
 ### Route types
 
 `NameToRoute` (typed `to` objects), `ExtractRouteParams<Path>`, `GenericRouteType`,
@@ -386,12 +392,13 @@ mount the provider on both sides so the trees match.) The full flow with code:
 
 | Export | Purpose |
 | --- | --- |
-| `renderApp({ url, createApp, … })` | the whole per-request loop: memory history → `createApp` → `prepareRoute` → prerender → dispose. Returns `{ kind: 'rendered', html, status, headTags, stateScript, hydration, errors, matchedCatchAll }` \| `{ kind: 'redirect', to, permanent, status }` \| `{ kind: 'no-match', status }` |
+| `renderApp({ url, createApp, assets?, onError? })` | the whole per-request loop: memory history → `createApp` → `prepareRoute` → prerender → dispose. Returns `{ kind: 'rendered', html, status, headTags, stateScript, hydration, errors, matchedCatchAll }` \| `{ kind: 'redirect', to, permanent, status }` \| `{ kind: 'no-match', status }` |
+| `RenderAssets` | `{ bootstrapModules?, styleTags?, preloadTagsFor? }` — what the built client needs from the page. Normally `virtual:rati/assets` from [`rati/vite`](#rativite); `bootstrapModules` reaches the prerender, the rest joins `headTags` |
 | `renderToHtml(node, { bootstrapModules?, onError? })` | drain `react-dom/static` `prerender` to a string (it awaits Suspense; `renderToString` cannot) |
 | `serializeHydration(state)` | the payload as an inert `application/json` script tag (CSP-friendly, placement-free); warns outside production about values that don't survive JSON |
 | `readHydration()` | client: parse the embedded payload; `null` → resolve from scratch |
 | `headTags(store)` | the head store's winners as escaped HTML — call after prerender |
-| `prepareRoute(router)` | drive a memory-history router to its match (preloading a lazy component); returns `{ hydratedState, matchedCatchAll, redirect? }` or `null` when nothing matched |
+| `prepareRoute(router)` | drive a memory-history router to its match (preloading a lazy component); returns `{ hydratedState, matchedCatchAll, redirect?, moduleId? }` or `null` when nothing matched |
 | `createHydrationCollector()` | `{ collect, collectError, data, seeds, errors }` — records islands' resolved values, live-source seeds, and failed loads during prerender |
 | `HydrationProvider` | server: `collect`/`collectError`; client: `data`/`seeds` — islands then hydrate without re-running loads |
 | `HydrationState`, `HydrationError`, `Hydration`, `HydrationData`, `PreparedRoute`, `RouterHydratedState`, `HYDRATION_SCRIPT_ID` | the payload/decision types |
@@ -408,17 +415,25 @@ HTML degrades to the loading slot and the client retries the load after hydratio
 
 Optional — requires the `vite` peer dependency. Build-time only: it runs in the Vite
 process and nothing from this entry reaches the browser. Walkthrough:
-[server rendering guide](./ssr.md#dev-the-vite-plugin).
+[server rendering guide](./ssr.md#the-vite-plugin).
 
 | Export | Purpose |
 | --- | --- |
-| `ratiSsr({ entry?, template?, placeholders? })` | dev: render every request through the app's server entry inside Vite's own dev server — result kinds mapped onto the response, `transformIndexHtml` on the shell (so HMR lives), failures in Vite's error overlay |
+| `ratiSsr({ entry?, clientEntry?, template?, placeholders?, outDir? })` | dev: render every request through the app's server entry inside Vite's own dev server — result kinds mapped onto the response, `transformIndexHtml` on the shell (so HMR lives), failures in Vite's error overlay. build: both environments on one `vite build`, plus `virtual:rati/assets` |
+| `virtual:rati/assets` (generated) | `{ bootstrapModules, styleTags, preloadTagsFor(moduleId) }` — the built client's tags, inlined into the server bundle so production reads no manifest. Hand it to `renderApp` as `assets`. Types: `/// <reference types="rati/vite/client" />` |
 
-`entry` defaults to `/src/entry-server.tsx`, `template` to `index.html` (Vite-root
-relative), `placeholders` to `{ head: '<!--app-head-->', html: '<!--app-html-->', state:
-'<!--app-state-->' }`. A `render` returning a whole `<html>` document is spliced into
+`entry` defaults to `/src/entry-server.tsx`, `clientEntry` to `/src/entry-client.tsx`
+(the client build's input — so `index.html` is a shell, not a build input), `template` to
+`index.html` (Vite-root relative), `placeholders` to `{ head: '<!--app-head-->', html:
+'<!--app-html-->', state: '<!--app-state-->' }`, `outDir` to `{ client: 'dist/client',
+server: 'dist/server' }`. A `render` returning a whole `<html>` document is spliced into
 rather than filled — no option to set. Anything the app renders with nowhere to go
 throws rather than serving a page that silently lost it.
+
+A `lazy()` route's client chunk is preloaded in the page it is rendered on: the plugin
+transforms each `lazy()` call site to record the module it imports, and resolves it
+through the client manifest. It is additive metadata — `lazy()` behaves identically
+without the plugin.
 
 ---
 

@@ -12,9 +12,9 @@ A route's data resolves at render time, so the server can resolve it too: rati r
 under React's `prerender` (from `react-dom/static` — it awaits Suspense, which
 `renderToString` cannot), waits for the islands' promise loads, and **dehydrates** the
 resolved values. The client reads them back and hydrates without re-running a single
-load. There is no rati server: in dev the [Vite plugin](#dev-the-vite-plugin) serves the
-app, and in production you bring a ~50-line HTTP server (or a serverless function) and
-call one function per request.
+load. There is no rati server: the [Vite plugin](#the-vite-plugin) serves the app in dev
+and builds both sides of it, and in production you bring a ~50-line HTTP server (or a
+serverless function) and call one function per request.
 
 ## The server entry
 
@@ -24,12 +24,18 @@ route matching → prerender → dispose — and returns a decision object:
 ```tsx
 // entry-server.tsx
 import { renderApp, type RenderAppResult } from 'rati/ssr';
+import * as assets from 'virtual:rati/assets';
 import { createApp } from './createApp';
 
 export function render(url: string): Promise<RenderAppResult> {
-    return renderApp({ url, createApp });
+    return renderApp({ url, createApp, assets });
 }
 ```
+
+`assets` is what the built client needs from the page — the hashed entry script, its
+stylesheets, this route's chunk preload. The [plugin](#the-vite-plugin) generates it
+from the build it ran, so nothing here reads a manifest. Without the plugin, pass the
+same shape (`RenderAssets`) yourself, or nothing at all.
 
 `createApp` is the same factory the client uses — it builds one app instance per call
 (router, stores, head store) and mounts `HydrationProvider`:
@@ -105,9 +111,9 @@ const { App } = createApp({
 hydrateRoot(document.getElementById('root')!, <App />);
 ```
 
-## Dev: the Vite plugin
+## The Vite plugin
 
-`vite dev` is the whole dev story — add the plugin and the app has no dev server of its
+The plugin is your dev server and your build. Add it and an SSR app has neither of its
 own:
 
 ```ts
@@ -119,19 +125,68 @@ export default defineConfig({
 });
 ```
 
-It installs a catch-all HTML middleware in Vite's own dev server: load the server entry,
-call its `render(url)`, map the kinds onto the response — the same three-way decision
-the snippet above spells out, made for you. HMR stays live (the shell goes through
-`transformIndexHtml`, so the page gets the dev client), and a render that throws lands
-in Vite's error overlay with the stack mapped back onto your source.
+```ts
+// src/vite-env.d.ts — types for the generated module
+/// <reference types="rati/vite/client" />
+```
 
 The options are the conventions, if you don't share them:
 
 | Option | Default | |
 | --- | --- | --- |
 | `entry` | `/src/entry-server.tsx` | the module exporting `render` |
+| `clientEntry` | `/src/entry-client.tsx` | the module that hydrates; the client build's input |
 | `template` | `index.html` | relative to the Vite root |
 | `placeholders` | `<!--app-head-->` / `<!--app-html-->` / `<!--app-state-->` | `{ head, html, state }` |
+| `outDir` | `dist/client` / `dist/server` | `{ client, server }`, relative to the root |
+
+### Dev
+
+`vite dev` is the whole dev story: a catch-all HTML middleware in Vite's own dev server
+loads the server entry, calls its `render(url)`, and maps the kinds onto the response —
+the same three-way decision the snippet above spells out, made for you. HMR stays live
+(the shell goes through `transformIndexHtml`, so the page gets the dev client), and a
+render that throws lands in Vite's error overlay with the stack mapped back onto your
+source.
+
+Editing a module only the server renders (the entry, a server-only loader) triggers a
+full reload — its graph is not HMR-safe, and nothing else would ask the browser for a
+fresh render. Shared components keep Fast Refresh.
+
+### Build
+
+One `vite build` produces `dist/client` (with the manifest) and `dist/server`, in that
+order, because the second inlines what the first hashed. That is the point of the plugin
+running both: it hands the client's manifest to the server build as
+**`virtual:rati/assets`**, so production reads no manifest, resolves no paths, and can't
+be handed a stale one.
+
+```ts
+import * as assets from 'virtual:rati/assets';
+// bootstrapModules  the hashed client entry — '/src/entry-client.tsx' in dev
+// styleTags         its stylesheet links — '' in dev (Vite injects styles through JS)
+// preloadTagsFor()  a route module's chunk preload — '' in dev (there are no chunks)
+```
+
+Hand it to `renderApp` and you are done; it uses what's there. The same import works in
+dev, so there is no mode to branch on.
+
+### Your HTML shell is only a shell
+
+Because the assets module names the entry, `index.html` is **not** a build input: it
+carries no `<script>` and no stylesheet, nothing in it is hashed, and no build rewrites
+it. Put the app's CSS where it belongs — imported from the client entry — and the
+manifest carries it into `styleTags`. Whole-document apps have no shell at all, and need
+no `index.html` to bundle their entry.
+
+### Lazy routes are preloaded
+
+A `lazy()` route lives in its own chunk, which the browser can only discover after the
+entry runs and React resolves the component — one round trip after the HTML it could
+have started during. The plugin closes that: it records which module each `lazy()` call
+imports (a transform on the call site — you never write it), resolves it through the
+manifest, and the matched route's chunk is named in the page's `<head>`. Nothing about
+`lazy()` changes; without the plugin there is simply no id and no preload.
 
 Two behaviours worth knowing:
 
@@ -142,13 +197,8 @@ Two behaviours worth knowing:
   best-effort page: a template missing `<!--app-state-->` would serve, hydrate from
   scratch, and look fine while SSR stopped paying for itself.
 
-Editing a module only the server renders (the entry, a server-only loader) triggers a
-full reload — its graph is not HMR-safe, and nothing else would ask the browser for a
-fresh render. Shared components keep Fast Refresh.
-
-Production is still yours to serve — see [below](#bring-your-own-server-notes). The
-plugin is dev-only today; the build half and a packaged production handler are the rest
-of the kit.
+Production is still yours to serve — see [below](#bring-your-own-server-notes). A
+packaged production handler is the rest of the kit.
 
 ## The per-request lifecycle
 
@@ -278,9 +328,13 @@ URLs stay at the HTTP layer (your server/CDN config), not in the route table.
   neither reconciles nor duplicates them during hydration.
 - **Serve static assets with correct MIME types** — a browser rejects a
   `<script type="module">` served without a JavaScript `Content-Type`.
-- **Dev needs nothing here.** The [plugin](#dev-the-vite-plugin) owns it, so a server is
+- **Dev needs nothing here.** The [plugin](#the-vite-plugin) owns it, so a server is
   production-only code now: serve `dist/client`, import the built entry, call `render`.
   `examples/ssr`'s `server.ts` is the reference to copy — it is ~90 lines, most of them
   a MIME table.
-- Reading the client manifest for hashed entry/CSS tags is still per-app, and still the
-  same code everywhere; a packaged production handler is the rest of the kit.
+- **No manifest reading, no asset splicing.** The built server entry carries its own
+  hashed tags ([`virtual:rati/assets`](#build)), so a server never looks at
+  `dist/client/.vite/`. If you don't build through the plugin, pass `renderApp` a
+  `RenderAssets` of your own — it is three optional fields.
+- A packaged production handler (fetch-shaped, plus a Node listener) is the rest of the
+  kit; the MIME table is the next thing to go.

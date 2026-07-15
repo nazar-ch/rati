@@ -57,6 +57,36 @@ round. The specifier-recording transform is the one open design question with re
 unknowns; if it fights the bundler, the fallback is an explicit app-provided
 `routeChunks` map, still checked against the manifest.
 
+### As implemented (SSR-02, 2026-07-15)
+
+Layer 2 shipped as designed; three details settled differently, recorded here because
+this file is the design of record.
+
+- **The transform is the primary — it doesn't fight the bundler.** It parses with
+  `parseSync`, matches only calls to a local bound to rati's `lazy` (React's is left
+  alone), and appends the root-relative module id as a second argument. The literal
+  import is untouched, so splitting is unaffected; the ids ride only in the ssr build.
+  The `routeChunks` fallback is unused, and unnecessary.
+- **`preloadTagsFor(moduleId)`, not `(routeName)`.** Route names are a runtime fact of
+  the app's table — a build-time module can only key by name if the app hand-writes the
+  mapping, which *is* the `routeChunks` fallback. The transform records modules, so the
+  module id is the key that needs no app input. `prepareRoute` surfaces the matched
+  route's id (it already reaches into the component for `preload()`).
+- **`renderApp` folds the tags in; the handler doesn't splice them.** The server entry
+  must import the assets module regardless (only it can pass `bootstrapModules` to the
+  prerender), so passing the whole module is one import and one option instead of two
+  places. And it is the only spot that works for all three assemblers: the dev
+  middleware never sees the generated module, so splicing in the handler would leave dev
+  without the behaviour and hand-rolled servers to do it themselves. The tags join
+  `result.headTags` — assembly already has one head slot, and a second part would mean a
+  new placeholder in every template. Layer 3 is smaller for it: `createRequestHandler({
+  render, template })`, no `assets`.
+
+One consequence beyond the plugin: since the assets module names the entry, `index.html`
+stops being a build input and becomes only a shell. nazar's already is one in all but
+name ("Build input only […] The dev/prod servers don't serve this markup") — SSR-04
+deletes it outright.
+
 ## Layer 3 — `rati/server`
 
 `createRequestHandler({ render, assets, template })` → `(request: Request) =>

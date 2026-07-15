@@ -394,7 +394,13 @@ route('/settings', 'settings', Settings);
 ```
 
 `<Link prefetch>` starts loading the chunk on hover/touch; server rendering preloads it
-before rendering.
+before rendering, so the HTML is complete either way.
+
+Built through the [Vite plugin](./ssr.md#lazy-routes-are-preloaded), a server-rendered
+lazy route also names its chunk in the page's `<head>` — otherwise the browser can't
+learn the chunk exists until the entry has run and React has resolved the component, one
+round trip after the HTML it could have started during. Nothing to configure, and nothing
+about `lazy()` changes without the plugin.
 
 ## Server rendering
 

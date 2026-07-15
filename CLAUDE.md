@@ -152,8 +152,11 @@ the intentional type-machinery warnings). `demo` is a client-only SPA showing pl
 components, route params, and `scope().load(…)` waterfalls (incl. a store class). `ssr` is a
 server-rendered **feature gallery** — a page per concept (async loads + dehydration, an
 `input`→`hook`→dependent waterfall, the `useRouteContext` value channel, a MobX store as a
-class load, a `Source`-backed live clock, and an error-slot + `retry`), each foregrounding its
-server/client behavior.
+class load, a `Source`-backed live clock, an error-slot + `retry`, and a `lazy()` route whose
+chunk the built page preloads), each foregrounding its server/client behavior. It runs dev and
+builds through `rati/vite` (`vp dev` / `vp build`, both environments on one command), so its
+`index.html` is a plain shell — no `<script>`, no build input — and `server.ts` is the last
+hand-rolled piece (SSR-03 takes it).
 
 The SSR mechanism: a route's scope is an island that resolves at render time, so the server
 uses `react-dom/static` `prerender` (not `renderToString`, which can't await the island's
