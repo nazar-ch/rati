@@ -7,6 +7,7 @@ the [guide](./guide.md).
 | --- | --- |
 | `rati` | Everything client-side: scopes, islands, routing, sources, stores. |
 | `rati/ssr` | The server-facing surface: hydration, `prepareRoute`. |
+| `rati/vite` | The Vite plugin: `vite dev` serves an SSR app, no server of your own. |
 | `rati/mobx` | Optional MobX bindings (`observableSource`) and the legacy data layer. |
 | `rati/debug` | Opt-in debug tooling (`navTrace`). |
 
@@ -400,6 +401,24 @@ dehydrate as seeds; unmarked sources stay pending under SSR and come alive after
 (see [Sources §SSR-capable sources](#ssr-capable-sources--the-ssr-marker)). A load that
 *rejects* is recorded in `errors` — statuses derive from it (`not-available` → 404); the
 HTML degrades to the loading slot and the client retries the load after hydration.
+
+---
+
+## `rati/vite`
+
+Optional — requires the `vite` peer dependency. Build-time only: it runs in the Vite
+process and nothing from this entry reaches the browser. Walkthrough:
+[server rendering guide](./ssr.md#dev-the-vite-plugin).
+
+| Export | Purpose |
+| --- | --- |
+| `ratiSsr({ entry?, template?, placeholders? })` | dev: render every request through the app's server entry inside Vite's own dev server — result kinds mapped onto the response, `transformIndexHtml` on the shell (so HMR lives), failures in Vite's error overlay |
+
+`entry` defaults to `/src/entry-server.tsx`, `template` to `index.html` (Vite-root
+relative), `placeholders` to `{ head: '<!--app-head-->', html: '<!--app-html-->', state:
+'<!--app-state-->' }`. A `render` returning a whole `<html>` document is spliced into
+rather than filled — no option to set. Anything the app renders with nowhere to go
+throws rather than serving a page that silently lost it.
 
 ---
 

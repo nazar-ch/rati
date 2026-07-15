@@ -12,8 +12,9 @@ A route's data resolves at render time, so the server can resolve it too: rati r
 under React's `prerender` (from `react-dom/static` — it awaits Suspense, which
 `renderToString` cannot), waits for the islands' promise loads, and **dehydrates** the
 resolved values. The client reads them back and hydrates without re-running a single
-load. There is no rati server — you bring a ~50-line HTTP server (or a serverless
-function) and call one function per request.
+load. There is no rati server: in dev the [Vite plugin](#dev-the-vite-plugin) serves the
+app, and in production you bring a ~50-line HTTP server (or a serverless function) and
+call one function per request.
 
 ## The server entry
 
@@ -103,6 +104,51 @@ const { App } = createApp({
 
 hydrateRoot(document.getElementById('root')!, <App />);
 ```
+
+## Dev: the Vite plugin
+
+`vite dev` is the whole dev story — add the plugin and the app has no dev server of its
+own:
+
+```ts
+// vite.config.ts
+import { ratiSsr } from 'rati/vite';
+
+export default defineConfig({
+    plugins: [react(), ratiSsr()],
+});
+```
+
+It installs a catch-all HTML middleware in Vite's own dev server: load the server entry,
+call its `render(url)`, map the kinds onto the response — the same three-way decision
+the snippet above spells out, made for you. HMR stays live (the shell goes through
+`transformIndexHtml`, so the page gets the dev client), and a render that throws lands
+in Vite's error overlay with the stack mapped back onto your source.
+
+The options are the conventions, if you don't share them:
+
+| Option | Default | |
+| --- | --- | --- |
+| `entry` | `/src/entry-server.tsx` | the module exporting `render` |
+| `template` | `index.html` | relative to the Vite root |
+| `placeholders` | `<!--app-head-->` / `<!--app-html-->` / `<!--app-state-->` | `{ head, html, state }` |
+
+Two behaviours worth knowing:
+
+- **Whole-document apps need no template.** If `render` returns a full `<html>` document,
+  the plugin splices the head tags and payload into it (before `</head>` / `</body>`)
+  instead of filling a template — no configuration, it just looks at what you rendered.
+- **It won't drop anything quietly.** A part with nowhere to go is an error, not a
+  best-effort page: a template missing `<!--app-state-->` would serve, hydrate from
+  scratch, and look fine while SSR stopped paying for itself.
+
+Editing a module only the server renders (the entry, a server-only loader) triggers a
+full reload — its graph is not HMR-safe, and nothing else would ask the browser for a
+fresh render. Shared components keep Fast Refresh.
+
+Production is still yours to serve — see [below](#bring-your-own-server-notes). The
+plugin is dev-only today; the build half and a packaged production handler are the rest
+of the kit.
 
 ## The per-request lifecycle
 
@@ -232,6 +278,9 @@ URLs stay at the HTTP layer (your server/CDN config), not in the route table.
   neither reconciles nor duplicates them during hydration.
 - **Serve static assets with correct MIME types** — a browser rejects a
   `<script type="module">` served without a JavaScript `Content-Type`.
-- The dev-vs-prod plumbing (Vite middleware mode + `ssrLoadModule`, manifest-derived
-  asset tags in prod) is the same for every app — `examples/ssr`'s `server.ts` is the
-  reference implementation to copy until rati ships a packaged server kit.
+- **Dev needs nothing here.** The [plugin](#dev-the-vite-plugin) owns it, so a server is
+  production-only code now: serve `dist/client`, import the built entry, call `render`.
+  `examples/ssr`'s `server.ts` is the reference to copy — it is ~90 lines, most of them
+  a MIME table.
+- Reading the client manifest for hashed entry/CSS tags is still per-app, and still the
+  same code everywhere; a packaged production handler is the rest of the kit.

@@ -28,6 +28,9 @@ src/
   scope/     scope.ts (scope/input/load/provide/hook/data + scope types), source.ts
   ssr/       index.ts (the rati/ssr entry) + renderApp, renderToHtml, payload
              (serializeHydration/readHydration), headTags
+  vite/      index.ts (the rati/vite entry) + ratiSsr (the dev middleware), html
+             (template filling / whole-document splicing). Node-side, never bundled
+             into an app; type-imports the RenderAppResult contract and nothing else
   data/      remoteData, apiUtils, ActiveData (legacy REST/data helpers)
   stores/    RootStore, GlobalStore (store roots)
   util/      utils.ts
