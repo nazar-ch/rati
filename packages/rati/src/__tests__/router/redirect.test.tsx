@@ -1,9 +1,14 @@
-import { describe, test, expect, vi } from 'vite-plus/test';
+import { describe, test, expect, vi, afterEach } from 'vite-plus/test';
+import { cleanup, render } from '@testing-library/react';
 import { route } from '../../router/route';
 import { RouterStore } from '../../router/store';
 import { createMemoryHistory } from '../../router/history';
 import { prepareRoute } from '../../router/prepareRoute';
+import { Router } from '../../router/Router';
+import { RootStore, RootStoreProvider } from '../../stores/RootStore';
 import type { GenericRouteType } from '../../router/route';
+
+afterEach(cleanup);
 
 const Home = () => <div>home</div>;
 const Settings = () => <div>settings</div>;
@@ -90,6 +95,42 @@ describe('route-level redirects', () => {
 
         router.navigate('/');
         expect(router.redirectHops).toHaveLength(0);
+        router.dispose();
+    });
+
+    test('hydrating onto a redirect route replays it as-is — no follow', () => {
+        // Reachable only from a server that ignored `renderApp`'s redirect result and
+        // built a snapshot naming the redirect route itself (the normal flow names the
+        // *target*, per prepareRoute). Pinning the choice rather than the accident:
+        // seeding is a verbatim replay of the server's decision, not a re-derivation —
+        // following the hop here would move the URL out from under the server's HTML
+        // and guarantee a mismatch. So the route renders as written, which for a
+        // redirect route means its (empty) component. The server is the thing at fault.
+        const router = new RouterStore({}, makeRoutes(), {
+            history: createMemoryHistory({ url: '/settings' }),
+            hydratedState: {
+                path: '/settings',
+                search: '',
+                hash: '',
+                activeRouteName: 'settings',
+                routeParams: {},
+            },
+        });
+        const root = new RootStore({ router }, { isReady: true });
+
+        const view = render(
+            <RootStoreProvider rootStore={root}>
+                <Router />
+            </RootStoreProvider>,
+        );
+
+        expect(router.activeRoute?.name).toBe('settings');
+        expect(router.path).toBe('/settings');
+        expect(router.redirectHops).toEqual([]);
+        // The declaration rides along on the active route — nothing acts on it.
+        expect(router.activeRoute?.redirect).toBeDefined();
+        expect(view.container.innerHTML).toBe('');
+
         router.dispose();
     });
 
