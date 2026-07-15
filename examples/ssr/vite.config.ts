@@ -15,13 +15,13 @@ export default defineConfig({
         lazyPlugins(() => [
             react(),
             babel({ presets: [decoratorPreset({ version: '2023-11' })] }),
-            // `vp dev` is the whole dev story: the plugin renders every request through
-            // src/entry-server.tsx, so this app has no dev server of its own.
+            // The plugin is both halves of this app's tooling: `vp dev` renders every
+            // request through src/entry-server.tsx (no dev server of its own), and
+            // `vp build` builds src/entry-client.tsx → dist/client and the server entry
+            // → dist/server in one command (no build scripts of its own, and no
+            // manifest for the production server to find).
             ratiSsr(),
         ]) ?? [],
-    build: {
-        manifest: true,
-    },
     ssr: {
         // Bundle our own workspace package so Vite resolves its source files.
         // react/react-dom stay external — Node's CJS↔ESM interop loads them

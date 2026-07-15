@@ -4,6 +4,10 @@
 // There is no dev branch here any more — `vp dev` is the whole dev story, because the
 // rati/vite plugin renders through src/entry-server.tsx inside Vite's own dev server.
 // The rest of this file goes the same way in SSR-03, when rati/server ships `serve()`.
+//
+// Note what is *not* here: no manifest is read, and no hashed script or stylesheet is
+// spliced in. The built entry-server already carries them (virtual:rati/assets), so
+// this file's only remaining jobs are static files and the three result kinds.
 
 import { createServer as createHttpServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -19,7 +23,10 @@ const clientDir = join(__dirname, 'dist/client');
 
 type RenderFn = (url: string) => Promise<RenderAppResult>;
 
-const template = await readFile(join(clientDir, 'index.html'), 'utf-8');
+// The shell is source, not a build output: it carries no hashed asset, so nothing about
+// it changes when the client build does, and the client build has no reason to rewrite
+// it. (SSR-03's handler takes it as a value — same read, one layer up.)
+const template = await readFile(join(__dirname, 'index.html'), 'utf-8');
 const { render } = (await import(resolve(__dirname, 'dist/server/entry-server.js'))) as {
     render: RenderFn;
 };

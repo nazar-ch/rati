@@ -39,6 +39,12 @@ const FEATURES = [
         tags: ['Source', 'error', 'retry'],
         blurb: 'A source that fails then recovers; the island routes the failure to an error slot whose retry rebuilds the load.',
     },
+    {
+        to: { name: 'split' },
+        title: 'Lazy routes · modulepreload',
+        tags: ['lazy', 'rati/vite'],
+        blurb: 'A route in its own chunk: server-rendered whole, and the built page names the chunk in the head so the browser fetches it without waiting for hydration.',
+    },
 ] as const;
 
 export function Home() {

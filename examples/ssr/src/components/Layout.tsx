@@ -11,6 +11,7 @@ const LINKS = [
     { to: { name: 'counter' }, label: 'Counter' },
     { to: { name: 'live' }, label: 'Live' },
     { to: { name: 'flaky' }, label: 'Flaky' },
+    { to: { name: 'split' }, label: 'Split' },
 ] as const;
 
 /**

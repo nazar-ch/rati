@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { hook, input, route, scope } from 'rati';
+import { hook, input, lazy, route, scope } from 'rati';
 import type { GenericRouteType } from 'rati';
 import { RegionContext } from './appContext';
 import { fetchProduct, fetchProfile, fetchReviews } from './data';
@@ -49,6 +49,14 @@ const profileScope = scope({ userId: input<string>() }).load({
     profile: ({ userId }) => fetchProfile(userId),
 });
 
+const splitScope = scope().load({ chapter: async () => 'resolved before the chunk arrived' });
+
+// A route in a chunk of its own. `lazy()` is unchanged by any of this — but built
+// through rati/vite, the plugin records which module it imports, so the server can
+// name this page's chunk in the HTML (`<link rel="modulepreload">`) instead of leaving
+// the browser to discover it after hydration.
+const Split = lazy(() => import('./components/Split'));
+
 export const routes = [
     route('/', 'home', Home),
     route('/about', 'about', About, { scope: aboutScope }),
@@ -60,6 +68,7 @@ export const routes = [
     route('/counter', 'counter', Counter),
     route('/live', 'live', Live),
     route('/flaky', 'flaky', Flaky),
+    route('/split', 'split', Split, { scope: splitScope }),
     // A route-level redirect: the legacy /store/:id path maps its param onto the
     // product route. The client follows it with a history replace; the server
     // responds 301 before rendering anything (see prepareRoute / renderApp).
