@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import type { Scope } from '../scope/scope';
 import { buildRouteComponent, type GenericRouteType } from './route';
 
@@ -8,7 +8,7 @@ import { buildRouteComponent, type GenericRouteType } from './route';
  */
 export type GroupDefaults = {
     /** Wrapper rendered around every child that doesn't set its own. */
-    wrapper?: ComponentType | undefined;
+    wrapper?: ComponentType<{ children: ReactNode }> | undefined;
     /** Default mandala loading slot for scope-bearing children lacking one. */
     loading?: ComponentType<any> | undefined;
     /** Default mandala error slot for scope-bearing children lacking one. */

@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import type { TupleToUnion } from '../types/generic';
 import type { Scope, ScopeComponent, ScopeProvidesOf } from '../scope/scope';
 import { createMandala, type MandalaConfig } from '../mandala/mandala';
@@ -103,8 +103,13 @@ export type RouteOptions<TScope extends Scope<any> | undefined, Path extends str
      * `hook(() => use(SomeContext))`, so there's no env to thread.
      */
     scope?: TScope extends Scope<any> ? TScope : undefined;
-    /** Route-level wrapper rendered around the component. */
-    wrapper?: ComponentType | undefined;
+    /**
+     * Route-level wrapper rendered around the component. It is handed the route's
+     * element as `children` — always, which is why `children` is required here: a
+     * wrapper that ignores them still fits, and one that declares what it receives no
+     * longer has to lie to.
+     */
+    wrapper?: ComponentType<{ children: ReactNode }> | undefined;
     /**
      * Slot shown while the scope resolves — the mandala's `loading`. Defaults to
      * rendering nothing. Only meaningful alongside `scope`.
@@ -268,7 +273,7 @@ export type GenericRouteType = {
     path: string;
     pathRe: RegExp | null;
     component: any;
-    wrapperComponent?: ComponentType | undefined;
+    wrapperComponent?: ComponentType<{ children: ReactNode }> | undefined;
     scope?: Scope<any> | undefined;
     redirect?: RouteRedirect | undefined;
     // Retained fold inputs so `group` can re-derive the mandala with shared slots; present

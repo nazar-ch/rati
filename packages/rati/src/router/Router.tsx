@@ -1,10 +1,17 @@
-import React, { type ComponentType, type FC, Suspense, useDeferredValue } from 'react';
+import React, {
+    type ComponentType,
+    type FC,
+    type ReactNode,
+    Suspense,
+    useDeferredValue,
+} from 'react';
 import { useRouter } from '../stores/RootStore';
 import { navTrace } from '../util/navTrace';
 
 export const Router: FC<{
     // router: RouterStore<any[] | readonly any[]>;
-    DefaultWrapper?: ComponentType;
+    /** Wrapper for routes that set none. Handed the route's element as `children`. */
+    DefaultWrapper?: ComponentType<{ children: ReactNode }>;
     Loading?: ComponentType;
 }> = ({ DefaultWrapper = EmptyWrapper, Loading = DefaultLoading }) => {
     // TODO: make this work with react native router too
