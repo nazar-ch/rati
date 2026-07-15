@@ -72,15 +72,13 @@ async function assertContract(model: Model, real: Real, label: string): Promise<
 
     // 7 — `pending` agreement, read through `useScopeControls` (the public surface).
     //
-    // Not in the error slot: `pending` means "keys currently re-fetching", and once the
-    // boundary has replaced the inner tree nothing is fetching at all — the set is stale
-    // leftovers either way (a swapped source that errors rather than readies stays in it,
-    // since only the ready path removes it), and a retry clears it wholesale through
-    // `treeCommitted`. The contract says nothing about the window, so asserting it would
-    // pin whichever way the engine happens to lean. It resumes the moment a generation does.
-    if (model.slot() !== 'error') {
-        expect(harness.pending(), `${label}: pending`).toEqual(model.pending());
-    }
+    // The error slot included, since 2026-07-15: a swapped source that errors rather than
+    // readies now settles its swap on the way to the boundary (`sourceErrored`), so the key
+    // leaves `pending` — an error is a settled state, not an in-flight one. What legitimately
+    // *stays* in `pending` there is a promise re-fetch still in flight when some other key
+    // errored the tree: it settles through the controller's own `.then`, boundary or not,
+    // and the model keeps its `inFlight` for exactly as long.
+    expect(harness.pending(), `${label}: pending`).toEqual(model.pending());
 
     // 5 — run-count upper bounds: one run per generation, per direct refresh, and per time
     // a read changed. Never an exact count: an engine that coalesces two dirty marks into

@@ -154,7 +154,10 @@ The moving parts:
   store; notifications are microtask-deferred because bookkeeping mutates during render.
   Waiters resolve when their key settles; a remount (`treeCommitted`) settles everything
   wholesale. Refresh failures keep the previous value, log, and resolve (fire-and-forget
-  callers must not trip unhandled rejections).
+  callers must not trip unhandled rejections). A cascade-swapped source holds its key in
+  `pending` until the replacement's first *settled* snapshot — ready (`sourceReady`) or
+  error (`sourceErrored`, on the way to the boundary); an error is a settled state, so the
+  error slot never reads a key as re-fetching when nothing is.
 
 ## The value channel (`mandala/channel.ts`)
 

@@ -4,7 +4,7 @@ import { prerender } from 'react-dom/static';
 import { hydrateRoot } from 'react-dom/client';
 import type { FC, ReactElement } from 'react';
 import { scope, data, input } from '../../scope/scope';
-import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
+import { SourceSymbol, type Source, type SourceError, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
 import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
 import { useScopeControls, type ScopeControls } from '../../mandala/controls';
@@ -32,7 +32,7 @@ function deferred<T>() {
 }
 
 // A hand-rolled source the test drives, logging attach/detach so lifetime is observable.
-type TestSource<T> = Source<T> & { ready: (value: T) => void };
+type TestSource<T> = Source<T> & { ready: (value: T) => void; fail: (error: SourceError) => void };
 
 function testSource<T>(log: string[], id: string): TestSource<T> {
     let state: SourceState<T> = { status: 'pending' };
@@ -55,6 +55,7 @@ function testSource<T>(log: string[], id: string): TestSource<T> {
             return () => log.push(`detach:${id}`);
         },
         ready: (value) => act(() => set({ status: 'ready', value })),
+        fail: (error) => act(() => set({ status: 'error', error })),
     };
 }
 
@@ -687,6 +688,69 @@ describe('selective refresh — races', () => {
             xRuns[1]!.resolve('x2');
         });
         expect(screen.getByText('x2/y2')).toBeTruthy();
+        expect(captured.current!.pending.size).toBe(0);
+    });
+
+    // Follow-up pin (2026-07-15; MF-02 left this standing as an observation, promoted to a
+    // fix): a cascade-swapped source that errors settles its swap the way a first ready
+    // would — an error is a settled state, not an in-flight one, so the key leaves
+    // `pending` before the boundary shows the error slot. It used to sit there until a
+    // retry's `treeCommitted`, so the error slot read a `pending` with nothing actually
+    // fetching. Effort record: docs/planned/mandala-fuzz/README.md §Findings.
+    //
+    // Kill: resolver.tsx, the source error branch — drop the `sourceErrored` call → 'live'
+    // stays in `pending` for the error slot's whole life.
+    test('a swapped source that errors settles the swap: the error slot reads an empty pending', async () => {
+        const log: string[] = [];
+        let version = 1;
+        const created: TestSource<string>[] = [];
+        const testScope = scope()
+            .load({ v: async () => version })
+            .load({
+                live: ({ v }: { v: number }) => {
+                    const source = testSource<string>(log, `s${v}`);
+                    created.push(source);
+                    return source;
+                },
+            });
+        const { captured, Probe } = probeControls(testScope);
+        const Island = island({
+            scope: testScope,
+            component: ({ live }: { live: string }) => (
+                <div>
+                    <span>live {live}</span>
+                    <Probe />
+                </div>
+            ),
+            loading: Loading,
+            error: () => (
+                <div>
+                    <span>failed</span>
+                    <Probe />
+                </div>
+            ),
+        });
+
+        await act(async () => {
+            render(<Island />);
+        });
+        created[0]!.ready('one');
+        expect(screen.getByText('live one')).toBeTruthy();
+
+        version = 2;
+        await act(async () => {
+            await captured.current!.refresh('v');
+        });
+        await flush();
+        // Mid-swap: the replacement is warming, so the key is pending and the old
+        // content bridges.
+        expect(created).toHaveLength(2);
+        expect([...captured.current!.pending]).toEqual(['live']);
+        expect(screen.getByText('live one')).toBeTruthy();
+
+        created[1]!.fail({ code: 'failed', message: 'boom' });
+        await flush();
+        expect(screen.getByText('failed')).toBeTruthy();
         expect(captured.current!.pending.size).toBe(0);
     });
 });

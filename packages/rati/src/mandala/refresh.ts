@@ -352,6 +352,15 @@ export class RefreshController {
         this.settleWaiters(key);
     }
 
+    /** Render-time: a swapped source errored instead — equally the end of the swap. An
+     * error is a settled state, not an in-flight one, so the key leaves `pending` before
+     * the boundary takes the tree; without this it sat there until a retry's
+     * `treeCommitted`, and the error slot read a `pending` with nothing actually fetching. */
+    sourceErrored(key: string): void {
+        this.removePending(key);
+        this.settleWaiters(key);
+    }
+
     // The `pending` external store (uSES-shaped). Mutations may happen during render
     // (dirty processing), so listener notification is microtask-deferred — never a
     // setState-during-render — and the snapshot is rebuilt per change for identity.

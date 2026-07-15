@@ -467,7 +467,15 @@ function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: Step
             resolved[key] = value;
         } else {
             const state = cell.source.getSnapshot();
-            if (state.status === 'error') throw state.error;
+            if (state.status === 'error') {
+                // A swap ending in error settles it the way a first ready would: the key
+                // leaves `pending` before the throw hands the tree to the boundary.
+                if ('swapped' in cell && cell.swapped) {
+                    cell.swapped = false;
+                    shared.controller?.sourceErrored(key);
+                }
+                throw state.error;
+            }
             if (state.status === 'pending') {
                 // A cascade-swapped source still warming up keeps the pre-swap value
                 // rendered instead of dropping the level to the loading slot. A live

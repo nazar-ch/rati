@@ -221,6 +221,22 @@ Two harness notes, both of which cost real time:
   only on the promise path. It now carries one dependent of each kind. The general lesson is
   the kill-note discipline's whole point — an unexecuted kill note is a guess.
 
+### 2026-07-15 (post-close review) — the stale `pending` observation promoted to a fix
+
+MF-02's first standing observation is resolved, on the user's call at the effort review: a
+cascade-swapped source that errors now settles its swap on the way to the boundary
+(`RefreshController.sourceErrored`, called from the resolver's source error branch), so the
+key leaves `pending` instead of sitting there until a retry's `treeCommitted`. The contract
+the fix defines: an error is a settled state, not an in-flight one — the error slot never
+reads a key as re-fetching when nothing is. What legitimately stays in `pending` there is a
+promise re-fetch still in flight when some other key errored the tree; it settles through
+the controller's own `.then`, boundary or not.
+
+Pinned in `scopeControls.test.tsx` (kill executed: dropping the `sourceErrored` call goes
+red), and the command property's invariant 7 now asserts `pending` in the error slot too —
+the guard MF-02 added is gone, and the model needed no change (it already treated an
+erroring swap as settled).
+
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with the
