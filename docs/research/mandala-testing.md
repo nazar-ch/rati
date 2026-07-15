@@ -247,5 +247,10 @@ a nightly lane later. Fast by default so `vp run rati#test` stays ~seconds.
 - **Hydration as a fuzz dimension** — deterministic pins first; promote to a fuzz variant only if
   the pins keep finding neighbors. StrictMode is no longer on this list: MF-03 promoted it for
   the *smoke* property (the double-mount is where the lifecycle ledger earns its keep). The
-  command model stays single-mode for now — see the effort's MF-03 note for what promoting it
-  would cost.
+  command model stays single-mode — **decided 2026-07-15** at the effort review, not just
+  deferred: the frontier and ledger invariants carry over untouched, so the only thing a
+  StrictMode command model would add is run-budget precision — and buying it means the model
+  counting reached levels per generation (MF-03's note), real modelling work for a lifecycle
+  the smoke variant already exercises under the double-mount. Revisit only if a StrictMode
+  bug ever slips past the smoke variant's ledger — that would be evidence the run-budget gap
+  matters, and the MF-03 note records exactly what closing it costs.

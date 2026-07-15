@@ -237,6 +237,13 @@ red), and the command property's invariant 7 now asserts `pending` in the error 
 the guard MF-02 added is gone, and the model needed no change (it already treated an
 erroring swap as settled).
 
+The same review closed MF-03's open question: the command model **stays single-mode** —
+a decision now, not a deferral. Promoting it would buy only run-budget precision under the
+double-mount, at the cost of the model counting reached levels per generation, and the
+smoke property's StrictMode variant already carries the lifecycle ledger there. Recorded in
+[mandala-testing.md](../../research/mandala-testing.md) §"Explicitly later", with the
+revisit condition.
+
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with the
