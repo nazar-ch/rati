@@ -5,12 +5,14 @@ import {
     fillTemplate,
     isWholeDocument,
     spliceDocument,
+    type Assembler,
     type RenderedParts,
-} from '../../vite/html';
+} from '../../ssr/html';
 
 /*
-    The dev plugin's HTML assembly. Pure string work, so it is tested here rather than
-    through a dev server — ratiSsr.test.ts covers the wiring around it.
+    The HTML assembly both servers share. Pure string work, so it is tested here rather
+    than through either of them — ratiSsr.test.ts and requestHandler.test.ts cover the
+    wiring around it.
 */
 
 function parts(overrides: Partial<RenderedParts> = {}): RenderedParts {
@@ -22,6 +24,13 @@ function parts(overrides: Partial<RenderedParts> = {}): RenderedParts {
     };
 }
 
+/** Whoever is assembling — its identity is what the refusals below quote back. */
+const BY: Assembler = {
+    name: 'rati:ssr',
+    template: 'index.html',
+    option: 'ratiSsr({ placeholders })',
+};
+
 const TEMPLATE = [
     '<!doctype html>',
     '<html><head><!--app-head--></head>',
@@ -30,7 +39,7 @@ const TEMPLATE = [
 
 describe('fillTemplate', () => {
     test('places each part at its placeholder', () => {
-        const html = fillTemplate(TEMPLATE, parts(), DEFAULT_PLACEHOLDERS, 'index.html');
+        const html = fillTemplate(TEMPLATE, parts(), DEFAULT_PLACEHOLDERS, BY);
 
         expect(html).toBe(
             '<!doctype html><html><head><title>t</title></head>' +
@@ -46,7 +55,7 @@ describe('fillTemplate', () => {
             TEMPLATE,
             parts({ html: `<p>$& and $' and $\` and $1</p>` }),
             DEFAULT_PLACEHOLDERS,
-            'index.html',
+            BY,
         );
 
         expect(html).toContain(`<p>$& and $' and $\` and $1</p>`);
@@ -57,7 +66,7 @@ describe('fillTemplate', () => {
             '<head>{{head}}</head><body>{{app}}{{state}}</body>',
             parts(),
             { head: '{{head}}', html: '{{app}}', state: '{{state}}' },
-            'index.html',
+            BY,
         );
 
         expect(html).toBe(
@@ -70,7 +79,7 @@ describe('fillTemplate', () => {
         // hydrates from scratch, so SSR quietly stops paying for itself.
         const noState = '<html><head><!--app-head--></head><body><!--app-html--></body></html>';
 
-        expect(() => fillTemplate(noState, parts(), DEFAULT_PLACEHOLDERS, 'index.html')).toThrow(
+        expect(() => fillTemplate(noState, parts(), DEFAULT_PLACEHOLDERS, BY)).toThrow(
             /index\.html has no <!--app-state-->.*hydration payload/s,
         );
     });
@@ -80,7 +89,7 @@ describe('fillTemplate', () => {
         const noHead = '<html><head></head><body><!--app-html--><!--app-state--></body></html>';
 
         expect(() =>
-            fillTemplate(noHead, parts({ headTags: '' }), DEFAULT_PLACEHOLDERS, 'index.html'),
+            fillTemplate(noHead, parts({ headTags: '' }), DEFAULT_PLACEHOLDERS, BY),
         ).not.toThrow();
     });
 });
@@ -104,7 +113,7 @@ describe('spliceDocument', () => {
     const DOCUMENT = '<!doctype html><html><head><meta /></head><body><div>app</div></body></html>';
 
     test('splices the head tags into <head> and the payload before </body>', () => {
-        const html = spliceDocument(DOCUMENT, parts());
+        const html = spliceDocument(DOCUMENT, parts(), BY);
 
         expect(html).toBe(
             '<!doctype html><html><head><meta /><title>t</title></head>' +
@@ -117,7 +126,7 @@ describe('spliceDocument', () => {
         // carries a closing tag of its own — the payload belongs after it.
         const withSample = '<html><head></head><body><pre></body></pre>x</body></html>';
 
-        const html = spliceDocument(withSample, parts({ headTags: '' }));
+        const html = spliceDocument(withSample, parts({ headTags: '' }), BY);
 
         expect(html).toBe(
             '<html><head></head><body><pre></body></pre>x<script id="s"></script></body></html>',
@@ -125,7 +134,7 @@ describe('spliceDocument', () => {
     });
 
     test('throws when the document has no </head> to splice into', () => {
-        expect(() => spliceDocument('<html><body>x</body></html>', parts())).toThrow(
+        expect(() => spliceDocument('<html><body>x</body></html>', parts(), BY)).toThrow(
             /no <\/head>.*head tags/s,
         );
     });

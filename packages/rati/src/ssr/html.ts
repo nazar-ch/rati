@@ -1,6 +1,10 @@
 /*
-    HTML assembly for the dev middleware — the two patterns docs/public/ssr.md
-    describes, and nothing else.
+    HTML assembly: a `rendered` result and a shell in, a page out — the two patterns
+    docs/public/ssr.md describes, and nothing else.
+
+    It sits here, next to the render loop, because both things that assemble compose it:
+    `rati/vite`'s dev middleware and `rati/server`'s request handler. Neither owns it,
+    and a page must not come out of dev one way and out of production another.
 
     Template: an index.html carrying `<!--app-head-->` / `<!--app-html-->` /
     `<!--app-state-->`, React rendering into #root.
@@ -35,6 +39,19 @@ export const DEFAULT_PLACEHOLDERS: Placeholders = {
 };
 
 /**
+ * Who is assembling. A refusal below has to name the fix, and the fix is a different
+ * call in each of them — so each says who it is rather than the shared code guessing.
+ */
+export interface Assembler {
+    /** The entry the user is looking at: `rati:ssr`, `rati/server`. */
+    name: string;
+    /** What to call the shell — a path where it is a file, `the template` where it is a value. */
+    template: string;
+    /** The call that names the placeholders: `ratiSsr({ placeholders })`. */
+    option: string;
+}
+
+/**
  * A rendered whole document rather than a fragment — the app rendered `<html>` itself,
  * so there is no template to fill.
  */
@@ -47,16 +64,30 @@ export function fillTemplate(
     template: string,
     parts: RenderedParts,
     placeholders: Placeholders,
-    templatePath: string,
+    by: Assembler,
 ): string {
-    let html = fill(template, placeholders.html, parts.html, 'the rendered app', templatePath);
-    html = fill(html, placeholders.head, parts.headTags, 'the head tags', templatePath);
-    return fill(html, placeholders.state, parts.stateScript, 'the hydration payload', templatePath);
+    let html = fill(template, placeholders.html, parts.html, 'the rendered app', by);
+    html = fill(html, placeholders.head, parts.headTags, 'the head tags', by);
+    return fill(html, placeholders.state, parts.stateScript, 'the hydration payload', by);
 }
 
-export function spliceDocument(document: string, parts: RenderedParts): string {
-    const withHead = spliceBefore(document, '</head>', 'first', parts.headTags, 'the head tags');
-    return spliceBefore(withHead, '</body>', 'last', parts.stateScript, 'the hydration payload');
+export function spliceDocument(document: string, parts: RenderedParts, by: Assembler): string {
+    const withHead = spliceBefore(
+        document,
+        '</head>',
+        'first',
+        parts.headTags,
+        'the head tags',
+        by,
+    );
+    return spliceBefore(
+        withHead,
+        '</body>',
+        'last',
+        parts.stateScript,
+        'the hydration payload',
+        by,
+    );
 }
 
 function fill(
@@ -64,13 +95,13 @@ function fill(
     placeholder: string,
     value: string,
     label: string,
-    templatePath: string,
+    by: Assembler,
 ): string {
     if (!html.includes(placeholder)) {
         if (!value) return html;
         throw new Error(
-            `rati:ssr — ${templatePath} has no ${placeholder}, so ${label} would be dropped. ` +
-                `Add the placeholder, or name your own with ratiSsr({ placeholders }).`,
+            `${by.name} — ${by.template} has no ${placeholder}, so ${label} would be dropped. ` +
+                `Add the placeholder, or name your own with ${by.option}.`,
         );
     }
     // A replacer function, not the value directly: String.replace reads `$&`, `$1` and
@@ -85,6 +116,7 @@ function spliceBefore(
     which: 'first' | 'last',
     value: string,
     label: string,
+    by: Assembler,
 ): string {
     if (!value) return html;
     // The document's own `</head>` is the first one — React escapes page text, so
@@ -93,7 +125,7 @@ function spliceBefore(
     const at = which === 'first' ? html.indexOf(anchor) : html.lastIndexOf(anchor);
     if (at === -1) {
         throw new Error(
-            `rati:ssr — the rendered document has no ${anchor}, so ${label} would be dropped.`,
+            `${by.name} — the rendered document has no ${anchor}, so ${label} would be dropped.`,
         );
     }
     return html.slice(0, at) + value + html.slice(at);

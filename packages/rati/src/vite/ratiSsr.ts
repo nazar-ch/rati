@@ -8,9 +8,10 @@ import {
     fillTemplate,
     isWholeDocument,
     spliceDocument,
+    type Assembler,
     type Placeholders,
     type RenderedParts,
-} from './html';
+} from '../ssr/html';
 import { ASSETS_MODULE, RESOLVED_ASSETS_MODULE, buildAssets, devAssets } from './assets';
 import { findLazyCalls, recordModuleIds } from './lazyModules';
 
@@ -305,16 +306,21 @@ async function assemble(
     url: string,
     originalUrl: string | undefined,
 ): Promise<string> {
+    const by: Assembler = {
+        name: 'rati:ssr',
+        template: options.template,
+        option: 'ratiSsr({ placeholders })',
+    };
     if (isWholeDocument(result.html)) {
         // No template, so the rendered document is the shell: splice around React's
         // output, then transform it so the document still gets the dev client.
-        return server.transformIndexHtml(url, spliceDocument(result.html, result), originalUrl);
+        return server.transformIndexHtml(url, spliceDocument(result.html, result, by), originalUrl);
     }
     const raw = await readFile(resolve(server.config.root, options.template), 'utf8');
     // Transform the shell, *then* fill it: transforming the filled page would hand the
     // app's own markup to Vite's HTML pipeline.
     const template = await server.transformIndexHtml(url, raw, originalUrl);
-    return fillTemplate(template, result, options.placeholders, options.template);
+    return fillTemplate(template, result, options.placeholders, by);
 }
 
 async function loadRender(server: ViteDevServer, entry: string): Promise<RenderFn> {
