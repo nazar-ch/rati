@@ -95,6 +95,35 @@ describe('renderApp', () => {
         }
     });
 
+    test('onError receives the render-level view of a failed load', async () => {
+        const seen: unknown[] = [];
+        const result = await renderApp({
+            url: '/posts/broken',
+            createApp,
+            onError: (error) => seen.push(error),
+        });
+
+        // Two views of one failure, both live: the collector's `errors` is the server's
+        // status input, `onError` is React's raw callback (it fires for errors inside a
+        // Suspense boundary too, where the render itself degrades to the loading slot).
+        expect(result.kind).toBe('rendered');
+        if (result.kind !== 'rendered') return;
+        expect(result.errors).toHaveLength(1);
+        expect(seen.map((error) => (error as Error).message)).toEqual(['backend exploded']);
+    });
+
+    test('the rendered result and its script agree on the payload version', async () => {
+        const result = await renderApp({ url: '/posts/hello', createApp });
+        expect(result.kind).toBe('rendered');
+        if (result.kind !== 'rendered') return;
+
+        // `hydration` is what an SSG caller embeds itself; `stateScript` is the same
+        // state already serialized. A version drift between them is a client that
+        // rejects the payload and silently resolves from scratch.
+        expect(result.hydration.v).toBe(1);
+        expect(result.stateScript).toContain('"v":1');
+    });
+
     test('a redirect route becomes a redirect result before any rendering', async () => {
         const result = await renderApp({ url: '/blog/hello', createApp });
         expect(result).toEqual({
@@ -120,6 +149,35 @@ describe('renderApp', () => {
             url: '/absent',
             createApp: ({ history, hydration }) => {
                 const router = new RouterStore({}, bare, { history });
+                const root = new RootStore({ router }, { isReady: true });
+                return {
+                    router,
+                    App: () => (
+                        <RootStoreProvider rootStore={root}>
+                            <HydrationProvider {...hydration}>
+                                <Router />
+                            </HydrationProvider>
+                        </RootStoreProvider>
+                    ),
+                };
+            },
+        });
+        expect(result).toEqual({ kind: 'no-match', status: 404 });
+    });
+
+    test('a redirect whose target is outside the table is a no-match, not a 30x', async () => {
+        // Pins current behavior, deliberately (see the effort README's findings): the
+        // router follows the hop, `/new` matches nothing, so `activeRoute` is null and
+        // prepareRoute returns null — which renderApp reads as no-match *before* it
+        // looks at the redirect. The 301 the author asked for is computed and dropped.
+        const redirectOnly = [
+            route('/old', 'old', () => null, { redirect: { to: '/new', permanent: true } }),
+        ] as const satisfies GenericRouteType[];
+
+        const result = await renderApp({
+            url: '/old',
+            createApp: ({ history, hydration }) => {
+                const router = new RouterStore({}, redirectOnly, { history });
                 const root = new RootStore({ router }, { isReady: true });
                 return {
                     router,
