@@ -90,3 +90,49 @@ turned up, none of it fixed in-item:
   un-revealed forever and the page looks broken (this is what made the title clobber above
   look permanent). Verify rati SSR in a *visible* tab; check `document.hidden` before
   believing a hydration failure.
+
+### 2026-07-15 — from SSR-05 (jnana website)
+
+The migration is jnana PR #537 (`claude/host/website-ssr-kit`): +217/−263, the two
+hand-rolled files (`server/src/ssr.ts`, `escape-json.ts`) and `render-result.ts` gone,
+the Hono server down to one `createRequestHandler` behind `app.all('*')`. The kit again
+needed no changes, and this is the first consumer to exercise the **template pattern**
+end-to-end (nazar is whole-document) — so the `index.html` shell, the `<!--app-head-->`
+slot and the CSR fallback all have a real user now. Verified in a visible browser
+through dev, a production build, and the deployed shape (the container image, offline
+install and `--production` prune included): hydration console-clean everywhere,
+statuses right, the dehydrated island reused. What it turned up, none of it fixed
+in-item:
+
+- **A `!isSsrBuild` plugin guard silently inverts under the plugin's build.** Consumers
+  that exclude a client-only plugin from the server build (`!isSsrBuild && plugin()` —
+  jnana's license-notice emitter) get `isSsrBuild: false` on *every* config call once
+  `ratiSsr` opts into the app builder; measured, all three invocations. It doesn't
+  error — the guard just stops excluding, and the plugin quietly starts running on the
+  SSR bundle. `applyToEnvironment: (env) => env.name === 'client'` is the fix, and
+  `docs/public/ssr.md §Build` should say so: this is a migration step for anyone whose
+  config branched on the build, and the failure mode is a wrong artifact, not a message.
+- **`rati/server` drags in a required `react` peer.** `react` is a non-optional peer of
+  the package, but the built `dist/server/index.js` imports only `node:*` builtins and
+  the react-free `html-*` chunk. A server-only workspace that installs rati purely for
+  `createRequestHandler` (jnana's `website/server`) gets a spurious peer warning and is
+  told to install React to run a Node listener. Packaging-level; the entries are already
+  sliced, the peer declaration just isn't.
+- **`no-match` turns a styled 404 into a plain-text one, unannounced.** The website had
+  no catch-all, so its old server filled the template with an empty `#root` at status
+  404 — blank, but styled and analytics-bearing. `createRequestHandler` answers
+  `kind: 'no-match'` with `text/plain` "Not found". Arguably the better default (a blank
+  styled page is worse), and `serve()`'s doc note assumes a catch-all exists — but a
+  migrating consumer without one loses its shell and nothing says so. A line in
+  §Response statuses would cover it.
+- **SSR-04's head clobber did not reproduce here, which narrows it.** `/wait` declares
+  `<Title>` from a resolved scope prop *inside* the route's Suspense boundary — SSR-04's
+  shape exactly — and the title is correct in the HTML and stays correct through
+  hydration, in dev and in a production build. The difference is dehydration: the
+  island's data comes back in the payload, so the boundary hydrates immediately and
+  `commit` lands before `applyToDocument` can write `defaultTitle` over it. So the bug
+  needs a boundary that is *still* unhydrated when `HeadProvider`'s effect runs — a
+  source-backed page, a `lazy()` chunk still in flight, or React deferring the reveal on
+  a large page (nazar's). Dehydrated async loads are safe. The design question
+  (`domSync.ts:17` cannot tell "nothing declared yet" from "nothing will be declared")
+  is unchanged, but its blast radius is smaller than SSR-04 implied.
