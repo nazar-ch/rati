@@ -12,9 +12,9 @@ A route's data resolves at render time, so the server can resolve it too: rati r
 under React's `prerender` (from `react-dom/static` — it awaits Suspense, which
 `renderToString` cannot), waits for the islands' promise loads, and **dehydrates** the
 resolved values. The client reads them back and hydrates without re-running a single
-load. There is no rati server: the [Vite plugin](#the-vite-plugin) serves the app in dev
-and builds both sides of it, and in production you bring a ~50-line HTTP server (or a
-serverless function) and call one function per request.
+load. You write no server: the [Vite plugin](#the-vite-plugin) serves the app in dev and
+builds both sides of it, and the [production handler](#the-production-handler) is a fetch
+function your host already knows how to call.
 
 ## The server entry
 
@@ -27,6 +27,8 @@ import { renderApp, type RenderAppResult } from 'rati/ssr';
 import * as assets from 'virtual:rati/assets';
 import { createApp } from './createApp';
 
+export { assets };
+
 export function render(url: string): Promise<RenderAppResult> {
     return renderApp({ url, createApp, assets });
 }
@@ -36,6 +38,11 @@ export function render(url: string): Promise<RenderAppResult> {
 stylesheets, this route's chunk preload. The [plugin](#the-vite-plugin) generates it
 from the build it ran, so nothing here reads a manifest. Without the plugin, pass the
 same shape (`RenderAssets`) yourself, or nothing at all.
+
+Re-export it (the line above) if you serve through
+[`createRequestHandler`](#the-production-handler): `virtual:rati/assets` exists only
+inside the build, and your production server is not part of one — so the module that
+*was* built is how the values reach it.
 
 `createApp` is the same factory the client uses — it builds one app instance per call
 (router, stores, head store) and mounts `HydrationProvider`:
@@ -59,7 +66,9 @@ export function createApp({ history, hydratedState, hydration }: CreateAppOption
 }
 ```
 
-The result is one of three kinds; the server maps them onto the response:
+The result is one of three kinds. You don't map them yourself — the [plugin](#dev) does
+in dev and the [handler](#the-production-handler) does in production — but this is what
+they do with it, and what to do with it if you [serve it yourself](#rolling-your-own-server):
 
 ```ts
 const result = await render(url);
@@ -77,7 +86,7 @@ if (result.kind === 'no-match') {
 }
 // kind === 'rendered'
 const body = template
-    .replace('<!--app-head-->', result.headTags)     // <title> + <meta> winners
+    .replace('<!--app-head-->', result.headTags)     // assets tags + <title>/<meta> winners
     .replace('<!--app-html-->', result.html)         // the prerendered app
     .replace('<!--app-state-->', result.stateScript); // the hydration payload tag
 res.writeHead(result.status, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -95,7 +104,7 @@ hydrate:
 
 ```tsx
 // entry-client.tsx
-import { hydrateRoot } from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 import { readHydration } from 'rati/ssr';
 import { createBrowserHistory } from 'rati';
 import { createApp } from './createApp';
@@ -108,8 +117,16 @@ const { App } = createApp({
     hydration: state ? { data: state.data, seeds: state.seeds } : undefined,
 });
 
-hydrateRoot(document.getElementById('root')!, <App />);
+const root = document.getElementById('root')!;
+
+if (state) hydrateRoot(root, <App />);
+else createRoot(root).render(<App />);
 ```
+
+**Why the branch.** No payload means no server-rendered HTML to hydrate — a client-only
+boot, or the [500 fallback](#the-production-handler) after a render failed. Hydrating an
+empty root against a tree that renders something is a mismatch: React reports it, then
+recovers by client-rendering anyway. `createRoot` is that outcome without the error.
 
 ## The Vite plugin
 
@@ -197,8 +214,76 @@ Two behaviours worth knowing:
   best-effort page: a template missing `<!--app-state-->` would serve, hydrate from
   scratch, and look fine while SSR stopped paying for itself.
 
-Production is still yours to serve — see [below](#bring-your-own-server-notes). A
-packaged production handler is the rest of the kit.
+## The production handler
+
+`createRequestHandler` turns the render loop into a fetch function: a `Request` in, a
+`Response` out, with the result kinds mapped onto HTTP. That is the whole interface,
+because it is the one every host already speaks.
+
+```ts
+import { createRequestHandler, serve } from 'rati/server';
+// The built server entry — `render`, plus the `assets` it re-exports.
+import { render, assets } from './dist/server/entry-server.js';
+
+const template = await readFile('index.html', 'utf-8');
+const handler = createRequestHandler({ render, assets, template });
+```
+
+| Option | | |
+| --- | --- | --- |
+| `render` | required | the server entry's `render(url)` |
+| `template` | | your HTML shell, as a string. Whole-document apps have none |
+| `assets` | | `virtual:rati/assets`, for the [fallback](#when-a-render-throws) only |
+| `placeholders` | | match `ratiSsr({ placeholders })` if you renamed them |
+| `onError` | `console.error` | a render that threw, on its way to a 500 |
+
+Then hand it to whatever you deploy on:
+
+```ts
+app.all('*', (c) => handler(c.req.raw));  // Hono
+export default { fetch: handler };        // Vercel, Bun, Deno, workers
+await serve({ handler, staticDir: 'dist/client' }); // plain Node — below
+```
+
+Nothing in the handler is platform-specific, and nothing in it reads a manifest or
+resolves a path: the built entry carries its own tags ([`virtual:rati/assets`](#build)).
+Fetch-shaped means edge runtimes probably work — untested is unsupported, so no promises.
+
+### When a render throws
+
+A failing *load* is not this: the island catches it, the HTML ships the loading slot, and
+`result.status` carries the failure. But an error outside every island — a bug in your
+shell, a route `wrapper` that throws — rejects `renderApp`, and there is no partial page
+to send.
+
+So the handler sends the shell the app would have hydrated: your template, the `assets`
+tags, an empty root, **no payload**. The client entry sees no payload, calls `createRoot`
+(see [the client entry](#the-client-entry)), and resolves from scratch — a reader still
+gets the app. The status stays **500**: the render did fail, and a crawler should be told.
+
+It needs a template and a client entry to do this. Without either — no `assets`, a
+whole-document app — the answer is a plain-text 500. Note this is a *production* answer:
+in dev the [plugin](#dev) hands the same throw to Vite's error overlay instead.
+
+### The Node adapter
+
+`serve()` is `node:http` wrapped around the handler, for hosts that aren't fetch-shaped:
+
+```ts
+await serve({
+    handler,
+    staticDir: 'dist/client', // omit when a CDN serves the assets
+    port: 3000,               // default: $PORT, or 3000
+});
+```
+
+It serves files from `staticDir` with correct MIME types (a browser rejects a
+`<script type="module">` served without a JavaScript type) and sends everything else to
+the handler — so an unknown path is your app's 404 page, not this server's. It is
+dependency-free and deliberately plain: no compression, no caching headers, no
+clustering. Fine at this scale; put a CDN in front for real traffic.
+
+`examples/ssr/serve.ts` is the whole thing in ~12 lines.
 
 ## The per-request lifecycle
 
@@ -275,8 +360,9 @@ reaches the error slot through the normal client path. Every failure is recorded
 `result.errors` (`{ mandalaId, key, error }` with the normalized `SourceError`), so a
 different status policy than the table above is a few lines over that array.
 
-An error *outside* every island — a render bug in the app shell — rejects `renderApp`
-itself; catch it and serve your 500 page (or the client-only shell as a fallback).
+An error *outside* every island — a render bug in the app shell, a route `wrapper` that
+throws — rejects `renderApp` itself. `createRequestHandler` answers that with the
+[CSR fallback](#when-a-render-throws); drive `render` yourself and it is yours to catch.
 
 ## Redirects
 
@@ -318,7 +404,12 @@ URLs stay at the HTTP layer (your server/CDN config), not in the route table.
   and islands silently re-fetch — SSR quietly stops paying for itself. A client-side
   watchdog warns about payload slices no island claimed within a few seconds.
 
-## Bring-your-own-server notes
+## Rolling your own server
+
+Every layer is optional, and each one composes the one below it: `serve()` wraps
+`createRequestHandler`, which wraps `render`, which is `renderApp` over the pieces
+(`prepareRoute`, `renderToHtml`, `headTags`, `serializeHydration`). Drop down to any of
+them. If you serve `render`'s result yourself, the notes are:
 
 - **Two assembly patterns.** The template pattern (above): an `index.html` with
   `<!--app-head-->` / `<!--app-html-->` / `<!--app-state-->` placeholders, React
@@ -328,13 +419,9 @@ URLs stay at the HTTP layer (your server/CDN config), not in the route table.
   neither reconciles nor duplicates them during hydration.
 - **Serve static assets with correct MIME types** — a browser rejects a
   `<script type="module">` served without a JavaScript `Content-Type`.
-- **Dev needs nothing here.** The [plugin](#the-vite-plugin) owns it, so a server is
-  production-only code now: serve `dist/client`, import the built entry, call `render`.
-  `examples/ssr`'s `server.ts` is the reference to copy — it is ~90 lines, most of them
-  a MIME table.
 - **No manifest reading, no asset splicing.** The built server entry carries its own
   hashed tags ([`virtual:rati/assets`](#build)), so a server never looks at
   `dist/client/.vite/`. If you don't build through the plugin, pass `renderApp` a
   `RenderAssets` of your own — it is three optional fields.
-- A packaged production handler (fetch-shaped, plus a Node listener) is the rest of the
-  kit; the MIME table is the next thing to go.
+- **Dev needs nothing here.** The [plugin](#the-vite-plugin) owns it, so anything you
+  write is production-only code, with no dev branch to keep honest.

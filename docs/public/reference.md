@@ -8,6 +8,7 @@ the [guide](./guide.md).
 | `rati` | Everything client-side: scopes, islands, routing, sources, stores. |
 | `rati/ssr` | The server-facing surface: hydration, `prepareRoute`. |
 | `rati/vite` | The Vite plugin: `vite dev` serves an SSR app, no server of your own. |
+| `rati/server` | Production serving: a fetch request handler, plus a Node listener. |
 | `rati/mobx` | Optional MobX bindings (`observableSource`) and the legacy data layer. |
 | `rati/debug` | Opt-in debug tooling (`navTrace`). |
 
@@ -434,6 +435,37 @@ A `lazy()` route's client chunk is preloaded in the page it is rendered on: the 
 transforms each `lazy()` call site to record the module it imports, and resolves it
 through the client manifest. It is additive metadata — `lazy()` behaves identically
 without the plugin.
+
+---
+
+## `rati/server`
+
+Production only — dev is the [plugin](#rativite)'s job, so there is no branch in here.
+Walkthrough: [server rendering guide](./ssr.md#the-production-handler).
+
+| Export | Purpose |
+| --- | --- |
+| `createRequestHandler({ render, template?, assets?, placeholders?, onError? })` | → `(request: Request) => Promise<Response>`. The result kinds as HTTP: 30x with `Location`, the rendered page at its derived status, 404 for `no-match`, and a 500 CSR fallback if `render` throws |
+| `serve({ handler, staticDir?, port? })` | → `Promise<Server>`. A `node:http` listener for the handler, with minimal static serving. Dependency-free |
+
+`render` is the server entry's (the [Layer-1 contract](#ratissr)). `template` is your HTML
+shell as a string — a whole-document app needs none. `placeholders` must match
+`ratiSsr({ placeholders })`. `onError` defaults to `console.error`.
+
+`assets` is the same `virtual:rati/assets` you pass `renderApp` — **re-export it from the
+server entry** to reach it here, since the virtual module exists only inside the build. It
+is used for one thing: if `render` throws (an error outside every island — a failing
+*load* is caught by its island and carried in the status), the handler serves the shell
+with the assets tags, an empty root and no payload, at status 500. The client entry finds
+no payload, calls `createRoot`, and resolves from scratch. Without `assets` or a template
+the answer is a plain-text 500.
+
+Fetch is the only interface: `app.all('*', (c) => handler(c.req.raw))` for Hono,
+`export default { fetch: handler }` for Vercel/Bun/Deno/workers. `serve()` is for the one
+host that isn't fetch-shaped; it maps `staticDir` files onto their URL paths with correct
+MIME types and sends everything else to the handler, so an unknown path reaches your app's
+404 page. `port` defaults to `$PORT`, then 3000. No compression, caching or clustering —
+put a CDN in front for real traffic.
 
 ---
 

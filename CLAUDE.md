@@ -109,9 +109,16 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
   `apiUtils`, `ActiveData*` mutable drafts), shipped via the `rati/mobx` entry, not core.
 - `mobx/` — the `rati/mobx` entry: `observableSource` (a MobX-derivation→`Source` adapter)
   plus the `data/` re-exports. The only code that touches MobX (an optional peer dep).
-- `ssr/index.ts` — the `rati/ssr` entry: the server-facing surface (`HydrationProvider`,
+- `ssr/` — the `rati/ssr` entry: the server-facing surface (`HydrationProvider`,
   `createHydrationCollector`, `prepareRoute` + the `Hydration`/`HydrationData` types),
-  re-exported from `mandala/hydration.tsx` and `router/prepareRoute.ts`.
+  re-exported from `mandala/hydration.tsx` and `router/prepareRoute.ts`; plus `renderApp`
+  (the per-request loop) and `html.ts` — the template/whole-document assembly the two
+  servers below share, internal.
+- `vite/` — the `rati/vite` entry: the plugin (dev serving + the two-environment build +
+  `virtual:rati/assets`). Runs in the Vite process; nothing here reaches the browser.
+- `server/` — the `rati/server` entry: `createRequestHandler` (fetch-shaped, the result
+  kinds → HTTP + the CSR fallback) and `serve` (the `node:http` adapter, static files +
+  the MIME table). Production only — dev is the plugin's.
 - `debug/index.ts` — the `rati/debug` entry: `navTrace` and friends (from `util/navTrace.ts`).
 - `stores/` — `RootStore`, `GlobalStore`. `types/` — `generic.ts`. `util/` — `utils.ts`.
 
@@ -152,11 +159,18 @@ the intentional type-machinery warnings). `demo` is a client-only SPA showing pl
 components, route params, and `scope().load(…)` waterfalls (incl. a store class). `ssr` is a
 server-rendered **feature gallery** — a page per concept (async loads + dehydration, an
 `input`→`hook`→dependent waterfall, the `useRouteContext` value channel, a MobX store as a
-class load, a `Source`-backed live clock, an error-slot + `retry`, and a `lazy()` route whose
-chunk the built page preloads), each foregrounding its server/client behavior. It runs dev and
-builds through `rati/vite` (`vp dev` / `vp build`, both environments on one command), so its
-`index.html` is a plain shell — no `<script>`, no build input — and `server.ts` is the last
-hand-rolled piece (SSR-03 takes it).
+class load, a `Source`-backed live clock, an error-slot + `retry`, a `lazy()` route whose
+chunk the built page preloads, and a route whose `wrapper` throws on the server to show the
+CSR fallback), each foregrounding its server/client behavior. It has no server and no build
+script of its own: `rati/vite` runs dev and both build environments (`vp dev` / `vp build`),
+so `index.html` is a plain shell — no `<script>`, no build input — and `serve.ts` is ~12
+lines over `rati/server` (`vp run ssr-demo#start`, after `vp run rati#build` — plain node
+resolves the published entry, not the `rati-dev` source condition).
+
+**Known**: the gallery's `/counter` renders blank in any *production* build (dev is fine).
+It is not the example: `is.class` (`util/utils.ts`) detects a class by reading
+`Function.prototype.toString`, and minification rewrites `class CounterStore {…}` into an
+anonymous `class{…}`, so the class load is called without `new`. Pre-dates the server kit.
 
 The SSR mechanism: a route's scope is an island that resolves at render time, so the server
 uses `react-dom/static` `prerender` (not `renderToString`, which can't await the island's

@@ -433,9 +433,10 @@ const { App } = createApp({
 hydrateRoot(container, <App />);
 ```
 
-The operational half — the server entry, document titles and meta, response statuses
-and load failures, route-level redirects, the payload contract, and
-bring-your-own-server notes — is the [server rendering guide](./ssr.md).
+The operational half — the server entry, the Vite plugin (dev + the build), the
+production handler, document titles and meta, response statuses and load failures,
+route-level redirects, and the payload contract — is the
+[server rendering guide](./ssr.md).
 
 Two consequences worth knowing:
 

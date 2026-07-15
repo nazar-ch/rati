@@ -27,13 +27,17 @@ src/
              scrollRestoration, lazy
   scope/     scope.ts (scope/input/load/provide/hook/data + scope types), source.ts
   ssr/       index.ts (the rati/ssr entry) + renderApp, renderToHtml, payload
-             (serializeHydration/readHydration), headTags
+             (serializeHydration/readHydration), headTags, html (template filling /
+             whole-document splicing — shared by the two things that assemble, the
+             plugin's dev middleware and rati/server's handler; not exported)
+  server/    index.ts (the rati/server entry) + requestHandler (result kinds → fetch
+             Response, incl. the CSR fallback), node (the node:http adapter: static
+             files + the MIME table). Production only — dev is the plugin's
   vite/      index.ts (the rati/vite entry) + ratiSsr (the dev middleware + the
-             two-environment build), html (template filling / whole-document splicing),
-             assets (the virtual:rati/assets generator), lazyModules (the
-             specifier-recording transform), client.d.ts (types for the generated
-             module). Node-side, never bundled into an app; type-imports the
-             RenderAppResult contract and nothing else
+             two-environment build), assets (the virtual:rati/assets generator),
+             lazyModules (the specifier-recording transform), client.d.ts (types for
+             the generated module). Node-side, never bundled into an app; type-imports
+             the RenderAppResult contract and nothing else
   data/      remoteData, apiUtils, ActiveData (legacy REST/data helpers)
   stores/    RootStore, GlobalStore (store roots)
   util/      utils.ts
@@ -236,8 +240,9 @@ Two jobs, one plugin, coupled to the engine by nothing but the `render(url)` con
 **Dev** (`ratiSsr.ts`): a catch-all middleware installed *after* Vite's own (the
 `configureServer` return-a-hook form, so module/HMR requests never reach it),
 `ssrLoadModule`s the entry, maps the result kinds onto the response, and assembles
-through `html.ts`. `appType: 'custom'` drops the SPA middlewares. `hotUpdate` full-reloads
-only for modules the client graph doesn't have — a shared component is Fast Refresh's.
+through `ssr/html.ts`. `appType: 'custom'` drops the SPA middlewares. `hotUpdate`
+full-reloads only for modules the client graph doesn't have — a shared component is Fast
+Refresh's.
 
 **Build**: `config()` returns `builder: {}` (opting into the app builder) plus the two
 environments' outDir/manifest/input, and the `buildApp` hook builds client → ssr. The
@@ -261,6 +266,39 @@ and the deprecated `parseAst` throws on them), matches only calls to a local bou
 client manifest keys a dynamic entry. It runs only in the ssr build (dev has no chunks;
 the client bundle has no reader) and returns `map: null`, since a one-line insertion
 after the code it follows moves nothing.
+
+## The rati/server entry (`server/`)
+
+Layer 3 of the kit — production only, and split by platform, not by feature.
+
+`requestHandler.ts` is platform-free: a `Request` in, a `Response` out, assembling
+through `ssr/html.ts` (the same code the dev middleware runs, so a page cannot come out
+of dev one way and out of production another). The result kinds are settled policy by the
+time they arrive — `renderApp` derived the status — so it maps rather than decides.
+
+The **CSR fallback** is the one decision it does make, and the reason it takes `assets`
+at all: a rendered page carries its own tags (folded into `headTags` by `renderApp`), but
+a render that *threw* has no result to fold into, and the shell has carried no `<script>`
+since SSR-02. So it fills the template with the assets tags, an empty root and no
+payload, at 500 — which is only a working page because the client entry calls
+`createRoot` when it finds no payload. No template or no `bootstrapModules` and it
+answers plain text instead: a shell that loads nothing is a blank page with a 500 on it.
+The design record notes this against its own "Layer 3 needs no assets" line.
+
+`node.ts` is the only file in the kit that knows a platform. `IncomingMessage` →
+`Request` (streamed body with `duplex: 'half'` for non-GET; the origin comes off the Host
+header, since the handler only reads path+query) and `Response` → `ServerResponse`
+(`getSetCookie()` separately, because every other header folds into one comma-joined
+value). Static files live here because nobody else wants them — Vercel has a CDN, Hono
+has serve-static — and with them the MIME table, which is why the file exists at all.
+
+`staticPath` decodes *after* `new URL()` normalizes, so containment is checked on the
+resolved path rather than by prefix-testing the request. Both halves earn their place:
+a prefix test would call `dist/client-secrets/x` a match for `dist/client`, and while
+plain `..` is folded and clamped at the root by normalization (landing harmlessly
+in-dir), `%2f` is not a separator to the URL parser — it survives intact and becomes a
+real traversal on decode. That case is unit-tested rather than driven over the socket:
+`fetch` folds `..` away before it sends, so the request that means it is hand-written.
 
 ## Head management (`head/`)
 

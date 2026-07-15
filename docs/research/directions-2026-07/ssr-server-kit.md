@@ -102,6 +102,33 @@ wrapping the fetch handler, minimal static serving with the MIME table (currentl
 copy-pasted in three places), documented as "fine at this scale; put a CDN in front for
 real traffic". No compression, no clustering — that's the fronting proxy's job.
 
+### As implemented (SSR-03, 2026-07-15)
+
+Layer 3 shipped as designed. Three notes, recorded here because this file is the design
+of record.
+
+- **`assets` is back, for the fallback alone.** SSR-02's note above concluded Layer 3
+  needs no `assets` — true of a page that *rendered*, whose tags `renderApp` folds into
+  `headTags`. The fallback is the case it doesn't cover: a render that threw has no
+  result to fold into, and since SSR-02 the shell carries no `<script>` of its own, so
+  "serve the CSR shell with the assets tags" (this section, unchanged) has no way to
+  name the entry without them. So `createRequestHandler({ render, assets, template })`
+  after all — the option is used for nothing else, and an app that would rather answer a
+  bare 500 omits it. The consequence for consumers: the server entry must re-export the
+  assets it imports, since `virtual:rati/assets` exists only inside the build and no
+  production server is part of one.
+- **The fallback needs the client entry's cooperation**, which the design didn't say. No
+  payload means React hydrating an empty root against a tree that renders something — a
+  mismatch it reports and then recovers from by client-rendering anyway. So the client
+  entry branches: `readHydration()` → null → `createRoot`, not `hydrateRoot`. Without
+  that the fallback "works" while filling the console with errors.
+- **`html.ts` moved to `ssr/`.** Two things assemble now, and neither is the plugin's to
+  own; its refusals take the caller's identity so each names its own option.
+
+The validation path's first consumer is done: `examples/ssr/server.ts` is deleted, dev
+runs on `vite dev`, prod on `serve()` — ~90 lines to ~12. nazar.ch and the jnana website
+are SSR-04/05.
+
 ## Anti-bloat lines (binding)
 
 - Fetch `Request`/`Response` is the only server interface — no Express/Koa/framework
