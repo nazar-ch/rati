@@ -344,11 +344,12 @@ export class RefreshController {
         this.addPending(key);
     }
 
-    /** Render-time: a swapped source produced its first ready snapshot. */
+    /** Render-time: a swapped source produced its first ready snapshot — the swap is over.
+     * Whether anything downstream moves is `valueChanged`'s call (the resolver runs the
+     * same equals gate on the new snapshot), so this is bookkeeping only. */
     sourceReady(key: string): void {
         this.removePending(key);
         this.settleWaiters(key);
-        this.emitChanged(key);
     }
 
     // The `pending` external store (uSES-shaped). Mutations may happen during render

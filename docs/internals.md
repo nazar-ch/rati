@@ -142,6 +142,12 @@ The moving parts:
   sync value re-runs gate-and-swap in the same render pass, and a dependent *source*
   re-creation replaces the level's `sources` array (re-keying the Step's effects and uSES
   subscription) with the pre-swap value bridging the new source's pending window.
+- **A source is a cascade origin too, not just a target.** Every new snapshot a source cell
+  renders goes through the same equals gate, and a moved value calls `valueChanged` — so a
+  live source transitioning ready → ready re-runs the loads that read it, exactly like a
+  promise settle. Gated on the cell already having a value, so a *first* ready cascades
+  nothing (the levels below have not run; the waterfall feeds them the value on its way
+  down), and an S8 pending/ready blip recovering onto its old value moves nothing.
 - **`.provide()` participates**: the factory's reads are tracked too; a changed consumed key
   bumps a version that re-keys the build/dispose layout effect.
 - **The controller's stores.** `pending` (the keys in flight) is a uSES-shaped external

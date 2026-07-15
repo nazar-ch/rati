@@ -196,6 +196,20 @@ Authoring rules: start the underlying work in `attach()` (not in the constructor
 its cleanup; keep `getSnapshot()` stable between changes; call the `subscribe` listeners
 after each state change.
 
+A source that changes value re-runs the loads that read it, by the same rules a
+[`refresh()`](#usescopecontrolsscope) cascade follows: the new value goes through the load's
+`equals` gate (deep by default), and a changed one re-runs exactly the downstream loads whose
+producers read the key. So deriving from live data in a dependent load works — it tracks:
+
+```ts
+scope()
+    .load({ clock: () => clockSource })            // ticks on its own
+    .load({ label: ({ clock }) => format(clock) }) // re-runs on each tick
+```
+
+A source returning to `pending` renders the loading slot instead (the levels below unmount);
+recovering onto the same value re-renders them with no producer re-runs.
+
 ### SSR-capable sources — the `ssr` marker
 
 By default a source stays pending under SSR (no effects run on the server). The marker

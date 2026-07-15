@@ -483,6 +483,19 @@ function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: Step
                     cell.swapped = false;
                     shared.controller?.sourceReady(key);
                 }
+                // A source's value moving must reach the loads that read it, exactly like a
+                // promise settle or a sync re-run — a swap settling on a new value, or a
+                // live source simply transitioning. Gated on `hasValue`, so a *first* ready
+                // cascades nothing: the levels below have not run yet and the waterfall
+                // feeds them this value on its way down. Through the same equals gate as
+                // every other path, so an unchanged snapshot (an S8 pending/ready blip
+                // recovering onto its old value) moves nothing.
+                if ('rerunnable' in cell && cell.hasValue) {
+                    const equals = cell.equals ?? deepEqual;
+                    if (!equals(cell.lastValue, state.value)) {
+                        shared.controller?.valueChanged(index, key);
+                    }
+                }
                 resolved[key] = state.value;
             }
         }

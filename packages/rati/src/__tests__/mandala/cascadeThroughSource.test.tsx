@@ -7,22 +7,16 @@ import { island } from '../../island/island';
 import { useScopeControls, type ScopeControls } from '../../mandala/controls';
 
 /*
-    A cascade stops at a source key — two pins for a *known gap*, found while building the
-    MF-02 command model (docs/planned/mandala-fuzz/README.md §Findings 2026-07-15).
+    A source key's value must reach the loads that read it — found while deciding whether the
+    MF-02 command model's expected-value fixpoint could hold through a source key (it could
+    not), and fixed. Effort record: docs/planned/mandala-fuzz/README.md §Findings 2026-07-15.
 
-    Root cause (one line): a source key's value reaches its dependents through
-    `RefreshController.sourceReady()`, which calls `emitChanged` (so a `.provide()` factory
-    rebuilds) but never `markDependents` — so no later-level cell whose producer read the
-    key is marked dirty, and nothing downstream re-runs. `settled()` (the promise path) and
-    `valueChanged()` (the sync path) both do call it.
-
-    Both tests below assert the **contract**, so both are `test.fails`: they run, they are
-    expected to fail, and the day the engine is fixed vitest reports "expected to fail but
-    passed" — flip them to `test()` then. They deliberately do not pin today's behavior; a
-    green test asserting `c` is stale would freeze the gap as if it were the promise.
-
-    The fuzz spec arbitrary excludes source-kind keys from later levels' read-sets for
-    exactly this reason (see fuzz/scopeHarness.tsx) — lift that restriction when these pass.
+    What was wrong: a source key's value reached its dependents through
+    `RefreshController.sourceReady()`, which emitted changed (so a `.provide()` factory
+    rebuilt) but never called `markDependents` — so no later-level cell whose producer read
+    the key was marked dirty, and nothing downstream re-ran. The promise path (`settled()`)
+    and the sync path (`valueChanged()`) always did. The resolver now runs the same equals
+    gate on each new source snapshot and calls `valueChanged` when it moves.
 */
 
 const Loading: FC = () => <div>loading...</div>;
@@ -60,12 +54,12 @@ function probeControls<S extends Parameters<typeof useScopeControls>[0]>(testSco
     return { captured, Probe };
 }
 
-describe('cascade through a source key (known gap)', () => {
+describe('a cascade reaches through a source key', () => {
     // The documented promise (docs/public/reference.md §refresh): "a changed value re-runs
-    // exactly the downstream loads whose producers read the key". Here the cascade re-creates
-    // the source `b` correctly — its rendered value does move a1 → a2 — but `c`, which reads
-    // `b`, never re-runs, so a stale derived value survives quiesce.
-    test.fails('a changed refresh cascades through a re-created source to its readers', async () => {
+    // exactly the downstream loads whose producers read the key" — `b` being a source is not
+    // an exemption. The cascade re-creates `b`; once its replacement settles on a new value,
+    // `c` must re-run over it rather than keep a value derived from the old one.
+    test('a changed refresh cascades through a re-created source to its readers', async () => {
         let aValue = 1;
         const testScope = scope()
             .load({ a: async () => aValue })
@@ -102,16 +96,14 @@ describe('cascade through a source key (known gap)', () => {
         await act(async () => {});
         await act(async () => {});
 
-        // Actual today: 'c(b(a1))' — b re-created and re-rendered as b(a2), c never re-ran.
         expect(screen.getByText('c(b(a2))')).toBeTruthy();
     });
 
-    // The same root cause with no refresh involved: a live source transitioning ready → ready
-    // leaves every load that derived from it stale. Whether this one is a gap or the intended
-    // division of labor (derive *inside* the source — an observableSource/computed — rather
-    // than in a dependent load) is the open question in the finding note; the waterfall reads
-    // as a derivation either way, which is why it is pinned rather than assumed.
-    test.fails('a live source value change re-runs the loads that read it', async () => {
+    // The same rule with no refresh involved: a live source transitioning ready → ready is a
+    // changed value like any other, so the loads that derived from it re-run. The waterfall
+    // reads as a derivation, and now behaves as one — deriving in a dependent load is not
+    // second-class next to deriving inside the source.
+    test('a live source value change re-runs the loads that read it', async () => {
         const source = testSource<string>();
         const testScope = scope()
             .load({ a: () => source })
@@ -135,7 +127,6 @@ describe('cascade through a source key (known gap)', () => {
         });
         await act(async () => {});
 
-        // Actual today: 'b(v1)'.
         expect(screen.getByText('b(v2)')).toBeTruthy();
     });
 });
