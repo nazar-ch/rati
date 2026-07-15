@@ -146,6 +146,40 @@ and both kills below went red on the code as shipped. What it did turn up:
   need the model to count reached levels per generation, which is real modelling work. Left for
   a later call, as the record says.
 
+### 2026-07-15 (MF-04) — six kills executed, no engine bug, no suite change
+
+All six went red on the code as shipped and were reverted; the executed recipes are in
+[mandala-testing.md](../../research/mandala-testing.md) §"Kill register". No kill survived, so no
+invariant needed re-encoding and the suite is untouched. What the audit turned up:
+
+- **The recipes pin `FUZZ_SEED`, and that is the honest answer, not a workaround.** MF-02 left
+  this open for kill #3 ("a pinned `FUZZ_SEED` is the cheap answer if tuning does not settle
+  it"); the audit found the same shape on kill #1 and generalized it. Kill #1 survives ~10% of
+  unpinned default-budget seeds (measured 1/10, plus one more in an earlier sample) and kill #3
+  survives seeds 1, 2, 3 and 42 while dying on 7 — roughly 1 case in 70 at `FUZZ_RUNS=2000`.
+  Both invariants are encoded correctly and catch the bug the moment the search reaches it: what
+  varies is *reachability*, and a widened run finds all six unpinned. The register therefore
+  treats an unpinned green as no evidence. Raising the default `numRuns` would buy reliability
+  at the cost of the seconds-long default run; pinning buys it for free, which is what
+  `FUZZ_SEED` was built for.
+- **Kill #5's failure shape is not the one the register predicted.** The plan said an empty
+  `trackReads` set fails convergence; it actually fails `assertProvideRebuild` — *"a changed
+  value must rebuild the provided value"* — on every seed tried (1, 2, 3, 7). The `.provide()`
+  factory reads every key, making it the universal dependent and the read-set's canary: it
+  notices mid-run, well before quiesce. Worth knowing that the `withProvide` variant, added in
+  MF-03 for the lifecycle half, is also what carries this kill.
+- **Kill #6 no longer needs the deep budget, and MF-03's note holds.** It dies at
+  `FUZZ_SEED=1` on the default `fuzz(100)` (MF-03 saw it only at `FUZZ_RUNS=500`, when the
+  default was 25). Confirmed: the mid-run bound is the only thing that bites — the smoke
+  property, StrictMode variant included, stays green. The shrink also sharpened it: the swap
+  detaches an *untouched sibling* in the same bucket, since a bucket is per level.
+- **Kill #2 shrinks past the transitive cascade to a level-skipping read.** The dependent one
+  level down is fine; only a reader that skips a level goes stale. A tighter statement of why
+  `markDependents` walks every later level.
+- **The non-vacuity counters gate.** Removing the refresh verbs from `commandsArb` leaves every
+  other invariant green and fails exactly one assert (`no refresh ever changed a value`) — so
+  the counter is what stands between a vacuous run and a reported pass.
+
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with the

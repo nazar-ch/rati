@@ -159,16 +159,67 @@ per sequence (or the run is discarded), and the suite counts refresh-with-change
 across the property — a green run that never exercised the machinery is a failure of the harness,
 not a pass.
 
-### Kill register (executed once at authoring, then recipes on file)
+### Kill register (executed at MF-04; recipes on file)
 
-The harness ships only after each planned kill has been run and reverted — proof it bites:
+The harness ships only after each kill — a one-line, bug-shaped mutation of the engine — has been
+run red, shrunk, and reverted. All six below were executed against the landed suite and reverted;
+mutations never merge. Each recipe names the site, the mutation, the command, and the failure
+shape, so re-verification is a copy-paste.
 
-- equality gate forced to "unchanged" → convergence fails (stale dependents survive).
-- `markDependents` limited to the next level only → transitive-cascade convergence fails.
-- refresh token guard dropped → the superseded-settle interleaving fails.
-- stale-while-refetch removed (swap the pending promise in immediately) → no-blank fails.
-- `trackReads` returning an empty set → cascade never fires, convergence fails.
-- swap-aware detach inverted (always detach on `[sources]` change) → the lifecycle ledger fails.
+**Every recipe pins `FUZZ_SEED`.** The default budget (`fuzz(100)`) does not reach every kill on
+every seed — kill 1 survives ~10% of unpinned seeds and kill 3 is rarer still (~1 case in 70 at
+depth). That is a property of the *search*, not of the invariants: each kill dies deterministically
+under its pinned seed, and a widened run (`FUZZ_RUNS=2000`) finds all six unpinned. Re-verify with
+the seed; treat an unpinned green as no evidence.
+
+The command below is the same for every kill (`P` = the commands property):
+
+```
+FUZZ_SEED=<seed> vp run rati#test src/__tests__/fuzz/mandala.commands.fuzz.test.tsx
+```
+
+1. **Equality gate forced to "unchanged"** — `refresh.ts` `settled()`: `const changed = false`.
+   `FUZZ_SEED=1` → red on case 51. Fails **3 — convergence** at quiesce: the settle never swaps
+   the cell to a value cell, so both the refreshed key *and* its dependents render the old
+   generation. Shrinks (22x) to a 2-level scope with `k1_2` reading `k0_0`, `refresh#0, settle#0`
+   on a warm start: `k0_0#1() → k0_0#0()`, `k1_2#0(k0_0#1()) → k1_2#0(k0_0#0())`.
+2. **`markDependents` limited to the next level** — `refresh.ts`: loop bound
+   `Math.min(levelIndex + 2, …)`. `FUZZ_SEED=1` → red on case 7, **3 — convergence**. Shrinks
+   (24x) past the chained a→b→c cascade to something sharper: a *level-skipping* read — `k2_0`
+   (level 2) reads `k0_0` (level 0), `sourceBump#0` — so the dependent one level down is fine
+   and only the skipped-over one is stale. `markDependents` must walk every later level, not the
+   adjacent one.
+3. **Refresh token guard dropped** — `refresh.ts` `settled()`: drop `cell.refreshing?.token !==
+   token`. `FUZZ_SEED=7` → red on case 4 (**note: survives seeds 1, 2, 3, 42** — the narrowest
+   kill of the six). Fails mid-run, not at quiesce: `SettleStale`'s own **values unmoved** assert.
+   Shrinks (16x) to `refresh#0, refreshInFlight#0, settleStale#0` — the superseded promise's
+   settle applies (`k0_0#0() → k0_0#1()`) where the contract says it is inert.
+4. **Stale-while-refetch removed** — `resolver.tsx` `processDirtyCells()`: `bucket.cells.set(key,
+   {kind:'promise', promise: next.promise, …})` before `trackRefresh`. `FUZZ_SEED=1` → red on
+   case 1. Fails **2 — no-blank**, mid-run: `sourceBump(k1_1): slot: expected 'loading' to be
+   'content'`. Shrinks (19x) to a cascade-driven re-run rather than an explicit `refresh` —
+   `k2_0` (promise) reads the bumped source `k1_1`, the level re-suspends on the fresh promise
+   and the loading slot replaces still-good content.
+5. **`trackReads` returns an empty set** — `refresh.ts`: `return { proxy, reads: new Set() }`.
+   `FUZZ_SEED=1` → red on case 1. **Fails differently than this register once predicted**: not
+   convergence but `assertProvideRebuild` — *"a changed value must rebuild the provided value"* —
+   and consistently so (seeds 1, 2, 3, 7 all land there). The `.provide()` factory reads every
+   key, so it is the universal dependent and the read-set's canary: an empty set stops the leaf
+   rebuilding mid-run, well before quiesce gets a look. The `withProvide` variant is what carries
+   this kill.
+6. **Swap-aware detach inverted** — `resolver.tsx` detach effect: drop the
+   `if (bucketIsLive && bucket.sources.includes(entry)) continue` skip. `FUZZ_SEED=1` → red on
+   case 7. Fails **6 — the lifecycle ledger**, mid-run: *"k2_0#1 feeds the rendered content while
+   detached"*. Shrinks (28x) to the collateral case — `k2_2` (a source reading the bumped `k0_2`)
+   swaps, and because a bucket is per *level*, replacing its `sources` array detaches its
+   untouched sibling `k2_0`, which is still feeding the render. Caught by the commands property;
+   the smoke property (incl. its StrictMode variant) stays green, so the ledger's mid-run bounds
+   — not its teardown balance — are what bite here.
+
+**The counters gate (MF-02 §5).** Neutering the guarantee — the `Refresh`/`RefreshInFlight` verbs
+removed from `commandsArb` — leaves every other invariant green and fails exactly one assert:
+`no refresh ever changed a value: expected 0 to be greater than 0`. Without the counter that run
+is a vacuous pass, which is the counterfeit-provider failure mode; with it, the suite complains.
 
 ### Budgets
 
