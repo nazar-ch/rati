@@ -71,9 +71,14 @@ behaviors. The known gaps, in rough priority order (each is a small, focused tes
    code intact; client re-attaches fresh. A seed whose `hydrate()` throws → logged, source
    resolves live (degraded, not broken — at the cost of a hydration mismatch, since the server
    shipped seeded HTML).
-8. **StrictMode accounting for the new machinery** — refresh mid-double-mount, SSR-seeded cells,
-   and the unmount sweep: attach/detach stay balanced (the island suite pins StrictMode for the
-   old lifecycle; the swap/sweep rework needs its own).
+8. **StrictMode accounting for the new machinery** — a refresh reaching the surviving run and
+   swapping a source there stays balanced (the island suite pins StrictMode for the old
+   lifecycle; the swap rework needs its own). The other two thirds this item first asked for
+   turned out not to be StrictMode's: **SSR-seeded cells** never meet a double-mount (a
+   hydration root doesn't get one — S7), and the **unmount sweep** is redundant with the Step's
+   own cleanup at every unmount a mounted Step can see, so it is pinned where it is the only
+   thing that can work — an island unmounting mid-S8-window, whose torn-down levels left
+   sources attached with no cleanup of theirs ever to run again (pin 12's file).
 9. **`data()` equals on cascade re-runs** — the per-load comparer gates cascaded re-runs of the
    dependent itself, not only direct refreshes.
 10. **Re-suspension of committed content** — a `hook()` load returning a fresh pending promise

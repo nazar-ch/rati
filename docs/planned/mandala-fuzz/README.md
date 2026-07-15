@@ -180,6 +180,47 @@ invariant needed re-encoding and the suite is untouched. What the audit turned u
   other invariant green and fails exactly one assert (`no refresh ever changed a value`) — so
   the counter is what stands between a vacuous run and a reported pass.
 
+### 2026-07-15 (MF-05) — twelve pins, no engine bug; three of them were asking the wrong question
+
+Every pin went green against the code as shipped and every kill note went red and was
+reverted, so the engine is unchanged. What the item found is in the *specification* and the
+harness rules — three of the twelve pins could not be written as the list described them:
+
+- **Pin 7's "error slot in the HTML" does not exist.** A server-side rejection — a promise
+  load's or a marked source's — degrades to the **loading** slot behind React's client-retry
+  marker; the error boundary never participates server-side. `islandSsrErrors.test.tsx` had
+  already pinned this by experiment for promise loads, and a marked source is a promise load
+  by another name. The pin list and suspense-situations.md §S10 both claimed otherwise and are
+  corrected. What the server keeps is the `collectError` record, and the pin now covers a
+  marked source reaching it with its code intact (the 404 signal).
+- **Pin 8's "SSR-seeded cells under the double-mount" has no situation.** A hydration root
+  does not double-mount at all — `hydrateRoot(<StrictMode>…)` builds one generation even with
+  nothing suspending — so a wire-fed cell and a StrictMode generation never meet. Related and
+  measured alongside it: the double-mount only reaches the levels the *initial mount* reached
+  (a level behind a pending promise sees one generation), which is the smoke property's
+  run-count range restated. Both are now in §S7, where a StrictMode test author will find them.
+- **Pin 8's "unmount sweep" is not the sweep's real customer.** Dropping
+  `sweepDetach(cacheRef.current?.buckets)` from the mandala's unmount left every StrictMode
+  ledger balanced: the mandala's cleanup nulls the cache *before* its children's cleanups run,
+  so a still-mounted Step calls its bucket dead and detaches everything itself. The sweep is
+  load-bearing only for buckets whose Steps are **already gone** — the S8 window and the error
+  slot. Pinned there instead (an island unmounting while a mid-tree source is pending), where
+  removing it leaks the deep source and the kill fires.
+
+Two harness notes, both of which cost real time:
+
+- **S2's async-act rule is about any act that suspends, not just the mount.** A source
+  transition can suspend the tree without looking like it — a ready source lets the waterfall
+  reach a level whose hook load `use()`es a promise React has not seen — and under the sync
+  `act(() => set(…))` that every `testSource` helper here uses, the retry is never delivered
+  and the island sits on the loading slot forever. The older suites never tripped on it
+  because their transitions reach no suspending level. Generalized in §S2.
+- **A pin can pass its kill for the wrong reason.** Pin 4 (lazy read-sets) was written with a
+  sync dependent and survived deleting `cell.reads = next.reads` outright: a sync value re-run
+  swaps in a whole new cell built from `next`, read-set included, so that line is load-bearing
+  only on the promise path. It now carries one dependent of each kind. The general lesson is
+  the kill-note discipline's whole point — an unexecuted kill note is a guess.
+
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with the

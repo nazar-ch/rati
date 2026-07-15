@@ -319,4 +319,59 @@ describe('S8 — a mid-tree source dropping to pending', () => {
         expect(ledger(log, 'deep')).toEqual({ live: 0, peak: 1 });
         expect(ledger(log, 'feed')).toEqual({ live: 0, peak: 1 });
     });
+
+    // The mandala's unmount sweep, tested where it is the only thing that can work — the
+    // sweep half of pin 8, which has nothing to do with StrictMode. A Step torn down
+    // while its bucket is still live keeps its sources attached on purpose (it cannot
+    // tell a source swap from an unmount, so it defers to the sweep). Unmount *during*
+    // the pending window and those Steps are already gone: no cleanup of theirs will
+    // ever run again, and `deep` is attached with nobody but the sweep to release it.
+    //
+    // (Every other unmount path is redundant with the Step's own cleanup, which is why
+    // the pin was originally written against one and the kill below did not fire: the
+    // mandala's cleanup nulls the cache *before* the children's cleanups run, so a
+    // still-mounted Step sees `currentBuckets() === null`, calls its bucket dead, and
+    // detaches everything itself.)
+    //
+    // Kill: mandala.tsx, the unmount effect's cleanup — drop
+    // `sweepDetach(cacheRef.current?.buckets)` → `deep` is never detached: live 1.
+    test('unmounting during the pending window releases what the torn-down levels kept', async () => {
+        const log: string[] = [];
+        const feed = testSource<string>(log, 'feed');
+        const deep = testSource<string>(log, 'deep');
+        const testScope = scope()
+            .load({ feed: () => feed })
+            .load({
+                derived: ({ feed: f }: { feed: string }) => `d(${f})`,
+                deep: () => deep,
+            });
+        const Island = island({
+            scope: testScope,
+            component: ({ derived, deep: d }: { derived: string; deep: string }) => (
+                <div>
+                    <span>
+                        {derived}/{d}
+                    </span>
+                </div>
+            ),
+            loading: Loading,
+        });
+
+        await act(async () => {
+            render(<Island />);
+        });
+        await feed.ready('v1');
+        await deep.ready('deep-1');
+        expect(screen.getByText('d(v1)/deep-1')).toBeTruthy();
+
+        // The blip tears the level below down; its source stays attached, deferred.
+        await feed.pend();
+        expect(screen.getByText('loading...')).toBeTruthy();
+        expect(ledger(log, 'deep')).toEqual({ live: 1, peak: 1 });
+
+        // The island goes away with the window still open.
+        cleanup();
+        expect(ledger(log, 'deep')).toEqual({ live: 0, peak: 1 });
+        expect(ledger(log, 'feed')).toEqual({ live: 0, peak: 1 });
+    });
 });

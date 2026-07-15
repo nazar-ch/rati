@@ -88,9 +88,23 @@ The old generation's suspended render never committed, so its sources never atta
 
 Dev StrictMode mounts → cleans up → remounts; the mandala drops its cache on the fake
 unmount and rebuilds, so producers legitimately run once per StrictMode generation (twice
-total), and the unmount sweep must release the first generation's attachments.
+total), and the first generation's attachments must be released.
 **Contract:** per-generation accounting holds; ledger balanced through the double-mount.
-**Coverage:** MF-03's StrictMode smoke variant; strategy-doc pin #8.
+
+Two limits on *which* mounts get one, both measured by MF-05's pin 8 and worth knowing
+before writing a StrictMode test (or reading a green one as evidence):
+
+- **Only the levels the initial mount reached.** A level behind a pending promise is first
+  built when that promise settles — after the double-mount is over — so it sees one
+  generation however deep the scope is; level 0 still runs twice. A test that wants a
+  *dependent* level doubled needs its upstream to resolve synchronously. (Same fact as the
+  smoke property's run-count *range*, from the other side.)
+- **A hydration root does not double-mount at all.** `hydrateRoot(<StrictMode>…)` builds
+  exactly one generation even where nothing suspends. So a cell that came off the wire and
+  a StrictMode double-mount never meet: the payload is read once, and there is no
+  "SSR-seeded cell under the double-mount" situation to test.
+
+**Coverage:** MF-03's StrictMode smoke variant; `strictModeLifecycle.test.tsx` (pin #8).
 
 ## S8 — Mid-tree source pending is *not* Suspense (the unmount asymmetry)
 
