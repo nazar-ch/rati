@@ -65,9 +65,12 @@ behaviors. The known gaps, in rough priority order (each is a small, focused tes
    asymmetry).
 6. **Concurrent refreshes of different keys** — `pending` holds both; settles in either order
    converge.
-7. **SSR error paths** — a marked source erroring during `firstSettle` → error slot in the HTML,
-   client re-attaches fresh; a seed whose `hydrate()` throws → logged, source resolves live
-   (degraded, not broken).
+7. **SSR error paths** — a marked source erroring during `firstSettle` → the loading slot ships
+   behind React's client-retry marker (**not** the error slot, as this list first predicted — the
+   boundary never participates server-side, see S10) and the error reaches `collectError` with its
+   code intact; client re-attaches fresh. A seed whose `hydrate()` throws → logged, source
+   resolves live (degraded, not broken — at the cost of a hydration mismatch, since the server
+   shipped seeded HTML).
 8. **StrictMode accounting for the new machinery** — refresh mid-double-mount, SSR-seeded cells,
    and the unmount sweep: attach/detach stay balanced (the island suite pins StrictMode for the
    old lifecycle; the swap/sweep rework needs its own).

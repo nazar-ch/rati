@@ -109,12 +109,18 @@ MF-04 register (defeat stale-while-refetch → no-blank fails).
 ## S10 — Server prerender
 
 `react-dom/static` `prerender` awaits Suspense: promise loads and SSR-marked sources
-(wrapped into promises by `firstSettle`) resolve server-side; a rejection reaches the
-boundary and the error slot ships in the HTML; unmarked sources stay pending (fallback in
-the HTML). There are no client-side retries of a server suspension — hydration
-short-circuits values/seeds instead.
-**Coverage:** `islandSsr.test.tsx`, `islandSsrSources.test.tsx`; error-path pin
-(strategy doc §pins #7).
+(wrapped into promises by `firstSettle`) resolve server-side; unmarked sources stay
+pending (fallback in the HTML). There are no client-side retries of a server suspension —
+hydration short-circuits values/seeds instead.
+
+A rejection — a promise load's or a marked source's — does **not** reach the error slot,
+though this catalog said so until MF-05 pinned it: `prerender` *resolves*, React emits the
+**loading** slot behind its "switched to client rendering" marker, and the client re-runs
+the load. The error boundary never participates server-side, so the error slot is a
+client-only surface. What the server keeps is rati's `collectError` record — its input for
+the response status (`not-available` → 404) before that degraded 200 goes out.
+**Coverage:** `islandSsr.test.tsx`, `islandSsrErrors.test.tsx` (which pinned the promise
+half by experiment first), `islandSsrSources.test.tsx` §error paths (strategy doc §pins #7).
 
 ## S11 — A suspending remount hides the old content (test-facing)
 
