@@ -178,13 +178,25 @@ export type ReferenceModel = {
         cascades: number;
         supersededRuns: number;
         sourceValueChanges: number;
+        /** A key that had *already* committed a value committed a different one — the
+         * event a `.provide()` value must rebuild on (its factory read every key). Only a
+         * resolved island can produce one, which is why the rebuild is assertable: the
+         * leaf is mounted exactly when this counter can move. A first settle is not one
+         * (nothing was committed yet, and the leaf does not exist). */
+        committedChanges: number;
     };
 };
 
 export function createModel(spec: ScopeSpec, declared: DeclaredState): ReferenceModel {
     const keys = new Map<string, ModelKey>();
     const ordered = allKeys(spec);
-    const stats = { refreshWithChange: 0, cascades: 0, supersededRuns: 0, sourceValueChanges: 0 };
+    const stats = {
+        refreshWithChange: 0,
+        cascades: 0,
+        supersededRuns: 0,
+        sourceValueChanges: 0,
+        committedChanges: 0,
+    };
     /** Superseded runs still outstanding, per key — the harness holds a settleable entry
      * for each, and firing one must be inert (the refresh token guard). */
     const stale = new Map<string, number>();
@@ -289,6 +301,7 @@ export function createModel(spec: ScopeSpec, declared: DeclaredState): Reference
             state.status = 'ready';
             runReachable();
         } else if (changed) {
+            stats.committedChanges++;
             cascade(state.spec.key);
         }
     };

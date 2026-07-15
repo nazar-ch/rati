@@ -117,6 +117,35 @@ arbitrary reads source keys like any other.
   rate is alphabet tuning, and belongs to MF-04 with the rest of the kill audit (a pinned
   `FUZZ_SEED` is the cheap answer if tuning does not settle it).
 
+### 2026-07-15 (MF-03) — three notes from the lifecycle ledger (no product findings)
+
+The ledger found no engine bug: every invariant it encodes was green on the first honest run,
+and both kills below went red on the code as shipped. What it did turn up:
+
+- **`<StrictMode>` must be the root element `render()` gets.** Nested one component deeper
+  (`<Wrapper>` rendering `<StrictMode>{children}</StrictMode>`) React still double-*renders* but
+  skips the double-*mount* — no effect cleanup, no re-run — so the mandala's cache is never
+  dropped, producers run once, and the variant silently asserts nothing about the lifecycle it
+  exists for. Caught only because the run-count bound was tightened to 1 to check the variant
+  bit; it passed. The property builds the element and wraps it at the root for this reason, and
+  a harness rule worth carrying to any later StrictMode dimension.
+- **Kill #6 needs the deep budget.** Inverting the swap-aware detach (`bucketIsLive &&
+  bucket.sources.includes(entry)` → always detach) is caught by the new mid-run bound — "nothing
+  detached still feeds renders", shrunk to `refresh(k0_2)` on a level holding two sources — but
+  only at `FUZZ_RUNS=500`, not at the default 25. The interleaving needs a level with two
+  sources where a cascade swaps one of them, which the default budget rarely reaches. Note for
+  MF-04's register: teardown balance alone does *not* catch this kill (the Step nulls
+  `entry.detach`, so the sweep finds nothing and the counts stay balanced) — the mid-run bound
+  is the only thing that bites.
+- **Promoting the command model to StrictMode looks cheap but not free.** The frontier and
+  ledger invariants carry over untouched (a producer supersedes its own in-flight entry, so the
+  live frontier stays one-per-key through the double-mount). What needs work is invariant 5:
+  the model's run budget grants one run per generation, and StrictMode makes every generation
+  two — but only for the levels that generation actually *reached*, which depends on the
+  generated shape. The smoke variant sidesteps it with a range (`1..2`); the command model would
+  need the model to count reached levels per generation, which is real modelling work. Left for
+  a later call, as the record says.
+
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with the

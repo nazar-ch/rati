@@ -2,9 +2,10 @@ import * as fc from 'fast-check';
 import { describe, test, expect, afterEach, beforeEach, vi } from 'vite-plus/test';
 import { render, cleanup, act } from '@testing-library/react';
 import { fuzz } from './arbitraries';
+import { assertLedgerBalanced } from './ledger';
 import { createDeclaredState, createModel } from './model';
 import { buildHarness, readContent, readSlot, scopeSpecArb } from './scopeHarness';
-import { commandsArb, type Model, type Real } from './commands';
+import { commandsArb, observed, type Model, type Real } from './commands';
 
 /*
     The MF-02 model-based property: a generated scope meets a generated *event sequence* —
@@ -18,6 +19,12 @@ import { commandsArb, type Model, type Real } from './commands';
     with loads still in the air — situation S5 of `../suspense-situations.md`: the late
     settles must be inert and the ledger must still balance, with never-attached sources at
     0/0.
+
+    Another generated fraction (`withProvide`) ends the scope in `.provide()`, so the same
+    alphabet runs against an island that also owns a derived, disposable value. That variant
+    is what carries the `.provide()` half of the lifecycle contract: dispose-before-detach
+    and the dispose/rebuild pairing across refresh-driven rebuilds (ledger.ts + the
+    `assertProvideRebuild` in commands.ts).
 
     Budget: fuzz(25) x byLevel(8, 4) commands keeps the default `vp run rati#test` in
     seconds. Deep runs are manual — `FUZZ_RUNS=500 vp run rati#test src/__tests__/fuzz/`.
@@ -122,9 +129,10 @@ describe('mandala fuzz — commands (event interleavings over generated scopes)'
                 commandsArb(),
                 fc.boolean(),
                 fc.boolean(),
-                async (spec, cmds, warmStart, skipQuiesce) => {
+                fc.boolean(),
+                async (spec, cmds, warmStart, skipQuiesce, withProvide) => {
                     const declared = createDeclaredState();
-                    const harness = buildHarness(spec, declared);
+                    const harness = buildHarness(spec, declared, { provide: withProvide });
                     const model = createModel(spec, declared);
                     // Async act at the mount — see suspense-situations.md S2.
                     let view!: ReturnType<typeof render>;
@@ -158,18 +166,11 @@ describe('mandala fuzz — commands (event interleavings over generated scopes)'
                             }
                         });
 
-                        // 6 — the lifecycle ledger, per source *instance*: balanced at
-                        // teardown, never attached twice while live. A source of a level
-                        // that never committed sits at 0/0 — balanced.
-                        for (const entry of harness.ledger()) {
-                            expect(entry.detaches, `attach/detach balance for ${entry.id}`).toBe(
-                                entry.attaches,
-                            );
-                            expect(
-                                entry.maxConcurrent,
-                                `concurrent attaches for ${entry.id}`,
-                            ).toBeLessThanOrEqual(1);
-                        }
+                        // 6 — the lifecycle ledger at final unmount: every attach matched
+                        // by a detach, every `.provide()` value disposed (and disposed
+                        // while its sources were still attached). A leak fails the run
+                        // even though every mid-run assert passed.
+                        assertLedgerBalanced(harness, 'teardown');
                     }
                 },
             ),
@@ -181,5 +182,6 @@ describe('mandala fuzz — commands (event interleavings over generated scopes)'
         expect(exercised.cascades, 'no cascade ever fired').toBeGreaterThan(0);
         expect(exercised.supersededRuns, 'no producer run was ever superseded').toBeGreaterThan(0);
         expect(exercised.sourceValueChanges, 'no live source ever moved').toBeGreaterThan(0);
+        expect(observed.provideRebuilds, 'no .provide() value ever rebuilt').toBeGreaterThan(0);
     });
 });

@@ -99,6 +99,34 @@ export type LedgerEntry = {
     attaches: number;
     detaches: number;
     maxConcurrent: number;
+    /** Attached right now — the ledger's live half. */
+    attached: boolean;
+    /** The instance this key's cell holds now: the one whose transitions reach the render.
+     * A cascade-swapped predecessor is *not* current even while its value is still on
+     * screen (the stale bridge, resolver.tsx `swapped`) — which is why the "nothing
+     * detached still feeds renders" bound tests this rather than the rendered value's
+     * provenance, where a correct swap would read as a violation. */
+    current: boolean;
+};
+
+type SourceLedger = Omit<LedgerEntry, 'attached' | 'current'> & { depth: number };
+
+/**
+ * One `.provide()` value's lifecycle. The contract it exists to pin: the value disposes
+ * *before* the sources it was built over detach, so a value holding a grabbed resource is
+ * torn down while that grab is still live (scope.ts `.provide()`).
+ */
+export type ProvideRecord = {
+    /** `provide#n` — one per build; a refresh-driven rebuild makes a new one. */
+    id: string;
+    /**
+     * Null while the value is live. At dispose: the source instances it was built over
+     * that had *already* detached by then — the violation list, captured at the only
+     * moment it is observable. Instances a later swap replaced are left out: that cascade
+     * detached them long before this teardown, on purpose, and the value's own reads went
+     * with the swapped-in ones.
+     */
+    detachedAtDispose: readonly string[] | null;
 };
 
 type HeldEntry = {
@@ -112,6 +140,9 @@ type HeldEntry = {
 };
 
 type Controllable = Source<HarnessValue> & {
+    id: string;
+    key: string;
+    attached: () => boolean;
     /** Emit the value the formula says this source holds *now* — its first ready, and every
      * later one after a `sourceBump` moves its epoch. */
     ready: () => void;
@@ -146,8 +177,19 @@ export type BuiltHarness = {
     runCounts(): ReadonlyMap<string, number>;
     totalRuns(): number;
     ledger(): readonly LedgerEntry[];
+    /** Every `.provide()` value the run has built, in order. Empty unless the spec variant
+     * asked for one. */
+    provideLog(): readonly ProvideRecord[];
     /** The object identity last rendered for `key` — the equals gate's observable half. */
     identityOf(key: string): HarnessValue | undefined;
+};
+
+export type HarnessOptions = {
+    /** End the scope chain in `.provide()` — the lifecycle variant. The value records its
+     * build/dispose and the sources it was built over (see {@link ProvideRecord}); it also
+     * reads every resolved key, so its tracked read-set is the whole scope and any changed
+     * value must rebuild it. */
+    provide?: boolean;
 };
 
 export const CONTENT_TESTID = 'fuzz-content';
@@ -186,13 +228,24 @@ export function readSlot(container: HTMLElement): 'loading' | 'content' | 'error
     return 'loading';
 }
 
-export function buildHarness(spec: ScopeSpec, declared: DeclaredState): BuiltHarness {
+export function buildHarness(
+    spec: ScopeSpec,
+    declared: DeclaredState,
+    options: HarnessOptions = {},
+): BuiltHarness {
     const runCounts = new Map<string, number>();
     const heldEntries: HeldEntry[] = [];
     const liveSources = new Map<string, Controllable>();
     const identities = new Map<string, HarnessValue>();
-    const ledgers = new Map<string, LedgerEntry & { depth: number }>();
+    const ledgers = new Map<string, SourceLedger>();
+    const provideRecords: Array<{ id: string; detachedAtDispose: readonly string[] | null }> = [];
     let sourceInstances = 0;
+    let provideInstances = 0;
+
+    const dumpKeys = spec.levels
+        .flat()
+        .map((keySpec) => keySpec.key)
+        .sort();
 
     const supersede = (key: string) => {
         for (const entry of heldEntries) if (entry.key === key) entry.superseded = true;
@@ -200,7 +253,7 @@ export function buildHarness(spec: ScopeSpec, declared: DeclaredState): BuiltHar
 
     const controllableSource = (key: string, recompute: () => HarnessValue): Controllable => {
         const id = `${key}#${sourceInstances++}`;
-        const ledger: LedgerEntry & { depth: number } = {
+        const ledger: SourceLedger = {
             id,
             key,
             attaches: 0,
@@ -218,6 +271,9 @@ export function buildHarness(spec: ScopeSpec, declared: DeclaredState): BuiltHar
         };
         return {
             [SourceSymbol]: true,
+            id,
+            key,
+            attached: () => ledger.depth > 0,
             getSnapshot: () => state,
             subscribe(onChange) {
                 listeners.add(onChange);
@@ -299,6 +355,34 @@ export function buildHarness(spec: ScopeSpec, declared: DeclaredState): BuiltHar
         }
     };
 
+    /*
+        The `.provide()` variant's factory. It records the value's build and its dispose,
+        and — the point of the whole variant — the source instances it was built over, so
+        the dispose can say whether they were still attached when it ran. It also touches
+        every resolved key, which is not decoration: the leaf tracks the factory's reads
+        and rebuilds the value when one of them changes, so reading all of them is what
+        makes "a changed value rebuilds the provided value" assertable for any key.
+    */
+    const provideFactory = (resolved: Record<string, unknown>) => {
+        const record: { id: string; detachedAtDispose: readonly string[] | null } = {
+            id: `provide#${provideInstances++}`,
+            detachedAtDispose: null,
+        };
+        provideRecords.push(record);
+        const seen = [INPUT_KEY, ...dumpKeys].map((key) => resolved[key]);
+        const builtOver = [...liveSources.values()];
+        return {
+            seen,
+            [Symbol.dispose]() {
+                record.detachedAtDispose = builtOver
+                    .filter(
+                        (source) => liveSources.get(source.key) === source && !source.attached(),
+                    )
+                    .map((source) => source.id);
+            },
+        };
+    };
+
     let chain = scope({ [INPUT_KEY]: input<string>() }) as unknown as {
         load: (def: Record<string, unknown>) => unknown;
     };
@@ -307,7 +391,15 @@ export function buildHarness(spec: ScopeSpec, declared: DeclaredState): BuiltHar
         for (const keySpec of level) def[keySpec.key] = makeProducer(keySpec);
         chain = chain.load(def) as typeof chain;
     }
-    const builtScope = chain as unknown as Scope;
+    // `.provide()` stamps the factory onto the same node rather than adding a level, but it
+    // returns a *new* object — so the island, `useScopeControls` and `useScope` must all be
+    // keyed off this one (the channels are scope-identity keyed).
+    const provideChain = chain as unknown as {
+        provide: (factory: (resolved: Record<string, unknown>) => unknown) => Scope;
+    };
+    const builtScope = (options.provide
+        ? provideChain.provide(provideFactory)
+        : chain) as unknown as Scope;
 
     // Reads the island's controls from inside its subtree — rendered in every slot, since
     // the mandala provides the controls channel around the whole inner tree.
@@ -316,11 +408,6 @@ export function buildHarness(spec: ScopeSpec, declared: DeclaredState): BuiltHar
         captured.current = useScopeControls(builtScope);
         return null;
     };
-
-    const dumpKeys = spec.levels
-        .flat()
-        .map((keySpec) => keySpec.key)
-        .sort();
 
     const Dump: FC<Record<string, unknown>> = (props) => {
         for (const key of dumpKeys) identities.set(key, props[key] as HarnessValue);
@@ -405,7 +492,13 @@ export function buildHarness(spec: ScopeSpec, declared: DeclaredState): BuiltHar
         pending: () => [...(captured.current?.pending ?? [])].sort(),
         runCounts: () => runCounts,
         totalRuns: () => [...runCounts.values()].reduce((total, count) => total + count, 0),
-        ledger: () => [...ledgers.values()],
+        ledger: () =>
+            [...ledgers.values()].map(({ depth, ...entry }) => ({
+                ...entry,
+                attached: depth > 0,
+                current: liveSources.get(entry.key)?.id === entry.id,
+            })),
+        provideLog: () => provideRecords,
         identityOf: (key) => identities.get(key),
     };
 }

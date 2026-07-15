@@ -185,5 +185,8 @@ a nightly lane later. Fast by default so `vp run rati#test` stays ~seconds.
   they stay deterministic (part 2 §7) until evidence says otherwise.
 - **`fc.scheduler` microtask interleaving** — the step-3 jnana technique; relevant once
   controller notifications/batching get more concurrent. Not before.
-- **Hydration/StrictMode as fuzz dimensions** — deterministic pins first; promote to fuzz
-  variants only if the pins keep finding neighbors.
+- **Hydration as a fuzz dimension** — deterministic pins first; promote to a fuzz variant only if
+  the pins keep finding neighbors. StrictMode is no longer on this list: MF-03 promoted it for
+  the *smoke* property (the double-mount is where the lifecycle ledger earns its keep). The
+  command model stays single-mode for now — see the effort's MF-03 note for what promoting it
+  would cost.

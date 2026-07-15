@@ -2,6 +2,7 @@ import * as fc from 'fast-check';
 import { expect } from 'vite-plus/test';
 import { act } from '@testing-library/react';
 import { byLevel } from './arbitraries';
+import { assertLedgerBounds } from './ledger';
 import { allKeys, type DeclaredState, type ReferenceModel, type ScopeSpec } from './model';
 import { readContent, readSlot, type BuiltHarness } from './scopeHarness';
 
@@ -23,11 +24,16 @@ import { readContent, readSlot, type BuiltHarness } from './scopeHarness';
         fixed flush count is what makes a failure mean something.
 
     The invariants encoded here are 1-5 and 7 of docs/research/mandala-testing.md
-    §"Invariants"; the lifecycle ledger (6) is asserted at teardown by the property, and its
-    full treatment is MF-03's.
+    §"Invariants"; the lifecycle ledger (6) is MF-03's — its mid-run bounds ride along in
+    `assertContract` (ledger.ts), its balance is the property's teardown.
 */
 
 export type Model = ReferenceModel;
+
+/** Non-vacuity, accumulated across every run of the command property: rebuilds of a
+ * `.provide()` value that `assertProvideRebuild` actually observed. A green provide
+ * variant that never rebuilt the value asserted nothing about the rebuild pairing. */
+export const observed = { provideRebuilds: 0 };
 
 export type Real = {
     harness: BuiltHarness;
@@ -85,6 +91,38 @@ async function assertContract(model: Model, real: Real, label: string): Promise<
             model.runBudgetOf(keySpec.key),
         );
     }
+
+    // 6 — the lifecycle ledger's mid-run half (bounds only; balance is the property's
+    // teardown). Runs on every command, since a double attach or a source left feeding a
+    // render is a *transient* state — by teardown the sweep has tidied it away.
+    assertLedgerBounds(harness, model.slot(), label);
+}
+
+type Snapshot = { committedChanges: number; provideBuilds: number };
+
+const snapshot = (model: Model, real: Real): Snapshot => ({
+    committedChanges: model.stats.committedChanges,
+    provideBuilds: real.harness.provideLog().length,
+});
+
+/**
+ * The `.provide()` variant's pairing contract: a key the factory read changed, so the value
+ * built over it is stale — it must have disposed and rebuilt. The harness factory reads
+ * every key, so any committed change qualifies.
+ *
+ * Inert in the plain variant (no provided value, an empty log). Gated on the *model's*
+ * committed-change counter rather than the rendered values, so a re-fetch the equals gate
+ * correctly swallowed asks for nothing — and a first settle asks for nothing either, since
+ * the leaf that owns the value only exists once every level is ready.
+ */
+function assertProvideRebuild(before: Snapshot, model: Model, real: Real, label: string): void {
+    if (!real.harness.provideLog().length) return;
+    if (model.stats.committedChanges === before.committedChanges) return;
+    expect(
+        real.harness.provideLog().length,
+        `${label}: a changed value must rebuild the provided value`,
+    ).toBeGreaterThan(before.provideBuilds);
+    observed.provideRebuilds++;
 }
 
 /**
@@ -110,7 +148,11 @@ abstract class PickCommand implements fc.AsyncCommand<Model, Real> {
 
     async run(model: Model, real: Real): Promise<void> {
         const targets = this.targets(model);
-        await this.exec(model, real, targets[this.pick % targets.length]!);
+        const key = targets[this.pick % targets.length]!;
+        const before = snapshot(model, real);
+        await this.exec(model, real, key);
+        // After `exec`, so it reads a flushed tree (`assertContract` closes every exec).
+        assertProvideRebuild(before, model, real, `${this.verb}(${key})`);
     }
 
     toString(): string {
@@ -218,6 +260,7 @@ class SettleStale implements fc.AsyncCommand<Model, Real> {
         const contentBefore = readContent(real.container);
         const pendingBefore = real.harness.pending();
         const runsBefore = real.harness.totalRuns();
+        const buildsBefore = real.harness.provideLog().length;
 
         model.dropStale(key);
         await act(async () => {
@@ -235,6 +278,12 @@ class SettleStale implements fc.AsyncCommand<Model, Real> {
             pendingBefore,
         );
         expect(real.harness.totalRuns(), `settleStale(${key}): no producer ran`).toBe(runsBefore);
+        // Nothing committed, so the `.provide()` value has no reason to rebuild either —
+        // the inertness claim reaching one level further out than the rendered values.
+        expect(
+            real.harness.provideLog().length,
+            `settleStale(${key}): the provided value was not rebuilt`,
+        ).toBe(buildsBefore);
         await assertContract(model, real, `settleStale(${key})`);
     }
 }
