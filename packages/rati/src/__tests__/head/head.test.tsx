@@ -1,12 +1,15 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
 import { prerender } from 'react-dom/static';
-import { act, cleanup, render } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { StrictMode, useState, type ReactElement } from 'react';
 import { createHeadStore } from '../../head/store';
 import { HeadProvider } from '../../head/HeadProvider';
 import { Title } from '../../head/Title';
 import { useTitle } from '../../head/useTitle';
 import { Meta } from '../../head/Meta';
+import { island } from '../../island/island';
+import { scope } from '../../scope/scope';
+import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { headTags } from '../../ssr/headTags';
 
 afterEach(() => {
@@ -28,6 +31,32 @@ async function prerenderToString(element: ReactElement): Promise<string> {
         html += decoder.decode(value, { stream: true });
     }
     return html;
+}
+
+/** A source driven by hand, to walk an island through ready → error on the client. */
+function testSource<T>(): Source<T> & {
+    ready: (value: T) => void;
+    fail: (code: string) => void;
+} {
+    let state: SourceState<T> = { status: 'pending' };
+    const listeners = new Set<() => void>();
+    const set = (next: SourceState<T>) => {
+        state = next;
+        for (const listener of listeners) listener();
+    };
+    return {
+        [SourceSymbol]: true,
+        getSnapshot: () => state,
+        subscribe(onChange) {
+            listeners.add(onChange);
+            return () => {
+                listeners.delete(onChange);
+            };
+        },
+        attach: () => () => {},
+        ready: (value) => act(() => set({ status: 'ready', value })),
+        fail: (code) => act(() => set({ status: 'error', error: { code } })),
+    };
 }
 
 describe('HeadStore winners', () => {
@@ -123,6 +152,84 @@ describe('HeadStore winners', () => {
         expect(document.title).toBe('Loaded');
     });
 
+    test('useTitle value → null → value re-registers at a fresh depth', () => {
+        const store = createHeadStore();
+
+        function Toggling({ title }: { title: string | null }) {
+            useTitle(title);
+            return null;
+        }
+
+        // `Sibling` registers after `Toggling`, so it is the deeper of the two and wins
+        // — the arrangement that makes the re-registration below observable.
+        function Page({ title }: { title: string | null }) {
+            return (
+                <HeadProvider store={store}>
+                    <Toggling title={title} />
+                    <Title>Sibling</Title>
+                </HeadProvider>
+            );
+        }
+
+        const view = render(<Page title="First" />);
+        expect(document.title).toBe('Sibling');
+
+        view.rerender(<Page title={null} />);
+        expect(document.title).toBe('Sibling');
+
+        // Going null withdrew the entry (a committed one leaves through the effect's
+        // `remove`, not the render's `clear`), so the returning value registers at the
+        // *end* of the sequence — it now outranks the sibling it used to lose to.
+        view.rerender(<Page title="Again" />);
+        expect(document.title).toBe('Again');
+    });
+
+    test('a committed entry survives the null render and leaves only through remove', () => {
+        // The two store phases the test above runs together, pulled apart — the render's
+        // `clear` cannot drop a committed entry (an abandoned render must not steal the
+        // win); the effect's `remove` is the only exit.
+        const store = createHeadStore();
+        store.set('outer', { kind: 'title', text: 'Outer' });
+        store.commit('outer', { kind: 'title', text: 'Outer' });
+        store.set('inner', { kind: 'title', text: 'Inner' });
+        store.commit('inner', { kind: 'title', text: 'Inner' });
+        expect(store.snapshot('client').title).toBe('Inner');
+
+        store.clear('inner');
+        expect(store.snapshot('client').title).toBe('Inner');
+
+        store.remove('inner');
+        expect(store.snapshot('client').title).toBe('Outer');
+    });
+
+    test('a Title inside an island that errors after committing falls back to the outer winner', async () => {
+        const store = createHeadStore();
+        const page = testSource<string>();
+
+        const Island = island({
+            scope: scope().load({ page: () => page }),
+            component: ({ page: title }) => <Title>{title}</Title>,
+            loading: () => <div>loading</div>,
+            error: ({ error }) => <div>error: {error.code}</div>,
+        });
+
+        render(
+            <HeadProvider store={store}>
+                <Title>Layout</Title>
+                <Island />
+            </HeadProvider>,
+        );
+
+        page.ready('Page');
+        expect(document.title).toBe('Page');
+
+        // The source errors *after* the Title committed: the island swaps in its error
+        // slot, so the declaration unmounts and its `remove` hands the win back out.
+        page.fail('failed');
+        expect(await screen.findByText('error: failed')).toBeTruthy();
+        expect(document.title).toBe('Layout');
+    });
+
     test('StrictMode double render registers once per declaration', () => {
         const store = createHeadStore();
         render(
@@ -179,6 +286,31 @@ describe('meta sync', () => {
         // final removal isn't observable there — nor does it matter.)
         view.rerender(<HeadProvider store={store}>none</HeadProvider>);
         expect(managed()).toHaveLength(0);
+    });
+
+    test('name and property carrying the same value string are separate keys', () => {
+        // `og:title` as a `name` and as a `property` dedupe independently — a key built
+        // from the value alone would drop one of them, on both readers.
+        const store = createHeadStore();
+        render(
+            <HeadProvider store={store}>
+                <Meta name="og:title" content="by name" />
+                <Meta property="og:title" content="by property" />
+            </HeadProvider>,
+        );
+
+        expect(document.head.querySelectorAll('meta[data-rati-head]')).toHaveLength(2);
+        expect(
+            document.head
+                .querySelector('meta[data-rati-head][name="og:title"]')
+                ?.getAttribute('content'),
+        ).toBe('by name');
+        expect(
+            document.head
+                .querySelector('meta[data-rati-head][property="og:title"]')
+                ?.getAttribute('content'),
+        ).toBe('by property');
+        expect(store.snapshot('client').metas).toHaveLength(2);
     });
 
     test('adopts server-emitted tags instead of duplicating them', () => {
