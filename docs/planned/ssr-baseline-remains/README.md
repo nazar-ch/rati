@@ -136,3 +136,35 @@ in-item:
   a large page (nazar's). Dehydrated async loads are safe. The design question
   (`domSync.ts:17` cannot tell "nothing declared yet" from "nothing will be declared")
   is unchanged, but its blast radius is smaller than SSR-04 implied.
+
+### 2026-07-15 — from SSR-06 (coverage tail)
+
+The listed gaps are closed: +13 tests across the head store's dedupe/depth edges, the
+payload's `id` option, the watchdog's two ends, `renderApp`'s `onError`/version, the
+redirect × hydration replay, and a new `ssr/wholeDocument.test.tsx` walking the
+document-as-root pattern from prerender through `hydrateRoot(document)`. Each was
+verified red under a one-line behavior break (per-commit notes). Two things the round
+turned up, neither fixed in-item:
+
+- **A redirect whose target is outside the route table answers 404 and drops the 301.**
+  `route('/old', …, { redirect: { to: '/new' } })` where `/new` is not a rati route: the
+  router follows the hop and records it in `redirectHops`, but nothing matches `/new`, so
+  `activeRoute` is null → `prepareRoute` returns null → `renderApp` reads that as
+  `no-match` *before* it ever looks at a redirect (`renderApp.tsx:130` precedes the
+  `prepared.redirect` check at `:131`). The hop is computed and discarded; the author's
+  declared 301 never goes out. Reachable whenever a target is same-origin but not a rati
+  route — a static file, a legacy app, another SPA mounted elsewhere; `docs/public/ssr.md`
+  sends *external* redirects to the HTTP layer, but a same-origin non-route is neither
+  external nor in the table. Two fix shapes, both small: `prepareRoute` reports a redirect
+  even with no `activeRoute` (the hop is already recorded, only `hydratedState` has
+  nothing to describe), or `renderApp` checks the hops before answering `no-match`. Same
+  neighborhood as SSR-05's `no-match` finding — a fix should weigh them together. Pinned
+  as-is in `ssr/renderApp.test.tsx`.
+- **Hydrating onto a redirect route renders blank, and that is defensible.** Scope item 3
+  asked for the pin and got it: seeding from `hydratedState` never follows a redirect, so
+  a snapshot naming the redirect route itself leaves it active and renders its (empty)
+  component. Reachable only from a server that ignored `renderApp`'s redirect result *and*
+  built its own snapshot — the normal flow names the target. Judged right rather than
+  merely current: seeding is a verbatim replay of the server's decision, and following the
+  hop would move the URL out from under the server's HTML. Recorded so the next reader
+  doesn't re-litigate it; no item cut.
