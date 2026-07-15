@@ -30,6 +30,12 @@
             "import": "./dist/ssr/index.js",
             "source": "./src/ssr/index.ts"
         },
+        "./server": {
+            "rati-dev": "./src/server/index.ts",
+            "types": "./dist/server/index.d.ts",
+            "import": "./dist/server/index.js",
+            "source": "./src/server/index.ts"
+        },
         "./vite": {
             "rati-dev": "./src/vite/index.ts",
             "types": "./dist/vite/index.d.ts",
