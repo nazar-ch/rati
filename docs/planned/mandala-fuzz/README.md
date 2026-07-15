@@ -42,6 +42,38 @@ Batching, dependencies, grading: [plan.md](./plan.md).
 
 ## Findings
 
+### 2026-07-15 (MF-02) — a source leaks when a teardown is followed by a new generation
+
+Found by the command property **on its first run** (shrunk to a 4-level scope +
+`reject(k3_1), changeInput`), then reduced to two hand-written repros. **Not fixed** — the
+fix decision is the user's. Pinned as contract-asserting `test.fails`:
+`packages/rati/src/__tests__/mandala/orphanedBucketLeak.test.tsx`.
+
+A Step's detach effect deliberately keeps entries the *live* bucket still holds — it cannot
+tell a source swap from an unmount, so it defers to the mandala's unmount sweep. So a Step
+torn down **while its bucket is still current** leaves its sources attached. Two ways in, no
+remount needed: a source erroring (the boundary swaps the subtree for the error slot), and a
+mid-tree source dropping to pending (S8 — the levels below unmount for real). A following
+generation (retry / input change) then rebuilds `cacheRef.current` into a *fresh* bucket
+array, orphaning the old one — and `sweepDetach` only ever sees `cacheRef.current`. Nothing
+detaches those sources, ever.
+
+The ordinary remount path is fine: the mandala re-renders before the old Steps' cleanups run,
+so `currentBuckets()` already points at the new array, `bucketIsLive` is false, and everything
+detaches. It is specifically *teardown-then-replace* that leaks — which is the plain
+error-slot → **retry** flow, and the plain "live source blipped, then navigate" flow.
+
+Sketch of a fix (the maintainer's call): sweep the outgoing buckets when the mandala swaps
+`cacheRef` for a new `treeKey` — the array is right there, and everything still attached in it
+is by definition last-generation. It wants to happen off the render path (a discarded render
+must not detach), so the `treeCommitted` effect that already keys on `treeKey` is the natural
+home.
+
+Cost to the fuzz suite: MF-02's ledger assert in the property `finally` is the strategy doc's
+invariant 6, and this leak trips it on any sequence that tears a level down and then remounts
+— see the record's `TODO` at that assert. Invariant 6 is MF-03's item; it cannot be encoded
+honestly until this is settled.
+
 ### 2026-07-15 (MF-02) — a cascade stops at a source key
 
 Found while deciding the shape of MF-02's reference model (does the model's expected-value
