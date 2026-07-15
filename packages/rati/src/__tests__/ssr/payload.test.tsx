@@ -2,7 +2,8 @@ import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
 import { act, cleanup, render } from '@testing-library/react';
 import { scope } from '../../scope/scope';
 import { island } from '../../island/island';
-import { HydrationProvider } from '../../mandala/hydration';
+import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
+import { createHydrationClaims } from '../../mandala/hydrationDiagnostics';
 import {
     HYDRATION_SCRIPT_ID,
     readHydration,
@@ -10,9 +11,12 @@ import {
     type HydrationState,
 } from '../../ssr/payload';
 
+const CUSTOM_ID = '__app-state';
+
 afterEach(() => {
     cleanup();
     document.getElementById(HYDRATION_SCRIPT_ID)?.remove();
+    document.getElementById(CUSTOM_ID)?.remove();
     vi.restoreAllMocks();
     vi.useRealTimers();
 });
@@ -70,6 +74,30 @@ describe('serializeHydration / readHydration', () => {
         );
         expect(readHydration()).toBeNull();
         expect(error).toHaveBeenCalledOnce();
+    });
+
+    test('a custom id round-trips, and the default id no longer reads it', () => {
+        const tag = serializeHydration(
+            { data: { ':r1:': { user: { name: 'Ada' } } }, seeds: {} },
+            { id: CUSTOM_ID },
+        );
+        expect(tag).toContain(`id="${CUSTOM_ID}"`);
+        insertIntoDocument(tag);
+
+        expect(readHydration({ id: CUSTOM_ID })!.data[':r1:']).toEqual({ user: { name: 'Ada' } });
+        // The id is the whole contract between the two halves — a client reading the
+        // default finds nothing and resolves from scratch rather than misreading.
+        expect(readHydration()).toBeNull();
+    });
+
+    test('a custom id survives script-breaking content too', () => {
+        // The escaping is id-independent, but the option path is the one an app that
+        // renames the tag actually runs — pin it end to end rather than by inspection.
+        const evil = '</script><script>alert(1)</script> & <!--';
+        insertIntoDocument(
+            serializeHydration({ data: { ':r1:': { evil } }, seeds: {} }, { id: CUSTOM_ID }),
+        );
+        expect(readHydration({ id: CUSTOM_ID })!.data[':r1:']!['evil']).toBe(evil);
     });
 
     test('warns outside production about values that do not survive JSON', () => {
@@ -133,6 +161,50 @@ describe('unclaimed-payload watchdog', () => {
         render(
             <HydrationProvider data={undefined} seeds={undefined}>
                 <Island />
+            </HydrationProvider>,
+        );
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(3500);
+        });
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    test('a claim after the warning fired is a no-op — one warning, no crash', () => {
+        vi.useFakeTimers();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const claims = createHydrationClaims();
+        // Two slices, so a re-armed countdown would have something left to report.
+        const disarm = claims.arm({ ':stale:': { orphan: 1, sibling: 2 } }, undefined);
+        vi.advanceTimersByTime(3500);
+        expect(warn).toHaveBeenCalledOnce();
+
+        // One island mounted after all — the very false alarm the message names. The
+        // late claim must neither throw nor restart the countdown, or the sibling still
+        // unclaimed would fire a second warning contradicting the first.
+        claims.claim(':stale:', 'orphan', 'data');
+        vi.advanceTimersByTime(10_000);
+        expect(warn).toHaveBeenCalledOnce();
+
+        disarm();
+    });
+
+    test('the collecting (server) side never arms it', async () => {
+        vi.useFakeTimers();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const collector = createHydrationCollector();
+
+        // A collector *and* a payload — the guard is the presence of `collect`, not the
+        // absence of data. A server pass must never warn about its own output, and the
+        // prerender that would claim the slices isn't this render.
+        render(
+            <HydrationProvider
+                collect={collector.collect}
+                data={{ ':stale:': { orphan: 1 } }}
+                seeds={{}}
+            >
+                <div>server</div>
             </HydrationProvider>,
         );
 
