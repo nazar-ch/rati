@@ -36,6 +36,11 @@
             "import": "./dist/vite/index.js",
             "source": "./src/vite/index.ts"
         },
+        "./vite/client": {
+            "rati-dev": "./src/vite/client.d.ts",
+            "types": "./dist/vite/client.d.ts",
+            "source": "./src/vite/client.d.ts"
+        },
         "./debug": {
             "rati-dev": "./src/debug/index.ts",
             "types": "./dist/debug/index.d.ts",
@@ -45,7 +50,7 @@
         "./package.json": "./package.json"
     },
     "scripts": {
-        "build": "vp build && yarn run -T tsgo -p tsconfig.build.json",
+        "build": "vp build && yarn run -T tsgo -p tsconfig.build.json && cp src/vite/client.d.ts dist/vite/client.d.ts",
         "watch": "yarn run -T tsgo --watch",
         "typecheck": "yarn run -T tsgo --noEmit",
         "typecheck:test": "yarn run -T tsgo --noEmit -p tsconfig.test.json",
