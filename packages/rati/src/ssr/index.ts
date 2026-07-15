@@ -42,4 +42,5 @@ export {
     type RenderAppSetup,
     type RenderAppInstance,
     type RenderAppResult,
+    type RenderAssets,
 } from './renderApp';

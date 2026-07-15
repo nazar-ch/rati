@@ -33,6 +33,29 @@ export interface RenderAppInstance {
     head?: HeadStore;
 }
 
+/**
+ * What the built client needs from the page: the hashed entry script, its stylesheets,
+ * and a route chunk's preload. `rati/vite` generates exactly this shape as
+ * `virtual:rati/assets` — hashed URLs in production, source paths in dev — so a server
+ * entry hands the module straight to {@link renderApp} and never reads a manifest. A
+ * hand-rolled build passes the same shape by hand; every field is optional.
+ */
+export interface RenderAssets {
+    /**
+     * Client entry module(s). React emits them as hydration-tracked
+     * `<script type="module">` tags, so the HTML shell needs no script of its own.
+     */
+    bootstrapModules?: string[];
+    /** `<link rel="stylesheet">` tags for the client entry's CSS. */
+    styleTags?: string;
+    /**
+     * Tags that preload a route module's client chunk, keyed as the client manifest
+     * keys it. `renderApp` asks for the matched route's `moduleId` (see
+     * `prepareRoute`); a route that isn't `lazy()` has none, so nothing is asked.
+     */
+    preloadTagsFor?: (moduleId: string) => string;
+}
+
 export interface RenderAppOptions {
     url: string;
     /**
@@ -40,7 +63,12 @@ export interface RenderAppOptions {
      * stores would leak state across requests.
      */
     createApp: (setup: RenderAppSetup) => RenderAppInstance;
-    bootstrapModules?: string[];
+    /**
+     * The built client's tags — normally `import * as assets from 'virtual:rati/assets'`.
+     * `bootstrapModules` reaches the prerender; the rest joins `result.headTags`, so
+     * assembly places them through the head slot it already has.
+     */
+    assets?: RenderAssets;
     onError?: (error: unknown) => void;
 }
 
@@ -54,7 +82,11 @@ export type RenderAppResult =
            * `matchedCatchAll` and picks its own.
            */
           status: number;
-          /** Escaped tags for `<head>` — empty when the app passes no head store. */
+          /**
+           * Everything for `<head>`: the `assets` tags (stylesheets, the matched
+           * route's chunk preload) followed by the app's own escaped title/meta —
+           * empty when there are neither.
+           */
           headTags: string;
           /** The hydration payload script tag — splice before `</body>`. */
           stateScript: string;
@@ -71,6 +103,18 @@ function deriveStatus(matchedCatchAll: boolean, errors: HydrationError[]): numbe
     if (errors.some((entry) => entry.error.code === 'not-available')) return 404;
     if (errors.length > 0) return 500;
     return 200;
+}
+
+/**
+ * The built client's `<head>` tags for this request: the entry's stylesheets, plus the
+ * matched route's chunk preload. They ride in `headTags` rather than a part of their
+ * own — assembly already has one head slot, and a second would mean a new placeholder
+ * in every template and a new splice point in every server.
+ */
+function assetTags(assets: RenderAssets | undefined, moduleId: string | undefined): string {
+    if (!assets) return '';
+    const preload = moduleId !== undefined ? assets.preloadTagsFor?.(moduleId) : undefined;
+    return (assets.styleTags ?? '') + (preload ?? '');
 }
 
 export async function renderApp(options: RenderAppOptions): Promise<RenderAppResult> {
@@ -93,8 +137,9 @@ export async function renderApp(options: RenderAppOptions): Promise<RenderAppRes
             };
         }
 
+        const bootstrapModules = options.assets?.bootstrapModules;
         const html = await renderToHtml(<App />, {
-            ...(options.bootstrapModules ? { bootstrapModules: options.bootstrapModules } : {}),
+            ...(bootstrapModules ? { bootstrapModules } : {}),
             ...(options.onError ? { onError: options.onError } : {}),
         });
 
@@ -107,7 +152,7 @@ export async function renderApp(options: RenderAppOptions): Promise<RenderAppRes
             kind: 'rendered',
             html,
             status: deriveStatus(prepared.matchedCatchAll, collector.errors),
-            headTags: head ? headTags(head) : '',
+            headTags: assetTags(options.assets, prepared.moduleId) + (head ? headTags(head) : ''),
             stateScript: serializeHydration(state),
             hydration: { v: 1, ...state },
             errors: collector.errors,
