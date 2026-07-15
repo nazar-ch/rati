@@ -32,6 +32,15 @@ Items live in [issues/](./issues/); status derives from rati git
 - **Exit:** both consumers on the released rati surface, hand-rolled SSR plumbing
   deleted, smoke-verified in their own deployment shape. Effort ready to close.
 
+### B4 — findings round (execution; after B3, cut 2026-07-15)
+
+- **Items:** SSR-07, SSR-08, SSR-09, SSR-10 — independent, any order. SSR-11 (blocked
+  on a maintainer discussion) and SSR-12 (design-first) are filed but not batched;
+  they enter a later batch once unblocked.
+- **Entry:** the findings review (this cut).
+- **Exit:** the four fixes landed with the gate green; SSR-11/12 dispositioned
+  (scheduled or closed) by the maintainer.
+
 ## Grading
 
 | Item | Model / effort | Why |
@@ -42,3 +51,9 @@ Items live in [issues/](./issues/); status derives from rati git
 | SSR-04 | Sonnet, medium | mechanical migration + rename sweep; real-deploy verification |
 | SSR-05 | Sonnet, medium | same, Hono-shaped |
 | SSR-06 | Sonnet, medium | deterministic tests against a settled surface |
+| SSR-07 | Opus, high | the hydration-phase design touches store semantics; the settle heuristic is judgment |
+| SSR-08 | Sonnet, medium | a small ordering fix + a pin flip + two doc paragraphs |
+| SSR-09 | Sonnet, low | one peerDependenciesMeta line |
+| SSR-10 | Sonnet, low | docs only |
+| SSR-11 | — | not batched: maintainer discussion first (the record carries the mechanics) |
+| SSR-12 | Opus, high | design-first: the render-into-document constraint needs a spike |

@@ -26,6 +26,28 @@ maintainer-confirmed), the **consumer migrations** (nazar.ch, jnana website), an
   subjects, a `Closes: SSR-NN` trailer on the finishing commit. No status written into
   these files.
 
+## Decisions taken 2026-07-15 (findings round)
+
+The findings below were task-cut into SSR-07…12 (maintainer-reviewed shape):
+
+- **SSR-07** fixes the head clobber via a distinct hydration phase (server-owned
+  document until the first `remove()`; CSR detected by the absence of marked tags) —
+  chosen over a bare first-apply guard so pure-CSR `defaultTitle` keeps working.
+- **SSR-08** makes a followed redirect win over `no-match` and documents the
+  plain-text 404 — the two same-neighborhood findings weighed together, as recorded.
+- **SSR-09** (react as optional peer) and **SSR-10** (docs tail: the `!isSsrBuild`
+  inversion, the hidden-tab/rAF testing note) are mechanical.
+- **SSR-11** (the out-of-order shell) is written up for discussion, not decided — the
+  record lays out why it is a buffered-render artifact, not a streaming tradeoff.
+- **SSR-12** reframes the whole-document finding: not a nazar migration (the
+  maintainer keeps nazar whole-document) but a design item — the CSR fallback should
+  be available to whole-document apps too. Design-first; nazar's stale-reason note
+  stays a nazar-side concern.
+- The Vercel `vercel build`/preview verification stays blocked on maintainer CLI auth
+  — not cuttable as agent work.
+- No item for the redirect-route hydration blank (judged right, recorded) or for the
+  whole-document ⇄ fallback exclusivity docs (SSR-12 owns that surface).
+
 ## Items
 
 SSR-01…03 build the kit in dependency order (dev plugin → build/assets →
@@ -33,6 +55,10 @@ prod handler + example adoption). SSR-04/05 migrate the two real consumers onto 
 three hosts (plain Node, Vercel function, Hono), one plumbing implementation, which is
 the kit's validation. SSR-06 is the independent coverage tail and can run first or in
 parallel with anything.
+
+The findings round: SSR-07…10 are independent fixes off the migrations' findings and
+can run in any order; SSR-11 waits on a maintainer discussion and SSR-12 on a design
+pass (both records carry the open questions).
 
 Batching, dependencies, grading: [plan.md](./plan.md).
 
