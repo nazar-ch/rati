@@ -4,7 +4,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "dev": "node server.ts",
+        "dev": "vp dev",
         "build": "yarn build:client && yarn build:server",
         "build:client": "vp build --outDir dist/client --ssrManifest",
         "build:server": "vp build --outDir dist/server --ssr src/entry-server.tsx",

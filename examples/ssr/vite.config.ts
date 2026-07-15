@@ -1,6 +1,7 @@
 import { defineConfig, lazyPlugins } from 'vite-plus';
 import react from '@vitejs/plugin-react';
 import babel from '@rolldown/plugin-babel';
+import { ratiSsr } from 'rati/vite';
 
 const conditions = ['rati-dev', 'import', 'module', 'browser', 'default'];
 
@@ -14,6 +15,9 @@ export default defineConfig({
         lazyPlugins(() => [
             react(),
             babel({ presets: [decoratorPreset({ version: '2023-11' })] }),
+            // `vp dev` is the whole dev story: the plugin renders every request through
+            // src/entry-server.tsx, so this app has no dev server of its own.
+            ratiSsr(),
         ]) ?? [],
     build: {
         manifest: true,
