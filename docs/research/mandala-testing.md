@@ -239,7 +239,8 @@ a nightly lane later. Fast by default so `vp run rati#test` stays ~seconds.
 
 - **Router fuzz** — the second fuzz target (navigation command alphabet over `RouterStore` +
   memory history + route islands); designed as its own effort once the mandala foundation proves
-  the harness pattern.
+  the harness pattern. **Cut 2026-07-15**: [planned/router-fuzz/](../planned/router-fuzz/README.md)
+  — five items, starting from the pre-cut router review's hardening findings.
 - **SSR under fuzz** — `prerender` per fuzz case is expensive and the SSR paths are narrow;
   they stay deterministic (part 2 §7) until evidence says otherwise.
 - **`fc.scheduler` microtask interleaving** — the step-3 jnana technique; relevant once
