@@ -43,3 +43,50 @@ with the item id (`SSR-01: …`), put `Closes: SSR-01` in the finishing commit's
 block, keep `vp run rati#typecheck` + `vp lint` + `vp run rati#test` green, and keep
 `docs/public/ssr.md` + `docs/internals.md` in sync with behavior changes. Findings out
 of an item's scope get a dated note appended here, not a silent fix.
+
+## Findings
+
+### 2026-07-15 — from SSR-04 (nazar.ch)
+
+The migration itself is nazar `581eaf1`: −653/+217, the Vercel function down to one
+line, no manifest read anywhere. The kit's premise held. What the first real consumer
+turned up, none of it fixed in-item:
+
+- **`HeadProvider` clobbers a server-rendered title when the declaring page is inside an
+  unresolved Suspense boundary.** The provider sits *above* the route's boundary, so its
+  effect runs while the boundary is still unhydrated; `snapshot('client')` counts only
+  confirmed entries, finds none, and `defaultTitle` makes the result non-null — so
+  `applyToDocument` writes the default over the correct title the server put there
+  (`head/domSync.ts:17` has no guard for "nothing confirmed yet"). It self-corrects once
+  the boundary hydrates and `<Title>` commits, so in practice it is a title flash;
+  observed *stuck* on nazar's large photo pages under the condition below. A first apply
+  that leaves the document alone when nothing is confirmed would fix it, but "nothing
+  declared yet" and "nothing will be declared" are the same state to the store today —
+  which is the actual design question.
+- **A large route's content ships out-of-order, so the shell carries the loading slot.**
+  React flushes the shell at its chunk budget and emits the rest into a detached
+  `<div id="S:0" hidden>` plus a completion script: `/texts` is inline (`<!--$-->`),
+  `/pictures/torcal-25` (~99KB) is not. The content *is* in the HTML, so this is not an
+  SSR-didn't-run problem, but a no-JS client sees `loading...`. Pre-existing (nazar.ch
+  live does it today) and arguably React's normal streaming — rati's contribution is
+  wrapping every route in a Suspense boundary, which is what gives React something to
+  defer. Worth a decision before the SEO smoke, not a bug report.
+- **Whole-document and the CSR 500 fallback are mutually exclusive.** `createRequestHandler`
+  needs a template + `bootstrapModules` to serve the fallback shell, and a whole-document
+  app has neither, so it gets the plain-text 500. `docs/public/ssr.md` says so; SSR-04's
+  scope picked whole-document without weighing it. nazar had no fallback before either,
+  so nothing regressed.
+- **nazar's reason for whole-document is now stale**, and worth revisiting: its
+  `index.html` said React must own `<html>` "so React 19 can hoist `<title>` into
+  `<head>`", but rati's head layer never renders a React `<title>` — the server splices
+  `headTags` in and the client writes `document.title`. Everything its `Document.tsx`
+  renders is static, so the template pattern would fit and would restore the fallback
+  above. Maintainer kept whole-document deliberately (test the path first, revisit after).
+- **Confirmed: Vercel's Node runtime takes `export default { fetch }` natively**, per its
+  docs and exercised locally against the built entry — ssr-server-kit.md:95's assumption
+  is good. `vercel build` / a preview deploy stayed **unverified**: the CLI needs auth.
+- **Testing note.** React 19.2 gates the Suspense reveal on `requestAnimationFrame`, which
+  never fires in a hidden tab — so a headless/background browser leaves the boundary
+  un-revealed forever and the page looks broken (this is what made the title clobber above
+  look permanent). Verify rati SSR in a *visible* tab; check `document.hidden` before
+  believing a hydration failure.
