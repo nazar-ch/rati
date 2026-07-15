@@ -34,12 +34,13 @@ Items live in [issues/](./issues/); status derives from rati git
 
 ### B4 — findings round (execution; after B3, cut 2026-07-15)
 
-- **Items:** SSR-07, SSR-08, SSR-09, SSR-10 — independent, any order. SSR-11 (blocked
-  on a maintainer discussion) and SSR-12 (design-first) are filed but not batched;
-  they enter a later batch once unblocked.
+- **Items:** SSR-07, SSR-08, SSR-09, SSR-10, SSR-11 — independent, any order (SSR-11
+  decided 2026-07-15: inline output becomes the behavior; streaming went to research).
+  SSR-12 (design-first) is filed but not batched; it enters a later batch once its
+  design pass runs.
 - **Entry:** the findings review (this cut).
-- **Exit:** the four fixes landed with the gate green; SSR-11/12 dispositioned
-  (scheduled or closed) by the maintainer.
+- **Exit:** the five fixes landed with the gate green; SSR-12 dispositioned by the
+  maintainer.
 
 ## Grading
 
@@ -55,5 +56,5 @@ Items live in [issues/](./issues/); status derives from rati git
 | SSR-08 | Sonnet, medium | a small ordering fix + a pin flip + two doc paragraphs |
 | SSR-09 | Sonnet, low | one peerDependenciesMeta line |
 | SSR-10 | Sonnet, low | docs only |
-| SSR-11 | — | not batched: maintainer discussion first (the record carries the mechanics) |
+| SSR-11 | Sonnet, low | decided: one prerender option + a pin + a docs paragraph |
 | SSR-12 | Opus, high | design-first: the render-into-document constraint needs a spike |

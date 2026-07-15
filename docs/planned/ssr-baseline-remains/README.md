@@ -37,8 +37,11 @@ The findings below were task-cut into SSR-07…12 (maintainer-reviewed shape):
   plain-text 404 — the two same-neighborhood findings weighed together, as recorded.
 - **SSR-09** (react as optional peer) and **SSR-10** (docs tail: the `!isSsrBuild`
   inversion, the hidden-tab/rAF testing note) are mechanical.
-- **SSR-11** (the out-of-order shell) is written up for discussion, not decided — the
-  record lays out why it is a buffered-render artifact, not a streaming tradeoff.
+- **SSR-11** (the out-of-order shell): discussed and decided same day — fully-inline
+  output becomes the behavior (the current output is a buffered-render artifact, not a
+  streaming tradeoff); what a real streaming mode would take is recorded in
+  [docs/research/ssr-streaming.md](../../research/ssr-streaming.md), alongside the RSC
+  support question ([docs/research/rsc-support.md](../../research/rsc-support.md)).
 - **SSR-12** reframes the whole-document finding: not a nazar migration (the
   maintainer keeps nazar whole-document) but a design item — the CSR fallback should
   be available to whole-document apps too. Design-first; nazar's stale-reason note

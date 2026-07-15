@@ -1,7 +1,7 @@
 # SSR-11 — the out-of-order shell (large routes ship the loading slot)
 
 area: packages/rati/src/ssr/renderToHtml.ts
-needs: maintainer discussion — no scope until the direction is picked
+needs: —
 disposition: —
 
 ## Problem
@@ -15,40 +15,41 @@ the reveal is JS- and rAF-gated (the hidden-tab interaction from SSR-04's testin
 note). rati's contribution is wrapping every route in a Suspense boundary, which is
 what gives React something to defer.
 
-## The mechanics (for the discussion)
-
 This is **not** streaming vs full render — rati is already full-render. `renderToHtml`
-uses `react-dom/static` `prerender`, awaits every Suspense boundary, drains the whole
-prelude into one string, and the server sends one complete response. The out-of-order
-segments are the *wire format* of React's streaming heuristic surviving into a
-buffered renderer: the outlining exists so a streaming server can flush a small shell
-early and progressively reveal — but rati never flushes early, so today we pay
-streaming's costs (hidden content, JS-gated reveal, no-JS sees "loading…") and collect
-none of its benefit (TTFB is identical either way). `prerender` takes
-`progressiveChunkSize`; a very large value makes every completed boundary render
-inline, in place, with no swap scripts.
+awaits every Suspense boundary via `prerender`, drains the whole prelude into one
+string, and the server sends one complete response. The out-of-order segments are the
+*wire format* of React's streaming heuristic surviving into a buffered renderer: the
+outlining exists so a streaming server could flush a small shell early — rati never
+flushes early, so today the output pays streaming's costs (hidden content, JS-gated
+reveal, no-JS sees "loading…") and collects none of its benefit.
 
-A real streaming mode ("stream and accept the current situation") would be a separate
-feature with real design costs, because two of rati's SSR guarantees are
-read-after-render:
+## Decision (maintainer, 2026-07-15)
 
-- **Status codes**: `result.status` derives from load errors known only after all
-  boundaries resolve. A streamed response commits its status at shell flush — before
-  the loads run — so streamed pages are always 200 (or need trailers/meta-refresh
-  hacks). The SEO-correct 404/500 derivation is fundamentally a full-render property.
-- **Head tags**: `headTags` reads the store's winners after the prerender; the
-  `<head>` ships in the shell, first. Streaming means the head flushes before a
-  route's `<Title>` inside Suspense has registered — deepest-wins titles would need
-  client-side correction, which is exactly the flash SSR-07 exists to avoid.
+Fully-inline output simply becomes the behavior — no new API; the current output is an
+artifact of defaults, not a choice. A true streaming mode is a **different contract**
+(status commits at shell flush → effectively always 200; the head ships before
+in-Suspense `<Title>`s register) and is recorded as research, not built:
+[ssr-streaming.md](../../../research/ssr-streaming.md).
 
-So the two coherent offerings are: (1) today's model, made honest — full render,
-everything inline, correct statuses and head ("SEO-first", one `progressiveChunkSize`
-line); (2) a future opt-in streaming mode built on `renderToReadableStream`, accepting
-200-always and shell-time head for time-to-first-byte on slow loads. They are not a
-knob on one renderer; they are different contracts.
+## Scope
 
-## Open question (maintainer)
+1. `renderToHtml`: pass a `progressiveChunkSize` large enough that every completed
+   boundary renders inline (content in place, no hidden divs, no swap scripts), with a
+   comment saying why — buffered output, so outlining is pure downside.
+2. A test pinning the shape: a route whose content exceeds the default budget renders
+   in place (`<!--$-->…<!--/$-->`, no `id="S:` divs) — demonstrably red without the
+   option.
+3. `docs/public/ssr.md`: one paragraph — output is fully inline by design (no-JS/SEO
+   sees content); streaming is a non-goal with the research pointer.
 
-Whether (1) simply becomes the behavior (no new API, arguably a bug fix — the current
-output is an artifact, not a choice), and whether (2) is worth a research record now
-or waits for a consumer that actually wants streaming.
+## Boundaries
+
+- No option surface — no `progressiveChunkSize`/`inline` knob on `renderApp` or the
+  handler; anyone wanting streamed output wants the other contract entirely.
+- Server-errored boundaries keep the loading slot + client retry (SSR baseline
+  behavior) — inlining changes completed boundaries only.
+
+## Verify
+
+`vp run rati#test` green with the new pin; `vp run rati#typecheck` + `vp lint`;
+spot-check the ssr example's built output for a large page if convenient.
