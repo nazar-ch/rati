@@ -18,6 +18,13 @@ export interface PreparedRoute {
      * `permanent` is true only when every followed hop was permanent.
      */
     redirect?: { to: string; permanent: boolean };
+    /**
+     * The matched route's own module, as the client build's manifest keys it — present
+     * only for a `lazy()` route built through `rati/vite` (which records it). The
+     * server turns it into the route chunk's `modulepreload`, so the browser fetches
+     * the chunk alongside the HTML instead of discovering it after hydration.
+     */
+    moduleId?: string;
 }
 
 /**
@@ -44,9 +51,12 @@ export async function prepareRoute(router: RouterStore<any>): Promise<PreparedRo
     const route = router.activeRoute;
     if (!route) return null;
 
-    const preload = (route.component as { preload?: () => Promise<unknown> }).preload;
-    if (typeof preload === 'function') {
-        await preload();
+    const lazyComponent = route.component as {
+        preload?: () => Promise<unknown>;
+        moduleId?: string;
+    };
+    if (typeof lazyComponent.preload === 'function') {
+        await lazyComponent.preload();
     }
 
     const hops = router.redirectHops;
@@ -59,6 +69,7 @@ export async function prepareRoute(router: RouterStore<any>): Promise<PreparedRo
             routeParams: route.routeParams,
         },
         matchedCatchAll: route.path === '*',
+        ...(lazyComponent.moduleId !== undefined ? { moduleId: lazyComponent.moduleId } : {}),
         ...(hops.length > 0
             ? {
                   redirect: {

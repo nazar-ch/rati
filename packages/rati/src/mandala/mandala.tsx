@@ -56,6 +56,8 @@ export type MandalaComponent<S extends Scope<any>> = FC<ScopeInputs<S>> & {
      * mandala by `route`. Absent when the component isn't lazy.
      */
     preload?: () => Promise<unknown>;
+    /** Forwarded from the same `lazy()` component, for the same reason — see {@link lazy}. */
+    moduleId?: string;
 };
 
 const DefaultLoading: FC<{ inputs: unknown }> = () => null;
@@ -220,10 +222,16 @@ export function createMandala<S extends Scope<any>>(
         config.component.displayName ?? (config.component as { name?: string }).name;
     Mandala.displayName = `${kindLabel}(${componentName || 'Component'})`;
 
-    // Stay transparent to chunk preloading: a `lazy()` component hangs `.preload` on
-    // itself; surface it on the mandala so the router can prefetch through the wrapper.
-    const preload = (config.component as { preload?: () => Promise<unknown> }).preload;
-    if (typeof preload === 'function') Mandala.preload = preload;
+    // Stay transparent to chunk preloading: a `lazy()` component hangs `.preload` and
+    // (built through rati/vite) its `.moduleId` on itself; surface both on the mandala,
+    // so the router can prefetch through the wrapper and a server render can name the
+    // chunk of a route that folded its scope in.
+    const lazyComponent = config.component as {
+        preload?: () => Promise<unknown>;
+        moduleId?: string;
+    };
+    if (typeof lazyComponent.preload === 'function') Mandala.preload = lazyComponent.preload;
+    if (lazyComponent.moduleId !== undefined) Mandala.moduleId = lazyComponent.moduleId;
 
     // A readable identifier for this scope's read errors (best-effort: shared scopes keep
     // the last mandala's label).
