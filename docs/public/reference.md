@@ -320,7 +320,7 @@ Members:
 | `getPath(to)` | build an href from a typed route reference (params percent-encoded); throws if the name isn't in the table |
 | `setSearchParams(params)` | update the query string |
 | `subscribe(fn)` | change notification (for non-React consumers) |
-| `dispose()` | release history listeners (one router per SSR request — dispose after render) |
+| `dispose()` | release history listeners, and the history itself if the router created it (one router per SSR request — dispose after render) |
 
 `navigate`/`replace` options: `keepCurrentRoute` (change the URL without re-resolving the
 mounted route) and `state` (per-entry state, survives back/forward; a same-URL navigation
@@ -344,6 +344,7 @@ that changes only state still re-resolves).
 | `createBrowserHistory()` | DOM history (default) |
 | `createMemoryHistory({ url })` | server / tests |
 | `History`, `HistoryLocation`, `HistoryListener`, `HistoryUpdate`, `HistoryAction` | the history contract, for custom hosts |
+| `history.dispose?.()` | detach from the host (the browser history's `popstate`) and drop listeners. A history you inject is yours to dispose — the router only disposes one it created itself |
 | `installScrollRestoration(options?)` | standalone installer; usually configured via `RouterStoreOptions.scrollRestoration` |
 
 ### `lazy(loader)`

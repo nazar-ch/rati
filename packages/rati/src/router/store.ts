@@ -133,6 +133,12 @@ export class RouterStore<
     history: History;
 
     unlistenHistory: () => void;
+    /**
+     * Whether this store created its own history, and so must dispose it. An
+     * injected one belongs to whoever passed it in — it may be shared between
+     * stores or outlive this one.
+     */
+    private readonly ownsHistory: boolean;
     /** Normalized basename — empty string when none was configured. */
     readonly basename: string;
     /**
@@ -178,8 +184,10 @@ export class RouterStore<
 
         if (options.history) {
             this.history = options.history;
+            this.ownsHistory = false;
         } else {
             this.history = createBrowserHistory();
+            this.ownsHistory = true;
         }
         this.unlistenHistory = this.history.listen(listener);
 
@@ -234,6 +242,9 @@ export class RouterStore<
     dispose() {
         this.unlistenHistory();
         this.uninstallScrollRestoration();
+        // Unlistening only detaches *this* store; the history it created is still
+        // holding the window's popstate. Nobody else can let go of it.
+        if (this.ownsHistory) this.history.dispose?.();
     }
 
     getPath(args: NameToRoute<T> | string) {

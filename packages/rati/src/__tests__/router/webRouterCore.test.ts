@@ -1,6 +1,7 @@
-import { describe, test, expect, beforeEach } from 'vite-plus/test';
+import { describe, test, expect, beforeEach, vi } from 'vite-plus/test';
 import { RouterStore } from '../../router/store';
 import { route } from '../../router/route';
+import { createMemoryHistory } from '../../router/history';
 
 const NoopComponent = () => null;
 
@@ -293,5 +294,40 @@ describe('RouterStore.dispose', () => {
         window.dispatchEvent(new PopStateEvent('popstate'));
         await Promise.resolve();
         expect(router.path).toBe(pathBefore);
+    });
+
+    // Observed red once against the unfixed engine: the created history kept its
+    // popstate subscription past dispose. Note the listener goes on *after* dispose —
+    // registering it before would pass either way, since unlistening the store already
+    // empties that set. The leak is only visible to a listener the disposed history
+    // should no longer be able to reach.
+    test('dispose() detaches the history the store created from the DOM', async () => {
+        const router = new RouterStore({}, routes);
+        await Promise.resolve();
+        const history = router.history;
+        router.dispose();
+
+        const listener = vi.fn();
+        history.listen(listener);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+
+        expect(listener).not.toHaveBeenCalled();
+    });
+
+    // The mirror image, and green from the start: it guards the ownership rule against
+    // the over-eager fix. The listener must be registered *before* dispose — a store
+    // that wrongly disposed an injected history would clear this set.
+    test('dispose() leaves an injected history alone — it belongs to the caller', async () => {
+        const history = createMemoryHistory({ url: '/' });
+        const listener = vi.fn();
+        history.listen(listener);
+
+        const router = new RouterStore({}, routes, { history });
+        await Promise.resolve();
+        router.dispose();
+
+        // The caller may outlive the store, or share one history across stores.
+        history.push('/dashboard');
+        expect(listener).toHaveBeenCalledOnce();
     });
 });

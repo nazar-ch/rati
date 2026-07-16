@@ -80,4 +80,26 @@ describe('createBrowserHistory', () => {
         expect(listener).toHaveBeenCalledOnce();
         expect(listener.mock.calls[0]![0].action).toBe('POP');
     });
+
+    test('dispose() detaches from popstate', () => {
+        const history = createBrowserHistory();
+        const listener = vi.fn();
+        history.listen(listener);
+
+        history.dispose!();
+        window.dispatchEvent(new PopStateEvent('popstate'));
+
+        expect(listener).not.toHaveBeenCalled();
+    });
+
+    test('dispose() drops listeners registered before it', () => {
+        const history = createBrowserHistory();
+        const listener = vi.fn();
+        history.listen(listener);
+
+        history.dispose!();
+        history.push('/after-dispose');
+
+        expect(listener).not.toHaveBeenCalled();
+    });
 });

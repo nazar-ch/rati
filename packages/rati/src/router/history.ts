@@ -31,6 +31,17 @@ export interface History {
      * subscribers like scroll restoration in sync.
      */
     notify(action: Action): void;
+    /**
+     * Detach from the host and drop every listener; the history is inert
+     * afterwards. `createBrowserHistory` subscribes to `window`'s `popstate`,
+     * which outlives the history object itself — without this, a history per
+     * test or per HMR cycle leaves its subscription behind.
+     *
+     * `RouterStore.dispose()` calls it on a history it created; an injected one
+     * is the caller's to dispose, since they may share or outlive the store.
+     * Optional: a host with nothing to detach need not implement it.
+     */
+    dispose?(): void;
 }
 
 interface InternalState {
@@ -67,7 +78,8 @@ export function createBrowserHistory(): History {
         for (const l of listeners) l({ location, action });
     }
 
-    window.addEventListener('popstate', () => emit('POP'));
+    const onPopState = () => emit('POP');
+    window.addEventListener('popstate', onPopState);
 
     return {
         // Read fresh on every access so Navigation API interceptions and other
@@ -94,6 +106,10 @@ export function createBrowserHistory(): History {
             };
         },
         notify: emit,
+        dispose() {
+            window.removeEventListener('popstate', onPopState);
+            listeners.clear();
+        },
     };
 }
 
@@ -143,5 +159,11 @@ export function createMemoryHistory(opts: { url?: string } = {}): History {
             };
         },
         notify: emit,
+        dispose() {
+            // Nothing to detach from — there is no host. Dropping the listeners
+            // still matters: it keeps the surface total, so a caller can dispose
+            // any History without asking which kind it holds.
+            listeners.clear();
+        },
     };
 }
