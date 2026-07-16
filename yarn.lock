@@ -2835,6 +2835,8 @@ __metadata:
   peerDependenciesMeta:
     mobx:
       optional: true
+    react:
+      optional: true
     react-dom:
       optional: true
     vite:

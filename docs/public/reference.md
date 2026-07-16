@@ -457,6 +457,9 @@ without the plugin.
 Production only — dev is the [plugin](#rativite)'s job, so there is no branch in here.
 Walkthrough: [server rendering guide](./ssr.md#the-production-handler).
 
+Nothing in here imports React — `react` is an optional peer, so a server-only workspace
+can install rati for `createRequestHandler` alone and never add it.
+
 | Export | Purpose |
 | --- | --- |
 | `createRequestHandler({ render, template?, assets?, placeholders?, onError? })` | → `(request: Request) => Promise<Response>`. The result kinds as HTTP: 30x with `Location`, the rendered page at its derived status, 404 for `no-match`, and a 500 CSR fallback if `render` throws |

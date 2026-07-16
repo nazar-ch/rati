@@ -97,6 +97,9 @@
         "mobx": {
             "optional": true
         },
+        "react": {
+            "optional": true
+        },
         "react-dom": {
             "optional": true
         },
