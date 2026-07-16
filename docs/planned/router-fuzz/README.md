@@ -239,6 +239,72 @@ Harness findings, generalizing for RF-05:
   at the URL under test and navigating to it are not interchangeable paths through `setPath`,
   and a property that only ever does the former would have missed the bug RF-02 filed.
 
+### 2026-07-16 (RF-03) — the shallow marker sits in the app's own pocket, and a query rewrite empties it
+
+Product findings, neither fixed (each is a decision, not a slip). Both were confirmed by
+hand against the real store before being filed, and the model states them rather than
+stepping around them — the alphabet cannot avoid either without giving up the shallow half
+of its scope.
+
+- **`keepCurrentRoute`'s suppression marker lives *inside* the app's per-entry state, where
+  it is both visible and load-bearing.** `pushOrReplace` merges its marker into the caller's
+  object (`{ ...skip, ...options.state }`), so after
+  `navigate(url, { keepCurrentRoute: true, state: { panelId: 'p0' } })` the public getter
+  reads `{ skip: '1/2dee0231-…', panelId: 'p0' }` — and with no state passed at all it reads
+  `{ skip: '…' }` rather than `null`. Both contradict what `state` documents itself as ("user
+  state attached to the current history entry … or `null`"; reference.md §Routing says the
+  same). The existing pin reads *through* it (`webRouterCore.test.ts` asserts
+  `(router.state as { panelId?: string }).panelId`), which is why nothing caught it.
+  The half that makes it more than cosmetic: `setPath` decides whether to re-resolve by
+  comparing whole `state` objects, so the marker is what makes a shallow entry compare
+  unequal to every other one. Two entries agreeing on URL *and* on the user's own state
+  still re-resolve when a traversal steps between them — driven by hand, two shallow
+  `navigate`s to `/users/1` with `{ panelId: 'p0' }` then `back()` remounts, while the same
+  shape without `keepCurrentRoute` does not. That re-resolve is *wanted* (a shallow entry's
+  mounted route is deliberately not the one the URL names, so resolving it on any later
+  arrival is right, and store.ts's own comment says a POP must find the marker stale) —
+  only the way it is achieved is the finding. So the constraint on any fix: getting the
+  marker out of the user's object must keep the per-entry distinctness it currently supplies,
+  or the shallow design loses the re-resolve it depends on. The property holds the user's
+  half to equality and lets the marker through by name, so a fix that moves it turns the
+  `stateHasMark` branch red and says so.
+- **`setSearchParams` drops the entry's per-entry state, and the drop re-resolves the
+  route.** It builds its URL and calls `history.push`/`replace` with no state at all, so an
+  app that tweaks a filter loses whatever `state` the entry carried — `router.state` reads
+  `null` afterwards. Because the store re-resolves on a state change, that silently remounts
+  the route on the same URL: driven by hand, `navigate('/users/1', { state: { panelId: 'p0' }})`
+  then `setSearchParams({ tab: 'a' })` remounts, and a *second* `setSearchParams` does not
+  (the state is already `null`, so nothing changed). A query rewrite costing the app its
+  state and one remount, but only the first time, is a surprising shape to leave undocumented
+  whichever way it is decided. The docs promise nothing either way today.
+
+Harness findings, generalizing for RF-05:
+
+- **A restatement of *state* must not assert a *command*-scoped fact.** Both properties close
+  with a catch-all that re-checks the end state, and it borrowed the per-command assertion
+  wholesale — including "the refused loop was reported", which belongs to the resolution that
+  raised it. A command that resolves nothing (a traversal with nowhere to go) leaves the
+  model still describing the last command that did, while the console log has moved on, and
+  the catch-all fails on that disagreement rather than on anything the router got wrong. The
+  fuzz run found it by shrinking to `[initial URL is the cycle, go(0)]` — two commands, one
+  of them a no-op. The assertions are split now (`assertRenderedState` vs `assertStep`).
+- **The deep budget the effort trusts is the one that trips the test timeout.** `scripts/ci.ts`
+  documents `FUZZ_RUNS=2000` as the way to deepen, and vitest's default 5s per-test bound is
+  blind to `numRuns` — so the command property crossed it and reported "Tests 1 failed" with
+  no counterexample and nothing wrong with the router. It cost a seed hunt to tell apart from
+  a real 1-in-20 flake (28,000 property runs across pinned seeds, all green, was what said
+  so). `fuzzTimeout()` now scales the bound with the budget. Worth knowing generally: a
+  failure mode that only fires on the *deep* runs is one that fires on exactly the runs meant
+  to be trustworthy, and it wears a property failure's clothes.
+- **Five kills executed against the encoding, all caught at the default budget** — the register
+  is RF-05's, but an invariant that could not catch its own kill is mis-encoded, so these were
+  run rather than guessed: `dispose()` dropping `unlistenHistory()` (the teardown tail:
+  "nothing may remount"), the skip marker never going stale (`back: rendered route` — the kept
+  route stranded), `shallowEqualState` degraded to `===` (`mount count`), `go` clamping to the
+  ends instead of refusing (`go(1): nothing to notify`), and the same-path early return
+  ignoring `stateChanged` (`rendered route`). Each landed at `fuzz(25)` with a message naming
+  the right thing; none needed the deep budget.
+
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with
