@@ -293,9 +293,29 @@ at all: a rendered page carries its own tags (folded into `headTags` by `renderA
 a render that *threw* has no result to fold into, and the shell has carried no `<script>`
 since SSR-02. So it fills the template with the assets tags, an empty root and no
 payload, at 500 — which is only a working page because the client entry calls
-`createRoot` when it finds no payload. No template or no `bootstrapModules` and it
-answers plain text instead: a shell that loads nothing is a blank page with a 500 on it.
-The design record notes this against its own "Layer 3 needs no assets" line.
+`createRoot` when it finds no payload. No `bootstrapModules` and it answers plain text
+instead: a shell that loads nothing is a blank page with a 500 on it. The design record
+notes this against its own "Layer 3 needs no assets" line.
+
+A **whole-document app** has no template, and `template === undefined` is already what
+says so (`assemble` reads it the same way), so the fallback branches there rather than on
+a new option (SSR-12): `synthesizeDocument` emits `<!doctype html>` plus the asset tags
+and nothing else, and the client entry mounts `createRoot(document)` on it. The emptiness
+is load-bearing, not minimalism — React's client render into a *document* container calls
+`clearContainerSparingly`, which keeps `SCRIPT`/`STYLE`/`LINK rel=stylesheet` and drops
+everything else, so a document holding only those cannot orphan the entry that is running
+the mount. Anything added there would silently disappear client-side.
+
+`createRoot(document)` is undocumented-but-real (the types, `isValidContainer`'s
+`nodeType === 9`, and browsers all take it; react.dev names `document` only under
+`hydrateRoot`). The maintainer accepted that on condition of the canary in
+`__tests__/ssr/wholeDocument.test.tsx` — it mounts a synthesized document through
+`createRoot` and asserts a working page with `onRecoverableError` never fired, so a React
+release that narrows the container is rati's failure, not a consumer's. Note the assertion
+is that, and not a console spy: React reports a recovery to `onRecoverableError`, whose
+default is `reportGlobalError` — a console-only check passes right through a mismatch that
+React papered over. If the canary ever fires, the escape hatch is `hydrateRoot(document)`
+against the same shell (recovery reaches the same page, noisily).
 
 `node.ts` is the only file in the kit that knows a platform. `IncomingMessage` →
 `Request` (streamed body with `duplex: 'half'` for non-GET; the origin comes off the Host

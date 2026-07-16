@@ -487,8 +487,9 @@ server entry** to reach it here, since the virtual module exists only inside the
 is used for one thing: if `render` throws (an error outside every island — a failing
 *load* is caught by its island and carried in the status), the handler serves the shell
 with the assets tags, an empty root and no payload, at status 500. The client entry finds
-no payload, calls `createRoot`, and resolves from scratch. Without `assets` or a template
-the answer is a plain-text 500.
+no payload, calls `createRoot`, and resolves from scratch. A whole-document app has no
+template to fill, so the assets are synthesized into a minimal document instead — the
+unset `template` is the signal. Without `assets` the answer is a plain-text 500.
 
 Fetch is the only interface: `app.all('*', (c) => handler(c.req.raw))` for Hono,
 `export default { fetch: handler }` for Vercel/Bun/Deno/workers. `serve()` is for the one

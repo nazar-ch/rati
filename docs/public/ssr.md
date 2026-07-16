@@ -128,6 +128,18 @@ boot, or the [500 fallback](#the-production-handler) after a render failed. Hydr
 empty root against a tree that renders something is a mismatch: React reports it, then
 recovers by client-rendering anyway. `createRoot` is that outcome without the error.
 
+**Whole-document apps branch the same way**, one container over — your app renders
+`<html>` itself, so the container is `document`:
+
+```tsx
+if (state) hydrateRoot(document, <App />);
+else createRoot(document).render(<App />);
+```
+
+The `else` is the [fallback](#when-a-render-throws) shell, and it is worth wiring even
+though hydrating would "work": React recovers into the same page, and says so on every
+reader's console.
+
 ## The Vite plugin
 
 The plugin is your dev server and your build. Add it and an SSR app has neither of its
@@ -282,9 +294,24 @@ tags, an empty root, **no payload**. The client entry sees no payload, calls `cr
 (see [the client entry](#the-client-entry)), and resolves from scratch — a reader still
 gets the app. The status stays **500**: the render did fail, and a crawler should be told.
 
-It needs a template and a client entry to do this. Without either — no `assets`, a
-whole-document app — the answer is a plain-text 500. Note this is a *production* answer:
-in dev the [plugin](#dev) hands the same throw to Vite's error overlay instead.
+**Whole-document apps get it too.** There is no shell to fill, so the handler synthesizes
+the minimal one — `<!doctype html>`, the `assets` tags, nothing else — and your client
+entry mounts `createRoot(document)` onto it. No option asks for this: no `template` is
+already what "this app renders `<html>` itself" means here.
+
+All it needs is `assets` — a client entry it can name. Without them the answer is a
+plain-text 500, in either pattern: a shell that loads nothing is a blank page with a 500
+on it. Note this is a *production* answer: in dev the [plugin](#dev) hands the same throw
+to Vite's error overlay instead.
+
+**What the whole-document one rests on**, since it is worth knowing: `createRoot(document)`.
+React's docs describe the container as "a DOM element" and mention `document` only under
+`hydrateRoot` — but the types, the runtime and browsers all take it, and a client render
+into a document clears it *sparingly*, keeping scripts and stylesheets. That is what lets
+the synthesized shell hold the very entry that mounts it. rati pins the behaviour in its
+own suite, so a React release that narrowed the container fails there rather than in your
+500 path; if that ever happens, the fallback becomes `hydrateRoot(document)` against the
+same shell — the same page via React's mismatch recovery, at the cost of a console error.
 
 ### The Node adapter
 

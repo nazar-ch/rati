@@ -33,7 +33,9 @@ export interface RequestHandlerOptions {
     /**
      * The HTML shell, as a string — the file is yours to read (it is source, not a
      * build output, so nothing about it is hashed). Whole-document apps have none: if
-     * `render` returns a full `<html>`, the parts splice into it instead.
+     * `render` returns a full `<html>`, the parts splice into it instead. Unset is also
+     * how the CSR fallback below knows it is serving one — there is nothing else it
+     * could mean.
      */
     template?: string;
     /**
@@ -123,23 +125,30 @@ function assemble(
  * payload, so the client boots and resolves from scratch. The status stays 500 — the
  * render did fail, and a crawler should be told so.
  *
- * It needs a shell to fill and a script to put in it. Without either there is nothing
- * to serve but the truth.
+ * It needs a script to boot and somewhere to put it. A template is the somewhere where
+ * there is one; a whole-document app has none by definition, so its shell is synthesized
+ * below. Without a client entry there is nothing to serve but the truth.
  */
 function fallback(options: RequestHandlerOptions, placeholders: Placeholders): Response {
     const modules = options.assets?.bootstrapModules;
-    if (options.template === undefined || !modules?.length) {
-        return text(500, 'Internal Server Error');
+    if (!modules?.length) return text(500, 'Internal Server Error');
+
+    const styleTags = options.assets?.styleTags ?? '';
+    const scriptTags = modules
+        .map((src) => `<script type="module" src="${src}"></script>`)
+        .join('');
+
+    // No template *is* the whole-document app — the option means the shell, and there is
+    // no shell to fill. Synthesize the minimal one the entry needs.
+    if (options.template === undefined) {
+        return html(500, synthesizeDocument(styleTags, scriptTags));
     }
-    const tags =
-        (options.assets?.styleTags ?? '') +
-        modules.map((src) => `<script type="module" src="${src}"></script>`).join('');
     try {
         return html(
             500,
             fillTemplate(
                 options.template,
-                { html: '', headTags: tags, stateScript: '' },
+                { html: '', headTags: styleTags + scriptTags, stateScript: '' },
                 placeholders,
                 BY,
             ),
@@ -150,6 +159,21 @@ function fallback(options: RequestHandlerOptions, placeholders: Placeholders): R
         // under a second one.
         return text(500, 'Internal Server Error');
     }
+}
+
+/**
+ * The fallback's shell for a whole-document app: the assets, and deliberately nothing
+ * else. There is no `#root` to leave empty — the client entry renders `<html>` itself,
+ * onto `createRoot(document)`, and React clears a document container *sparingly*:
+ * `SCRIPT`, `STYLE` and `LINK rel="stylesheet"` survive, everything else goes. A
+ * document holding only those therefore survives its own mount — the entry that is
+ * running the render cannot be swept away by it. Adding markup here would break that
+ * quietly (it would simply vanish), which is why this stays as bare as it looks.
+ *
+ * `charset` rides the Content-Type header, so the document needs no meta of its own.
+ */
+function synthesizeDocument(styleTags: string, scriptTags: string): string {
+    return `<!doctype html><html><head>${styleTags}</head><body>${scriptTags}</body></html>`;
 }
 
 function html(status: number, body: string): Response {

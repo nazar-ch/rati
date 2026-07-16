@@ -202,6 +202,26 @@ container is caught by rati's own gate, not by a consumer's 500 path; the docume
 fallback if that ever fires is shape (1)-as-filed (`hydrateRoot` + recovery). The SSR-12
 item record carries the implementation scope.
 
+#### As implemented (SSR-12, 2026-07-16)
+
+Shipped as decided: `fallback` branches on the unset `template`, `synthesizeDocument`
+emits the shape above verbatim, status 500 throughout, no new option. Two notes, since
+this file is the design of record.
+
+- **The spike's "a `console.error` by default" is wrong, and it matters for the pin.**
+  React's default `onRecoverableError` is `reportGlobalError`, not `console.error`
+  (`react-dom-client.development.js:9417`). The observable claim holds — a browser shows
+  an uncaught error, so shape (1) is still the noisy one — but a console spy does *not*
+  see a recovery: under Vitest it lands as an unhandled error, which fails no assertion.
+  So the canary asserts on an `onRecoverableError` it passes itself, and this was verified
+  the only way that matters: swapped to `hydrateRoot`, the pin goes red on that assertion
+  and green on the console one. A console-only canary would have passed the very shape it
+  exists to distinguish.
+- **`exactOptionalPropertyTypes` makes the signal sharper than it reads.** Under
+  `@tsconfig/strictest` (rati's, and any consumer's) `template?: string` cannot *take*
+  `undefined` — omitting the option is the only way to say it. So "unset" is a deliberate
+  act rather than a value that can arrive by accident from a conditional.
+
 ## Anti-bloat lines (binding)
 
 - Fetch `Request`/`Response` is the only server interface — no Express/Koa/framework

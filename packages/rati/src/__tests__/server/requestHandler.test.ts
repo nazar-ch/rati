@@ -135,10 +135,38 @@ describe('the CSR fallback', () => {
         expect(onError.mock.calls[0]?.[0]).toMatchObject({ message: 'render exploded' });
     });
 
+    test('synthesizes a document when there is no template', async () => {
+        // A whole-document app has no shell to fill, which is what the unset option
+        // says — so the assets become one. Asserted whole rather than piecewise: React
+        // sweeps everything but script/style/stylesheet out of a document container on
+        // mount, so anything else that appears here would silently vanish client-side.
+        const handler = createRequestHandler({ render: boom, assets: ASSETS, onError: vi.fn() });
+        const response = await get(handler);
+
+        expect(response.status).toBe(500);
+        expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+        expect(await response.text()).toBe(
+            '<!doctype html><html>' +
+                '<head><link rel="stylesheet" href="/assets/index-c3d4.css"></head>' +
+                '<body><script type="module" src="/assets/entry-a1b2.js"></script></body>' +
+                '</html>',
+        );
+    });
+
     test('answers plainly when there is no client entry to boot', async () => {
         // No assets: the shell would load nothing, so a blank page dressed as a working
         // one helps no one.
         const response = await get(handlerFor(boom, { onError: vi.fn() }));
+
+        expect(response.status).toBe(500);
+        expect(response.headers.get('content-type')).toBe('text/plain; charset=utf-8');
+        expect(await response.text()).toBe('Internal Server Error');
+    });
+
+    test('answers plainly with neither a template nor assets', async () => {
+        // The same reasoning one pattern over: a synthesized document that names no
+        // entry is a blank page with a 500 on it. This is the answer SSR-12 left alone.
+        const response = await get(createRequestHandler({ render: boom, onError: vi.fn() }));
 
         expect(response.status).toBe(500);
         expect(response.headers.get('content-type')).toBe('text/plain; charset=utf-8');
