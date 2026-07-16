@@ -385,6 +385,14 @@ deterministic pin list, the fuzz harness design — is
 (the async-act mount requirement above all) are cataloged in
 `packages/rati/src/__tests__/suspense-situations.md`.
 
+`fuzz/` holds two targets sharing one budget convention (`fuzz(n)`, `FUZZ_RUNS`,
+`FUZZ_LEVEL`, `FUZZ_SEED` — documented in `fuzz/arbitraries.ts`): the mandala's scope
+harness (`scopeHarness.tsx` / `model.ts`) and the router's route-table harness
+(`routerHarness.tsx` / `routerModel.ts`, effort
+[planned/router-fuzz/](./planned/router-fuzz/README.md)). Each model is plain JS with no
+imports from the engine it mirrors — where the router compiles a regex, its model walks
+segments — so a bug cannot hide behind a model that shares the implementation.
+
 **Verifying SSR in a browser: use a visible tab.** React 19.2 gates the Suspense reveal on
 `requestAnimationFrame`, which never fires in a hidden or backgrounded tab — and since rati
 wraps every route in a boundary, a headless/background browser leaves the page at its

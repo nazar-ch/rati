@@ -342,9 +342,15 @@ that changes only state still re-resolves).
 | Export | Purpose |
 | --- | --- |
 | `createBrowserHistory()` | DOM history (default) |
-| `createMemoryHistory({ url })` | server / tests |
+| `createMemoryHistory({ url })` | server / tests — a real entry stack, so back/forward work without a DOM |
 | `History`, `HistoryLocation`, `HistoryListener`, `HistoryUpdate`, `HistoryAction` | the history contract, for custom hosts |
+| `history.go(delta)`, `.back()`, `.forward()` | traverse the entry stack. Lands on an existing entry, so its `state` and `key` come back as they were, and the update arrives as `POP`. Out of range does nothing (it doesn't clamp) |
 | `history.dispose?.()` | detach from the host (the browser history's `popstate`) and drop listeners. A history you inject is yours to dispose — the router only disposes one it created itself |
+
+A traversal reports back at different times on the two histories: the memory history owns
+its stack and emits before `go` returns, while the browser queues the traversal and the
+`POP` arrives on a later task (via `popstate`). Code that must work on both awaits the
+listener rather than reading `location` on the next line.
 | `installScrollRestoration(options?)` | standalone installer; usually configured via `RouterStoreOptions.scrollRestoration` |
 
 ### `lazy(loader)`

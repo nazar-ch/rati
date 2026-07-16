@@ -124,6 +124,58 @@ to silently fix.)
   for RF-03's arbitrary, which should not assume a param table shuffles independently of the
   path.
 
+### 2026-07-16 (RF-02) — three product edges the foundation found, and two vacuous tests
+
+Product findings, none fixed (each is a decision, not a slip). All three were confirmed
+against the engine by hand; the fuzz arbitrary steps around them deliberately, with the
+reason written at the exclusion, so the model isn't quietly made to bless them:
+
+- **A route that redirects to itself leaves the *previous* page rendered at the new URL.**
+  `route('/self', …, { redirect: { to: '/self' } })`, navigated to from `/home`: the URL bar
+  and `router.path` both read `/self`, a hop is recorded — and `activeRoute` is still `home`.
+  No loop is reported and the depth guard never fires, because `setPath` writes `this._path`
+  *before* following the redirect, so the nested `setPath` sees its own path unchanged and
+  takes the same-path early return. A 2-cycle recurses to the cap normally; only the 1-cycle
+  short-circuits. This is the one shape that produces a genuinely stale route — the thing
+  RF-02's catch-all check exists to look for — so it is worth a decision rather than a
+  shrug. The arbitrary excludes self-targets; RF-03 should not add them until the semantics
+  are chosen (render the redirect route? report the loop? treat it as a cycle of length 1?).
+- **A bare string redirect target escapes the basename.** With `basename: '/admin'`,
+  `route('/a', …, { redirect: { to: '/b' } })` lands on URL `/b`, not `/admin/b` — the app
+  leaves its own mount point. It still *renders* `b`, because `stripBasename` hands a
+  pathname that isn't under the basename to the matcher as-is. Consistent with the docs read
+  literally (an object target "resolves through the route table", a string one "is used
+  verbatim", and `getPath` says the basename is the caller's business for strings) — but the
+  fall-through it relies on is commented as being there for the 404 catch-all, and here it
+  quietly rescues a URL that has already lost the prefix. The arbitrary writes string targets
+  with the basename included (what a correct app writes), so the model states the working
+  shape rather than the sharp one.
+- **A param value of `.` or `..` silently navigates somewhere else.** `getPath({ name:
+  'user', id: '..' })` builds `/users/..` — `encodeURIComponent` does not touch dots — and
+  the URL parser then normalizes the segment away, so the entry lands on `/` and the root
+  route renders. `.` behaves the same (`/users/.` → `/users/`). This is the codec's one
+  remaining round-trip hole after RF-01: everything else in the hostile pool (spaces,
+  slashes, percent, `?`, `#`, non-ASCII) survives. Closing it means encoding dot-only
+  segments (`%2E%2E`) in `getPath`, which is a codec decision of the same class as RF-01's.
+
+Harness findings, generalizing for RF-05:
+
+- **Two proposed pins were vacuous, and the kill is what said so.** The memory-history
+  "push drops the forward tail" pin first asserted through `forward()` — and it passes
+  against an untruncated push, because appending still leaves the index at the tip, so
+  `forward` is a no-op either way and the orphaned entry hides *behind* the new one. Only a
+  `back()` step reaches it. Restated for the register: for a bug that makes a container hold
+  *too much*, assert from the side the surplus is on.
+- **Non-vacuity is a property of the arbitrary's *joint* distribution, not of its parts.**
+  Both starved paths in this item came from independent draws that were fine alone: drawing
+  a navigation's search/hash independently of its form demoted ~17 in 18 navigations to a
+  literal URL (a reference is the only form that calls `getPath`, and it can't carry a
+  query), so the prefix-collision kill needed a 20x budget to land; and independent targets
+  almost never repeated a URL, leaving the *skipped* navigation at ~1% of steps. Every
+  invariant was green throughout. The counters are now asserted in the property, and the
+  fix — pair the two draws, repeat whole destinations — moved that kill from 0/1 seeds to
+  8/8 at the default budget.
+
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with
