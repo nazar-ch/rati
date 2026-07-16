@@ -83,6 +83,141 @@ describe('createMemoryHistory', () => {
         expect(listener.mock.calls[0]![0].action).toBe('POP');
     });
 
+    test('replace() generates a fresh key too', () => {
+        const history = createMemoryHistory();
+        history.push('/a');
+        const pushedKey = history.location.key;
+
+        history.replace('/a2');
+
+        // The slot now holds a different page, so scroll restoration must not hand
+        // it the position saved under the replaced entry's key. Matches
+        // createBrowserHistory's replace, which also re-keys.
+        expect(history.location.key).not.toBe(pushedKey);
+    });
+});
+
+/*
+    The entry stack. `createMemoryHistory` used to hold a single location — its doc said
+    "back/forward navigation is not modeled" — so every POP test in this suite's siblings
+    hand-rolled `replaceState` + a `PopStateEvent` against the *browser* history. These pin
+    the stack that replaced it (RF-02): the semantics are the browser's, so they are worth
+    stating as their own contract rather than leaving to the fuzz suite that drives them.
+*/
+describe('createMemoryHistory — the entry stack', () => {
+    test('go() moves the index and reports POP', () => {
+        const history = createMemoryHistory({ url: '/a' });
+        history.push('/b');
+        history.push('/c');
+        const listener = vi.fn();
+        history.listen(listener);
+
+        history.go(-2);
+
+        expect(history.location.pathname).toBe('/a');
+        expect(listener).toHaveBeenCalledOnce();
+        expect(listener.mock.calls[0]![0].action).toBe('POP');
+        expect(listener.mock.calls[0]![0].location.pathname).toBe('/a');
+    });
+
+    test('back() and forward() step one entry each way', () => {
+        const history = createMemoryHistory({ url: '/a' });
+        history.push('/b');
+
+        history.back();
+        expect(history.location.pathname).toBe('/a');
+
+        history.forward();
+        expect(history.location.pathname).toBe('/b');
+    });
+
+    test('a traversed entry restores its own state and key, rather than fresh ones', () => {
+        const history = createMemoryHistory({ url: '/a' });
+        history.push('/b', { panel: 'left' });
+        const bKey = history.location.key;
+        history.push('/c', { panel: 'right' });
+
+        history.back();
+
+        // The whole point of the stack: POP hands back the entry as it was pushed.
+        // A regenerated key would break scroll restoration (it looks up the saved
+        // position by key), and a dropped state would break `router.state` across
+        // back/forward.
+        expect(history.location.state).toEqual({ panel: 'left' });
+        expect(history.location.key).toBe(bKey);
+    });
+
+    test('push() drops the forward tail', () => {
+        const history = createMemoryHistory({ url: '/a' });
+        history.push('/b');
+        history.back();
+        // At `/a` with `/b` ahead of us. Pushing here starts a new branch, and the
+        // old one has to become unreachable.
+        history.push('/c');
+        expect(history.location.pathname).toBe('/c');
+
+        history.back();
+
+        // Lands on the entry we branched from. Asserting through `back` is what makes
+        // this bite: a push that appends without truncating still leaves the index at
+        // the tip, so `forward` is a no-op either way and the orphaned `/b` hides
+        // *behind* the new entry — where only a back step finds it.
+        expect(history.location.pathname).toBe('/a');
+    });
+
+    test('replace() leaves the forward tail reachable', () => {
+        const history = createMemoryHistory({ url: '/a' });
+        history.push('/b');
+        history.back();
+
+        history.replace('/a2');
+
+        // Unlike push: swapping the entry in place doesn't cut the branch.
+        expect(history.location.pathname).toBe('/a2');
+        history.forward();
+        expect(history.location.pathname).toBe('/b');
+    });
+
+    test('going out of range does nothing at all — no move, no POP', () => {
+        const history = createMemoryHistory({ url: '/a' });
+        history.push('/b');
+        const listener = vi.fn();
+        history.listen(listener);
+
+        // The browser's rule: there is no entry there, so no traversal happens. It
+        // does not clamp to the ends, which would report a POP that never occurred.
+        history.go(-5);
+        history.forward();
+
+        expect(history.location.pathname).toBe('/b');
+        expect(listener).not.toHaveBeenCalled();
+    });
+
+    test('go(0) does nothing — the browser reloads, a memory history has nothing to reload', () => {
+        const history = createMemoryHistory({ url: '/a' });
+        const listener = vi.fn();
+        history.listen(listener);
+
+        history.go(0);
+
+        expect(history.location.pathname).toBe('/a');
+        expect(listener).not.toHaveBeenCalled();
+    });
+
+    test('the sugar survives destructuring — go/back/forward are not `this`-bound', () => {
+        const history = createMemoryHistory({ url: '/a' });
+        history.push('/b');
+        // Callers hand these to a button's onClick. They must work detached.
+        const { back, forward } = history;
+
+        back();
+        expect(history.location.pathname).toBe('/a');
+        forward();
+        expect(history.location.pathname).toBe('/b');
+    });
+});
+
+describe('createMemoryHistory — hostlessness', () => {
     test('does not touch window or document', () => {
         // Smoke-check: constructing and using memory history with window
         // temporarily shadowed should still work. If the implementation reaches
