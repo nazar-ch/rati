@@ -6,7 +6,7 @@ import {
     type HydrationError,
 } from '../mandala/hydration';
 import { createMemoryHistory, type History } from '../router/history';
-import { prepareRoute } from '../router/prepareRoute';
+import { prepareRoute, redirectFromHops } from '../router/prepareRoute';
 import type { RouterStore } from '../router/store';
 import { headTags } from './headTags';
 import { serializeHydration, type HydrationState } from './payload';
@@ -127,15 +127,21 @@ export async function renderApp(options: RenderAppOptions): Promise<RenderAppRes
 
     try {
         const prepared = await prepareRoute(router);
-        if (!prepared) return { kind: 'no-match', status: 404 };
-        if (prepared.redirect) {
+        // A null prepare can still carry a redirect: when a followed hop lands outside
+        // the route table (a static file, a legacy app, another SPA), nothing matches,
+        // so there is no route to describe — but the author's declared 30x stands, and
+        // serving the target is someone else's job. The hops are the router's own;
+        // prepareRoute reads the same ones when it has a route to attach them to.
+        const redirect = prepared ? prepared.redirect : redirectFromHops(router.redirectHops);
+        if (redirect) {
             return {
                 kind: 'redirect',
-                to: prepared.redirect.to,
-                permanent: prepared.redirect.permanent,
-                status: prepared.redirect.permanent ? 301 : 302,
+                to: redirect.to,
+                permanent: redirect.permanent,
+                status: redirect.permanent ? 301 : 302,
             };
         }
+        if (!prepared) return { kind: 'no-match', status: 404 };
 
         const bootstrapModules = options.assets?.bootstrapModules;
         const html = await renderToHtml(<App />, {

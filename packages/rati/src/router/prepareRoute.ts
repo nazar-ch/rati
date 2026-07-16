@@ -28,6 +28,19 @@ export interface PreparedRoute {
 }
 
 /**
+ * The 30x a followed redirect trail describes: the last hop's target, permanent only
+ * when every hop along the way was. Shared with `renderApp`, which reads the hops off
+ * the router when the trail ends outside the table and there is no `PreparedRoute` to
+ * carry them.
+ */
+export function redirectFromHops(
+    hops: RouterStore<any>['redirectHops'],
+): { to: string; permanent: boolean } | undefined {
+    if (hops.length === 0) return undefined;
+    return { to: hops[hops.length - 1]!.to, permanent: hops.every((hop) => hop.permanent) };
+}
+
+/**
  * Drive a memory-history-backed router to its matched active route, then snapshot
  * its routing state for client hydration.
  *
@@ -38,7 +51,10 @@ export interface PreparedRoute {
  *    React.lazy doesn't throw during the server render with no fallback to show.
  *
  * Returns `null` when no route matches (typically a routing table without a
- * wildcard catch-all). Callers can treat that as a 404.
+ * wildcard catch-all). Callers can treat that as a 404 — but a null return can also
+ * mean a followed redirect landed outside the table, where the hop stands and only
+ * the route to describe is missing. Consult `router.redirectHops` before answering
+ * 404 (`renderApp` does, via {@link redirectFromHops}).
  *
  * Scope *data* is not resolved here — a route's scope is an island that resolves at
  * render time, so a Suspense-awaiting server render (`react-dom/static`
@@ -59,7 +75,7 @@ export async function prepareRoute(router: RouterStore<any>): Promise<PreparedRo
         await lazyComponent.preload();
     }
 
-    const hops = router.redirectHops;
+    const redirect = redirectFromHops(router.redirectHops);
     return {
         hydratedState: {
             path: router.path,
@@ -70,13 +86,6 @@ export async function prepareRoute(router: RouterStore<any>): Promise<PreparedRo
         },
         matchedCatchAll: route.path === '*',
         ...(lazyComponent.moduleId !== undefined ? { moduleId: lazyComponent.moduleId } : {}),
-        ...(hops.length > 0
-            ? {
-                  redirect: {
-                      to: hops[hops.length - 1]!.to,
-                      permanent: hops.every((hop) => hop.permanent),
-                  },
-              }
-            : {}),
+        ...(redirect ? { redirect } : {}),
     };
 }

@@ -367,6 +367,11 @@ Throw `NotAvailableError` from a load when the requested thing doesn't exist —
 error the error slot receives as `code: 'not-available'` on the client drives the 404
 on the server.
 
+**Without a `*` catch-all**, an unmatched URL is `kind: 'no-match'` instead, which
+`createRequestHandler` answers with a plain-text 404 — no template, no client entry,
+no styling. Add a catch-all route to keep your own not-found page; the status is 404
+either way.
+
 **What a failed load renders.** The error slot never renders on the server: React
 abandons the failing Suspense boundary, emits the *loading* slot with a client-retry
 marker, and the promise still resolves. On hydration the client re-runs that load — a
@@ -400,6 +405,13 @@ On the server this becomes `{ kind: 'redirect', to, permanent, status }` *before
 anything renders — a real 301/302. On the client the router follows it with a history
 `replace`, so the redirecting URL never enters the back stack. Redirects to external
 URLs stay at the HTTP layer (your server/CDN config), not in the route table.
+
+**The target need not be a rati route.** A same-origin path that nothing in the table
+matches — a static file, a legacy app, another SPA mounted elsewhere — is still a
+redirect: the server answers the 30x and whatever owns that path serves it. (The
+client follows the hop the same way, and the browser makes the request.) Through a
+chain of hops, `to` is the last one's target and `permanent` is true only when every
+hop declared itself permanent.
 
 ## The payload contract
 

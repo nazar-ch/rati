@@ -165,11 +165,12 @@ describe('renderApp', () => {
         expect(result).toEqual({ kind: 'no-match', status: 404 });
     });
 
-    test('a redirect whose target is outside the table is a no-match, not a 30x', async () => {
-        // Pins current behavior, deliberately (see the effort README's findings): the
-        // router follows the hop, `/new` matches nothing, so `activeRoute` is null and
-        // prepareRoute returns null — which renderApp reads as no-match *before* it
-        // looks at the redirect. The 301 the author asked for is computed and dropped.
+    test('a redirect whose target is outside the table still answers the 30x', async () => {
+        // The router follows the hop, `/new` matches nothing, so `activeRoute` is null
+        // and prepareRoute returns null — no route to describe. The declared 301 is
+        // still the answer: renderApp reads the hop off the router before it can call
+        // the request a no-match. Reachable whenever a target is same-origin but not a
+        // rati route (a static file, a legacy app).
         const redirectOnly = [
             route('/old', 'old', () => null, { redirect: { to: '/new', permanent: true } }),
         ] as const satisfies GenericRouteType[];
@@ -191,6 +192,34 @@ describe('renderApp', () => {
                 };
             },
         });
-        expect(result).toEqual({ kind: 'no-match', status: 404 });
+        expect(result).toEqual({ kind: 'redirect', to: '/new', permanent: true, status: 301 });
+    });
+
+    test('an outside-the-table trail is 302 unless every hop was permanent', async () => {
+        const chain = [
+            route('/a', 'a', () => null, { redirect: { to: '/b', permanent: true } }),
+            route('/b', 'b', () => null, { redirect: { to: '/outside' } }),
+        ] as const satisfies GenericRouteType[];
+
+        const result = await renderApp({
+            url: '/a',
+            createApp: ({ history, hydration }) => {
+                const router = new RouterStore({}, chain, { history });
+                const root = new RootStore({ router }, { isReady: true });
+                return {
+                    router,
+                    App: () => (
+                        <RootStoreProvider rootStore={root}>
+                            <HydrationProvider {...hydration}>
+                                <Router />
+                            </HydrationProvider>
+                        </RootStoreProvider>
+                    ),
+                };
+            },
+        });
+        // The last hop's target, under the same every-hop-permanent rule the matched
+        // case uses: one temporary hop makes the whole trail temporary.
+        expect(result).toEqual({ kind: 'redirect', to: '/outside', permanent: false, status: 302 });
     });
 });
