@@ -333,11 +333,13 @@ flight, a large page React is still revealing. A document rati server-rendered t
 stays the server's until a declaration is *removed* (a navigation, a conditional
 declaration leaving): declared titles and metas land as they commit, but `defaultTitle`
 is never written over the server's title, and server-rendered tags are never reconciled
-away — their declarer may simply not have hydrated yet. rati knows its own output by the
-`data-rati-head` marker `headTags` puts on every tag it emits, so a client-only document
-carries none, owns its head from the first sync, and gets `defaultTitle` immediately. A
-server that assembles `<head>` by hand rather than from `headTags` (or `renderApp`) opts
-out of the guard — the marker is the evidence.
+away — their declarer may simply not have hydrated yet. rati recognizes a head it
+server-rendered by the `data-rati-head="server"` marker `headTags` puts on every tag it
+emits (the client sync marks its own tags `client`), so a client-only document never
+looks server-rendered: it owns its head from the first sync and gets `defaultTitle`
+immediately, with no need to repeat the default in `index.html`. A server that assembles
+`<head>` by hand rather than from `headTags` (or `renderApp`) opts out of the guard —
+the marker is the evidence.
 
 **The dividing line: rati's head layer owns only tags that need dedupe.** React 19
 hoists `<title>`/`<meta>`/`<link>` rendered anywhere into `<head>` natively — but it

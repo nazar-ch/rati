@@ -40,8 +40,8 @@ import { deepEqual } from '../util/utils';
     signal the head is churning (a navigation, a conditional declaration leaving).
     `commit()` does not — on a multi-boundary page one boundary's commit says nothing
     about its siblings. A page rati never server-rendered has no server head to protect;
-    HeadProvider detects that (no marked tags in the document) and `settle()`s on mount,
-    so a client-only app is unaffected by any of this.
+    HeadProvider detects that (no `data-rati-head="server"` tag in the document) and
+    `settle()`s on mount, so a client-only app is unaffected by any of this.
 
     (In StrictMode's simulated remount the cleanup `remove()`s and settles early. Dev
     only, and it lands on today's behavior — the pre-phase one — for the rest of the

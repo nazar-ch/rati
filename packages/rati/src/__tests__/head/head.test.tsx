@@ -34,14 +34,14 @@ function serverHead(tags: { title?: string; metas?: { name: string; content: str
         for (const stale of document.head.querySelectorAll('title')) stale.remove();
         const title = document.createElement('title');
         title.textContent = tags.title;
-        title.setAttribute('data-rati-head', '');
+        title.setAttribute('data-rati-head', 'server');
         document.head.appendChild(title);
     }
     for (const meta of tags.metas ?? []) {
         const element = document.createElement('meta');
         element.setAttribute('name', meta.name);
         element.setAttribute('content', meta.content);
-        element.setAttribute('data-rati-head', '');
+        element.setAttribute('data-rati-head', 'server');
         document.head.appendChild(element);
     }
 }
@@ -356,6 +356,31 @@ describe('hydration phase', () => {
         expect(document.title).toBe('Default');
     });
 
+    test("the client sync's own leftover tags are not mistaken for a server head", () => {
+        // A client-only app that declared a <Meta> leaves it in <head> when its root
+        // unmounts: React tears the provider's subscription down before the
+        // declaration's removal, so the reconcile that would have dropped it never runs.
+        // A fresh store must read that as its own litter, not as a head to protect —
+        // otherwise a client-only page that declares no title never gets defaultTitle,
+        // which is the whole case the marker's `server` value exists to keep working.
+        const first = createHeadStore({ defaultTitle: 'Default' });
+        const view = render(
+            <HeadProvider store={first}>
+                <Meta name="description" content="from the client" />
+            </HeadProvider>,
+        );
+        view.unmount();
+        expect(managedMetas()).toHaveLength(1);
+        expect(managedMetas()[0]!.getAttribute('data-rati-head')).toBe('client');
+
+        document.title = 'from index.html';
+        const second = createHeadStore({ defaultTitle: 'Default' });
+        render(<HeadProvider store={second}>nothing declared</HeadProvider>);
+
+        expect(second.phase).toBe('live');
+        expect(document.title).toBe('Default');
+    });
+
     test('a remove that removes nothing does not settle the phase', () => {
         // `useHeadTag(null)` calls remove() on mount for a declaration that never
         // registered — a page that declares its title once loaded, not a churning head.
@@ -476,8 +501,8 @@ describe('server read-back (headTags after prerender)', () => {
 
         const html = headTags(store);
         expect(html).toBe(
-            '<title data-rati-head>Fish &amp; &lt;Chips&gt; · Site</title>' +
-                '<meta name="description" content="a &quot;quoted&quot; page" data-rati-head>',
+            '<title data-rati-head="server">Fish &amp; &lt;Chips&gt; · Site</title>' +
+                '<meta name="description" content="a &quot;quoted&quot; page" data-rati-head="server">',
         );
     });
 
@@ -505,7 +530,7 @@ describe('server read-back (headTags after prerender)', () => {
                 <Island />
             </HeadProvider>,
         );
-        expect(headTags(store)).toBe('<title data-rati-head>Resolved page</title>');
+        expect(headTags(store)).toBe('<title data-rati-head="server">Resolved page</title>');
     });
 
     test('no declarations and no default → empty string (leave the shell alone)', async () => {

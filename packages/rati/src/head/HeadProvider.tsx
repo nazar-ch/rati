@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { HeadContext } from './context';
-import { applyToDocument, RATI_HEAD_ATTRIBUTE } from './domSync';
+import { applyToDocument, RATI_HEAD_ATTRIBUTE, RATI_HEAD_SERVER } from './domSync';
 import { createHeadStore, type HeadStore } from './store';
 
 /**
@@ -24,11 +24,12 @@ export function HeadProvider({
     const activeStore = store ?? ownStore;
 
     useEffect(() => {
-        // No rati-marked tag in the document → rati didn't render this page's head, so
+        // No server-written tag in the document → rati didn't render this page's head, so
         // there is nothing of the server's to preserve and the tree can own it from the
         // first apply (a client-only app gets `defaultTitle` immediately). Otherwise the
         // store stays `hydrating` until something removes a declaration — store.ts §phase.
-        if (!document.head.querySelector(`[${RATI_HEAD_ATTRIBUTE}]`)) activeStore.settle();
+        const serverHead = `[${RATI_HEAD_ATTRIBUTE}="${RATI_HEAD_SERVER}"]`;
+        if (!document.head.querySelector(serverHead)) activeStore.settle();
 
         const apply = () => applyToDocument(activeStore);
         apply();

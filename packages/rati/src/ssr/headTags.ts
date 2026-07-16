@@ -1,4 +1,4 @@
-import { RATI_HEAD_ATTRIBUTE } from '../head/domSync';
+import { RATI_HEAD_ATTRIBUTE, RATI_HEAD_SERVER } from '../head/domSync';
 import type { HeadStore } from '../head/store';
 
 function escapeText(value: string): string {
@@ -16,27 +16,26 @@ function escapeAttribute(value: string): string {
  * outside the React tree (spliced before `</head>`, or via an HTML-template slot) so
  * React doesn't try to reconcile it during hydration.
  *
- * Every tag carries the rati marker attribute. On the metas it is bookkeeping —
- * HeadProvider's client sync adopts and updates them on navigation instead of
- * duplicating. On the `<title>` it is evidence: `document.title` writes to the same node
- * either way, but a marked tag is how the client tells this document's head came from
- * rati's server and must not be overwritten before the page hydrates (head/store.ts
- * §phase).
+ * Every tag is marked `data-rati-head="server"`. On the metas the marker is bookkeeping
+ * — HeadProvider's client sync adopts and updates them on navigation instead of
+ * duplicating. Its `server` value, on every tag, is evidence: it is how the client tells
+ * that this document's head came from rati's server and must not be overwritten before
+ * the page that declares it has hydrated (head/store.ts §phase). That is also why the
+ * `<title>` carries it, though `document.title` writes to the same node either way.
  */
 export function headTags(store: HeadStore): string {
     const { title, metas } = store.snapshot('server');
+    const marker = `${RATI_HEAD_ATTRIBUTE}="${RATI_HEAD_SERVER}"`;
     const tags: string[] = [];
     if (title !== null) {
-        tags.push(`<title ${RATI_HEAD_ATTRIBUTE}>${escapeText(title)}</title>`);
+        tags.push(`<title ${marker}>${escapeText(title)}</title>`);
     }
     for (const meta of metas) {
         const key =
             meta.property !== undefined
                 ? `property="${escapeAttribute(meta.property)}"`
                 : `name="${escapeAttribute(meta.name ?? '')}"`;
-        tags.push(
-            `<meta ${key} content="${escapeAttribute(meta.content)}" ${RATI_HEAD_ATTRIBUTE}>`,
-        );
+        tags.push(`<meta ${key} content="${escapeAttribute(meta.content)}" ${marker}>`);
     }
     return tags.join('');
 }

@@ -238,8 +238,8 @@ app factory → `prepareRoute` → `renderToHtml` → dispose — into the decis
 public docs describe (`docs/public/ssr.md`); `renderToHtml` is the `prerender` stream
 drain; `payload.ts` owns the wire format (versioned `HydrationState`, the inert JSON
 script tag, the dev round-trip warning); `headTags.ts` is the head store's post-prerender
-read-back (escaped, `data-rati-head`-marked — on the metas so the client reconciler
-adopts them, on the `<title>` as evidence for the hydration phase below).
+read-back (escaped, `data-rati-head="server"`-marked — the attribute so the client
+reconciler adopts the tags, its `server` value as evidence for the hydration phase below).
 `react-dom/static` is imported statically — it has browser builds, and `sideEffects:
 false` keeps it tree-shaken out of client bundles that touch only `readHydration`.
 
@@ -329,8 +329,17 @@ the store — an unmount can only follow its subtree's hydration, and it is the 
 churn signal; `commit()` doesn't, since on a multi-boundary page one boundary's commit
 says nothing about its siblings, and a `remove()` that removed nothing doesn't either
 (`useHeadTag(null)` calls it on mount). `HeadProvider.settle()`s on mount when the
-document holds no `data-rati-head` tag — rati didn't render this head, so there is
-nothing of the server's to protect and a client-only app behaves as it always did.
+document holds no `data-rati-head="server"` tag — rati didn't render this head, so there
+is nothing of the server's to protect and a client-only app behaves as it always did.
+
+The marker's value carries that provenance because the two jobs are different: the
+attribute is bookkeeping (which tags are rati's to reconcile), the `server` value is
+evidence (this head came from a prerender). A client-only app leaves its own marked
+metas in `<head>` when a root unmounts — React destroys the provider's subscription
+before it reaches the declarations' `remove`s, so the reconcile that would drop them
+never runs — and a fresh store reading those as a server head would protect one that was
+never there, leaving a client-only page that declares no title without its
+`defaultTitle`. Hence `server` vs `client`; both still reconcile.
 
 ## Router (`router/`)
 

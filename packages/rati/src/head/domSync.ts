@@ -3,11 +3,21 @@ import type { HeadStore, MetaTag } from './store';
 /**
  * Marks the tags rati manages — both the ones `headTags` (rati/ssr) emits and the ones
  * the client sync creates — so the reconciler below can adopt, update, and remove
- * exactly its own tags and never touch app-owned or React-hoisted ones. On the emitted
- * `<title>` it is evidence rather than bookkeeping: it is how HeadProvider tells a
- * rati-server-rendered document from a client-only one.
+ * exactly its own tags and never touch app-owned or React-hoisted ones.
  */
 export const RATI_HEAD_ATTRIBUTE = 'data-rati-head';
+
+/**
+ * …and the value says who wrote it. Both are rati's to reconcile, but only `server` is
+ * evidence that this document's head came from a rati prerender — which is what
+ * HeadProvider reads on mount to decide the store's phase (store.ts). The two are
+ * distinct because a client-only app leaves its own marked metas in `<head>` when a
+ * root unmounts (React tears the provider's subscription down before the declarations'
+ * removals, so the final reconcile never runs); a fresh store must not read those as a
+ * server head and spend its life protecting one that was never there.
+ */
+export const RATI_HEAD_SERVER = 'server';
+export const RATI_HEAD_CLIENT = 'client';
 
 /**
  * Apply the store's winners to the live document: `document.title` (also updating a
@@ -48,7 +58,7 @@ function reconcileMetas(metas: MetaTag[], removeOrphans: boolean): void {
             if (meta.property !== undefined) element.setAttribute('property', meta.property);
             else if (meta.name !== undefined) element.setAttribute('name', meta.name);
             element.setAttribute('content', meta.content);
-            element.setAttribute(RATI_HEAD_ATTRIBUTE, '');
+            element.setAttribute(RATI_HEAD_ATTRIBUTE, RATI_HEAD_CLIENT);
             document.head.appendChild(element);
         }
     }
