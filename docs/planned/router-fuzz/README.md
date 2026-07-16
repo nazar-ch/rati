@@ -305,6 +305,68 @@ Harness findings, generalizing for RF-05:
   ignoring `stateChanged` (`rendered route`). Each landed at `fuzz(25)` with a message naming
   the right thing; none needed the deep budget.
 
+### 2026-07-16 (RF-04) — the audit: three of the five named kills already bit, and one standing pin was vacuous
+
+The item's own framing held — the risk here was duplication, not absence. Every verdict below
+was reached by *executing* the kill against the existing suite rather than by reading it: an
+"already covered" claim is exactly as much of a guess as an unexecuted kill note, and it is the
+more expensive one to get wrong (it ends with a pin not written).
+
+| Pin | Existed? | Added |
+| --- | --- | --- |
+| 1 skip-marker staleness across POP | no — `webRouterCore` arms the marker (`:185`) and never steps back; the suite has no traversal at all | `webRouterTraversal.test.ts` |
+| 2 cross-session marker | no — `sessionId` appears nowhere in the test tree, and the fuzz lane cannot reach it | `webRouterTraversal.test.ts` |
+| 3 redirect depth/loop | the named kill already bites (`redirect.test.tsx:92`); RF-06 pinned the 1-cycle exactly | cap depth + trail content + the render, folded into the existing cap test |
+| 4 hydrated-state drift | **yes** — `webRouterHydration.test.tsx:56` catches the named kill | nothing |
+| 5 state-only navigation | the named kill already bites (`webRouterCore.test.ts:242`); both halves pinned via PUSH | the traversal half only |
+| 6 basename edges | (a) `:70`, (c) `:28`, (d) `:52` all bite | the outside-basename fall-through |
+| 7 scroll-restoration keys | no — the standing pin is vacuous (below) | three POP branches, over a memory history |
+| 8 `preloadRoute` | **yes** — all four clauses bite | nothing |
+
+- **`saves position when leaving an entry, restores on POP` never looked up a saved position,
+  and deleting the entire restore branch left it green.** It forged the POP by dispatching a
+  bare `popstate`, which changes neither the URL nor `window.history.state` — so `readLocation`
+  handed back the key of the entry the test had just pushed *to*, `positions.get` missed, and
+  the restore fell through to `scrollTo(0, 0)`. Its assertion (scrollTo was called *at all*,
+  more times than before) cannot tell that apart from a restore, and the test says so in its own
+  comment: "For a minimal smoke test…". It was written before `createMemoryHistory` had an entry
+  stack (README finding 5), which is the whole reason it forged the event — so this is RF-02's
+  gap cashing out one item later, in a test that read as coverage for a year. The replacements
+  traverse a real stack, where the entry hands back its own key. Generalizes for RF-05: a pin
+  whose subject is *key bookkeeping* must be written against a history that has keys — forging
+  the event forges the key too, and the assertion left standing was the one weak enough to
+  survive it.
+- **Three of the five named kills were already caught, so three planned pins were not written.**
+  Pins 3, 4 and 5 each name a kill (`redirectDepth === 0` reset dropped; `seedFromHydratedState`
+  returning early; `shallowEqualState` degraded to `===`), and all three go red against the
+  suite as it stands. What was missing in 3 and 5 was never the kill but a *clause*: the cap's
+  depth and the render for 3, the traversal for 5. Pin 4 was missing nothing. Worth knowing for
+  a future audit item: a pin list written from the source reads gaps that the suite may already
+  cover from the other side, and only the kill says which.
+- **Pin 2's counter coincides by construction, which is the hazard itself.** The restored-tab
+  shape needs the marker's counter half to *match* or the session id is never what's doing the
+  work — and it matches for free: the second store replays the same navigation count over the
+  same stack, so it arrives holding exactly the counter the first store stamped. That is not a
+  test convenience; it is why `sessionId` exists (a reload restarts `pathCounter` at 0 against
+  markers that persisted). The pin builds it by driving two real stores over one history rather
+  than hand-writing a marker string, so nothing in it spells the mechanics out.
+- **The render clause earns its place, and a second kill is what proved it.** "Renders the last
+  route's component" looks redundant next to the store-level `activeRoute?.name` the cap test
+  already asserted. It is not: a `Router` that declines to render a route still carrying a
+  `redirect` declaration — a plausible optimization, since such a route is normally transient —
+  leaves the store's answer correct and the screen blank, and only the DOM assertion goes red.
+  Generalizes: when a clause looks redundant, the question is not whether *a* kill catches it
+  but whether one exists that catches it *alone*.
+- **A failing test poisoned the next one, through `getElementById`.** The new anchor pin removed
+  its target inline, so a red run left `div#section` in the DOM and the *existing* anchor test —
+  which builds its own `#section` — then asserted against the first match, someone else's
+  element. Three of the four scroll kills reported two failures each until the teardown moved to
+  `afterEach`. Harmless while green, which is when nobody looks: it inflates every future kill
+  run in the file into a false blast radius, and RF-05 reads those.
+- **No product findings.** Every added pin went green against the engine as it stands; nothing
+  here uncovered a router bug, which after RF-01/02/06 is the expected result rather than a
+  surprising one.
+
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with
