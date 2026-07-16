@@ -314,13 +314,52 @@ async function assemble(
     if (isWholeDocument(result.html)) {
         // No template, so the rendered document is the shell: splice around React's
         // output, then transform it so the document still gets the dev client.
-        return server.transformIndexHtml(url, spliceDocument(result.html, result, by), originalUrl);
+        return transformHtml(server, spliceDocument(result.html, result, by), url, originalUrl);
     }
     const raw = await readFile(resolve(server.config.root, options.template), 'utf8');
     // Transform the shell, *then* fill it: transforming the filled page would hand the
     // app's own markup to Vite's HTML pipeline.
-    const template = await server.transformIndexHtml(url, raw, originalUrl);
+    const template = await transformHtml(server, raw, url, originalUrl);
     return fillTemplate(template, result, options.placeholders, by);
+}
+
+/**
+ * `transformIndexHtml`, surviving a URL `decodeURIComponent` rejects (`/products/%zz`).
+ * Vite decodes the URL to name the HTML file it reports to the html hooks, so a
+ * malformed escape throws a URIError there — *after* the app rendered its answer — and
+ * the middleware's `.catch` hands it to Vite's error middleware, which serves the 500
+ * overlay. Production answers the app's 404. A URL is user input: dev disagreeing with
+ * production about a bad one makes a bad address look like an app bug, exactly where the
+ * developer is watching.
+ *
+ * Escaping every `%` is what makes the retry total — a stray `%` is not the only shape
+ * rejected (`%FF` is well-formed hex that decodes to no character), and afterwards every
+ * `%` opens `%25`, which decodes back to the characters the request carried. Nothing is
+ * lost: the URL is plugin context here, and no file backs a route path anyway. The app
+ * above still rendered from the raw URL — the router hands a segment it cannot decode
+ * through as-is — and `originalUrl` Vite compares but never decodes.
+ *
+ * Retried rather than sanitized up front, which is not a style choice: a probe (decode
+ * it, escape on throw) reads to the bundler as a pure call whose result is unused, so
+ * `vite build` drops it and ships the identity function — green here, because the tests
+ * run this source, and broken in every consumer, which is the one place it runs built.
+ * Reaching for the error the real decode threw leaves nothing to drop.
+ */
+async function transformHtml(
+    server: ViteDevServer,
+    html: string,
+    url: string,
+    originalUrl: string | undefined,
+): Promise<string> {
+    try {
+        // Awaited, not handed back: a rejection has to land in the catch below.
+        return await server.transformIndexHtml(url, html, originalUrl);
+    } catch (error) {
+        // Narrow, so a plugin's own failure still reaches the overlay rather than being
+        // retried into a second, more confusing one.
+        if (!(error instanceof URIError)) throw error;
+        return server.transformIndexHtml(url.replaceAll('%', '%25'), html, originalUrl);
+    }
 }
 
 async function loadRender(server: ViteDevServer, entry: string): Promise<RenderFn> {

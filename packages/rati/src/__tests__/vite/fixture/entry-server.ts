@@ -38,6 +38,17 @@ const RESULTS = new Map<string, RenderAppResult>([
         ),
     ],
     ['/no-head', rendered('<html lang="en"><body><p>headless</p></body></html>')],
+    // A URL `decodeURIComponent` rejects. The router hands the raw segment through, so
+    // the app renders an answer — one per assembly path, since both hand the URL on.
+    ['/products/%zz', rendered('<h1>no such product</h1>', { status: 404, matchedCatchAll: true })],
+    [
+        '/document/%zz',
+        rendered(
+            '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /></head>' +
+                '<body><div id="root"><h1>no such document</h1></div></body></html>',
+            { status: 404, matchedCatchAll: true },
+        ),
+    ],
     ['/old', { kind: 'redirect', to: '/', permanent: true, status: 301 }],
     ['/temporary', { kind: 'redirect', to: '/', permanent: false, status: 302 }],
     ['/unrouted', { kind: 'no-match', status: 404 }],

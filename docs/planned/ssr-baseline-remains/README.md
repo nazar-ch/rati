@@ -262,3 +262,28 @@ The fallback landed as designed. One finding, wider than the item and left unfix
   deliberately, so the fix is a known one-liner per mount, not a design question. Not cut
   as an item: it is test-strength in a suite SSR-12 doesn't own, and it may turn something
   up when the assertion starts working — worth its own session, with room to be surprised.
+
+### 2026-07-16 — from SSR-13 (the dev malformed escape)
+
+The fix landed on the item's second candidate shape, because the first one compiled away.
+One finding, wider than the item:
+
+- **A builtin called for its throw alone is dead code to the bundler — and no test here
+  can see it.** SSR-13's first implementation was the item's leading candidate, sanitize
+  up front: `try { decodeURIComponent(url); return url } catch { return
+  url.replaceAll('%', '%25') }`. The suite went green and `dist/vite/index.js` shipped
+  `function O(e) { try { return e } catch { return e.replaceAll("%","%25") } }` — rolldown
+  reads `decodeURIComponent(url)` as a pure call whose result is unused and drops it,
+  leaving the identity function. So the fix was a no-op in every consumer while the gate
+  called it done. What caught it was the item's gallery spot-check (dev still 500'd on
+  `/products/%zz`), and only because the example's vite config imports `rati/vite` through
+  the published `import` condition — i.e. by luck of the one thing in this repo that runs
+  rati *built*. Every test runs the `rati-dev` source condition, so a behavior change the
+  build introduces is invisible to `yarn ci` — the test stage and the build stage never
+  meet. Second instance of the family (the first: `is.class` reading
+  `Function.prototype.toString`, which minification defeats — the blank `/counter`,
+  CLAUDE.md §Examples), and unlike that one this had no symptom in dev at all. The shape
+  is ordinary enough to reach for again (a decode/parse probe guarding a fallback), and
+  `grep` says the source carries no other instance today. Not cut as an item: the useful
+  question is bigger than a lint rule — whether anything should exercise the built
+  artifact's *behavior*, given the gate builds it and then only checks that it built.

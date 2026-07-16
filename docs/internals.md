@@ -254,7 +254,14 @@ Two jobs, one plugin, coupled to the engine by nothing but the `render(url)` con
 `ssrLoadModule`s the entry, maps the result kinds onto the response, and assembles
 through `ssr/html.ts`. `appType: 'custom'` drops the SPA middlewares. `hotUpdate`
 full-reloads only for modules the client graph doesn't have — a shared component is Fast
-Refresh's.
+Refresh's. `transformHtml` retries `transformIndexHtml` with every `%` escaped when it
+throws a URIError: Vite decodes the URL to name the HTML file for the html hooks, so a
+malformed escape (`/products/%zz`) throws there, past the app's already-rendered 404, and
+dev would answer a bad address with the overlay where production answers the app. Only
+the transform's copy — the app renders from the raw URL. Retried rather than sanitized up
+front because a probe (decode it, escape on throw) is a pure call whose result is unused:
+the bundler drops it and the *published* plugin gets an identity function, which the tests
+cannot see because they run this source.
 
 **Build**: `config()` returns `builder: {}` (opting into the app builder) plus the two
 environments' outDir/manifest/input, and the `buildApp` hook builds client → ssr. The

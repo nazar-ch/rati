@@ -149,3 +149,25 @@ describe('failures', () => {
         }
     });
 });
+
+describe('malformed escape', () => {
+    // A URL is user input, and the app already has an answer for a bad one (the router
+    // hands the raw segment through, the load reports not-available, 404). Dev must
+    // serve *that* — `transformIndexHtml` decodes the URL it is handed, and a URIError
+    // out of it lands on the error middleware, replacing the app's answer with a 500
+    // overlay: a bad address looking like an app bug, exactly where the developer is
+    // watching. Production has always agreed with the app here.
+    test.for([
+        ['/products/%zz', '<h1>no such product</h1>'],
+        ['/document/%zz', '<h1>no such document</h1>'],
+    ] as const)('serves what the app answered (%s)', async ([path, marker]) => {
+        const response = await get(path);
+        const body = await response.text();
+
+        expect(response.status).toBe(404);
+        expect(body).toContain(marker);
+        // Still assembled and transformed — the URL is bad, the page is not.
+        expect(body).toContain('<title>fixture</title>');
+        expect(body).toContain('/@vite/client');
+    });
+});
