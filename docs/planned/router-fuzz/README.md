@@ -66,6 +66,27 @@ one-notification-per-call `finally` is deliberate, `useRouter` subscribes throug
   model asserts save/restore *keys* (which entry's position would be restored), and the
   pixel behavior stays with the existing deterministic suite.
 
+## Decisions taken 2026-07-16 (post-RF-02 review)
+
+The maintainer reviewed RF-01/RF-02 and decided the three product edges the foundation
+filed (findings below), cut as **RF-06**:
+
+- **A self-redirect is a loop of length 1**: report the loop and render the route's own
+  component — the contract `route()` already documents for detected loops, extended to
+  the 1-cycle the same-path guard was swallowing. Not: leave the stale route.
+- **Dot-only param values encode**: `getPath` emits `%2E`/`%2E%2E` for a value that is
+  exactly `.` or `..`, closing the codec's last round-trip hole. Values merely
+  containing dots stay untouched.
+- **String redirect targets stay verbatim**, basename included by the author — no
+  behavior change; the docs get the explicit line. (Auto-prepending would break every
+  app already writing the full path.)
+
+Also from the review: the RF-02 **calibration gate is passed** — the invariant altitude
+(rendered route, URL bar, public getters, mount effects, the hop trail) is confirmed;
+B3 fans out once RF-06 lands. And RF-01's vacuity finding propagated: RF-03.4 and
+RF-05.7 are restated at the surface that owns the leaked resource (the History surface's
+deterministic pin), not the store consuming it.
+
 ## Items
 
 RF-01 executes the review findings above — the codec decision, the substitution fix, the
@@ -74,9 +95,12 @@ error, the dispose — each fix with its pin, before the fuzz suite would trip o
 builds the foundation: the traversable memory history, the routes-table arbitrary, the
 reference model (URL × entry stack → expected route), a navigate-everywhere smoke
 property — and is the **calibration gate**: its review fixes the invariant altitude.
-RF-03 adds the command alphabet and the behavioral invariants; RF-04 audits the existing
-21 suites against the pin list and adds only the missing pins — the two run as parallel
-lanes. RF-05 closes with the kill audit and non-vacuity verification.
+RF-06 executes the 2026-07-16 decisions on the edges RF-02 found and lifts the fuzz
+exclusions they forced, so the model and the engine agree everywhere before the alphabet
+grows. RF-03 adds the command alphabet and the behavioral invariants; RF-04 audits the
+existing 21 suites against the pin list and adds only the missing pins — the two run as
+parallel lanes (RF-04 needs only RF-02). RF-05 closes with the kill audit and
+non-vacuity verification.
 
 Batching, dependencies, grading: [plan.md](./plan.md).
 

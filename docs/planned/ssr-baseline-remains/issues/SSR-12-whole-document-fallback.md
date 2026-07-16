@@ -6,8 +6,14 @@ disposition: design pass ran 2026-07-16 —
 [ssr-server-kit.md §The fallback for whole-document apps](../../../research/directions-2026-07/ssr-server-kit.md).
 The spike says the constraint below is **false**: `createRoot(document)` exists and works
 in React 19.2, so shape (1) lands without the recovery lean and shapes (2)/(3) lose their
-reason. Implementation waits on maintainer confirmation of two things the record names
-(the supportedness soft spot; the `template === undefined` signal).
+reason. **Maintainer confirmed both open points, 2026-07-16**: the supportedness soft
+spot is accepted and `template === undefined` is the signal (no new option) —
+implementation may proceed, with one addition: a **canary pin** — a test that renders a
+synthesized minimal document through `createRoot(document)` and asserts the working page,
+so the React upgrade that narrows the container (the one risk the record names) fails
+loudly here instead of in a consumer's fallback path. Document the reliance where the
+fallback is documented, with the recovery shape (`hydrateRoot` + mismatch, noisy console)
+named as the escape hatch if React ever moves.
 
 ## Problem
 

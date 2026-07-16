@@ -25,7 +25,11 @@ evidence, the MF-04 finding):
 5. *Redirect discipline* — follow redirects with `push` instead of `replace` (the back
    stack grows; traversal invariants must notice).
 6. *Notification coherence* — drop `emitChange` from one of `setPath`'s return paths.
-7. *Teardown* — drop the history dispose call (RF-03.4's tail must catch it).
+7. *Teardown* — drop `unlistenHistory()` from `RouterStore.dispose()` (RF-03.4's tail
+   must catch it). The *other* dispose — dropping `this.history.dispose?.()` — is not
+   this suite's kill: RF-01 proved it has no store-level shadow (README, 2026-07-16);
+   its executed kill lives with the deterministic pin in `webRouterCore.test.ts`.
+   Re-run that one here rather than re-aiming a fuzz invariant at it.
 
 Plus the non-vacuity gate: remove the traversal verbs from the alphabet and verify
 exactly the counters assert fails, nothing else.

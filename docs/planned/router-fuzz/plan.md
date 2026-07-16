@@ -22,11 +22,21 @@ Items live in [issues/](./issues/); status derives from rati git (`git log --gre
   smoke property land; the **user reviews the invariant altitude** before B3 — every later
   item encodes invariants against this bar.
 
+### B2b — hardening 2 (execution; decisions taken)
+
+- **Items:** RF-06.
+- **Entry:** B2 merged; the 2026-07-16 decisions (README §Decisions) — taken: self-redirect
+  is a loop of length 1, dot-only params encode, string targets stay verbatim + documented.
+- **Exit / checkpoint:** the two fixes landed with pins; the smoke arbitrary's exclusions
+  lifted with the model grown to match; `yarn ci` green at the deep budget.
+
 ### B3 — coverage (execution; two lanes)
 
 - **Items:** RF-03 (command model — grows the fuzz harness files), RF-04 (deterministic
   pins in the existing `__tests__/router/` suites; independent lane, may run in parallel).
-- **Entry:** B2 merged and its altitude review done.
+- **Entry:** B2 merged and its altitude review done (done 2026-07-16); RF-03 additionally
+  needs B2b (its alphabet includes the self-target and dot values). RF-04 may start
+  right away.
 - **Exit / checkpoint:** fuzz suite green at default budget and at `FUZZ_RUNS=500`; the
   pin audit filed (what existed, what was added); checkpoint report of product findings.
 
@@ -43,6 +53,7 @@ Items live in [issues/](./issues/); status derives from rati git (`git log --gre
 | --- | --- | --- |
 | RF-01 | Opus, medium | small fixes, but the codec change ripples through pinned suites |
 | RF-02 | Opus, high | the model + history design set the effort's bar; judgment-dense |
+| RF-06 | Opus, medium | two small engine fixes, but the loop semantics touch setPath's core and the model must grow in lockstep |
 | RF-03 | Opus, high | invariant encoding over traversal interleavings — the subtle heart |
 | RF-04 | Opus, medium | pin audit against 21 existing suites; discipline over invention |
 | RF-05 | Opus, medium | mutation discipline: honest kills, honest reverts |

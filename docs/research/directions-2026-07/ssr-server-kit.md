@@ -194,6 +194,14 @@ not, shape (1)-as-filed still works — noisy console, no reliance on `createRoo
 container); and whether inferring the pattern from `template === undefined` is the right
 signal or wants to be explicit.
 
+**Decided 2026-07-16 (maintainer): both confirmed.** The soft spot is accepted and
+`template === undefined` stays the signal — no new option. One addition rides the
+acceptance: a canary pin in the test suite renders a synthesized document through
+`createRoot(document)` and asserts the working page, so a React release that narrows the
+container is caught by rati's own gate, not by a consumer's 500 path; the documented
+fallback if that ever fires is shape (1)-as-filed (`hydrateRoot` + recovery). The SSR-12
+item record carries the implementation scope.
+
 ## Anti-bloat lines (binding)
 
 - Fetch `Request`/`Response` is the only server interface — no Express/Koa/framework

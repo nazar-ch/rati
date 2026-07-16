@@ -42,6 +42,16 @@ Items live in [issues/](./issues/); status derives from rati git
 - **Exit:** the five fixes landed with the gate green; SSR-12 dispositioned by the
   maintainer.
 
+### B5 — the tail (execution; cut 2026-07-16)
+
+- **Items:** SSR-12 (implementation — the design pass ran and the maintainer confirmed
+  both open points, see the item's disposition), SSR-13. Independent, any order.
+- **Entry:** none — both gates are cleared.
+- **Exit:** the whole-document fallback lands with its canary pin and the
+  throw→fallback walk; dev answers the app's status on a malformed escape, with the pin
+  red-before green-after. Effort ready to close (the Vercel preview verification stays
+  maintainer-blocked and is not an item).
+
 ## Grading
 
 | Item | Model / effort | Why |
@@ -57,4 +67,5 @@ Items live in [issues/](./issues/); status derives from rati git
 | SSR-09 | Sonnet, low | one peerDependenciesMeta line |
 | SSR-10 | Sonnet, low | docs only |
 | SSR-11 | Sonnet, low | decided: one prerender option + a pin + a docs paragraph |
-| SSR-12 | Opus, high | design-first: the render-into-document constraint needs a spike |
+| SSR-12 | Opus, high | design-first: the render-into-document constraint needs a spike (ran 2026-07-16; implementation follows the confirmed shape) |
+| SSR-13 | Sonnet, medium | a contained dev-pipeline fix, but the sanitization shape needs care across both assembly paths |

@@ -1,7 +1,7 @@
 # RF-03 — fc.commands model: the navigation alphabet + behavioral invariants
 
 area: packages/rati/src/__tests__/fuzz
-needs: RF-02
+needs: RF-02, RF-06
 disposition: —
 
 ## Problem
@@ -23,7 +23,8 @@ each other. This item turns the foundation into an `fc.commands` suite over the 
      shallow-equal-but-not-identical objects (the `shallowEqualState` seam);
    - `back` / `forward` / `go(n)` — the RF-02 traversal;
    - `setSearchParams` (push and replace modes);
-   - `toRedirectRoute` — navigate into a redirect (single hop and into the cycle pair).
+   - `toRedirectRoute` — navigate into a redirect (single hop, into the cycle pair, and
+     onto a self-target — a loop of length 1 once RF-06 lands its semantics).
 2. **Invariants after every command** (the altitude bar from RF-02's review):
    1. *Rendered agreement* — the mounted route (name + params, decoded) ≡ the model's
       match of the model's current entry.
@@ -41,9 +42,13 @@ each other. This item turns the foundation into an `fc.commands` suite over the 
 3. **Non-vacuity counters**: across the run set, assert traversals actually happened,
    at least one stale-skip-marker POP re-resolved, and the redirect pair was entered —
    the counters gate from mandala-fuzz, same reasoning.
-4. **The teardown tail**: unmount in `finally`; `RouterStore.dispose()` +
-   the history dispose (RF-01.4) leave no listener behind — asserted by driving the
-   history after dispose and seeing no render.
+4. **The teardown tail**: unmount in `finally`; after `RouterStore.dispose()`, driving
+   the injected memory history produces no render — the store detached itself (the kill
+   is dropping `unlistenHistory()`). Deliberately *not* asserted here: the
+   created-history DOM detach (RF-01.4). The harness injects its history, so
+   `dispose()` never reaches `history.dispose()` — and RF-01's finding (README,
+   2026-07-16) showed that leak has no store-level shadow anyway; its pin lives at the
+   History surface in `webRouterCore.test.ts`, where it bites.
 
 ## Boundaries
 

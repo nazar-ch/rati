@@ -51,6 +51,19 @@ The findings below were task-cut into SSR-07…12 (maintainer-reviewed shape):
 - No item for the redirect-route hydration blank (judged right, recorded) or for the
   whole-document ⇄ fallback exclusivity docs (SSR-12 owns that surface).
 
+## Decisions taken 2026-07-16 (post-findings-round review)
+
+- **SSR-12 is approved for implementation.** Both open points confirmed: the
+  `createRoot(document)` supportedness soft spot is accepted, and `template ===
+  undefined` stays the whole-document signal (no new option). One addition: a canary
+  pin that renders a synthesized document through `createRoot(document)`, so the React
+  release that narrows the container fails rati's gate, not a consumer's fallback.
+  Scope in the item record; the design record carries the decision line.
+- **SSR-13 cut** from RF-01's out-of-scope finding (router-fuzz README, 2026-07-16):
+  the dev server 500s on a malformed escape (`/products/%zz`) where production answers
+  the app's 404 — `assemble` hands the raw URL to `transformIndexHtml`, whose decode
+  throws after the app already rendered. Dev must agree with production.
+
 ## Items
 
 SSR-01…03 build the kit in dependency order (dev plugin → build/assets →
@@ -62,6 +75,9 @@ parallel with anything.
 The findings round: SSR-07…10 are independent fixes off the migrations' findings and
 can run in any order; SSR-11 waits on a maintainer discussion and SSR-12 on a design
 pass (both records carry the open questions).
+
+The tail (2026-07-16): SSR-12's implementation (approved above) and SSR-13 — independent
+of each other, any order.
 
 Batching, dependencies, grading: [plan.md](./plan.md).
 
@@ -197,3 +213,29 @@ turned up, neither fixed in-item:
   merely current: seeding is a verbatim replay of the server's decision, and following the
   hop would move the URL out from under the server's HTML. Recorded so the next reader
   doesn't re-litigate it; no item cut.
+
+### 2026-07-16 — from the findings round (SSR-07…12)
+
+Small records the executing commits carry, restated here so the README stays the
+station; nothing needed a new item beyond SSR-13 (cut above):
+
+- **SSR-07 refined its own detection mid-item**: the bare `[data-rati-head]` check the
+  record proposed reads a client-only app's leftover tags (a root unmount tears down the
+  provider's subscription before the declarations' removes) as a server head. The marker
+  value now carries provenance — `server` from `headTags`, `client` from the DOM sync —
+  and detection asks for `server` alone. Consequence: the record's documented caveat
+  (a pure-CSR page needing the default in `index.html` too) is gone; `defaultTitle`
+  works everywhere it used to. A residual, judged acceptable: a tag the client *adopts*
+  keeps its `server` marker even after client-side churn updates it, so a fresh provider
+  mounted onto such a document (a root remount without a reload — HMR shapes) re-enters
+  the hydrating phase and holds defaults until the first removal. Self-corrects on any
+  navigation; no item.
+- **SSR-09's fix has a typing edge**: the type surface still names react, so a react-less
+  consumer type-checking with `skipLibCheck: false` needs `@types/react`. Every real
+  consumer runs `skipLibCheck`; fixing it for real would need the exports gymnastics the
+  item's anti-bloat line rules out. Recorded in the commit; accepted.
+- **SSR-11's gallery spot-check is weak evidence for the fix itself** — every gallery
+  page is under the outlining budget; the pin (a >budget route inside a shell div, red
+  without the option) is the real guard. The pin also caught that React never outlines
+  the root segment, so a bare island pins nothing — the shell-div wrapper is
+  load-bearing and commented.
