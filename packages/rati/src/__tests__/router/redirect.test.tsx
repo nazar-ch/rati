@@ -136,19 +136,45 @@ describe('route-level redirects', () => {
 
     test('a redirect cycle stops at the depth guard and renders instead', () => {
         const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const A = () => <div>a</div>;
+        const B = () => <div>b</div>;
         const routes = [
-            route('/a', 'a', Null, { redirect: { to: '/b' } }),
-            route('/b', 'b', Null, { redirect: { to: '/a' } }),
+            route('/a', 'a', A, { redirect: { to: '/b' } }),
+            route('/b', 'b', B, { redirect: { to: '/a' } }),
             route('*', 'notFound', NotFound),
         ] as const satisfies GenericRouteType[];
         const router = new RouterStore({}, routes, {
             history: createMemoryHistory({ url: '/a' }),
         });
+        const root = new RootStore({ router }, { isReady: true });
+        const view = render(
+            <RootStoreProvider rootStore={root}>
+                <Router />
+            </RootStoreProvider>,
+        );
 
         // Following stopped: one of the cycle's routes is active, rendered as-is.
+        // *Which* one is the parity of the cap and deliberately not pinned — the fuzz
+        // property makes the same call (see routerAsserts' capped-cycle oneOf).
         expect(['a', 'b']).toContain(router.activeRoute?.name);
-        expect(error).toHaveBeenCalled();
+        // The half the store-level name cannot show: the route's own component is what
+        // reaches the DOM — not the catch-all, and not a blank screen. Two kills, both
+        // executed red — returning from the loop-report branch instead of falling
+        // through to the assignment below it (which the name above catches too), and the
+        // one that needs this line: a Router declining to render a route still carrying
+        // a `redirect` declaration, which leaves the store's answer right and the screen
+        // empty.
+        expect(['a', 'b']).toContain(view.container.textContent);
+        // The cap, stated where it is observable: one hop per level the guard allowed
+        // and no eleventh. Kill: move MAX_REDIRECT_DEPTH — the trail's length follows it.
+        expect(router.redirectHops).toHaveLength(10);
+        expect(router.redirectHops[0]).toEqual({ from: '/a', to: '/b', permanent: false });
+        expect(error).toHaveBeenCalledOnce();
         expect(error.mock.calls[0]![0]).toContain('redirect loop');
+        // The trail rides along in the report, and is the only thing naming which routes
+        // the cycle ran through — the first thing a reader needs and the only place it is
+        // written down. Kill: drop the hops join from the message. Executed once, red.
+        expect(error.mock.calls[0]![0]).toContain('/a → /b → /a');
         error.mockRestore();
         router.dispose();
     });
