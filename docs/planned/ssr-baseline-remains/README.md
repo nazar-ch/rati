@@ -239,3 +239,26 @@ station; nothing needed a new item beyond SSR-13 (cut above):
   without the option) is the real guard. The pin also caught that React never outlines
   the root segment, so a bare island pins nothing — the shell-div wrapper is
   load-bearing and commented.
+
+### 2026-07-16 — from SSR-12 (the whole-document fallback)
+
+The fallback landed as designed. One finding, wider than the item and left unfixed:
+
+- **"Hydrates without console errors" does not test that, and the suites that say it are
+  the ones underwriting the baseline's hydration claims.** React reports a recovered
+  mismatch to `onRecoverableError`, whose default is `reportGlobalError` — *not*
+  `console.error` (`react-dom-client.development.js:9417`; the SSR-12 design record says
+  console.error, which is where this started). Under Vitest that lands as an "Unhandled
+  Error" the reporter prints and no assertion reads, so a `vi.spyOn(console, 'error')`
+  check passes straight through a real mismatch. Measured, not inferred: injecting a
+  deliberate text mismatch into `router/hydration.test.tsx`'s `ssrThenHydrate` leaves all
+  391 tests green, and its comment (`:105`) states the opposite. `router/hydration.test.tsx`
+  is the suite affected — every test in it hydrates through that one helper, and its
+  console-only assertion is the whole point of four of them. `ssr/wholeDocument.test.tsx`
+  had the same hole and was fixed in-item (it now passes its own `onRecoverableError` and
+  asserts it never fired — the canary is worthless otherwise: swapped to `hydrateRoot`, a
+  console-only version passes the very shape it exists to distinguish).
+  `mandala/islandSsrSources.test.tsx:337` already knows the channel and silences it
+  deliberately, so the fix is a known one-liner per mount, not a design question. Not cut
+  as an item: it is test-strength in a suite SSR-12 doesn't own, and it may turn something
+  up when the assertion starts working — worth its own session, with room to be surprised.
