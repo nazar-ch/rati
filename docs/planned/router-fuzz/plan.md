@@ -47,6 +47,15 @@ Items live in [issues/](./issues/); status derives from rati git (`git log --gre
 - **Exit:** every planned kill executed red and reverted; recipes filed; non-vacuity
   counters verified. Effort ready to close.
 
+### B5 — round-2 hardening (execution; cut 2026-07-16, decisions taken)
+
+- **Items:** RF-07 (relative strings made coherent), RF-08 (getPath refuses dot-only
+  param values). Independent, any order.
+- **Entry:** none — both decisions are taken (README §Decisions, round-2 review).
+- **Exit:** the memory history resolves like the browser, the relative-spelling 1-cycle
+  bypass is closed, `<Link to="..">` is pinned and documented; `getPath` throws with its
+  pins and reference.md updated. `yarn ci` green. Effort ready to close.
+
 ## Grading
 
 | Item | Model / effort | Why |
@@ -57,6 +66,8 @@ Items live in [issues/](./issues/); status derives from rati git (`git log --gre
 | RF-03 | Opus, high | invariant encoding over traversal interleavings — the subtle heart |
 | RF-04 | Opus, medium | pin audit against 21 existing suites; discipline over invention |
 | RF-05 | Opus, medium | mutation discipline: honest kills, honest reverts |
+| RF-07 | Opus, medium | a resolution-semantics change across two histories + a setPath comparison; small but load-bearing |
+| RF-08 | Sonnet, medium | one guard + pins + docs; the decision is already taken |
 
 The Agent tool sets `model` but not reasoning-effort — carry the effort tier as a
 thoroughness line in the prompt.

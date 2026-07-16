@@ -79,6 +79,10 @@ pass (both records carry the open questions).
 The tail (2026-07-16): SSR-12's implementation (approved above) and SSR-13 — independent
 of each other, any order.
 
+Round-2 corrections (2026-07-16, cut at the review): SSR-14 (hydration-mismatch
+observability, from SSR-12's finding) and SSR-15 (the fallback config-error guard) —
+independent, any order.
+
 Batching, dependencies, grading: [plan.md](./plan.md).
 
 ## Per-item conventions
@@ -262,6 +266,7 @@ The fallback landed as designed. One finding, wider than the item and left unfix
   deliberately, so the fix is a known one-liner per mount, not a design question. Not cut
   as an item: it is test-strength in a suite SSR-12 doesn't own, and it may turn something
   up when the assertion starts working — worth its own session, with room to be surprised.
+  — **Cut 2026-07-16 (round-2 review) as [SSR-14](./issues/SSR-14-hydration-mismatch-observability.md).**
 
 ### 2026-07-16 — from SSR-13 (the dev malformed escape)
 
@@ -287,3 +292,32 @@ One finding, wider than the item:
   `grep` says the source carries no other instance today. Not cut as an item: the useful
   question is bigger than a lint rule — whether anything should exercise the built
   artifact's *behavior*, given the gate builds it and then only checks that it built.
+
+### 2026-07-16 — round-2 review (SSR-12/13 verified; two items cut)
+
+The review re-verified both items against the code (independent agents, the load-bearing
+claims re-executed by hand): the fallback branches and the synthesized document are as
+designed, the canary genuinely reads `onRecoverableError` rather than the console, the
+`transformHtml` retry is total and correctly narrowed to `URIError`, and the docs are in
+sync. Two findings became items, one was closed in-round:
+
+- **A fragment app misconfigured with no template gets the whole-document fallback** —
+  `assemble` detects whole-document by content, `fallback` by `template === undefined`,
+  and the config-error path threads the gap: the synthesized shell has no `#root` for a
+  fragment entry to boot into, where pre-SSR-12 the same misconfiguration answered an
+  honest plain-text 500. Verified by tracing the catch path. Cut as
+  [SSR-15](./issues/SSR-15-fallback-config-error.md), which also owns the noted
+  script-placement asymmetry between the two fallback shapes.
+- **The standing SSR-12 finding above (console-only hydration asserts) is now cut** as
+  [SSR-14](./issues/SSR-14-hydration-mismatch-observability.md) — the round's reviewer
+  judged "worth its own session" to mean an item, so it derives status like everything
+  else.
+- **SSR-13's pins covered only `%zz`** of the four shapes the item verified by hand
+  against the gallery. Closed in-round: `ratiSsr.test.ts` gains `%FF` (well-formed hex,
+  no character), `%2` (truncated) and `%` (stray) rows, with fixture entries to match —
+  the first run of those rows also demonstrated why they were missing: the fixture's
+  canned-results map answers 500 for any URL it doesn't know, which reads exactly like
+  the bug the suite guards against.
+
+The built-artifact-behavior question (SSR-13's note above) deliberately stays a note,
+not an item — it is a testing-strategy direction, not a fix with a pin.

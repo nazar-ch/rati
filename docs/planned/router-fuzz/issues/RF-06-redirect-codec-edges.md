@@ -2,7 +2,11 @@
 
 area: packages/rati/src/router, packages/rati/src/__tests__/fuzz
 needs: RF-02
-disposition: —
+disposition: Scope §2 was superseded mid-item — `%2E` is no escape from dot-segment
+normalization, so nothing encodes; the shipped shape is *document the limitation* (README
+§Findings, 2026-07-16 RF-06), re-taken at the round-2 review as *refuse* (RF-08). §Verify's
+"a dot-only value round-tripped" counter became "a param value carrying dots round-tripped"
+for the same reason. The text below is the cut-time spec, kept as written.
 
 ## Problem
 

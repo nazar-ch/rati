@@ -52,6 +52,15 @@ Items live in [issues/](./issues/); status derives from rati git
   red-before green-after. Effort ready to close (the Vercel preview verification stays
   maintainer-blocked and is not an item).
 
+### B6 — round-2 corrections (execution; cut 2026-07-16)
+
+- **Items:** SSR-14 (hydration-mismatch observability — may surface product findings),
+  SSR-15 (the fallback config-error guard). Independent, any order.
+- **Entry:** none — both cut from verified round-2 review findings.
+- **Exit:** the injected-mismatch canary red-then-green; the fragment/no-template
+  misconfiguration answers plain-text 500 again. Effort ready to close (the Vercel
+  preview verification stays maintainer-blocked).
+
 ## Grading
 
 | Item | Model / effort | Why |
@@ -69,3 +78,5 @@ Items live in [issues/](./issues/); status derives from rati git
 | SSR-11 | Sonnet, low | decided: one prerender option + a pin + a docs paragraph |
 | SSR-12 | Opus, high | design-first: the render-into-document constraint needs a spike (ran 2026-07-16; implementation follows the confirmed shape) |
 | SSR-13 | Sonnet, medium | a contained dev-pipeline fix, but the sanitization shape needs care across both assembly paths |
+| SSR-14 | Opus, medium | mechanical per-mount change, but whatever it surfaces needs judgment to file rather than silence |
+| SSR-15 | Sonnet, low | one tagged error + a pin + a comment |

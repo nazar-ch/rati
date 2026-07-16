@@ -89,6 +89,30 @@ B3 fans out once RF-06 lands. And RF-01's vacuity finding propagated: RF-03.4 an
 RF-05.7 are restated at the surface that owns the leaked resource (the History surface's
 deterministic pin), not the store consuming it.
 
+## Decisions taken 2026-07-16 (round-2 review)
+
+The maintainer reviewed RF-03…06 (and SSR-12/13) and re-opened the `.`/`..` topic against
+what the field does; two decisions, cut as **RF-07** and **RF-08**:
+
+- **Relative navigation strings are coherent passthrough** (RF-07): no route-hierarchy
+  semantics (rati's table is flat; named routes and `ContextualLink` are its relative
+  story), but every surface resolves a relative string the way the browser does — the
+  memory history resolves against its *current entry* rather than a placeholder root
+  (today they diverge on every relative input), the self-redirect comparison resolves
+  the target before comparing (a relative spelling of a 1-cycle bypasses it today —
+  confirmed, the stale route is back), and `<Link to="..">` is functional and
+  documented. Not: rejecting non-absolute strings (that would also reject `?query` /
+  `#hash` strings and break the verbatim rule for no gain).
+- **`getPath` refuses a dot-only param value** (RF-08) — the third take on RF-02's
+  finding, superseding RF-06's *document the limitation*. The platform facts stand (no
+  encoding survives; every peer router silently misnavigates — React Router's
+  `generatePath` doesn't encode at all, Vue Router's encoder and TanStack's
+  `encodeURIComponent` both leave dots alone); what changes is the response: `getPath`
+  is the single choke point, its contract is a URL that round-trips, and for this value
+  no such URL exists — so it throws a framework-shaped error naming the fix, the
+  RF-01 precedent. Accepted trade: a `<Link>` whose param is user data equal to `..`
+  throws at render instead of silently linking to `/`.
+
 ## Items
 
 RF-01 executes the review findings above — the codec decision, the substitution fix, the
@@ -102,7 +126,9 @@ exclusions they forced, so the model and the engine agree everywhere before the 
 grows. RF-03 adds the command alphabet and the behavioral invariants; RF-04 audits the
 existing 21 suites against the pin list and adds only the missing pins — the two run as
 parallel lanes (RF-04 needs only RF-02). RF-05 closes with the kill audit and
-non-vacuity verification.
+non-vacuity verification. RF-07 and RF-08 carry the round-2 decisions above (relative
+strings made coherent; dot-only param values refused) — hardening the review found, not
+new fuzz scope.
 
 Batching, dependencies, grading: [plan.md](./plan.md).
 
@@ -511,6 +537,40 @@ no product findings: the engine went back to exactly where it started.
   the state seam and every generated table carries a redirect pair, so a 14-command sequence hits
   the machinery many times over. Read it as calibration — the budget has headroom, and a future
   invariant that needs a pinned seed is worth a second look rather than a shrug.
+
+### 2026-07-16 (round-2 review) — the fix that compared a spelling, and the model that mirrors one history
+
+The review re-verified RF-03…06 against the code (independent agents, claims re-executed
+by hand) and re-opened the `.`/`..` topic; the decisions are above, the findings here:
+
+- **RF-06's 1-cycle check compares the target's *spelling*, not its resolution — a
+  relative self-target walks straight past it.** Confirmed against the real store:
+  `redirect: { to: 'self' }` at `/self`, entered from `/home`, leaves `activeRoute` on
+  `home` at URL `/self` with one hop recorded and **no loop reported** — the exact
+  stale-route shape RF-06 fixed, back through a spelling. The comparison sees
+  `'self' !== '/self'`, follows, the platform resolves the replace back to `/self`, and
+  the nested `setPath` takes the same-path early return. RF-07 §2 owns the fix.
+  Generalizes: a guard that compares what the *caller wrote* against what the *platform
+  resolves* has to resolve first, or every alternate spelling is a bypass.
+- **The two histories disagree on every relative navigation string.** The browser
+  resolves against the current URL (`push('sub')` at `/a/b/c` → `/a/b/sub`); the memory
+  history parses against a fixed placeholder origin (`/sub`) — confirmed by hand. So
+  SSR (a relative redirect target's `Location`), tests, and the fuzz model all run on
+  semantics the browser doesn't have. The model is only faithful because the arbitrary
+  draws absolute URLs exclusively; RF-07 §1 makes the memory history resolve against its
+  current entry, which is fidelity, not new semantics.
+- **The fresh-construction self-redirect had no deterministic pin** (agent finding): the
+  1-cycle was hand-pinned only on the navigate-into path, while the fresh path — the one
+  RF-06's own kill shrank to — was property-only. Pinned in-round
+  (`redirect.test.tsx`, "constructed straight at a self-redirect"); the deterministic
+  lane is 186 pins now (the register's 185 is RF-05's execution record and stays as
+  written).
+- **A kill comment predicted the wrong stranded route** (agent finding, re-traced by
+  hand): `webRouterTraversal.test.ts`'s marker-staleness kill note said the assertion
+  would read `'dashboard'` (the kept route); it reads `'home'` — the route mounted when
+  the POP fires. The pin bites either way; the comment is corrected. A sharpening of
+  RF-05's lesson: what a kill strands is decided by the state at the *traversal*, not by
+  the entry that armed the marker.
 
 ## Per-item conventions
 
