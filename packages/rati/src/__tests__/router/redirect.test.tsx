@@ -211,6 +211,32 @@ describe('route-level redirects', () => {
         router.dispose();
     });
 
+    test('constructed straight at a self-redirect, the cycle still ends at one hop', () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const Self = () => <div>self</div>;
+        const routes = [
+            route('/home', 'home', Home),
+            route('/self', 'self', Self, { redirect: { to: '/self' } }),
+            route('*', 'notFound', NotFound),
+        ] as const satisfies GenericRouteType[];
+        const router = new RouterStore({}, routes, {
+            history: createMemoryHistory({ url: '/self' }),
+        });
+
+        // The other way into setPath — no resolved route for the early return to skip
+        // past, so before the self-check this entry recursed to the depth cap: the same
+        // report after ten identical hops. The check unifies the two entries at one hop;
+        // this is the shape RF-06's kill shrank to, pinned here so the property isn't
+        // the only witness.
+        expect(router.activeRoute?.name).toBe('self');
+        expect(router.path).toBe('/self');
+        expect(router.redirectHops).toEqual([{ from: '/self', to: '/self', permanent: false }]);
+        expect(error.mock.calls[0]![0]).toContain('redirect loop');
+
+        error.mockRestore();
+        router.dispose();
+    });
+
     test('a self-redirect differing only in query is the same cycle', () => {
         const error = vi.spyOn(console, 'error').mockImplementation(() => {});
         const Self = () => <div>self</div>;

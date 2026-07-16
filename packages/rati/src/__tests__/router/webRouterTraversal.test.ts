@@ -22,8 +22,8 @@ const routes = [
 describe('RouterStore across back/forward', () => {
     // Kill: compare the marker against the marker string alone, ignoring the counter
     // (stamp `{ skip: this.sessionId }` and test for it) — the marker then never goes
-    // stale, the POP is skipped, and this reads 'dashboard': the kept route stranded on
-    // an entry whose URL names another one.
+    // stale, the POP is skipped, and this reads 'home': whatever route the traversal
+    // left mounted, stranded on an entry whose URL names another one.
     test('a POP back onto a shallow entry finds its marker stale and re-resolves', () => {
         const history = createMemoryHistory({ url: '/dashboard' });
         const router = new RouterStore({}, routes, { history });
