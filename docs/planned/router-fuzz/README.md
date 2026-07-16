@@ -85,6 +85,45 @@ Batching, dependencies, grading: [plan.md](./plan.md).
 (Appended as dated notes as items execute; a real router bug is a finding to surface, not
 to silently fix.)
 
+### 2026-07-16 (RF-01) — the four fixes landed; one proposed pin was vacuous
+
+- **Finding 4's proposed pin does not bite, and the leak has no store-level symptom.** The
+  item asked for "two sequential stores in one jsdom window; disposing the first leaves
+  exactly the second responding to popstate". Written and run against the unfixed engine, it
+  **passes** — `dispose()` already unhooks the store's own listener from its history, so a
+  disposed store is inert either way. The leaked `popstate` subscription is real, but it is a
+  memory leak with no behavioral shadow at the store altitude: the only store-visible
+  difference would be counting `window` listeners, which the altitude rule forbids. What does
+  bite is a pin at the *History* surface's own contract (public API, so a legitimate
+  altitude): register a listener on the store's created history **after** `dispose()`, then
+  dispatch popstate — unfixed, the window subscription still fans out to it. The ordering is
+  load-bearing and is commented at the test; registering before dispose passes either way.
+  Generalizes for RF-05: a leak-shaped finding needs a pin at the surface that owns the
+  resource, not at the consumer that outlives it.
+- **The codec change moved no pinned URL string.** The item expected a sweep ("existing
+  suites for pinned URL strings the change moves"). There was nothing to review: every param
+  value pinned across the 21 suites and both examples is alphanumeric (`42`, `abc`, `7`,
+  `Unicorn`), and `encodeURIComponent` is the identity on all of them. The full suite went
+  green on the fix with no test edited. jnana's base64url shape is likewise untouched by
+  construction — its alphabet (`A-Za-z0-9-_`) is entirely unreserved — and now has a pin
+  saying so.
+- **Out of scope, pre-existing: a malformed escape 500s the *dev* server.** Driving the
+  gallery to check the new fallback end-to-end: `GET /products/%zz` answers **404 in
+  production** — `staticPath` already guards its own decode, the router now warns and hands
+  `%zz` through, and the example's load reports not-available — but the **dev** server
+  answers 500 `URI malformed`. `assemble` (`vite/ratiSsr.ts`) passes the raw request URL to
+  `server.transformIndexHtml(url, …)`, and vite-plus-core's `getHtmlFilename` runs
+  `decodeURIComponent` on it and throws, after the app has already rendered its 404. So the
+  router is right and the layer above it drops the result. Confirmed pre-existing (stash
+  RF-01, same 500) and it lives in `vite/`, not `router/` — left for its own item rather
+  than folded in here. Worth knowing that dev and production disagree on malformed URLs.
+- **Finding 2's corruption is key-order dependent.** `/x/:idx/:id` only breaks when the
+  shorter name is substituted first, i.e. when the caller's object happens to list `id`
+  before `idx` (`Object.entries` is insertion-ordered). The README's `/x/7x/:id` example is
+  exactly that case. So the bug was live but fired on caller-side key order — worth knowing
+  for RF-03's arbitrary, which should not assume a param table shuffles independently of the
+  path.
+
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with
