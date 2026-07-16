@@ -129,6 +129,71 @@ The validation path's first consumer is done: `examples/ssr/server.ts` is delete
 runs on `vite dev`, prod on `serve()` — ~90 lines to ~12. nazar.ch and the jnana website
 are SSR-04/05.
 
+### The fallback for whole-document apps (SSR-12 design pass, 2026-07-16)
+
+The fallback above needs a shell to fill and a script to put in it; a whole-document app
+has neither, so a render that throws answers the plain-text 500. SSR-04 met this on nazar
+and kept whole-document deliberately. The question the item asks is not nazar's — it is
+whether the pattern should *structurally* lack a fallback for the projects that do want
+one. It doesn't have to: the constraint the item was filed on turns out not to exist.
+
+**The spike.** The item's premise — "React has no `createRoot(document)`: a client-only
+render of a component that returns `<html>` has no supported mount call" — is false in
+React 19.2. Two mounts work against a synthesized minimal document (the asset tags, no app
+markup, no payload), verified twice each: jsdom, and Chrome against a dev server.
+
+- **`createRoot(document).render(<App/>)`** produces a working page — content rendered,
+  `<html lang>` applied, the stylesheet loaded *and applied*, the button interactive — on
+  a **clean console**. It is not an accident that it works: DefinitelyTyped's `Container`
+  includes `Document`, `isValidContainer` accepts `nodeType === 9`, `clearContainer` has a
+  dedicated document branch, and the only dev warning on the path is about double-rooting
+  one container.
+- **`hydrateRoot(document, <App/>)`** — shape (1) as filed — reaches the same working page
+  through mismatch recovery, and says so: an `onRecoverableError` call, which is a
+  `console.error` by default.
+
+One React detail carries both, and is worth naming because the shape rests on it: the
+clear before a client render into a document is `clearContainerSparingly`, which keeps
+`SCRIPT`, `STYLE` and `LINK rel="stylesheet"` and drops everything else. A synthesized
+document holds exactly those, so the mount cannot orphan the entry that is running it.
+
+**Weighing the three shapes, with that in hand.** (1) survives, in a better form than it
+was filed in: synthesize the document, and let the client entry *mean* it — `createRoot`,
+not a mismatch React forgives. That removes the objection to (1) (it "leans on recovery
+semantics and logs a hydration error") rather than trading it away. (2) — an app-authored
+`fallbackDocument` plus a client-side branch — buys nothing once the branch is
+`createRoot(document)`: the app would be hand-writing a document the handler can already
+synthesize from `assets`, and "more surface, honest semantics" collapses to just more
+surface. (3) — declare the exclusivity permanent — was the honest read while the mount was
+believed not to exist; it isn't, so the reason is gone.
+
+**The shape, then.** No new option: `template === undefined` is *already* the handler's
+"this is a whole-document app" signal (that is what the option means, and what `assemble`
+tells a fragment-rendering app that omitted it). So the fallback branches where it already
+branches — a template to fill → fill it; no template, but `assets` → synthesize
+`<!doctype html><html><head>{styleTags}</head><body>{bootstrapModules}</body></html>`;
+neither → the plain-text 500 stands, unchanged. Status stays 500 throughout.
+
+Two consequences to carry, not one:
+
+- **The client entry's cooperation again** — the same note SSR-03 recorded for the
+  template pattern, one container over: a whole-document entry branches
+  `readHydration()` → payload → `hydrateRoot(document, <App/>)`, null →
+  `createRoot(document).render(<App/>)`. Without the branch the fallback still *works*,
+  via recovery, while filling the console — which is exactly the failure SSR-03 already
+  documented for `#root`. `docs/public/ssr.md` §The client entry shows only the `#root`
+  pair today.
+- **Supportedness is the one soft spot.** react.dev documents `createRoot`'s container as
+  "a DOM element" and mentions `document` only under `hydrateRoot`. The types, the runtime
+  branch and two browsers say otherwise, but the docs page does not — so this rests on
+  observed behavior over a stated contract, and a React release could in principle move it
+  where `hydrateRoot(document)` could not.
+
+Open for the maintainer, ahead of implementation: whether that soft spot is acceptable (if
+not, shape (1)-as-filed still works — noisy console, no reliance on `createRoot`'s
+container); and whether inferring the pattern from `template === undefined` is the right
+signal or wants to be explicit.
+
 ## Anti-bloat lines (binding)
 
 - Fetch `Request`/`Response` is the only server interface — no Express/Koa/framework

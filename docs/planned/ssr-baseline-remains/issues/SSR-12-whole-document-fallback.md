@@ -2,7 +2,12 @@
 
 area: packages/rati/src/server, packages/rati/src/ssr
 needs: design first — the render-into-document constraint below shapes everything
-disposition: —
+disposition: design pass ran 2026-07-16 —
+[ssr-server-kit.md §The fallback for whole-document apps](../../../research/directions-2026-07/ssr-server-kit.md).
+The spike says the constraint below is **false**: `createRoot(document)` exists and works
+in React 19.2, so shape (1) lands without the recovery lean and shapes (2)/(3) lose their
+reason. Implementation waits on maintainer confirmation of two things the record names
+(the supportedness soft spot; the `template === undefined` signal).
 
 ## Problem
 
