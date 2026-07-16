@@ -91,8 +91,14 @@ export type RedirectTarget = { name: string } & Record<string, string>;
  * here — redirect those at the HTTP layer.
  *
  * An object target resolves through the route table and keeps the current search and
- * hash (the alias-route expectation); a string target is used verbatim. A function
- * receives the matched params — the legacy-path shape (`/old/:id` → `/new/:id`).
+ * hash (the alias-route expectation); a string target is used verbatim — so under a
+ * `basename` it must include it (`to: '/admin/b'`, not `to: '/b'`): write what the URL bar
+ * should say, which is the same rule `getPath` follows for a string and the only way a
+ * target outside the app's own mount point stays expressible. A function receives the
+ * matched params — the legacy-path shape (`/old/:id` → `/new/:id`).
+ *
+ * A target that resolves back to the route declaring it is a redirect loop: it is reported
+ * and the route's component renders, rather than being followed (see `RouterStore.setPath`).
  */
 export type RouteRedirect<Path extends string = string> = {
     to: string | RedirectTarget | ((params: ExtractRouteParams<Path>) => string | RedirectTarget);

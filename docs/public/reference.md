@@ -255,6 +255,15 @@ stays one segment). Pass values raw — encoding them yourself double-encodes. A
 encoding is malformed (`/station/%zz`) hands the param through undecoded and warns rather
 than throwing.
 
+**One value has no URL to carry it: a param that is exactly `.` or `..`.** A dot-only
+segment is a path operator, and every browser resolves it away before the router is
+reached — `/station/..` *is* `/`, so that navigation lands on whatever `/` matches.
+Percent-encoding does not rescue it: URLs treat `%2E` as a dot for exactly this purpose,
+so `/station/%2E%2E` resolves away too. If a param's values can be arbitrary (filenames,
+user input), keep them out of the path — put them in the query string, where a dot is
+ordinary — or map them to an id first. Dots *within* a value (`a.b`, `..x`) are fine and
+need nothing.
+
 ```ts
 route('/station/:stationId', 'station', Board, {
     scope: stationScope,   // optional: data resolved before the component renders
@@ -275,6 +284,13 @@ route('/settings', 'settings', () => null, {
     redirect: { to: { name: 'settings-profile' }, permanent: true },
 });
 ```
+
+Under a [`basename`](#routerstore), a **string** target must include it — a string is used
+verbatim, so write what the URL bar should say (`to: '/admin/b'`, not `to: '/b'`). This is
+the same rule `getPath` follows for a string, and the reason to prefer an object target
+when the destination is a route in the table: that one is resolved through it, basename
+and all. A redirect whose target resolves back to the route declaring it is a loop —
+reported, with the route's own component rendered rather than followed.
 
 Routes live in a plain `as const` array. Register its type once for app-wide typed links
 and route reads:

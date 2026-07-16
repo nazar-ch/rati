@@ -276,7 +276,13 @@ export class RouterStore<
         // the matcher compiles), so a name can never be found inside a longer one.
         // Values are percent-encoded, which is the outbound half of the round-trip
         // getActiveRoute closes: what the caller passes here is what the component is
-        // handed back, whatever characters it contains.
+        // handed back, whatever characters it contains — save one shape no encoding
+        // reaches. A value of exactly '.' or '..' is a path operator, not data: the URL
+        // parser resolves the segment away before any router sees it, and `%2E` is not an
+        // escape from that (URLs read it as a dot for precisely this reason — it is what
+        // stops percent-encoding from smuggling a traversal past a path check). No URL
+        // carries such a value, so it is documented as unrepresentable rather than
+        // encoded here — see docs/public/reference.md §Routing.
         const path = matched.path.replace(PARAM_RE, (token, key: string, tail: string) => {
             const value = (params as Record<string, string | undefined>)[key];
             // Types require every param, so a missing one means a caller reaching past

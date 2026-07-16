@@ -481,6 +481,12 @@ client follows the hop the same way, and the browser makes the request.) Through
 chain of hops, `to` is the last one's target and `permanent` is true only when every
 hop declared itself permanent.
 
+That is also why a **string** target is never rewritten for you: under a `basename`, write
+it in full (`to: '/admin/b'`, not `to: '/b'`) — a string says what the URL bar should say,
+which is the only way a target pointing *outside* the app's mount point stays expressible.
+Object and function-object targets resolve through the table and carry the basename
+themselves.
+
 ## The payload contract
 
 `serializeHydration(state)` emits an **inert JSON script tag**
