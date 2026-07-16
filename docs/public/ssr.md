@@ -188,6 +188,27 @@ import * as assets from 'virtual:rati/assets';
 Hand it to `renderApp` and you are done; it uses what's there. The same import works in
 dev, so there is no mode to branch on.
 
+**Migrating: a config that branches on `isSsrBuild` no longer branches.** That flag
+answers "is this config call the `--ssr` build?", and under the plugin there is no such
+call — `ratiSsr` opts into the app builder, so one `vite build` resolves the config once
+and runs both environments from it, with `isSsrBuild: false` every time. A plugin kept
+off the server bundle by `!isSsrBuild && plugin()` therefore stops being excluded and
+quietly starts running on it. Nothing errors; the wrong artifact is the only symptom.
+Scope by environment instead:
+
+```ts
+plugins: [
+    react(),
+    // Was `!isSsrBuild && thirdPartyLicenses()` — a client-only emitter, of no use to
+    // a server bundle that runs on your own infra.
+    {
+        ...thirdPartyLicenses({ fileName: 'third-party-licenses.txt' }),
+        applyToEnvironment: (environment) => environment.name === 'client',
+    },
+    ratiSsr(),
+]
+```
+
 ### Your HTML shell is only a shell
 
 Because the assets module names the entry, `index.html` is **not** a build input: it

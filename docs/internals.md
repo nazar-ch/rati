@@ -383,6 +383,14 @@ deterministic pin list, the fuzz harness design — is
 (the async-act mount requirement above all) are cataloged in
 `packages/rati/src/__tests__/suspense-situations.md`.
 
+**Verifying SSR in a browser: use a visible tab.** React 19.2 gates the Suspense reveal on
+`requestAnimationFrame`, which never fires in a hidden or backgrounded tab — and since rati
+wraps every route in a boundary, a headless/background browser leaves the page at its
+loading slot forever. A healthy server-rendered page reads as a broken hydration, and any
+real bug on the page hides behind that. So before believing a hydration failure, check
+`document.hidden`; screenshot and step through SSR pages in a tab that is actually on
+screen.
+
 The whole gate runs as one command: `yarn ci` (`scripts/ci.ts`, plain Node over zx) — fmt,
 lint, typecheck (every workspace), the full test suite, the fuzz suites at a deep budget
 (default `FUZZ_RUNS=500`, override via env), and the builds. Every stage runs even when an
