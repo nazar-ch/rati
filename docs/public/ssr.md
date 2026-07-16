@@ -326,6 +326,19 @@ sync — hydration and every navigation. On the server, declarations register du
 prerender (including inside a route's Suspense), and `renderApp` reads the winners into
 `result.headTags` afterwards.
 
+**On hydration, the server's head stands until the page speaks.** `HeadProvider` sits
+above the routes' Suspense boundaries, so its first sync can run before the page that
+declares the title has hydrated — a source-backed page, a `lazy()` chunk still in
+flight, a large page React is still revealing. A document rati server-rendered therefore
+stays the server's until a declaration is *removed* (a navigation, a conditional
+declaration leaving): declared titles and metas land as they commit, but `defaultTitle`
+is never written over the server's title, and server-rendered tags are never reconciled
+away — their declarer may simply not have hydrated yet. rati knows its own output by the
+`data-rati-head` marker `headTags` puts on every tag it emits, so a client-only document
+carries none, owns its head from the first sync, and gets `defaultTitle` immediately. A
+server that assembles `<head>` by hand rather than from `headTags` (or `renderApp`) opts
+out of the guard — the marker is the evidence.
+
 **The dividing line: rati's head layer owns only tags that need dedupe.** React 19
 hoists `<title>`/`<meta>`/`<link>` rendered anywhere into `<head>` natively — but it
 does not dedupe them, and layered declarations are the normal case for titles and

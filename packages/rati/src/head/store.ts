@@ -28,6 +28,24 @@ import { deepEqual } from '../util/utils';
         the entry's seq so a re-rendering layout can't steal the win from a page.
       - One store per rendered tree — on the server, per request; never a module
         global, or concurrent requests clobber each other's heads.
+
+    The phase (`hydrating` → `live`, one-way) exists because "nothing declared yet" and
+    "nothing will be declared" are the same state to the entries above, and on a
+    server-rendered page they call for opposite acts. HeadProvider sits above the routes'
+    Suspense boundaries, so its first apply can run while the page that declares the
+    title is still unhydrated: no entry is confirmed, and writing `defaultTitle` (or
+    reconciling away the server's metas) would destroy a correct head. So while
+    `hydrating` the document is the server's — see domSync.ts. `remove()` settles the
+    store: an unmount can only follow that subtree's hydration, and it is the earliest
+    signal the head is churning (a navigation, a conditional declaration leaving).
+    `commit()` does not — on a multi-boundary page one boundary's commit says nothing
+    about its siblings. A page rati never server-rendered has no server head to protect;
+    HeadProvider detects that (no marked tags in the document) and `settle()`s on mount,
+    so a client-only app is unaffected by any of this.
+
+    (In StrictMode's simulated remount the cleanup `remove()`s and settles early. Dev
+    only, and it lands on today's behavior — the pre-phase one — for the rest of the
+    page's life.)
 */
 
 export type MetaTag = { name?: string; property?: string; content: string };
@@ -51,6 +69,13 @@ export interface HeadSnapshot {
     metas: MetaTag[];
 }
 
+/**
+ * `hydrating`: the document may carry a server-rendered head that no declaration has
+ * spoken for yet, so it is treated as authoritative. `live`: the tree owns the head.
+ * One-way — see the phase note above.
+ */
+export type HeadPhase = 'hydrating' | 'live';
+
 type Entry = { seq: number; tag: HeadTag; confirmed: boolean };
 
 // One winner per key; `title` is a single slot, metas dedupe per name/property.
@@ -63,8 +88,23 @@ export class HeadStore {
     private readonly entries = new Map<string, Entry>();
     private readonly listeners = new Set<() => void>();
     private seq = 0;
+    private _phase: HeadPhase = 'hydrating';
 
     constructor(private readonly options: HeadStoreOptions = {}) {}
+
+    get phase(): HeadPhase {
+        return this._phase;
+    }
+
+    /**
+     * Hand the head to the tree, for a reader that knows there is no server head to
+     * protect (HeadProvider, on a document with no rati-marked tags). Silent: the
+     * provider settles before its first apply, and `remove()` — the other way in —
+     * emits on its own.
+     */
+    settle(): void {
+        this._phase = 'live';
+    }
 
     /**
      * Render-phase registration (keyed by the declarer's `useId`). Silent — emitting
@@ -98,8 +138,16 @@ export class HeadStore {
         if (entry && !entry.confirmed) this.entries.delete(id);
     }
 
+    /**
+     * Effect-phase removal: an unmount, or a declaration that went `null` after
+     * committing. Settles the phase — but only on a real removal: `useHeadTag(null)`
+     * calls this on mount for a declaration that never registered, and that is not a
+     * head that has started churning.
+     */
     remove(id: string): void {
-        if (this.entries.delete(id)) this.emit();
+        if (!this.entries.delete(id)) return;
+        this._phase = 'live';
+        this.emit();
     }
 
     subscribe(listener: () => void): () => void {
@@ -110,14 +158,20 @@ export class HeadStore {
     }
 
     /**
-     * Compute the winners. `'client'` counts only effect-confirmed entries (abandoned
-     * renders never confirm); `'server'` counts every registration — prerender runs no
-     * effects, and its single pass has no abandoned trees to guard against.
+     * Compute the winners for one reader:
+     *
+     *   - `'server'` counts every registration — prerender runs no effects, and its
+     *     single pass has no abandoned trees to guard against.
+     *   - `'client'` counts only effect-confirmed entries (abandoned renders never
+     *     confirm), and falls back to `defaultTitle`.
+     *   - `'hydrating'` is `'client'` minus the default: an undeclared title means
+     *     "nobody has hydrated yet", so there is nothing to say and the server's
+     *     `<title>` stands (the phase note above).
      */
-    snapshot(mode: 'client' | 'server'): HeadSnapshot {
+    snapshot(mode: 'client' | 'server' | 'hydrating'): HeadSnapshot {
         const winners = new Map<string, Entry>();
         for (const entry of this.entries.values()) {
-            if (mode === 'client' && !entry.confirmed) continue;
+            if (mode !== 'server' && !entry.confirmed) continue;
             const key = dedupeKey(entry.tag);
             const current = winners.get(key);
             if (!current || entry.seq > current.seq) winners.set(key, entry);
@@ -129,7 +183,7 @@ export class HeadStore {
         let title: string | null = null;
         if (titleEntry && titleEntry.tag.kind === 'title') {
             title = this.options.titleTemplate?.(titleEntry.tag.text) ?? titleEntry.tag.text;
-        } else if (this.options.defaultTitle !== undefined) {
+        } else if (mode !== 'hydrating' && this.options.defaultTitle !== undefined) {
             title = this.options.defaultTitle;
         }
 

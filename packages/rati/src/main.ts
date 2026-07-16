@@ -97,6 +97,7 @@ export {
     HeadStore,
     type HeadStoreOptions,
     type HeadSnapshot,
+    type HeadPhase,
     type MetaTag,
 } from './head/store';
 export { HeadProvider } from './head/HeadProvider';

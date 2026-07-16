@@ -67,7 +67,7 @@ describe('renderApp', () => {
         if (result.kind !== 'rendered') return;
         expect(result.status).toBe(200);
         expect(result.html).toContain('Post hello');
-        expect(result.headTags).toBe('<title>Post hello · Blog</title>');
+        expect(result.headTags).toBe('<title data-rati-head>Post hello · Blog</title>');
         expect(result.stateScript).toContain('application/json');
         expect(result.hydration.router?.activeRouteName).toBe('post');
         // The resolved load was dehydrated for the client.

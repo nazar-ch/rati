@@ -238,7 +238,8 @@ app factory → `prepareRoute` → `renderToHtml` → dispose — into the decis
 public docs describe (`docs/public/ssr.md`); `renderToHtml` is the `prerender` stream
 drain; `payload.ts` owns the wire format (versioned `HydrationState`, the inert JSON
 script tag, the dev round-trip warning); `headTags.ts` is the head store's post-prerender
-read-back (escaped, `data-rati-head`-marked so the client reconciler adopts the tags).
+read-back (escaped, `data-rati-head`-marked — on the metas so the client reconciler
+adopts them, on the `<title>` as evidence for the hydration phase below).
 `react-dom/static` is imported statically — it has browser builds, and `sideEffects:
 false` keeps it tree-shaken out of client bundles that touch only `readHydration`.
 
@@ -318,6 +319,18 @@ title; a value update keeps its seq, so deepest-registered keeps winning. One st
 tree, enforced by a null context default (no module-global fallback — that's a
 cross-request leak on the server). `domSync.ts` reconciles `document.title` plus the
 `data-rati-head`-marked metas from `HeadProvider`'s effect.
+
+The store also carries a **phase** (`hydrating` → `live`, one-way), because the entries
+cannot tell "nothing declared yet" from "nothing will be declared" — and above a
+still-unhydrated boundary those call for opposite acts (SSR-07). While `hydrating`,
+`domSync` applies declared winners but writes no `defaultTitle` and removes no marked
+tag: `snapshot('hydrating')` is `'client'` minus the default fallback. `remove()` settles
+the store — an unmount can only follow its subtree's hydration, and it is the earliest
+churn signal; `commit()` doesn't, since on a multi-boundary page one boundary's commit
+says nothing about its siblings, and a `remove()` that removed nothing doesn't either
+(`useHeadTag(null)` calls it on mount). `HeadProvider.settle()`s on mount when the
+document holds no `data-rati-head` tag — rati didn't render this head, so there is
+nothing of the server's to protect and a client-only app behaves as it always did.
 
 ## Router (`router/`)
 

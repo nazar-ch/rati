@@ -16,14 +16,19 @@ function escapeAttribute(value: string): string {
  * outside the React tree (spliced before `</head>`, or via an HTML-template slot) so
  * React doesn't try to reconcile it during hydration.
  *
- * Meta tags carry the rati marker attribute, so HeadProvider's client sync adopts and
- * updates them on navigation instead of duplicating. The `<title>` needs no marker —
- * `document.title` writes to the same node.
+ * Every tag carries the rati marker attribute. On the metas it is bookkeeping —
+ * HeadProvider's client sync adopts and updates them on navigation instead of
+ * duplicating. On the `<title>` it is evidence: `document.title` writes to the same node
+ * either way, but a marked tag is how the client tells this document's head came from
+ * rati's server and must not be overwritten before the page hydrates (head/store.ts
+ * §phase).
  */
 export function headTags(store: HeadStore): string {
     const { title, metas } = store.snapshot('server');
     const tags: string[] = [];
-    if (title !== null) tags.push(`<title>${escapeText(title)}</title>`);
+    if (title !== null) {
+        tags.push(`<title ${RATI_HEAD_ATTRIBUTE}>${escapeText(title)}</title>`);
+    }
     for (const meta of metas) {
         const key =
             meta.property !== undefined

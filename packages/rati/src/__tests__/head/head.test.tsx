@@ -14,11 +14,42 @@ import { headTags } from '../../ssr/headTags';
 
 afterEach(() => {
     cleanup();
-    // The provider's meta reconciler appends to document.head — reset between tests.
+    // The provider's meta reconciler appends to document.head, and the tests below plant
+    // a server-rendered head there — reset between tests, or the marked tags left behind
+    // would make the next test's document look server-rendered.
     // querySelectorAll returns a static list, so removing while iterating is safe.
-    for (const el of document.head.querySelectorAll('meta[data-rati-head]')) el.remove();
+    for (const el of document.head.querySelectorAll('[data-rati-head]')) el.remove();
     document.title = '';
 });
+
+/**
+ * Plant what a rati server left in `<head>` — the `headTags` output of a previous
+ * render, which is what HeadProvider wakes up to on a server-rendered page.
+ */
+function serverHead(tags: { title?: string; metas?: { name: string; content: string }[] }): void {
+    if (tags.title !== undefined) {
+        // `document.title` reads (and writes) the *first* <title> in the document, and
+        // the reset below leaves an empty unmarked one behind — so clear before
+        // planting, the way a server-rendered head has exactly one.
+        for (const stale of document.head.querySelectorAll('title')) stale.remove();
+        const title = document.createElement('title');
+        title.textContent = tags.title;
+        title.setAttribute('data-rati-head', '');
+        document.head.appendChild(title);
+    }
+    for (const meta of tags.metas ?? []) {
+        const element = document.createElement('meta');
+        element.setAttribute('name', meta.name);
+        element.setAttribute('content', meta.content);
+        element.setAttribute('data-rati-head', '');
+        document.head.appendChild(element);
+    }
+}
+
+const managedMetas = () => [...document.head.querySelectorAll('meta[data-rati-head]')];
+
+const metaContent = (name: string) =>
+    document.head.querySelector(`meta[data-rati-head][name="${name}"]`)?.getAttribute('content');
 
 async function prerenderToString(element: ReactElement): Promise<string> {
     const { prelude } = await prerender(element);
@@ -244,6 +275,104 @@ describe('HeadStore winners', () => {
     });
 });
 
+describe('hydration phase', () => {
+    test('a server-rendered head stands while nothing has hydrated', () => {
+        // The clobber SSR-04 hit on nazar: HeadProvider sits above the route's Suspense
+        // boundary, so its first apply runs while the page that declares the title is
+        // still unhydrated. Nothing is confirmed — which is not the same as nothing
+        // being declared, and the server already said what this page's head is.
+        serverHead({
+            title: 'Server page',
+            metas: [{ name: 'description', content: 'from server' }],
+        });
+
+        const store = createHeadStore({ defaultTitle: 'Default' });
+        render(<HeadProvider store={store}>content, no declarations yet</HeadProvider>);
+
+        expect(document.title).toBe('Server page');
+        expect(metaContent('description')).toBe('from server');
+        expect(store.phase).toBe('hydrating');
+    });
+
+    test('a declaration that hydrates lands; the tags nobody spoke for stay', () => {
+        serverHead({
+            title: 'Server page',
+            metas: [
+                { name: 'description', content: 'from server' },
+                { name: 'keywords', content: 'server, keywords' },
+            ],
+        });
+
+        const store = createHeadStore({ defaultTitle: 'Default' });
+        render(
+            <HeadProvider store={store}>
+                <Title>Hydrated page</Title>
+                <Meta name="description" content="hydrated description" />
+            </HeadProvider>,
+        );
+
+        // What committed wins — the server's tags are adopted, not duplicated.
+        expect(document.title).toBe('Hydrated page');
+        expect(metaContent('description')).toBe('hydrated description');
+        expect(managedMetas()).toHaveLength(2);
+        // `keywords` has no declaration *yet*: its declarer may be in a boundary that
+        // hasn't hydrated. Removing it here is the half of the bug that doesn't heal.
+        expect(metaContent('keywords')).toBe('server, keywords');
+        expect(store.phase).toBe('hydrating');
+    });
+
+    test('the first remove settles the store: defaults apply, orphans are reconciled away', () => {
+        serverHead({
+            title: 'Server page',
+            metas: [{ name: 'keywords', content: 'server, keywords' }],
+        });
+
+        const store = createHeadStore({ defaultTitle: 'Default' });
+
+        function Page({ show }: { show: boolean }) {
+            return <HeadProvider store={store}>{show && <Title>Page</Title>}</HeadProvider>;
+        }
+
+        const view = render(<Page show={true} />);
+        expect(document.title).toBe('Page');
+        expect(managedMetas()).toHaveLength(1);
+
+        // The declaration leaves — that can only follow its subtree hydrating, so the
+        // head is now the tree's and it is saying nothing.
+        view.rerender(<Page show={false} />);
+        expect(store.phase).toBe('live');
+        expect(document.title).toBe('Default');
+        expect(managedMetas()).toHaveLength(0);
+    });
+
+    test('a document with no rati-marked tags is client-only: the default applies at once', () => {
+        // No serverHead() — index.html's own title, nothing rati wrote.
+        document.title = 'from index.html';
+
+        const store = createHeadStore({ defaultTitle: 'Default' });
+        render(<HeadProvider store={store}>content, no declarations</HeadProvider>);
+
+        expect(store.phase).toBe('live');
+        expect(document.title).toBe('Default');
+    });
+
+    test('a remove that removes nothing does not settle the phase', () => {
+        // `useHeadTag(null)` calls remove() on mount for a declaration that never
+        // registered — a page that declares its title once loaded, not a churning head.
+        const store = createHeadStore({ defaultTitle: 'Default' });
+        store.remove('never-registered');
+        expect(store.phase).toBe('hydrating');
+        expect(store.snapshot('hydrating').title).toBeNull();
+
+        store.set('a', { kind: 'title', text: 'A' });
+        store.commit('a', { kind: 'title', text: 'A' });
+        expect(store.phase).toBe('hydrating');
+
+        store.remove('a');
+        expect(store.phase).toBe('live');
+    });
+});
+
 describe('meta sync', () => {
     test('creates, deduplicates by name, updates, and removes rati-managed tags', () => {
         const store = createHeadStore();
@@ -347,7 +476,7 @@ describe('server read-back (headTags after prerender)', () => {
 
         const html = headTags(store);
         expect(html).toBe(
-            '<title>Fish &amp; &lt;Chips&gt; · Site</title>' +
+            '<title data-rati-head>Fish &amp; &lt;Chips&gt; · Site</title>' +
                 '<meta name="description" content="a &quot;quoted&quot; page" data-rati-head>',
         );
     });
@@ -376,7 +505,7 @@ describe('server read-back (headTags after prerender)', () => {
                 <Island />
             </HeadProvider>,
         );
-        expect(headTags(store)).toBe('<title>Resolved page</title>');
+        expect(headTags(store)).toBe('<title data-rati-head>Resolved page</title>');
     });
 
     test('no declarations and no default → empty string (leave the shell alone)', async () => {
