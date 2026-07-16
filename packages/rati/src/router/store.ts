@@ -75,6 +75,16 @@ function stripBasename(pathname: string, basename: string): string {
 }
 
 /**
+ * The pathname a redirect target names, in the same terms `setPath` resolves in: query
+ * and fragment dropped, basename stripped. Comparing the two is what catches a redirect
+ * pointing back at the route that declared it (see {@link RouterStore.setPath}).
+ */
+function redirectTargetPathname(targetPath: string, basename: string): string {
+    const pathname = targetPath.split('?')[0]!.split('#')[0]!;
+    return stripBasename(pathname, basename);
+}
+
+/**
  * Percent-decode the matched params — the inbound half of the round-trip `getPath`
  * opens, so a component reads the value that was put in rather than the browser's
  * encoding of it (`hello world`, not `hello%20world`).
@@ -426,13 +436,23 @@ export class RouterStore<
                         ? target
                         : this.getPath(target as NameToRoute<T>) + this._search + this._hash;
                 this.redirectHops.push({ from: pathname, to: targetPath, permanent });
-                this.redirectDepth++;
-                try {
-                    this.replace(targetPath);
-                } finally {
-                    this.redirectDepth--;
+                // A target pointing back at the pathname being resolved is a cycle of
+                // length 1, and following it cannot reveal that: the nested setPath sees
+                // its own path unchanged, takes the same-path early return above, and
+                // leaves the *previous* route on screen at the new URL. Stop here and
+                // fall through to the loop report instead, so a 1-cycle ends the way a
+                // capped longer one does — trail recorded, the route's own component
+                // rendered. Search and hash are excluded from the comparison on purpose:
+                // a target differing from its own route only in query is the same trap.
+                if (redirectTargetPathname(targetPath, this.basename) !== pathname) {
+                    this.redirectDepth++;
+                    try {
+                        this.replace(targetPath);
+                    } finally {
+                        this.redirectDepth--;
+                    }
+                    return;
                 }
-                return;
             }
             if (matched?.redirect) {
                 console.error(

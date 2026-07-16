@@ -152,4 +152,64 @@ describe('route-level redirects', () => {
         error.mockRestore();
         router.dispose();
     });
+
+    test('a route redirecting to itself is a cycle of length one', () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const Self = () => <div>self</div>;
+        const routes = [
+            route('/home', 'home', Home),
+            route('/self', 'self', Self, { redirect: { to: '/self' } }),
+            route('*', 'notFound', NotFound),
+        ] as const satisfies GenericRouteType[];
+        const router = new RouterStore({}, routes, {
+            history: createMemoryHistory({ url: '/home' }),
+        });
+
+        router.navigate('/self');
+
+        // Entering from another route is load-bearing, and it is what made this the one
+        // shape that produced a genuinely stale route: the same-path early return needs a
+        // resolved `activeRoute` to skip past, so a router constructed straight at /self
+        // never had the bug — it recursed to the depth cap like any other cycle. With the
+        // self-check reverted this reads 'home' (executed once): the previous page, left
+        // on screen at the new URL.
+        expect(router.activeRoute?.name).toBe('self');
+        expect(router.path).toBe('/self');
+        expect(router.history.location.pathname).toBe('/self');
+        // One hop — the one it refused to follow — rather than the ten identical ones a
+        // cycle of length one would otherwise record on its way to the cap.
+        expect(router.redirectHops).toEqual([{ from: '/self', to: '/self', permanent: false }]);
+        expect(error.mock.calls[0]![0]).toContain('redirect loop');
+
+        error.mockRestore();
+        router.dispose();
+    });
+
+    test('a self-redirect differing only in query is the same cycle', () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const Self = () => <div>self</div>;
+        const routes = [
+            route('/home', 'home', Home),
+            route('/self', 'self', Self, { redirect: { to: '/self?tab=a' } }),
+            route('*', 'notFound', NotFound),
+        ] as const satisfies GenericRouteType[];
+        const router = new RouterStore({}, routes, {
+            history: createMemoryHistory({ url: '/home' }),
+        });
+
+        router.navigate('/self');
+
+        // The cycle check compares pathnames alone. A target that re-enters its own route
+        // carrying a query is still a target that cannot resolve to anything else — the
+        // query rides along into the same early return — so it is reported, not followed.
+        expect(router.activeRoute?.name).toBe('self');
+        expect(router.history.location.search).toBe('');
+        expect(router.redirectHops).toEqual([
+            { from: '/self', to: '/self?tab=a', permanent: false },
+        ]);
+        expect(error.mock.calls[0]![0]).toContain('redirect loop');
+
+        error.mockRestore();
+        router.dispose();
+    });
 });
