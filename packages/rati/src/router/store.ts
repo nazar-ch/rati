@@ -216,7 +216,14 @@ export class RouterStore<
         }
 
         const { name, ...params } = args;
-        let path: string = this.routes.find((item) => item.name === name)!.path;
+        const matched = this.routes.find((item) => item.name === name);
+        if (!matched) {
+            throw new Error(
+                `[rati] getPath: no route named "${name}". ` +
+                    `Known routes: ${this.routes.map((item) => item.name).join(', ')}.`,
+            );
+        }
+        let path: string = matched.path;
         if (params) {
             for (const [key, value] of Object.entries(params)) {
                 path = path.replace(`:${key}`, value as string);

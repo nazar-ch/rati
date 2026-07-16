@@ -98,6 +98,17 @@ describe('RouterStore.getPath', () => {
         expect(router.getPath('/raw/url?x=1#y')).toBe('/raw/url?x=1#y');
         router.dispose();
     });
+
+    // Observed red once against the unfixed engine, which threw the TypeError below.
+    test('throws a named error for a route that is not in the table', () => {
+        const router = new RouterStore({}, routes);
+        // A typo in a route name used to surface as `Cannot read properties of
+        // undefined (reading 'path')` from the non-null assertion on `find`.
+        expect(() => router.getPath({ name: 'dashbaord' } as never)).toThrow(
+            '[rati] getPath: no route named "dashbaord"',
+        );
+        router.dispose();
+    });
 });
 
 describe('RouterStore.isPath', () => {
