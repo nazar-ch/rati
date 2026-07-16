@@ -321,6 +321,26 @@ shared across users. Corollaries:
 - The head store is per-request for the same reason (see below) — `HeadProvider` with a
   module-global store would let concurrent requests overwrite each other's titles.
 
+## The output is fully inline
+
+Every route is a Suspense boundary, and past a byte budget React normally *outlines* a
+completed one: the content goes into a hidden `<div>` at the end of the document and an
+inline script swaps it over the loading slot. That trade exists so a streaming server can
+flush a small shell before the slow boundaries resolve — rati never flushes early, so it
+would be all cost: a reader without JavaScript (a crawler) would get "loading…" for the
+page's real content, and the swap is also animation-frame-gated, so a backgrounded tab
+wouldn't run it either. rati therefore renders with the budget out of reach: resolved
+content always sits where you declared it, whatever the page weighs. Two exceptions stay
+React's call — a boundary carrying hoisted stylesheets or suspensey images is outlined
+regardless (it is coordinating the reveal with its own loads), and a boundary whose load
+*failed* keeps its loading slot for the client to [retry](#response-statuses-and-load-failures).
+
+Streaming is a non-goal rather than a missing flag: committing the status line at shell
+flush and shipping `<head>` before in-Suspense `<Title>`s register is a different contract
+from this one, not a knob on it. What it would take is written up in
+[docs/research/ssr-streaming.md](../research/ssr-streaming.md) for a consumer that ever has
+a real time-to-first-byte problem.
+
 ## Titles and meta
 
 Declare the title (and per-page meta) from page content; the deepest live declaration

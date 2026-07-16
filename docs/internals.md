@@ -236,7 +236,9 @@ memory-history router to its matched route and returns the server's decision obj
 `renderApp` (`ssr/renderApp.tsx`) composes the per-request loop — memory history → the
 app factory → `prepareRoute` → `renderToHtml` → dispose — into the decision object the
 public docs describe (`docs/public/ssr.md`); `renderToHtml` is the `prerender` stream
-drain; `payload.ts` owns the wire format (versioned `HydrationState`, the inert JSON
+drain, and raises `progressiveChunkSize` out of reach so React inlines every completed
+boundary instead of outlining it into a hidden div + swap script (buffered output — the
+outlining is streaming's machinery, and the file says why); `payload.ts` owns the wire format (versioned `HydrationState`, the inert JSON
 script tag, the dev round-trip warning); `headTags.ts` is the head store's post-prerender
 read-back (escaped, `data-rati-head="server"`-marked — the attribute so the client
 reconciler adopts the tags, its `server` value as evidence for the hydration phase below).
