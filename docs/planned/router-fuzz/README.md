@@ -106,6 +106,109 @@ non-vacuity verification.
 
 Batching, dependencies, grading: [plan.md](./plan.md).
 
+## Kill register (executed at RF-05)
+
+A green fuzz suite proves nothing until each invariant has caught a planted bug (mandala-fuzz's
+MF-04, same reasoning). Every kill below — a bug-shaped mutation of the engine — was run red,
+shrunk, and reverted; mutations never merge. Each recipe names the site, the mutation, the seed,
+and the failure shape, so re-verification is a copy-paste. One command per lane:
+
+```
+FUZZ_SEED=1 vp run rati#test src/__tests__/fuzz/router.commands.fuzz.test.tsx   # the property
+vp run rati#test src/__tests__/router/                                          # the 185 pins
+```
+
+**Every kill landed at the default budget** (`fuzz(25)`) **and on every seed tried** (1, 2, 3, 7,
+42), where the mandala register has one kill that survives four seeds of five. The recipes pin
+`FUZZ_SEED=1` regardless: an unpinned green is no evidence (MF-04's rule), and the spread is a
+fact about today's alphabet rather than a promise it makes.
+
+Both lanes were run against every kill, because "the other suite covers it" is a guess until it
+isn't (RF-04's rule). What they say is the register's headline:
+
+| Kill | The property | The 185 deterministic pins |
+| --- | --- | --- |
+| 1 — the matcher never refuses | red · `rendered route` | red, broadly (39 tests, 14 files) |
+| 2 — a navigation drops the fragment | red · `url` | **green** |
+| 3a — the same-path guard ignores `stateChanged` | red · `mount count` | red (2) |
+| 3b — a navigation drops the caller's state | red · `router.state` | red (3) |
+| 4 — the skip marker never goes stale | red · `mount count` | red (2, RF-04's traversal pins) |
+| 5 — a redirect pushes instead of replacing | red · always on a traversal | **green** |
+| 6 — a `setPath` return path stops notifying | red · `must notify subscribers` | **green** |
+| 7a — `dispose()` keeps its history listener | red · the teardown tail | **green** |
+| 7b — `dispose()` orphans the history it made | green (blind by construction) | red (1, RF-01's pin) |
+
+Four kills are the fuzz suite's alone (2, 5, 6, 7a) and one is the deterministic lane's alone
+(7b) — the split RF-01's finding predicted, and the reason that pin was never re-aimed at a
+fuzz invariant.
+
+1. **The matcher never refuses** — `store.ts` `getActiveRoute()`: `result = pathRe.exec(currentPath)
+   ?? { groups: {} }`, so the table's first route answers every URL. `FUZZ_SEED=1` → red on case 1,
+   **1 — rendered agreement**: `navigateRef → /q0/%C3%A4/a%3Fb: rendered route: expected { name:
+   'root', params: {} } to deeply equal { name: 'g0', …(1) }`. Shrinks (22x) to one `navigateRef`
+   off the initial `/`. The smoke property catches it too, from its own angle — `a cycle must leave
+   one of its own routes: expected [ 'cyB', 'cyA' ] to include 'root'`.
+2. **A navigation drops the fragment** — `store.ts` `pushOrReplace()`: `const path = (typeof to ===
+   'string' ? to : this.getPath(to)).split('#')[0]!`. `FUZZ_SEED=1` → red on case 1, **2 — URL
+   agreement**: `navigatePath → /zz-nothing-here#top: url: expected '/zz-nothing-here' to be
+   '/zz-nothing-here#top'`. Shrinks (54x) onto the *unmatched* URL, where the rendered route agrees
+   by construction and the URL assert is the only one left standing. **Not the mutation the item
+   planned** — RF-05 §2 asked `pushOrReplace` to swallow the path and push the current one, which is
+   red on every seed but on **1 — rendered agreement** (`navigateRef → /collide/a%20b/a%20b: rendered
+   route: expected { name: 'root', … }`): a store that never moves leaves the wrong route on screen,
+   and assert 1 runs first. See the finding below.
+3. **State agreement is two clauses, so it takes two kills.**
+   1. *The re-resolve half* — `store.ts` `setPath()`: drop `stateChanged` from the skip condition
+      (`if (this._path === pathname && this.activeRoute)`). `FUZZ_SEED=1` → red on case 1, **4 —
+      remount discipline**: `navigateWithState → /: mount count: expected 1 to be 2`, shrunk 45x to
+      a single `navigateWithState`. It cannot reach invariant 3's own assert: `setPath` writes
+      `_state` *before* the guard, so `router.state` stays right and what the kill costs is only the
+      resolution — which the mount ledger is the sole witness to.
+   2. *The getter half* — `store.ts` `pushOrReplace()`: `const state = skip ? { ...skip } : null`,
+      dropping the caller's `{ state }` (the shape RF-03 filed against `setSearchParams`,
+      generalized). `FUZZ_SEED=1` → red, **3 — state agreement**: `navigateRef → /: router.state:
+      expected null to deeply equal { panelId: 'p0' }`. Shrinks 60x.
+4. **The skip marker never goes stale** — `store.ts` `setPath()`: consume it without comparing the
+   counter (`if (typeof state === 'object' && state && 'skip' in state) return`). `FUZZ_SEED=1` →
+   red on case 1, **4 — remount discipline**: `go(-1): mount count: expected 1 to be 2` (seeds 2, 7,
+   42 land on `back`). Both lanes bite, and differently: RF-04's pins name the stranded route
+   outright (`expected 'home' to be 'user'`), while the property shrinks past that to the sharper
+   shape — a POP onto a stale marker whose URL resolves to the route *already mounted*, where every
+   rendered value agrees and the remount that didn't happen is the only evidence. Which bites
+   first, as the item asked: the pin, by a wide margin — it is unconditional and names the symptom,
+   where the property has to generate the interleaving (it did, on all five seeds).
+5. **A redirect pushes instead of replacing** — `store.ts` `setPath()`: `this.navigate(targetPath)`
+   in place of `this.replace(targetPath)`. `FUZZ_SEED=1` → red on case 1, **5 — redirect
+   discipline**, shrunk 66x to `toRedirectRoute → /r0` then `back`: `back: redirectHops: expected
+   [ { from: '/r0', to: '/', …(1) } ] to deeply equal []` — going back re-enters the redirect it
+   should have stepped over. Seeds 2, 3, 42 fail on `back: rendered route`, seed 7 on `go(-1): url`:
+   the verdict is always a *traversal*, never the navigation that grew the stack. Which is why the
+   forward-only smoke property stays green, and why all 185 pins do — including RF-04's fresh
+   redirect-cap ones, since none of them steps back afterwards.
+6. **A `setPath` return path stops notifying** — `store.ts` `setPath()`: `let silent = false`, set
+   at the same-path early return, and `finally { if (!silent) this.emitChange(); }` — the deliberate
+   one-notification-per-call `finally`, undone for the return that "resolved nothing". `FUZZ_SEED=1`
+   → red on case 2, **6 — notification coherence**: `setSearchParams:replace ?: a resolution must
+   notify subscribers: expected 1 to be greater than 1`, shrunk 20x. See the finding below: the
+   shrink lands on the corner where *nothing observable changed*, and it is the consumer clause —
+   not this one — that catches the same kill where an app would see it.
+7. **Teardown, two disposes, one per lane.**
+   1. *The store's own listener* — `store.ts` `dispose()`: drop `this.unlistenHistory()`.
+      `FUZZ_SEED=1` → red on case 1 (shrunk 23x), on RF-03.4's tail: `after dispose: nothing may
+      remount: expected 2 to be 1`. All 185 pins stay green — a disposed store is inert to *its own*
+      history only through that call, and nothing hand-written drives the injected history past
+      dispose.
+   2. *The history it created* — `store.ts` `dispose()`: drop `this.history.dispose?.()`. The fuzz
+      suite is green and stays green by construction (the harness injects its history, so this line
+      never runs); exactly one pin goes red, the one RF-01 wrote at the surface that owns the
+      resource — `webRouterCore.test.ts > RouterStore.dispose > dispose() detaches the history the
+      store created from the DOM`.
+
+**The counters gate.** Removing the traversal verbs (`Back`, `Forward`, `Go`) from
+`routerCommandsArb` leaves every invariant green — a run that never walks the entry stack is a
+vacuous pass — and fails exactly one assert, the first counter: `never exercised: a traversal ran:
+expected 0 to be greater than 0`. Nothing else moves, which is the gate doing its job.
+
 ## Findings
 
 (Appended as dated notes as items execute; a real router bug is a finding to surface, not
@@ -366,6 +469,48 @@ more expensive one to get wrong (it ends with a pin not written).
 - **No product findings.** Every added pin went green against the engine as it stands; nothing
   here uncovered a router bug, which after RF-01/02/06 is the expected result rather than a
   surprising one.
+
+### 2026-07-16 (RF-05) — the kills the wrong family caught, and the four the pins can't see
+
+The register above is the artifact; these are the things executing it taught that reading it
+wouldn't. No kill survived, so no invariant was mis-encoded and no suite change was forced — and
+no product findings: the engine went back to exactly where it started.
+
+- **Two of the seven planned kills were caught by a *different* family's assert, and that is the
+  register earning its keep rather than a slip in it.** The item's kill for *URL agreement* (push
+  the current URL) and its kill for *state agreement* (drop `stateChanged`) both go red on every
+  seed — and neither one reaches the assert it was written for. A store that pushes nowhere leaves
+  the wrong route on screen, and `rendered route` runs before `url`; a guard that ignores
+  `stateChanged` still writes `_state` before it returns, so `router.state` is right and only the
+  missing remount is wrong. Both families were re-killed with mutations that leave exactly one
+  assert standing (the fragment dropped; the caller's state dropped), and both then bit on their
+  own. Generalizes, and sharpens RF-04's version of it: a kill proves the family it lands on, not
+  the family it was aimed at — so the mutation has to be chosen against the *assertion order*, and
+  a register that only records "red" records less than it thinks.
+- **Four kills are invisible to all 185 deterministic pins, and one of them was a surprise.**
+  Following a redirect with `push` (2), silencing a `setPath` return (6) and leaking the store's
+  history listener (7a) were expected to be the fuzz lane's own — they need a traversal, a
+  subscriber, or a teardown that hand-written tests don't reach. **Dropping the fragment from every
+  navigation** was not: 24 files, one of them named `webRouterHashAnchor.test.ts`, and the suite
+  stays green, because the hash pins drive the *history* directly and nothing pins the hash
+  surviving a `navigate`. That gap sat under a suite that reads as covering it. Worth knowing for a
+  future audit: the strongest evidence a lane adds something is a kill the other lane cannot see,
+  and it turns up in the places whose names suggest otherwise.
+- **The emit-half of notification coherence is proved only at its degenerate corner.** Kill 6
+  shrinks to `setSearchParams:replace ?` — an empty rewrite on a query-less URL, where *nothing
+  observable changed* and the assert is pinning the store's "one notification per `setPath`"
+  contract rather than anything an app could see. Blinding `assertNotified` and re-running the same
+  kill shows `assertConsumerFresh` catching it on all five seeds, on the case that matters
+  (`setSearchParams:replace ?tab=a: what a subscribed consumer last rendered`) — so the family is
+  proved twice, by two asserts that each cover what the other doesn't. The lesson is about
+  shrinking, not about this invariant: a shrinker walks to the *weakest* instance of an assert, so
+  a counterexample is the worst evidence in the run for what the invariant is worth.
+- **The kills are much broader here than in the mandala register**, where kill 3 survives four
+  seeds of five and the recipes lean on their pins. Every router kill is red at `fuzz(25)` on every
+  seed tried. Not a virtue of the invariants: the alphabet is hand-weighted toward traversal and
+  the state seam and every generated table carries a redirect pair, so a 14-command sequence hits
+  the machinery many times over. Read it as calibration — the budget has headroom, and a future
+  invariant that needs a pinned seed is worth a second look rather than a shrug.
 
 ## Per-item conventions
 
