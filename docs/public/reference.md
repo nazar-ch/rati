@@ -249,6 +249,12 @@ Declares one route. `:param` segments become typed params (`/station/:id` →
 props — or, with `options.scope`, the scope's resolved props (checked against the scope,
 with the params feeding the scope's inputs).
 
+Param values are percent-encoded into the URL and decoded back out, so what a navigation
+puts in is what the component gets, whatever characters it holds (a value containing `/`
+stays one segment). Pass values raw — encoding them yourself double-encodes. A URL whose
+encoding is malformed (`/station/%zz`) hands the param through undecoded and warns rather
+than throwing.
+
 ```ts
 route('/station/:stationId', 'station', Board, {
     scope: stationScope,   // optional: data resolved before the component renders
@@ -311,7 +317,7 @@ Members:
 | `path` / `state` | current path; per-entry navigation state |
 | `navigate(to, options?)` | push. `to`: `{ name, …params }` (typed off the table) or a string |
 | `replace(to, options?)` | replace — back skips the current URL |
-| `getPath(to)` | build an href from a typed route reference |
+| `getPath(to)` | build an href from a typed route reference (params percent-encoded); throws if the name isn't in the table |
 | `setSearchParams(params)` | update the query string |
 | `subscribe(fn)` | change notification (for non-React consumers) |
 | `dispose()` | release history listeners (one router per SSR request — dispose after render) |

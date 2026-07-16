@@ -57,9 +57,18 @@ export type RouteContextNames<Routes extends readonly GenericRouteType[]> = {
 
 // -------------------------------------------------------------
 
+/**
+ * Where a path's `:param` tokens are: a name runs from `:` to the next `/` or the end,
+ * captured alongside that terminator. {@link buildPathRe} compiles these into the
+ * matcher's named groups and `RouterStore.getPath` substitutes at the very same
+ * boundaries — sharing the pattern is what keeps the two from drifting. Scanning for the
+ * `:name` substring instead would let `:id` match inside `:idx`.
+ */
+export const PARAM_RE = /:(.*?)(\/|$)/g;
+
 function buildPathRe(path: string): RegExp | null {
     // TODO 2023: allow regexps for the path (manually type params in this case)
-    const pathReCore = path.replace(/:(.*?)(\/|$)/g, '(?<$1>[^/]+?)$2');
+    const pathReCore = path.replace(PARAM_RE, '(?<$1>[^/]+?)$2');
     const pathReString =
         '^' +
         pathReCore +

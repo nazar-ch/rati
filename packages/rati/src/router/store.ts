@@ -2,7 +2,7 @@ import { createBrowserHistory, type History, type Location } from './history';
 import { navTrace } from '../util/navTrace';
 import { installScrollRestoration, type ScrollRestorationOptions } from './scrollRestoration';
 import { GlobalStore } from '../stores/GlobalStore';
-import type { GenericRouteType, NameToRoute } from './route';
+import { PARAM_RE, type GenericRouteType, type NameToRoute } from './route';
 
 // Redirect chains longer than this are treated as a cycle (see setPath).
 const MAX_REDIRECT_DEPTH = 10;
@@ -72,6 +72,34 @@ function stripBasename(pathname: string, basename: string): string {
     // Pathname doesn't live under basename — return as-is so the route matcher
     // gets a chance to fall through to a 404 catch-all if one is defined.
     return pathname;
+}
+
+/**
+ * Percent-decode the matched params — the inbound half of the round-trip `getPath`
+ * opens, so a component reads the value that was put in rather than the browser's
+ * encoding of it (`hello world`, not `hello%20world`).
+ *
+ * A URL is user input: hand-typed, truncated, or copied wrong, it can carry a sequence
+ * `decodeURIComponent` rejects (`/pages/%zz`). Decoding runs during `setPath`, so
+ * letting the URIError fly would turn a bad address into a dead app; the raw segment is
+ * handed through instead — the component sees exactly what the URL said — and the
+ * problem is reported rather than swallowed.
+ */
+function decodeParams(groups: Record<string, string | undefined> | undefined) {
+    const params: Record<string, string> = {};
+    for (const [key, value] of Object.entries(groups ?? {})) {
+        if (value === undefined) continue;
+        try {
+            params[key] = decodeURIComponent(value);
+        } catch {
+            console.warn(
+                `[rati] route param "${key}" is not valid percent-encoding ("${value}") — ` +
+                    `using it undecoded.`,
+            );
+            params[key] = value;
+        }
+    }
+    return params;
 }
 
 /**
@@ -223,12 +251,17 @@ export class RouterStore<
                     `Known routes: ${this.routes.map((item) => item.name).join(', ')}.`,
             );
         }
-        let path: string = matched.path;
-        if (params) {
-            for (const [key, value] of Object.entries(params)) {
-                path = path.replace(`:${key}`, value as string);
-            }
-        }
+        // Substitute at the path's own `:param` boundaries (PARAM_RE — the same tokens
+        // the matcher compiles), so a name can never be found inside a longer one.
+        // Values are percent-encoded, which is the outbound half of the round-trip
+        // getActiveRoute closes: what the caller passes here is what the component is
+        // handed back, whatever characters it contains.
+        const path = matched.path.replace(PARAM_RE, (token, key: string, tail: string) => {
+            const value = (params as Record<string, string | undefined>)[key];
+            // Types require every param, so a missing one means a caller reaching past
+            // them; leave the token in place rather than interpolating "undefined".
+            return value === undefined ? token : encodeURIComponent(value) + tail;
+        });
         return this.basename + path;
     }
 
@@ -522,7 +555,7 @@ export class RouterStore<
                 return {
                     name,
                     component,
-                    routeParams: (result.groups as any) ?? {},
+                    routeParams: decodeParams(result.groups),
                     path,
                     wrapperComponent,
                     redirect,

@@ -226,6 +226,11 @@ the route's component (or scope inputs) are checked against it. `group(defaults,
 applies a shared `wrapper`/`loading`/`error` to a list of routes without changing their
 types.
 
+Param values round-trip: they are percent-encoded into the URL and decoded back out, so a
+component reads the value that was navigated with — `'Zürich HB'`, not `'Z%C3%BCrich%20HB'`
+— and a value carrying `/`, `?` or `#` stays inside its own segment. Pass values raw; don't
+encode them yourself, or they will be encoded twice.
+
 ### Links and navigation
 
 `Link`'s `to` is checked against the routes table — the name must exist and every path
