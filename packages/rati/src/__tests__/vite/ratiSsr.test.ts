@@ -160,6 +160,12 @@ describe('malformed escape', () => {
     test.for([
         ['/products/%zz', '<h1>no such product</h1>'],
         ['/document/%zz', '<h1>no such document</h1>'],
+        // The other rejected shapes: well-formed hex that decodes to no character, a
+        // truncated escape, and a stray `%` — the retry escapes every `%`, so one path
+        // per shape is what keeps that claim honest.
+        ['/products/%FF', '<h1>no such product</h1>'],
+        ['/products/%2', '<h1>no such product</h1>'],
+        ['/products/%', '<h1>no such product</h1>'],
     ] as const)('serves what the app answered (%s)', async ([path, marker]) => {
         const response = await get(path);
         const body = await response.text();

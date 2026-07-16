@@ -41,6 +41,9 @@ const RESULTS = new Map<string, RenderAppResult>([
     // A URL `decodeURIComponent` rejects. The router hands the raw segment through, so
     // the app renders an answer — one per assembly path, since both hand the URL on.
     ['/products/%zz', rendered('<h1>no such product</h1>', { status: 404, matchedCatchAll: true })],
+    ['/products/%FF', rendered('<h1>no such product</h1>', { status: 404, matchedCatchAll: true })],
+    ['/products/%2', rendered('<h1>no such product</h1>', { status: 404, matchedCatchAll: true })],
+    ['/products/%', rendered('<h1>no such product</h1>', { status: 404, matchedCatchAll: true })],
     [
         '/document/%zz',
         rendered(
