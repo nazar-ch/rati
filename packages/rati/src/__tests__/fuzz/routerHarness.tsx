@@ -5,10 +5,11 @@ import { route, type GenericRouteType, type RouteRedirect } from '../../router/r
 import { RouterStore } from '../../router/store';
 import { createMemoryHistory } from '../../router/history';
 import { Router } from '../../router/Router';
-import { RootStore, RootStoreProvider } from '../../stores/RootStore';
+import { RootStore, RootStoreProvider, useRouter } from '../../stores/RootStore';
 import { byLevel } from './arbitraries';
 import {
     buildPath,
+    paramNamesOf,
     type ParamSource,
     type RedirectSpec,
     type RouteSpec,
@@ -112,13 +113,6 @@ function pathFor(shape: PathShape, index: number): string {
         case 'param2':
             return `/q${index}/:${shape.names[0]}/:${shape.names[1]}`;
     }
-}
-
-function paramNamesOf(path: string): string[] {
-    return path
-        .split('/')
-        .filter((segment) => segment.startsWith(':'))
-        .map((segment) => segment.slice(1));
 }
 
 /** The redirect target's params: literals, except that a `fn-*` form on a redirect route
@@ -346,7 +340,12 @@ export type Nav = {
 
 /** A URL no generated route answers — the only way to reach the catch-all, since `*` is
  * not a path `getPath` can build a URL from. */
-const UNMATCHED_PATH = '/zz-nothing-here';
+export const UNMATCHED_PATH = '/zz-nothing-here';
+
+/** Kept simple and pre-encoded: the URL parser would re-encode anything else, and the
+ * model splits the string rather than re-implementing that. */
+export const SEARCH_VALUES = ['', '?tab=a', '?a=1&b=2'];
+export const HASH_VALUES = ['', '#top', '#sec-1'];
 
 export function navTargetArb(table: TableCase): fc.Arbitrary<NavTarget> {
     return fc.oneof(
@@ -383,10 +382,8 @@ export function navArb(table: TableCase): fc.Arbitrary<Nav> {
             mode: fc.constantFrom<Nav['mode']>('navigate', 'replace'),
             target: navTargetArb(table),
             form: fc.constantFrom<Nav['form']>('reference', 'string'),
-            // Kept simple and pre-encoded: the URL parser would re-encode anything else,
-            // and the model splits the string rather than re-implementing that.
-            search: fc.constantFrom('', '?tab=a', '?a=1&b=2'),
-            hash: fc.constantFrom('', '#top', '#sec-1'),
+            search: fc.constantFrom(...SEARCH_VALUES),
+            hash: fc.constantFrom(...HASH_VALUES),
             state: fc.option(
                 fc.record({ panelId: fc.constantFrom('p0', 'p1') }) as fc.Arbitrary<
                     Record<string, unknown>
@@ -462,6 +459,27 @@ export function routerCaseArb(): fc.Arbitrary<RouterCase> {
     );
 }
 
+export type CommandCase = { table: RouteTable; navigable: string[]; initialUrl: string };
+
+/**
+ * The ground for the RF-03 command property: a generated table and the URL the app opens
+ * at. The commands themselves are *not* drawn here — they pick their targets against the
+ * model at run time (routerCommands.ts), so the alphabet needs to know nothing about the
+ * table that gets drawn beside it.
+ */
+export function commandCaseArb(): fc.Arbitrary<CommandCase> {
+    return tableArb().chain((tableCase) =>
+        navTargetArb(tableCase).map((initial) => ({
+            table: tableCase.table,
+            navigable: tableCase.navigable,
+            initialUrl: urlFor(tableCase.table, initial, '', ''),
+        })),
+    );
+}
+
+/** The value pool, for the commands' param picks. */
+export const paramValues = (): readonly string[] => PARAM_VALUES;
+
 /** The URL a target names, as an app would build it — the basename included, since that is
  * what `getPath` does and what a server would have served. */
 export function urlFor(table: RouteTable, target: NavTarget, search: string, hash: string): string {
@@ -482,10 +500,32 @@ export type Harness = {
     mounts: Mount[];
     /** What is on screen right now, or null when the Router rendered nothing. */
     rendered(): Mount | null;
+    /** What an ordinary consumer subscribed through `useRouter` last rendered. */
+    consumer(): Consumed;
     dispose(): void;
 };
 
 const RENDERED_ID = 'rendered-route';
+const CONSUMER_ID = 'router-consumer';
+
+/** The router values a subscribed component read on its last render. */
+export type Consumed = { path: string; search: string; hash: string };
+
+/**
+ * An ordinary app component: it reads the router through the public hook and renders what
+ * it read. `useRouter` subscribes through `useSyncExternalStore`, so this is the whole
+ * notification contract from the outside — a store that changed `search` without telling
+ * its consumers leaves a stale value *here* while `router.search` reads correctly.
+ *
+ * Sits beside the `<Router>` rather than inside a route component on purpose: it must
+ * survive the remounts, so that "the consumer re-read" cannot be satisfied by the route
+ * being thrown away and rebuilt.
+ */
+function RouterConsumer() {
+    const router = useRouter();
+    const consumed: Consumed = { path: router.path, search: router.search, hash: router.hash };
+    return <div data-testid={CONSUMER_ID}>{JSON.stringify(consumed)}</div>;
+}
 
 /** One probe per route: the route component the Router mounts, closed over its own name
  * (the component is handed the params, never the name). It logs its mount rather than its
@@ -582,6 +622,7 @@ export function buildHarness(table: RouteTable, initialUrl: string): Harness {
     const view = render(
         <RootStoreProvider rootStore={root}>
             <Router />
+            <RouterConsumer />
         </RootStoreProvider>,
     );
 
@@ -593,11 +634,27 @@ export function buildHarness(table: RouteTable, initialUrl: string): Harness {
             const el = view.container.querySelector(`[data-testid="${RENDERED_ID}"]`);
             return el ? (JSON.parse(el.textContent!) as Mount) : null;
         },
+        consumer() {
+            const el = view.container.querySelector(`[data-testid="${CONSUMER_ID}"]`);
+            return JSON.parse(el!.textContent!) as Consumed;
+        },
         dispose() {
             view.unmount();
             router.dispose();
         },
     };
+}
+
+/**
+ * A URL that resolves to *something* other than wherever the router currently is — the
+ * probe the teardown tail drives a disposed store with.
+ *
+ * Both candidates always resolve (every generated table has a root and a catch-all), so
+ * driving the history with one is guaranteed to re-key the route of a store still
+ * listening: the tripwire cannot come up vacuous by landing on the path it started from.
+ */
+export function awayUrl(table: RouteTable, currentPath: string): string {
+    return table.basename + (currentPath === UNMATCHED_PATH ? '/' : UNMATCHED_PATH);
 }
 
 /** Apply one generated navigation to the real router, in the shape it declared. */
@@ -607,7 +664,7 @@ export function applyNav(router: RouterStore<GenericRouteType[]>, table: RouteTa
     // search or hash.
     const to =
         nav.form === 'reference' && nav.target.kind === 'route'
-            ? referenceFor(nav.target)
+            ? referenceFor(nav.target.name, nav.target.params, nav.target.keyOrder)
             : urlFor(table, nav.target, nav.search, nav.hash);
     if (nav.mode === 'navigate') {
         router.navigate(to as never, options);
@@ -616,13 +673,23 @@ export function applyNav(router: RouterStore<GenericRouteType[]>, table: RouteTa
     }
 }
 
-/** `{ name, …params }` with the params inserted in the caller's generated order. */
-function referenceFor(target: Extract<NavTarget, { kind: 'route' }>): Record<string, string> {
-    const names = Object.keys(target.params);
+/**
+ * `{ name, …params }` with the params inserted in the caller's generated order.
+ *
+ * The order is drawn rather than fixed because RF-01's finding 2 fired on exactly it:
+ * `getPath` substituted by substring, so `/x/:idx/:id` corrupted when the caller's object
+ * happened to list `id` before `idx` (`Object.entries` is insertion-ordered).
+ */
+export function referenceFor(
+    name: string,
+    params: Record<string, string>,
+    keyOrder: readonly number[],
+): Record<string, string> {
+    const names = Object.keys(params);
     const ordered = names
-        .map((name, i) => ({ name, key: target.keyOrder[i]! * 1000 + i }))
+        .map((paramName, i) => ({ paramName, key: (keyOrder[i] ?? 0) * 1000 + i }))
         .sort((a, b) => a.key - b.key);
-    const reference: Record<string, string> = { name: target.name };
-    for (const { name } of ordered) reference[name] = target.params[name]!;
+    const reference: Record<string, string> = { name };
+    for (const { paramName } of ordered) reference[paramName] = params[paramName]!;
     return reference;
 }

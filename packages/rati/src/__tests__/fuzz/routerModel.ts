@@ -105,6 +105,14 @@ function decodeParam(raw: string): string {
     }
 }
 
+/** The `:param` names a route path declares, in path order. */
+export function paramNamesOf(routePath: string): string[] {
+    return routePath
+        .split('/')
+        .filter((segment) => segment.startsWith(':'))
+        .map((segment) => segment.slice(1));
+}
+
 /** One route's pattern against a pathname → its decoded params, or `null` for no match. */
 export function matchPath(routePath: string, pathname: string): Record<string, string> | null {
     // The catch-all has no pattern at all: it matches whatever reached it.
@@ -169,8 +177,48 @@ function splitUrl(url: string): { pathname: string; search: string; hash: string
 
 // ---------------------------------------------------------------------------------------
 
-/** A history entry, as the model keeps it. */
-type Entry = { pathname: string; search: string; hash: string; state: unknown };
+/**
+ * A history entry, as the model keeps it.
+ *
+ * `mark` is the suppression stamp a *shallow* navigation (`{ keepCurrentRoute: true }`)
+ * puts on the entry it creates. The model gives it an opaque identity of its own rather
+ * than mirroring the engine's spelling — the string the store writes embeds a counter and
+ * a session id, which is exactly the mechanics the altitude rule keeps out of here. What
+ * the model states is the two contract facts the stamp carries:
+ *
+ *   - it is **one-shot** — honored by the resolution its own navigation triggers, and by
+ *     no other, so a later arrival at the entry (a POP back onto it) resolves normally;
+ *   - it makes the entry **distinguishable from every other entry**, because the store
+ *     keeps it *inside* the entry's `state` and compares whole states to decide whether a
+ *     resolution is needed.
+ *
+ * The second fact is a filed finding, not a design the model would choose (README,
+ * 2026-07-16 (RF-03)): it is why two entries that agree on URL *and* on the user's own
+ * state can still re-resolve when a traversal steps between them. It is modelled rather
+ * than stepped around because the alphabet cannot avoid it — and because the re-resolve it
+ * produces is the behavior the shallow design wants (the route on screen is not the one
+ * the URL names, so resolving it is right); only the way it is achieved is the finding.
+ */
+type Entry = {
+    pathname: string;
+    search: string;
+    hash: string;
+    /** The caller's own `{ state }`, or `null` — what `router.state` documents itself as. */
+    userState: Record<string, unknown> | null;
+    /** The shallow stamp, or `null` on an ordinary entry. */
+    mark: string | null;
+};
+
+/**
+ * What the store's `_state` actually holds for an entry — the caller's state with the
+ * shallow stamp merged in, mirroring `pushOrReplace`'s `{ ...skip, ...options.state }`.
+ * Only the *comparisons* use this; what the property may assert `router.state` against is
+ * `Step.state` (the user's half) plus `Step.stateHasMark`.
+ */
+function fullState(entry: Entry): unknown {
+    if (entry.mark === null) return entry.userState ?? null;
+    return { skip: entry.mark, ...entry.userState };
+}
 
 /** What the Router must be showing: the route's name and the params handed to its component. */
 export type Rendered = { name: string; params: Record<string, string> };
@@ -204,7 +252,30 @@ export type Step = {
     path: string;
     search: string;
     hash: string;
-    state: unknown;
+    /**
+     * The caller's own per-entry state — `router.state`'s documented contents ("user state
+     * attached to the current history entry via `navigate`/`replace` `{ state }`, or
+     * `null`").
+     *
+     * On an entry a shallow navigation created, the store's getter also carries its
+     * internal stamp (`stateHasMark`) — a filed finding rather than something the model
+     * blesses by predicting a marker string it would have to reach into the engine to know.
+     */
+    state: Record<string, unknown> | null;
+    /** Whether the store's `state` additionally carries the shallow stamp. See `Entry`. */
+    stateHasMark: boolean;
+    /**
+     * Whether this command's resolution was suppressed by a shallow navigation's stamp —
+     * the URL moved, the mounted route deliberately did not.
+     */
+    suppressed: boolean;
+    /**
+     * Whether this command resolved *at* an entry carrying a stamp that was no longer
+     * armed: the stale-marker arrival (a POP back onto a shallowly-created entry), which
+     * must re-resolve rather than keep the kept route. Carries no assertion of its own —
+     * `remounted` holds the contract — and exists so the property can count the shape.
+     */
+    staleShallowPop: boolean;
     /** `router.redirectHops` — the trail this navigation followed. */
     hops: Hop[];
     /**
@@ -243,14 +314,25 @@ export class RouterModel {
     private loopNow = false;
     /** Reset per command; set when the guard that stopped it was the 1-cycle check. */
     private selfLoopNow = false;
+    /** Reset per command; see `Step.suppressed` / `Step.staleShallowPop`. */
+    private suppressedNow = false;
+    private staleMarkNow = false;
 
     /** Bumped by every resolution that re-keys the active route. The property compares it
      * against the probes' mount log. */
     private mounts = 0;
 
+    /**
+     * The stamp the *next* resolution is allowed to honor — armed by a shallow navigation,
+     * consumed by the very next `setPath` whether or not it got that far. One-shot: see
+     * `Entry`.
+     */
+    private armedMark: string | null = null;
+    private markCounter = 0;
+
     constructor(table: RouteTable, initialUrl: string) {
         this.table = table;
-        this.entries = [{ ...splitUrl(initialUrl), state: null }];
+        this.entries = [{ ...splitUrl(initialUrl), userState: null, mark: null }];
         this.index = 0;
         // The store resolves in its constructor, from the history's opening location.
         this.setPath(0);
@@ -261,20 +343,60 @@ export class RouterModel {
         return this.step(this.mounts > 0);
     }
 
-    navigate(url: string, state: unknown): Step {
+    navigate(url: string, state: Record<string, unknown> | null, shallow = false): Step {
         const before = this.mounts;
+        // A push from anywhere but the tip drops the forward tail: those entries are no
+        // longer reachable, in the model exactly as in the browser.
         this.entries = this.entries.slice(0, this.index + 1);
-        this.entries.push({ ...splitUrl(url), state: state ?? null });
+        this.entries.push(this.newEntry(url, state, shallow));
         this.index = this.entries.length - 1;
         this.setPath(0);
         return this.step(this.mounts > before);
     }
 
-    replace(url: string, state: unknown): Step {
+    replace(url: string, state: Record<string, unknown> | null, shallow = false): Step {
         const before = this.mounts;
-        this.entries[this.index] = { ...splitUrl(url), state: state ?? null };
+        // Swap in place: the stack neither grows nor loses its forward tail.
+        this.entries[this.index] = this.newEntry(url, state, shallow);
         this.setPath(0);
         return this.step(this.mounts > before);
+    }
+
+    /**
+     * Traverse the entry stack — `go`/`back`/`forward`.
+     *
+     * `null` is the whole answer for a traversal that had nowhere to go: out of range does
+     * nothing rather than clamping to the ends, and `go(0)` is the host's reload, which a
+     * memory history has no document for. Nothing happens means *nothing* — no resolution,
+     * and so not even a notification, which is a fact the property asserts (a store that
+     * quietly re-emitted here would make every consumer re-read for no reason).
+     */
+    go(delta: number): Step | null {
+        const target = this.index + delta;
+        if (delta === 0 || target < 0 || target >= this.entries.length) return null;
+        const before = this.mounts;
+        this.index = target;
+        this.setPath(0);
+        return this.step(this.mounts > before);
+    }
+
+    canGo(delta: number): boolean {
+        const target = this.index + delta;
+        return delta !== 0 && target >= 0 && target < this.entries.length;
+    }
+
+    /**
+     * `setSearchParams` — the query rewritten on the current URL, defaulting to `replace`.
+     *
+     * Built from the store's *own* `path`/`hash` rather than the entry's, which is the same
+     * thing everywhere except after a shallow navigation (where `_path` has moved on and
+     * the mounted route hasn't). Carries no state, so the entry it writes has none: on an
+     * entry that had some, that is a change, and the route re-resolves because of it — a
+     * filed finding (README, 2026-07-16 (RF-03)), stated here rather than smoothed over.
+     */
+    setSearchParams(search: string, mode: 'push' | 'replace'): Step {
+        const url = this.table.basename + this.path + (search ? '?' + search : '') + this.hash;
+        return mode === 'push' ? this.navigate(url, null) : this.replace(url, null);
     }
 
     /** The current expectation, without issuing a command. */
@@ -286,9 +408,42 @@ export class RouterModel {
         return this.mounts;
     }
 
+    /** `router.path` — what the *store* reads, which after a shallow navigation is the URL's
+     * path rather than the mounted route's. */
+    currentPath(): string {
+        return this.path;
+    }
+
+    /** The URL of the entry the model is on, basename included. */
+    currentUrl(): string {
+        const entry = this.entries[this.index]!;
+        return entry.pathname + entry.search + entry.hash;
+    }
+
+    /** Names that can be navigated to by reference — the catch-all's `*` is not a URL. */
+    navigable(): string[] {
+        return this.table.routes.filter((spec) => spec.path !== '*').map((spec) => spec.name);
+    }
+
+    /** The redirect routes, so the alphabet can aim at one on purpose. */
+    redirectNames(): string[] {
+        return this.table.routes.filter((spec) => spec.redirect).map((spec) => spec.name);
+    }
+
+    /** The `:param` names a route's path declares, in path order. */
+    paramNamesFor(name: string): string[] {
+        return paramNamesOf(this.routeByName(name).path);
+    }
+
     /** A URL for a route in this table, as an app would build it. */
     url(name: string, params: Record<string, string>, search = '', hash = ''): string {
         return buildPath(this.table.basename, this.routeByName(name).path, params) + search + hash;
+    }
+
+    private newEntry(url: string, state: Record<string, unknown> | null, shallow: boolean): Entry {
+        const mark = shallow ? `m${this.markCounter++}` : null;
+        if (mark) this.armedMark = mark;
+        return { ...splitUrl(url), userState: state ?? null, mark };
     }
 
     private step(remounted: boolean): Step {
@@ -300,7 +455,10 @@ export class RouterModel {
             path: this.path,
             search: this.search,
             hash: this.hash,
-            state: this.state,
+            state: entry.userState,
+            stateHasMark: entry.mark !== null,
+            suppressed: this.suppressedNow,
+            staleShallowPop: this.staleMarkNow,
             hops: this.hops,
             reportedLoop: this.loopNow,
             selfRedirect: this.selfLoopNow,
@@ -336,9 +494,16 @@ export class RouterModel {
             this.hops = [];
             this.loopNow = false;
             this.selfLoopNow = false;
+            this.suppressedNow = false;
+            this.staleMarkNow = false;
         }
 
-        const nextState = entry.state ?? null;
+        // Disarm before anything can return: the stamp is spent by the resolution it was
+        // armed for, whether or not that resolution got as far as reading it.
+        const armed = this.armedMark;
+        this.armedMark = null;
+
+        const nextState = fullState(entry);
         const stateChanged = !shallowEqualState(this.state, nextState);
 
         // Search, hash and state always update — even on a navigation that resolves
@@ -352,6 +517,18 @@ export class RouterModel {
         // a URL re-key the route.
         if (this.path === pathname && this.rendered !== null && !stateChanged) return;
         this.path = pathname;
+
+        // The shallow navigation's own resolution: the URL is already updated above (and
+        // `router.path` with it), and the mounted route is deliberately left where it is.
+        // Nothing below runs — including the redirect follow, so a shallow navigation onto
+        // a redirect route lands on that route's URL without following it anywhere.
+        if (entry.mark !== null && entry.mark === armed) {
+            this.suppressedNow = true;
+            return;
+        }
+        // Reached the entry's stamp with it no longer armed — a later arrival, which
+        // resolves like any other. Counted, not asserted: see `Step.staleShallowPop`.
+        if (entry.mark !== null) this.staleMarkNow = true;
 
         const matched = this.match(pathname);
 
@@ -377,8 +554,9 @@ export class RouterModel {
 
             // The store follows a redirect with `replace`, so the entry is swapped rather
             // than stacked — the redirect route is not reachable by a back step. `replace`
-            // passes no state, so the target entry's is null.
-            this.entries[this.index] = { ...splitUrl(target), state: null };
+            // passes no state and no `keepCurrentRoute`, so the target entry carries
+            // neither the previous entry's state nor a stamp.
+            this.entries[this.index] = { ...splitUrl(target), userState: null, mark: null };
             this.setPath(depth + 1, [...trail, matched.spec.name]);
             return;
         }

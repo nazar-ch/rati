@@ -42,3 +42,19 @@ export function fuzz(numRuns: number): Parameters<unknown> {
 export function byLevel(base: number, perLevel: number): number {
     return base + (envInt('FUZZ_LEVEL') ?? 0) * perLevel;
 }
+
+/**
+ * Vitest's per-test timeout for a fuzz property, scaled to the budget it was asked for.
+ *
+ * The default 5s bound is blind to the one knob that decides how long a property runs:
+ * `FUZZ_RUNS`. `scripts/ci.ts` documents `FUZZ_RUNS=2000` as the way to deepen, and at that
+ * budget a property can walk into a timeout that reads exactly like a property failure —
+ * "Tests 1 failed", no counterexample, and nothing wrong with the code under test. Costly
+ * to diagnose, and it fires on the deep runs that are meant to be the trustworthy ones.
+ *
+ * Generous on purpose: this is a hang-catcher, not a performance gate. The budgets that
+ * keep the suite fast are `fuzz(n)` and `byLevel`.
+ */
+export function fuzzTimeout(): number {
+    return Math.max(5_000, (envInt('FUZZ_RUNS') ?? 0) * 30);
+}
