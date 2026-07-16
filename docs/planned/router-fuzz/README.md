@@ -76,7 +76,9 @@ filed (findings below), cut as **RF-06**:
   the 1-cycle the same-path guard was swallowing. Not: leave the stale route.
 - **Dot-only param values encode**: `getPath` emits `%2E`/`%2E%2E` for a value that is
   exactly `.` or `..`, closing the codec's last round-trip hole. Values merely
-  containing dots stay untouched.
+  containing dots stay untouched. — **Superseded 2026-07-16**: `%2E` is normalized away
+  exactly as `.` is, so this closes nothing. Re-taken as *document the limitation*, no
+  behavior change — see Findings, 2026-07-16 (RF-06).
 - **String redirect targets stay verbatim**, basename included by the author — no
   behavior change; the docs get the explicit line. (Auto-prepending would break every
   app already writing the full path.)
@@ -199,6 +201,43 @@ Harness findings, generalizing for RF-05:
   invariant was green throughout. The counters are now asserted in the property, and the
   fix — pair the two draws, repeat whole destinations — moved that kill from 0/1 seeds to
   8/8 at the default budget.
+
+### 2026-07-16 (RF-06) — one decision could not be carried out, and the 1-cycle was two bugs
+
+- **`%2E` is not an escape from dot-segment normalization, so the dot decision was re-taken
+  mid-item.** RF-06 §2 asked `getPath` to emit `%2E`/`%2E%2E` for a value that is exactly
+  `.` or `..`, on the reading that "the decode side already round-trips them". The decode
+  side does; the URL parser does not. A dot-only segment is resolved away in *every*
+  spelling — `..`, `%2E%2E`, `%2e%2e`, `.%2E` — because URLs read `%2E` as a dot on
+  purpose: it is exactly what stops percent-encoding from smuggling a traversal past a path
+  check. Driven against the real store, `/users/%2E%2E` lands on `/` just as `/users/..`
+  does, and both histories agree (memory parses via `new URL`, browser via `pushState`).
+  The one spelling that survives is double-encoding (`%252E%252E`), which decodes to
+  `%2E%2E`, not `..`; closing *that* gap needs a decode-side special case, and it collides —
+  `'..'` and the literal `'%2E%2E'` both encode to `%252E%252E`, so it would trade the hole
+  for a worse one, on a value that round-trips correctly today. There is no URL that carries
+  a dot-only param value. Decision re-taken by the maintainer: **document the limitation**,
+  no behavior change. reference.md §Routing states it and points at the query string;
+  `getPath`'s comment names the `%2E` trap so the next reader doesn't re-file it as a bug
+  (it also stopped claiming the round-trip holds "whatever characters it contains", which
+  was false). The value pool keeps dot-only values out — now against documented contract
+  rather than an open finding — and gains `a.b`/`..x`, the live half: the boundary is "the
+  whole segment is dots", not "dots occur". Generalizes: a "close the last hole" decision
+  taken over a codec is worth driving against the platform before it is committed to, since
+  the platform may already have taken a position for its own reasons.
+- **The self-redirect was two behaviors under one description, and only one of them was the
+  stale route.** RF-02 filed the 1-cycle as "leaves the *previous* page rendered at the new
+  URL" — which is what a *navigation into* it does. A router constructed straight at the
+  self-route never had that symptom: the same-path early return needs a resolved
+  `activeRoute` to skip past, and a fresh store has none, so following recursed to the depth
+  cap and reported the loop correctly, in ten identical hops. The two entries into `setPath`
+  disagreed, and the filed description only covered one. The fix unifies them at one hop, so
+  `prepareRoute` reports the same 30x it always did (`redirectFromHops` reads the last hop's
+  target, which is `/self` either way) while the client stops going stale. It also showed up
+  in the kill: with the fix reverted, the fuzz property shrank to the *fresh-router* case and
+  failed on the hop trail, not on the rendered route. Worth knowing for RF-03: constructing
+  at the URL under test and navigating to it are not interchangeable paths through `setPath`,
+  and a property that only ever does the former would have missed the bug RF-02 filed.
 
 ## Per-item conventions
 
