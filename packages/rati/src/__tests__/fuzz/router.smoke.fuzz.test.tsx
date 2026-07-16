@@ -133,7 +133,8 @@ const isHostile = (value: string) => encodeURIComponent(value) !== value;
 function noteWhatHappened(step: Step, nav: Nav) {
     if (step.hops.length > 0) note('a redirect was followed');
     if (step.hops.length > 1) note('a redirect chain was followed');
-    if (step.reportedLoop) note('a redirect cycle hit the depth guard');
+    if (step.reportedLoop && !step.selfRedirect) note('a redirect cycle hit the depth guard');
+    if (step.selfRedirect) note('a redirect resolved back to its own route');
     if (!step.remounted) note('a navigation resolved nothing (no remount)');
     if (nav.form === 'reference') note('a navigation went through getPath');
     if (step.rendered !== null && !('oneOf' in step.rendered)) {
@@ -143,6 +144,11 @@ function noteWhatHappened(step: Step, nav: Nav) {
         }
         if (Object.values(step.rendered.params).some(isHostile)) {
             note('a URL-hostile param value round-tripped');
+        }
+        // The live half of the dot rule: a value *containing* dots is ordinary and must
+        // survive untouched. (A value that is only dots has no URL at all — see the pool.)
+        if (Object.values(step.rendered.params).some((value) => value.includes('.'))) {
+            note('a param value carrying dots round-tripped');
         }
     }
 }
@@ -204,11 +210,13 @@ describe('router fuzz — smoke (navigation over generated route tables)', () =>
             'a redirect was followed',
             'a redirect chain was followed',
             'a redirect cycle hit the depth guard',
+            'a redirect resolved back to its own route',
             'a navigation resolved nothing (no remount)',
             'a navigation went through getPath',
             'the catch-all answered',
             'an earlier route shadowed the one asked for',
             'a URL-hostile param value round-tripped',
+            'a param value carrying dots round-tripped',
         ]) {
             expect(exercised[what] ?? 0, `never exercised: ${what}`).toBeGreaterThan(0);
         }

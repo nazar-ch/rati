@@ -40,18 +40,37 @@ import {
  *   'a?b'   'a#b'        → %3F/%23: the delimiters that would otherwise end the path
  *   'ä'     non-ASCII    → two-byte %C3%A4
  *   "a'b"   → neither encodeURIComponent nor the URL parser touches an apostrophe
+ *   'a.b'   '..x'        → dots that are *part of* a value: ordinary characters, untouched
+ *                          end to end. They are the live half of the dot rule below — the
+ *                          boundary being "the whole segment is dots", not "dots occur".
  *   'new'   → collides with the static half of the shadow pair below, on purpose
  *
  * Deliberately absent:
- *   - '.' and '..' — `encodeURIComponent` leaves dots alone and the URL parser then
- *     *normalizes the segment away* ('/x/..' → '/'), so they do not round-trip at all.
- *     That is a real hole in the codec, filed as a finding rather than fuzzed here: the
- *     model would have to grow URL dot-segment normalization to describe it, which is the
- *     URL parser's contract, not the router's.
+ *   - '.' and '..' — a dot-only segment is a path operator rather than data, and no
+ *     encoding rescues it: the URL parser resolves '/x/..' away to '/', and reads '%2E' as
+ *     a dot too (that is what stops percent-encoding from smuggling a traversal past a
+ *     path check). RF-06 confirmed both against the real histories and documented the
+ *     value as unrepresentable instead of encoding it, so there is no round trip here for
+ *     the codec to be held to — and describing what *does* happen would mean growing URL
+ *     dot-segment normalization into the model, which is the URL parser's contract, not
+ *     the router's.
  *   - '' — `getPath` with an empty param builds a URL that no longer identifies the route
  *     ('/users/'). A caller violating the param contract is not a router behavior.
  */
-const PARAM_VALUES = ['a b', 'a/b', '100%', 'a?b', 'a#b', 'ä', "a'b", 'new', '7', 'abc'];
+const PARAM_VALUES = [
+    'a b',
+    'a/b',
+    '100%',
+    'a?b',
+    'a#b',
+    'ä',
+    "a'b",
+    'a.b',
+    '..x',
+    'new',
+    '7',
+    'abc',
+];
 
 const paramValueArb = () => fc.constantFrom(...PARAM_VALUES);
 
@@ -147,6 +166,12 @@ export type TableCase = {
  *                        *static* route may answer. First-match-wins is the contract; the
  *                        model predicts whichever the order gives.
  *   `/cy-a` ⇄ `/cy-b`    the cycle pair, for the depth guard
+ *   `/cy-self`           the cycle of length one, for the guard RF-06 added. Fixed rather
+ *                        than left to the target draw for the reason the pair is: a shape
+ *                        the property claims to cover should not depend on a coin landing
+ *                        (a drawn self-target needs a redirect route to exist, to pick
+ *                        itself out of the pool, *and* to be navigated to — percentage
+ *                        points, at a budget of 25)
  *   `*`                  the catch-all, last — anywhere else it would strand every route
  *                        after it, which is a dead table rather than a router behavior
  */
@@ -164,9 +189,11 @@ export function tableArb(): fc.Arbitrary<TableCase> {
             ),
             permanents: fc.array(fc.boolean(), { minLength: 3, maxLength: 3 }),
             cycleForm: fc.constantFrom<RedirectSpec['form']>('string', 'object'),
+            selfForm: fc.constantFrom<RedirectSpec['form']>('string', 'object'),
             shadowFirst: fc.boolean(),
-            // Sort keys, kept small so `key * 1000 + i` stays an exact integer.
-            order: fc.array(fc.nat({ max: 99 }), { minLength: 12, maxLength: 12 }),
+            // Sort keys, kept small so `key * 1000 + i` stays an exact integer. One per
+            // route the body can hold, so every route's place is its own draw.
+            order: fc.array(fc.nat({ max: 99 }), { minLength: 13, maxLength: 13 }),
         })
         .chain((draw) => {
             const plain: RouteSpec[] = [
@@ -193,42 +220,42 @@ export function tableArb(): fc.Arbitrary<TableCase> {
                 };
             });
 
-            // Targets may be any *other* route, so redirect chains form naturally. A route
-            // redirecting to itself is excluded: the store's same-path guard swallows it
-            // before the depth guard can see it, which is its own question (filed as a
-            // finding), not something to bake into the foundation's model.
+            // Targets may be any route, redirect routes included, so chains form naturally
+            // — and a route may name *itself*: RF-06 made that a cycle of length one
+            // (reported, the route renders), so it is ground the model states rather than
+            // an edge to step around. Drawn self-targets reach the shapes the fixed
+            // `/cy-self` below cannot: a self-target on a param path, and one arrived at
+            // partway down a chain.
             const targetPool = [...plain.map((r) => r.name), ...redirects.map((r) => r.name)];
 
             return fc
                 .tuple(
                     ...redirects.map((redirect) =>
-                        fc
-                            .constantFrom(...targetPool.filter((name) => name !== redirect.name))
-                            .chain((targetName) => {
-                                const targetPath = [...plain, ...redirects].find(
-                                    (r) => r.name === targetName,
-                                )!.path;
-                                const isFn =
-                                    redirect.form === 'fn-string' || redirect.form === 'fn-object';
-                                return targetParamsArb(
-                                    targetPath,
-                                    redirect.form,
-                                    isFn ? 'id' : null,
-                                ).map<RouteSpec>((params) => ({
-                                    name: redirect.name,
-                                    path: redirect.path,
-                                    redirect: {
-                                        form: redirect.form,
-                                        targetName,
-                                        params,
-                                        permanent: redirect.permanent,
-                                    },
-                                }));
-                            }),
+                        fc.constantFrom(...targetPool).chain((targetName) => {
+                            const targetPath = [...plain, ...redirects].find(
+                                (r) => r.name === targetName,
+                            )!.path;
+                            const isFn =
+                                redirect.form === 'fn-string' || redirect.form === 'fn-object';
+                            return targetParamsArb(
+                                targetPath,
+                                redirect.form,
+                                isFn ? 'id' : null,
+                            ).map<RouteSpec>((params) => ({
+                                name: redirect.name,
+                                path: redirect.path,
+                                redirect: {
+                                    form: redirect.form,
+                                    targetName,
+                                    params,
+                                    permanent: redirect.permanent,
+                                },
+                            }));
+                        }),
                     ),
                 )
                 .map((redirectSpecs): TableCase => {
-                    const cycle: RouteSpec[] = [
+                    const cycles: RouteSpec[] = [
                         {
                             name: 'cyA',
                             path: '/cy-a',
@@ -249,11 +276,25 @@ export function tableArb(): fc.Arbitrary<TableCase> {
                                 permanent: false,
                             },
                         },
+                        // The two guards differ in what they can promise, so both are kept
+                        // in every table: the pair runs to the depth cap and the model goes
+                        // weak on which of them survives; this one is refused on sight and
+                        // the model names the route exactly.
+                        {
+                            name: 'cySelf',
+                            path: '/cy-self',
+                            redirect: {
+                                form: draw.selfForm,
+                                targetName: 'cySelf',
+                                params: {},
+                                permanent: false,
+                            },
+                        },
                     ];
 
                     // Shuffle everything but the catch-all: match order is the contract,
                     // and it is what decides the shadow pair.
-                    const body = [...plain, ...redirectSpecs, ...cycle];
+                    const body = [...plain, ...redirectSpecs, ...cycles];
                     const ordered = body
                         .map((spec, i) => ({
                             spec,
@@ -483,6 +524,14 @@ function buildRedirect(table: RouteTable, spec: RedirectSpec): RouteRedirect {
     };
 
     switch (spec.form) {
+        // `buildPath` writes the basename in, which for a *string* target is not the
+        // harness being kind to the router: a string is used verbatim, so under a basename
+        // the author must include it — RF-06 made that explicit contract (reference.md
+        // §Routing, `RouteRedirect`'s doc comment) rather than change the behavior, since
+        // auto-prepending would break every app already writing the full path, and a target
+        // outside the app's mount point would stop being expressible at all. So this draws
+        // the documented shape, and `to: '/b'` under `/admin` is a table bug rather than a
+        // case the model should bless.
         case 'string':
             return {
                 to: buildPath(table.basename, target.path, literals()),

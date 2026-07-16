@@ -20,7 +20,8 @@
       - Mid-segment params (`/p/x:id`). `PARAM_RE` accepts them; the arbitrary never
         generates them, so the model's segment walk needn't. Not a contract claim either
         way — just this suite's ground.
-      - Predict which route survives a redirect *cycle*. See `oneOf` below.
+      - Predict which route survives a redirect cycle *long enough to cap*. See `oneOf`
+        below. A cycle of length one is exact, and is stated.
 */
 
 /** Mirrors the store's documented cap. The model's own follow uses it only to decide when
@@ -179,13 +180,16 @@ export type Hop = { from: string; to: string; permanent: boolean };
 /**
  * The model's answer after one command — everything the property is allowed to look at.
  *
- * `rendered` is `{ oneOf }` when a redirect cycle hit the depth cap. The follow *is*
+ * `rendered` is `{ oneOf }` when a redirect cycle ran to the depth cap. The follow *is*
  * deterministic (the cap's parity decides the winner), but which route that leaves on
  * screen is not something the router promises — the deterministic suite makes the same
  * call (`redirect.test.tsx`: "a redirect cycle stops at the depth guard and renders
  * instead" asserts `['a','b']` contains the name). The contract is: following stops, an
  * error is reported, and one of the cycle's routes renders. Pinning the parity here would
  * make a legitimate change to the cap read as a regression.
+ *
+ * A cycle of *length one* is not weakened that way: no parity is involved, so the route
+ * that declared the self-redirect is named exactly (RF-06).
  */
 export type Step = {
     /** `null` when nothing matched and the table has no catch-all: the Router renders
@@ -204,7 +208,8 @@ export type Step = {
     /** `router.redirectHops` — the trail this navigation followed. */
     hops: Hop[];
     /**
-     * Whether *this command's* resolution ended at the redirect depth guard, and so must
+     * Whether *this command's* resolution stopped at one of the two redirect guards — the
+     * depth cap, or a target that resolved back to the route declaring it — and so must
      * have reported the loop it refused to follow.
      *
      * Distinct from `rendered` being `{ oneOf }`, which says what is on screen and outlives
@@ -213,6 +218,13 @@ export type Step = {
      * resolves and nothing is reported.
      */
     reportedLoop: boolean;
+    /**
+     * Whether the guard that stopped it was the cycle-of-length-one check. Carries no
+     * assertion of its own — `reportedLoop` and `rendered` hold the whole contract — and
+     * exists so the property can count the shape RF-06 lifted the exclusion for, rather
+     * than let the pool quietly stop generating it.
+     */
+    selfRedirect: boolean;
 };
 
 export class RouterModel {
@@ -227,8 +239,10 @@ export class RouterModel {
     private state: unknown = null;
     private rendered: Rendered | { oneOf: string[] } | null = null;
     private hops: Hop[] = [];
-    /** Reset per command; set when this command's follow hit the guard. */
-    private cappedNow = false;
+    /** Reset per command; set when this command's follow stopped at either guard. */
+    private loopNow = false;
+    /** Reset per command; set when the guard that stopped it was the 1-cycle check. */
+    private selfLoopNow = false;
 
     /** Bumped by every resolution that re-keys the active route. The property compares it
      * against the probes' mount log. */
@@ -288,7 +302,8 @@ export class RouterModel {
             hash: this.hash,
             state: this.state,
             hops: this.hops,
-            reportedLoop: this.cappedNow,
+            reportedLoop: this.loopNow,
+            selfRedirect: this.selfLoopNow,
         };
     }
 
@@ -319,7 +334,8 @@ export class RouterModel {
         // A fresh navigation clears the previous trail; a followed redirect appends to it.
         if (depth === 0) {
             this.hops = [];
-            this.cappedNow = false;
+            this.loopNow = false;
+            this.selfLoopNow = false;
         }
 
         const nextState = entry.state ?? null;
@@ -343,6 +359,22 @@ export class RouterModel {
             const redirect = matched.spec.redirect;
             const target = this.resolveTarget(redirect, matched.params);
             this.hops.push({ from: pathname, to: target, permanent: redirect.permanent });
+
+            // A target naming the pathname being resolved is a cycle of length one, and is
+            // refused rather than followed: following it could only re-enter the same path,
+            // resolve nothing, and leave the previous route stranded on screen. Search and
+            // hash are not part of the question — a target differing from its own route
+            // only in query re-enters exactly the same way.
+            if (stripBasename(splitUrl(target).pathname, this.table.basename) === pathname) {
+                // No parity to be coy about, unlike a capped cycle: the route that declared
+                // the redirect is the one left rendering its own component.
+                this.rendered = { name: matched.spec.name, params: matched.params };
+                this.loopNow = true;
+                this.selfLoopNow = true;
+                this.mounts++;
+                return;
+            }
+
             // The store follows a redirect with `replace`, so the entry is swapped rather
             // than stacked — the redirect route is not reachable by a back step. `replace`
             // passes no state, so the target entry's is null.
@@ -359,7 +391,7 @@ export class RouterModel {
             const visited = [...trail, matched.spec.name];
             const repeated = [...new Set(visited.filter((n, i) => visited.indexOf(n) !== i))];
             this.rendered = { oneOf: repeated.length > 0 ? repeated : [...new Set(visited)] };
-            this.cappedNow = true;
+            this.loopNow = true;
             this.mounts++;
             return;
         }
