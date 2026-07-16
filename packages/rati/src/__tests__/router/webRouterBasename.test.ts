@@ -75,4 +75,27 @@ describe('RouterStore basename', () => {
         expect(router.activeRoute?.name).toBe('home');
         router.dispose();
     });
+
+    // Kill: return '/' from stripBasename's third branch instead of the pathname —
+    // the URL then reads as the app's root and 'home' renders for an address the app
+    // was never mounted at. Executed once, red. The catch-all must be last, so this
+    // table is local rather than the shared one above.
+    test('a pathname outside the basename falls through to the catch-all', async () => {
+        const routesWithCatchAll = [
+            route('/', 'home', NoopComponent),
+            route('/dashboard', 'dashboard', NoopComponent),
+            route('*', 'notFound', NoopComponent),
+        ] as const;
+        window.history.replaceState(null, '', '/other/page');
+        const router = new RouterStore({}, routesWithCatchAll, { basename: '/admin' });
+        await Promise.resolve();
+
+        // A pathname that doesn't live under the basename is handed to the matcher
+        // as-is rather than mangled into one that does, so the app answers for it with
+        // the 404 it defines. Stripping is not the same as claiming: /other/page is
+        // not /admin's, and it is not the root either.
+        expect(router.path).toBe('/other/page');
+        expect(router.activeRoute?.name).toBe('notFound');
+        router.dispose();
+    });
 });
