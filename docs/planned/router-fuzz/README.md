@@ -579,6 +579,28 @@ by hand) and re-opened the `.`/`..` topic; the decisions are above, the findings
   RF-05's lesson: what a kill strands is decided by the state at the *traversal*, not by
   the entry that armed the marker.
 
+### 2026-07-17 (from SSR-14/15's gate run) — the coverage guard is itself unreachable ~14% of the time
+
+- **`router.commands.fuzz.test.tsx`'s "never exercised" guard fails intermittently at the
+  default budget, and its comment says it cannot.** Surfaced as a `yarn ci` test-stage
+  failure during an unrelated SSR item (`never exercised: a traversal landed on a stale
+  shallow entry`), on a tree that touches no router code. Measured rather than assumed:
+  50 runs of the suite at the default `fuzz(25)`, half on a clean checkout, failed 7
+  times — ~14% per run, on two of the sixteen listed shapes (`a traversal landed on a
+  stale shallow entry`, `a traversal stepped between two same-URL entries differing in
+  state`). Both need a multi-step conspiracy the alphabet reaches only sometimes: a
+  shallow entry armed, *then* navigated away from, *then* traversed back onto.
+  `:117` states the opposite — "Every one of these is reachable at the default budget" —
+  which is what makes this worth a note rather than a shrug: the guard exists to catch a
+  harness that stopped generating a shape, and it currently cries wolf often enough that
+  the honest reading of a red one is "re-run it". That is the failure mode it was built
+  to prevent, inverted. The deep stage (`FUZZ_RUNS=500`) is not affected — this is the
+  day-to-day `test` stage only.
+- Not fixed here (out of an SSR item's scope, and the fix is a judgment call): the shapes
+  are real and reachable, so the options are a per-shape floor rather than one budget for
+  all sixteen, a generator weighted toward the conspiracy, or moving the coverage guard
+  off the tiny budget onto the deep stage that can actually afford it. Worth an RF item.
+
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with
