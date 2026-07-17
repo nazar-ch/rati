@@ -282,6 +282,72 @@ describe('RouterStore navigation', () => {
     });
 });
 
+/**
+ * RF-07: the router's string vocabulary is absolute paths. A relative one would mean two
+ * different places on the two histories, so it is refused at the choke point instead.
+ *
+ * Kill executed once (2026-07-17, reverted after): dropping the `assertAbsolutePathTarget`
+ * call from `pushOrReplace` turns all nine refusal pins red — the string is pushed
+ * verbatim, and where it lands then depends on which history is underneath, which is the
+ * whole reason for the rule. The absolute and object pins stay green.
+ */
+describe('RouterStore refuses a non-absolute string target', () => {
+    test.each([
+        ['a relative segment', 'sub'],
+        ['a parent reference', '..'],
+        ['a current-directory reference', '.'],
+        ['a query-only reference', '?q=1'],
+        ['a hash-only reference', '#section'],
+        ['an absolute URL', 'https://example.com/x'],
+        ['an empty string', ''],
+    ])('navigate rejects %s', async (_label, target) => {
+        window.history.replaceState(null, '', '/users/1');
+        const router = new RouterStore({}, routes);
+        await Promise.resolve();
+
+        expect(() => router.navigate(target)).toThrow(/not an absolute path/);
+        // Refused before anything moved.
+        expect(router.path).toBe('/users/1');
+        router.dispose();
+    });
+
+    test('replace rejects a relative string, naming itself', async () => {
+        const router = new RouterStore({}, routes);
+        await Promise.resolve();
+
+        expect(() => router.replace('sub')).toThrow(/\[rati\] replace:/);
+        router.dispose();
+    });
+
+    test('the error names the alternatives', async () => {
+        const router = new RouterStore({}, routes);
+        await Promise.resolve();
+
+        expect(() => router.navigate('sub')).toThrow(/getPath|setSearchParams|<Link>/);
+        router.dispose();
+    });
+
+    test('absolute string targets still navigate', async () => {
+        const router = new RouterStore({}, routes);
+        await Promise.resolve();
+
+        router.navigate('/dashboard');
+        await Promise.resolve();
+        expect(router.activeRoute?.name).toBe('dashboard');
+        router.dispose();
+    });
+
+    test('an object target is unaffected — the table builds an absolute path', async () => {
+        const router = new RouterStore({}, routes);
+        await Promise.resolve();
+
+        router.navigate({ name: 'user', userId: '7' });
+        await Promise.resolve();
+        expect(router.path).toBe('/users/7');
+        router.dispose();
+    });
+});
+
 describe('RouterStore.dispose', () => {
     test('stops responding to history changes after dispose', async () => {
         const router = new RouterStore({}, routes);

@@ -57,26 +57,27 @@ const GenericAnchor = function GenericAnchor({
             if (userOnClick) userOnClick(event);
             if (!shouldHandleLinkClick(event)) return;
             event.preventDefault();
-            navTraceStart(`click → ${href}`);
-            router.navigate(href);
+            const path = anchorPath(event.currentTarget);
+            navTraceStart(`click → ${path}`);
+            router.navigate(path);
         },
-        [href, userOnClick, router],
+        [userOnClick, router],
     );
 
     const handleMouseEnter = useCallback(
         (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
             if (userOnMouseEnter) userOnMouseEnter(event);
-            if (prefetch) void router.preloadRoute(href);
+            if (prefetch) void router.preloadRoute(anchorPath(event.currentTarget));
         },
-        [href, prefetch, userOnMouseEnter, router],
+        [prefetch, userOnMouseEnter, router],
     );
 
     const handleTouchStart = useCallback(
         (event: React.TouchEvent<HTMLAnchorElement>) => {
             if (userOnTouchStart) userOnTouchStart(event);
-            if (prefetch) void router.preloadRoute(href);
+            if (prefetch) void router.preloadRoute(anchorPath(event.currentTarget));
         },
-        [href, prefetch, userOnTouchStart, router],
+        [prefetch, userOnTouchStart, router],
     );
 
     return (
@@ -104,7 +105,7 @@ export const Link = function Link({
     const router = useRouter();
 
     const resolvedHref = to ? router.getPath(to) : href!;
-    const isActive = router.isPath(resolvedHref);
+    const isActive = isHrefActive(router, resolvedHref);
 
     return <GenericAnchor {...props} {...{ isActive, href: resolvedHref }} />;
 };
@@ -139,6 +140,50 @@ export const ContextualLink = function ContextualAnchor(
 };
 
 /**
+ * Where this anchor points, in the terms the router speaks: an absolute path.
+ *
+ * `anchor.href` (the IDL property, not `getAttribute('href')`) is the DOM's own
+ * resolution of the attribute — the URL an unintercepted click would go to, `..` and
+ * dot-segment normalization included. Reading it back is how a relative href resolves
+ * with no resolution code in rati: the platform owns the reference an anchor carries, and
+ * an intercepted click lands byte-identically where the unintercepted one would. A
+ * Navigation API interception hands over exactly this shape, which
+ * {@link shouldHandleLinkClick} already mirrors — and which has run by the time we call
+ * this, so the URL is same-origin and only its path part is the router's business.
+ */
+function anchorPath(anchor: HTMLAnchorElement): string {
+    const url = new URL(anchor.href);
+    return url.pathname + url.search + url.hash;
+}
+
+/**
+ * Whether `href` names the route on screen — resolved before comparing, since the raw
+ * spelling is not the destination. An anchor resolves relative to the current URL, so
+ * `href="c"` at `/a/b/c` points at the page it is on while the string never equals the
+ * path; comparing spellings reported it inactive forever.
+ *
+ * Resolution uses the URL parser against the base the anchor itself would use, so it
+ * agrees with the click by construction. The placeholder origin keeps it off `window`
+ * (SSR-safe, same trick as the memory history); an href resolving away from that
+ * placeholder is an absolute external URL, which is no path of this app's. A spelling the
+ * parser rejects outright is likewise nothing we're on — and inactive is the answer to
+ * give, not an exception thrown through a render.
+ */
+function isHrefActive(router: RouterStore<readonly GenericRouteType[]>, href: string): boolean {
+    const base = PLACEHOLDER_ORIGIN + router.basename + router.path + router.search;
+    let url: URL;
+    try {
+        url = new URL(href, base);
+    } catch {
+        return false;
+    }
+    if (url.origin !== PLACEHOLDER_ORIGIN) return false;
+    return router.isPath(url.pathname + url.search + url.hash);
+}
+
+const PLACEHOLDER_ORIGIN = 'http://_';
+
+/**
  * Decide whether to intercept this link click for SPA navigation, or let the
  * browser do its default thing (open in new tab, download, follow external
  * URL, etc.). Mirrors the checks the Navigation API does natively, for
@@ -170,7 +215,7 @@ class LinkContextStore<T extends readonly GenericRouteType[]> {
     ) {}
 
     get isActive() {
-        return this.router.isPath(this.href);
+        return isHrefActive(this.router, this.href);
     }
 
     get href() {

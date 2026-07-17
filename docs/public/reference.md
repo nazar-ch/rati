@@ -286,8 +286,9 @@ route('/settings', 'settings', () => null, {
 });
 ```
 
-Under a [`basename`](#routerstore), a **string** target must include it — a string is used
-verbatim, so write what the URL bar should say (`to: '/admin/b'`, not `to: '/b'`). This is
+A **string** target is an absolute path (it starts with `/`; a relative one is
+[refused](#routerstore)), used verbatim — so under a [`basename`](#routerstore) it must
+include it: write what the URL bar should say (`to: '/admin/b'`, not `to: '/b'`). This is
 the same rule `getPath` follows for a string, and the reason to prefer an object target
 when the destination is a route in the table: that one is resolved through it, basename
 and all. A redirect whose target resolves back to the route declaring it is a loop —
@@ -342,6 +343,18 @@ Members:
 `navigate`/`replace` options: `keepCurrentRoute` (change the URL without re-resolving the
 mounted route) and `state` (per-entry state, survives back/forward; a same-URL navigation
 that changes only state still re-resolves).
+
+**Router-facing strings are absolute path references** — they start with `/`, and anything
+else is refused (`navigate`, `replace`, `<Navigate>`, a `redirect` target). The router does
+not resolve a reference against the current URL: only the browser could, and the memory
+history that serves SSR and tests reads the same spelling differently, so a relative string
+would name two different places depending on the host. Name a route (`{ name, …params }`,
+or `getPath`) to have the table build the path, `setSearchParams` to change the query — and
+where a *platform*-relative reference is what you mean, put it on a `<Link>` or a plain
+anchor. That is the surface that owns one: the DOM resolves the href against the current
+URL, and `<Link>` navigates to the URL the anchor resolved, so an intercepted click lands
+exactly where an unintercepted one would (`href=".."` at `/a/b/c` goes to `/a/`). Active
+state resolves the same way before comparing.
 
 ### Components & hooks
 

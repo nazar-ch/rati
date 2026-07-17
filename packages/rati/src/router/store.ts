@@ -85,6 +85,34 @@ function redirectTargetPathname(targetPath: string, basename: string): string {
 }
 
 /**
+ * The router's string vocabulary is absolute path references; anything else is refused
+ * here, at the choke point, rather than misnavigating quietly.
+ *
+ * A relative string has no single meaning in this router. The platform resolves one
+ * against the current URL, but only in the browser: `createMemoryHistory` parses every
+ * input against a fixed placeholder origin, so the two hosts disagree on every relative
+ * spelling — `push('sub')` from `/a/b/c` is `/a/b/sub` in the browser and `/sub` in
+ * memory, and SSR, tests and the fuzz model all run on the latter. Teaching both to
+ * resolve was the alternative; refusing is the decision, because two hosts can only
+ * disagree about input we accept. It also closes a trap the spelling opened: a
+ * self-targeting redirect written relatively (`to: 'self'` on `/self`) walked past the
+ * loop check, which compares resolutions and saw `'self' !== '/self'`.
+ *
+ * Where a relative reference is genuinely meant, `<Link>`/an anchor is the surface that
+ * owns it — the platform resolves it there, and the router receives the answer.
+ */
+function assertAbsolutePathTarget(target: string, where: string): void {
+    if (target.startsWith('/')) return;
+    throw new Error(
+        `[rati] ${where}: "${target}" is not an absolute path. Router-facing strings must ` +
+            `start with "/" — the router does not resolve a reference against the current URL. ` +
+            `Name a route ({ name: … }, or getPath) to have the table build the path, use ` +
+            `setSearchParams() to change the query, or put the reference on a <Link>/an anchor, ` +
+            `where the platform resolves it.`,
+    );
+}
+
+/**
  * Percent-decode the matched params — the inbound half of the round-trip `getPath`
  * opens, so a component reads the value that was put in rather than the browser's
  * encoding of it (`hello world`, not `hello%20world`).
@@ -260,7 +288,11 @@ export class RouterStore<
     getPath(args: NameToRoute<T> | string) {
         if (typeof args === 'string') {
             // String paths are passed through verbatim (basename is the caller's
-            // responsibility here — they may already have the full URL).
+            // responsibility here — they may already have the full URL). Not held to the
+            // absolute-path rule `navigate`/`replace` enforce, on purpose: this output
+            // feeds `href` attributes (the ContextualLink path), and an anchor is the one
+            // surface where a relative reference is legal — the platform resolves it there
+            // and the router only ever sees the resolved answer (see Link's anchorPath).
             return args;
         }
 
@@ -444,10 +476,16 @@ export class RouterStore<
             if (matched?.redirect && this.redirectDepth < MAX_REDIRECT_DEPTH) {
                 const { to, permanent = false } = matched.redirect;
                 const target = typeof to === 'function' ? to(matched.routeParams) : to;
-                const targetPath =
-                    typeof target === 'string'
-                        ? target
-                        : this.getPath(target as NameToRoute<T>) + this._search + this._hash;
+                let targetPath: string;
+                if (typeof target === 'string') {
+                    // Refused before the hop is recorded or followed: a relative target is
+                    // also how a self-redirect used to slip past the 1-cycle check below,
+                    // which compares resolved pathnames and reads a spelling as different.
+                    assertAbsolutePathTarget(target, `redirect from route "${matched.name}"`);
+                    targetPath = target;
+                } else {
+                    targetPath = this.getPath(target as NameToRoute<T>) + this._search + this._hash;
+                }
                 this.redirectHops.push({ from: pathname, to: targetPath, permanent });
                 // A target pointing back at the pathname being resolved is a cycle of
                 // length 1, and following it cannot reveal that: the nested setPath sees
@@ -515,7 +553,13 @@ export class RouterStore<
         to: NameToRoute<T> | string,
         options: { keepCurrentRoute?: boolean; state?: Record<string, unknown> },
     ) {
-        const path = typeof to === 'string' ? to : this.getPath(to);
+        let path: string;
+        if (typeof to === 'string') {
+            assertAbsolutePathTarget(to, mode === 'push' ? 'navigate' : 'replace');
+            path = to;
+        } else {
+            path = this.getPath(to);
+        }
         // The skip marker is consumed by the very next `setPath` (the synchronous
         // emit from this push/replace) to suppress re-resolution. It embeds the
         // current `pathCounter`, so a later POP back to this entry — where the

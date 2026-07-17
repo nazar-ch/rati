@@ -264,4 +264,62 @@ describe('route-level redirects', () => {
         error.mockRestore();
         router.dispose();
     });
+
+    /**
+     * RF-07: a relative target is refused where the redirect is followed. This is also the
+     * hole RF-06's loop check had — a *relative* self-target walked past a comparison that
+     * reads resolutions, because `'self' !== '/self'` as a spelling. Refusing the input
+     * class closes it: a spelling can no longer sneak past by not looking like its answer.
+     *
+     * Kills executed once, 2026-07-17, reverted after. Both guards dropped (the pre-RF-07
+     * engine) reproduces the bypass exactly, on the browser history and here: one hop
+     * recorded, **no loop reported**, and `home` left on screen at URL `/self` — the stale
+     * shape RF-06 fixed, reached by spelling. Both pins go red.
+     *
+     * Dropping *only* the redirect branch's guard is the sharper kill, and the reason this
+     * guard exists rather than leaning on the `replace` one downstream: the target still
+     * throws — the nested `replace` refuses it — but says `[rati] replace:` instead of
+     * naming the route that declared it, and records the hop before dying, so
+     * `redirectHops` reports one it never followed. Both assertions below catch that; the
+     * function-redirect pin does not (it goes green), and is regression cover only.
+     */
+    test('a relative redirect target is refused rather than resolved', () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const Self = () => <div>self</div>;
+        const routes = [
+            route('/home', 'home', Home),
+            route('/self', 'self', Self, { redirect: { to: 'self' } }),
+            route('*', 'notFound', NotFound),
+        ] as const satisfies GenericRouteType[];
+        const router = new RouterStore({}, routes, {
+            history: createMemoryHistory({ url: '/home' }),
+        });
+
+        // The error names the route that declared the target, not just the string.
+        expect(() => router.navigate('/self')).toThrow(
+            /redirect from route "self": "self" is not an absolute path/,
+        );
+        // Refused before the hop was recorded, so nothing reports it as a followed one.
+        expect(router.redirectHops).toEqual([]);
+        expect(error).not.toHaveBeenCalled();
+
+        error.mockRestore();
+        router.dispose();
+    });
+
+    test('a relative target from a function redirect is refused too', () => {
+        const routes = [
+            route('/home', 'home', Home),
+            route('/old/:userId', 'old', Null, { redirect: { to: ({ userId }) => userId } }),
+            route('*', 'notFound', NotFound),
+        ] as const satisfies GenericRouteType[];
+        const router = new RouterStore({}, routes, {
+            history: createMemoryHistory({ url: '/home' }),
+        });
+
+        // The function's *return* is the target — the string rule reads it there, so a
+        // legacy mapper that forgets the leading slash is caught rather than followed.
+        expect(() => router.navigate('/old/7')).toThrow(/not an absolute path/);
+        router.dispose();
+    });
 });

@@ -332,7 +332,11 @@ export type Nav = {
     mode: 'navigate' | 'replace';
     target: NavTarget;
     /** A reference (`{ name, …params }`) or a literal URL — the two shapes `navigate`
-     * accepts. Only the string form can carry a search or hash. */
+     * accepts. Only the string form can carry a search or hash. The string form draws
+     * absolute paths (`buildPath` writes the leading `/` and the basename), which since
+     * RF-07 is the whole of the contract rather than a corner of it the draw declines to
+     * probe: a router-facing string that doesn't start with `/` is refused, so a relative
+     * draw would only ever pin the guard the deterministic suites already pin. */
     form: 'reference' | 'string';
     search: string;
     hash: string;
