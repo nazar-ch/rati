@@ -163,7 +163,9 @@ function anchorPath(anchor: HTMLAnchorElement): string {
  * path; comparing spellings reported it inactive forever.
  *
  * Resolution uses the URL parser against the base the anchor itself would use, so it
- * agrees with the click by construction. The placeholder origin keeps it off `window`
+ * agrees with the click by construction — assuming no `<base href>` element, which would
+ * move the anchor's base but not this one (rati doesn't support one). The placeholder
+ * origin keeps it off `window`
  * (SSR-safe, same trick as the memory history); an href resolving away from that
  * placeholder is an absolute external URL, which is no path of this app's. A spelling the
  * parser rejects outright is likewise nothing we're on — and inactive is the answer to

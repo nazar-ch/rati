@@ -322,4 +322,32 @@ describe('route-level redirects', () => {
         expect(() => router.navigate('/old/7')).toThrow(/not an absolute path/);
         router.dispose();
     });
+
+    /**
+     * The open-redirect shape the origin check exists for. `:dest` matches one URL
+     * segment, but `%2F` decodes to `/` (decodeParams), so a request can hand the mapper
+     * a value that composes into `//evil.com` — starts with `/`, passes the absolute-path
+     * check, and on the server would ride `prepareRoute` verbatim into the `Location`
+     * header: a redirect to an origin the app never chose. Refused where the redirect is
+     * followed, before the hop is recorded. Kill: see webRouterCore.test.ts — dropping
+     * the origin check turns this red (the memory history quietly lands on `/`, the trail
+     * records the authority, and prepareRoute would report it).
+     */
+    test('a redirect target carrying an authority is refused, not followed', () => {
+        const routes = [
+            route('/home', 'home', Home),
+            route('/go/:dest', 'go', Null, { redirect: { to: ({ dest }) => dest } }),
+            route('*', 'notFound', NotFound),
+        ] as const satisfies GenericRouteType[];
+        const router = new RouterStore({}, routes, {
+            history: createMemoryHistory({ url: '/home' }),
+        });
+
+        expect(() => router.navigate('/go/%2F%2Fevil.com')).toThrow(
+            /resolves off the app's origin/,
+        );
+        // Nothing for prepareRoute to report as a followed hop.
+        expect(router.redirectHops).toEqual([]);
+        router.dispose();
+    });
 });

@@ -100,17 +100,46 @@ function redirectTargetPathname(targetPath: string, basename: string): string {
  *
  * Where a relative reference is genuinely meant, `<Link>`/an anchor is the surface that
  * owns it — the platform resolves it there, and the router receives the answer.
+ *
+ * A leading `/` is not yet a path: the URL parser reads a second authority introducer as
+ * another origin — `//host`, and every spelling it normalizes into that (`/\host`,
+ * `///host`, tab/newline-smuggled variants; the parser strips those characters before it
+ * looks). The two hosts split on exactly this class (the browser's pushState refuses it
+ * as cross-origin, the memory history quietly lands on the parsed pathname), and a
+ * redirect target travels verbatim into the server's `Location` header — where an
+ * authority the app never chose is an open redirect, reachable through a function
+ * redirect composed from a decoded param (params carry `/` via `%2F`). So the check is
+ * the memory history's own parse: resolve against the placeholder origin and refuse
+ * anything that leaves it.
  */
 function assertAbsolutePathTarget(target: string, where: string): void {
-    if (target.startsWith('/')) return;
-    throw new Error(
-        `[rati] ${where}: "${target}" is not an absolute path. Router-facing strings must ` +
-            `start with "/" — the router does not resolve a reference against the current URL. ` +
-            `Name a route ({ name: … }, or getPath) to have the table build the path, use ` +
-            `setSearchParams() to change the query, or put the reference on a <Link>/an anchor, ` +
-            `where the platform resolves it.`,
-    );
+    if (!target.startsWith('/')) {
+        throw new Error(
+            `[rati] ${where}: "${target}" is not an absolute path. Router-facing strings must ` +
+                `start with "/" — the router does not resolve a reference against the current URL. ` +
+                `Name a route ({ name: … }, or getPath) to have the table build the path, use ` +
+                `setSearchParams() to change the query, or put the reference on a <Link>/an anchor, ` +
+                `where the platform resolves it.`,
+        );
+    }
+    let origin: string | null = null;
+    try {
+        origin = new URL(target, PLACEHOLDER_ORIGIN).origin;
+    } catch {
+        // e.g. "//[" — unparseable; neither history could follow it either.
+    }
+    if (origin !== PLACEHOLDER_ORIGIN) {
+        throw new Error(
+            `[rati] ${where}: "${target}" resolves off the app's origin ("//host" is an ` +
+                `authority, not a path) — the router only moves within the app. Link an ` +
+                `external URL with a plain <a>; redirect to one at the HTTP layer.`,
+        );
+    }
 }
+
+// The memory history's trick (see createMemoryHistory): a fixed origin so the URL parser
+// answers for path-only input. Any input that resolves away from it named another origin.
+const PLACEHOLDER_ORIGIN = 'http://_';
 
 /**
  * Percent-decode the matched params — the inbound half of the round-trip `getPath`

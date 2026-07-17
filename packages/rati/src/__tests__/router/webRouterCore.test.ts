@@ -311,6 +311,29 @@ describe('RouterStore refuses a non-absolute string target', () => {
         router.dispose();
     });
 
+    // A leading '/' can still name another origin: the parser reads a second authority
+    // introducer ('//host') out of every one of these spellings — backslashes become
+    // slashes and tabs/newlines are stripped before it looks. The two histories split on
+    // exactly this class (pushState refuses cross-origin, memory lands on the parsed
+    // pathname), so the guard refuses it with the memory history's own parse.
+    // Kill executed once (2026-07-17, reverted after): with the origin check dropped from
+    // `assertAbsolutePathTarget` all four pins here and both redirect.test.tsx pins go
+    // red — each string is pushed verbatim; the nine not-absolute pins stay green.
+    test.each([
+        ['a protocol-relative URL', '//example.com/x'],
+        ['a backslash authority', '/\\example.com/x'],
+        ['a slash-run authority', '///example.com/x'],
+        ['a tab-smuggled authority', '/\t/example.com/x'],
+    ])('navigate rejects %s — it resolves off the origin', async (_label, target) => {
+        window.history.replaceState(null, '', '/users/1');
+        const router = new RouterStore({}, routes);
+        await Promise.resolve();
+
+        expect(() => router.navigate(target)).toThrow(/resolves off the app's origin/);
+        expect(router.path).toBe('/users/1');
+        router.dispose();
+    });
+
     test('replace rejects a relative string, naming itself', async () => {
         const router = new RouterStore({}, routes);
         await Promise.resolve();

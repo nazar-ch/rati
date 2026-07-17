@@ -95,8 +95,10 @@ export type RedirectTarget = { name: string } & Record<string, string>;
  * so under a `basename` it must include it (`to: '/admin/b'`, not `to: '/b'`): write what
  * the URL bar should say, which is the same rule `getPath` follows for a string and the
  * only way a target outside the app's own mount point stays expressible. A relative string
- * is refused where the redirect is followed (the router resolves nothing — see
- * `assertAbsolutePathTarget` in `RouterStore`). A function receives the matched params —
+ * — or one the URL parser reads as carrying an authority (`//host`), which on the server
+ * would ride into the `Location` header as an open redirect — is refused where the
+ * redirect is followed (the router resolves nothing — see `assertAbsolutePathTarget` in
+ * `RouterStore`). A function receives the matched params —
  * the legacy-path shape (`/old/:id` → `/new/:id`); the rule reads its return.
  *
  * A target that resolves back to the route declaring it is a redirect loop: it is reported

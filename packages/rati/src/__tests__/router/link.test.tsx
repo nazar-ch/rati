@@ -110,6 +110,10 @@ describe('<Link> active state resolves before comparing', () => {
         // at              href       active
         ['/a/b/c', 'c', true],
         ['/a/b/c', '/a/b/c', true],
+        // An empty href is the current document (the parser returns the base), so it is
+        // active — under the old spelling comparison it never was. Deliberate: resolution
+        // decides, not the raw string.
+        ['/a/b/c', '', true],
         ['/a/b/c', '..', false],
         ['/a/b/c', 'sub', false],
         ['/a/b/c', '/x', false],

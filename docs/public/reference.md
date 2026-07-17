@@ -348,7 +348,11 @@ that changes only state still re-resolves).
 else is refused (`navigate`, `replace`, `<Navigate>`, a `redirect` target). The router does
 not resolve a reference against the current URL: only the browser could, and the memory
 history that serves SSR and tests reads the same spelling differently, so a relative string
-would name two different places depending on the host. Name a route (`{ name, …params }`,
+would name two different places depending on the host. A leading `/` alone is not enough:
+a string the URL parser reads as carrying an *authority* (`//host` and its spellings) names
+another origin, not a path, and is refused too — the router only moves within the app, and
+a redirect target travels into the server's `Location` header, where an authority the app
+never chose would be an open redirect. Link external URLs with a plain `<a>`. Name a route (`{ name, …params }`,
 or `getPath`) to have the table build the path, `setSearchParams` to change the query — and
 where a *platform*-relative reference is what you mean, put it on a `<Link>` or a plain
 anchor. That is the surface that owns one: the DOM resolves the href against the current

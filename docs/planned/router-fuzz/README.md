@@ -601,6 +601,33 @@ by hand) and re-opened the `.`/`..` topic; the decisions are above, the findings
   all sixteen, a generator weighted toward the conspiracy, or moving the coverage guard
   off the tiny budget onto the deep stage that can actually afford it. Worth an RF item.
 
+### 2026-07-17 (post-close review round) — RF-07's guard admitted authority-carrying spellings
+
+- **`assertAbsolutePathTarget` checked only `startsWith('/')`, and `//host` starts with
+  `/`.** The URL parser reads a second authority introducer as another origin — `//host`,
+  and every spelling it normalizes into it: `/\host` (backslash becomes slash in special
+  schemes), `///host`, and tab/newline-smuggled variants (`/\t/host` — the parser strips
+  those characters before it looks; all five confirmed by hand in Node). The class is
+  exactly what RF-07 refuses on — the browser's `pushState` throws it cross-origin while
+  the memory history quietly lands on the parsed pathname — and it is security-relevant
+  besides: a redirect target rides `prepareRoute` verbatim into the server's `Location`
+  header, and a function redirect composed from a decoded param (params carry `/` via
+  `%2F`) makes `Location: //evil.com` reachable from a request URL — an open redirect.
+  Found independently by a review agent and by hand; the reachability chain
+  (`decodeParams` → `to(params)` → guard → hops → `redirectFromHops` → `Location`)
+  re-traced in code before fixing.
+- Closed at the same choke point, in-round: the guard now also parses the target against
+  the memory history's placeholder origin and refuses anything that resolves off it —
+  the character-prefix alternative was rejected because the whitespace spellings escape
+  it. Four deterministic pins (`webRouterCore.test.ts`) plus the open-redirect repro
+  (`redirect.test.tsx`, `%2F%2Fevil.com` through a function redirect); kill executed once
+  — origin check dropped, exactly those five red, the nine not-absolute pins green.
+- Also from the same round, pinned without a code change: an empty `href` on `<Link>` is
+  now *active* at a search-less current URL (`new URL('', base)` returns the base — the
+  resolution-decides rule, deliberately), and `isHrefActive`'s comment now names the
+  `<base href>` element as the one base the click and the active check would not share
+  (rati doesn't support one).
+
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with
