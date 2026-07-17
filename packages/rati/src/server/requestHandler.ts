@@ -91,10 +91,25 @@ export function createRequestHandler(
             return html(result.status, assemble(options, placeholders, result));
         } catch (error) {
             onError(error, request);
+            // The fallback answers a *render* failure — an app that may still be fine in
+            // a browser. `Unservable` is the other thing: the handler's own
+            // configuration is wrong, and the fallback cannot read it right either. It
+            // branches on `template === undefined`, which is the same signal that got us
+            // here meaning something else, so it would answer a fragment app with a
+            // whole-document app's shell. A 500 the developer can read beats a page that
+            // cannot boot.
+            if (error instanceof Unservable) return text(500, 'Internal Server Error');
             return fallback(options, placeholders);
         }
     };
 }
+
+/**
+ * The handler is configured in a way that cannot produce a page — not a render that
+ * failed. Private: `onError` hands the developer the message, and the only decision the
+ * type carries is the one in the catch above.
+ */
+class Unservable extends Error {}
 
 const BY: Assembler = {
     name: 'rati/server',
@@ -109,7 +124,11 @@ function assemble(
 ): string {
     if (isWholeDocument(result.html)) return spliceDocument(result.html, result, BY);
     if (options.template === undefined) {
-        throw new Error(
+        // Here the two readings of `template === undefined` disagree: this app renders
+        // fragments, so the unset option is a mistake, where the fallback below can only
+        // read it as "whole-document app". Hence `Unservable` rather than a plain Error
+        // — see the catch.
+        throw new Unservable(
             'rati/server — createRequestHandler({ template }) is unset and the app rendered ' +
                 'a fragment, so there is nothing to render it into. Pass your index.html; ' +
                 'only a whole-document app (one that renders `<html>` itself) needs no shell.',
@@ -144,6 +163,13 @@ function fallback(options: RequestHandlerOptions, placeholders: Placeholders): R
         return html(500, synthesizeDocument(styleTags, scriptTags));
     }
     try {
+        // The scripts go in the *head* slot, where `synthesizeDocument` puts them at the
+        // end of the body. The asymmetry is the template's, not a preference: the head
+        // slot is the only one that can hold them. `<!--app-html-->` sits inside `#root`
+        // by construction, which the client entry clears on mount; `<!--app-state-->` is
+        // the payload's, and the payload is precisely what a fallback has none of.
+        // Nothing is lost — a module script defers, so it runs after parsing from either
+        // place, which is also why the synthesized document is free to be conventional.
         return html(
             500,
             fillTemplate(

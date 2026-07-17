@@ -212,4 +212,34 @@ describe('the CSR fallback', () => {
             message: expect.stringContaining('createRequestHandler({ template }) is unset'),
         });
     });
+
+    // SSR-15. The handler's own misconfiguration is not a render failure, and must not
+    // be answered by the shape above: a fragment app with no template threads the gap
+    // between the two readings of `template === undefined` — `assemble` throws its
+    // config error (the app rendered a fragment), and the fallback, seeing no template,
+    // would synthesize a whole-document shell with no `#root` for that app's entry to
+    // boot into. Plain text is what this answered before SSR-12 built the fallback, and
+    // it was honest.
+    //
+    // Kill: requestHandler.ts, the catch — drop the `error instanceof Unservable` line
+    // → the assets synthesize an `<html>` this app cannot run (executed: red here, and
+    // nowhere else in the suite).
+    test('answers plainly when a fragment app has no template, assets or not', async () => {
+        const onError = vi.fn();
+        const handler = createRequestHandler({
+            render: () => Promise.resolve(RENDERED),
+            assets: ASSETS,
+            onError,
+        });
+        const response = await get(handler);
+
+        expect(response.status).toBe(500);
+        expect(response.headers.get('content-type')).toBe('text/plain; charset=utf-8');
+        expect(await response.text()).toBe('Internal Server Error');
+        // The developer still gets the real reason — the guard changes the answer on the
+        // wire, not the report.
+        expect(onError.mock.calls[0]?.[0]).toMatchObject({
+            message: expect.stringContaining('createRequestHandler({ template }) is unset'),
+        });
+    });
 });

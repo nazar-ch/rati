@@ -313,6 +313,17 @@ is load-bearing, not minimalism — React's client render into a *document* cont
 everything else, so a document holding only those cannot orphan the entry that is running
 the mount. Anything added there would silently disappear client-side.
 
+Reading one signal two ways costs a guard (SSR-15). `assemble` decides whole-document by
+*content* (`isWholeDocument(result.html)`) and the fallback by *config* (`template ===
+undefined`), so a fragment app misconfigured with no template threads the gap: the render
+succeeds, `assemble` throws the "pass your index.html" config error, and the fallback —
+seeing no template — would synthesize a document with no `#root` for that app's entry.
+So that throw is an `Unservable` (a private Error subclass, the only thing the type is
+for) and the catch answers it plain-text 500, which is what it answered before the
+fallback existed. `onError` still reports it either way. The fallback's
+`template === undefined` branch is thereby reached only by apps that really do render
+whole documents — every *render* failure still gets the shell.
+
 `createRoot(document)` is undocumented-but-real (the types, `isValidContainer`'s
 `nodeType === 9`, and browsers all take it; react.dev names `document` only under
 `hydrateRoot`). The maintainer accepted that on condition of the canary in
