@@ -599,7 +599,10 @@ by hand) and re-opened the `.`/`..` topic; the decisions are above, the findings
 - Not fixed here (out of an SSR item's scope, and the fix is a judgment call): the shapes
   are real and reachable, so the options are a per-shape floor rather than one budget for
   all sixteen, a generator weighted toward the conspiracy, or moving the coverage guard
-  off the tiny budget onto the deep stage that can actually afford it. Worth an RF item.
+  off the tiny budget onto the deep stage that can actually afford it. Filed as RF-09
+  (issues/RF-09-coverage-guard-flake.md, plan.md B6) with the options weighed there; it
+  re-fired once more during the 2026-07-17 review round, again on a tree touching no
+  traversal code.
 
 ### 2026-07-17 (post-close review round) — RF-07's guard admitted authority-carrying spellings
 

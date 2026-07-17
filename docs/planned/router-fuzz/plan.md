@@ -59,6 +59,15 @@ Items live in [issues/](./issues/); status derives from rati git (`git log --gre
   documented; `getPath` throws with its pins and reference.md updated. `yarn ci` green.
   Effort ready to close.
 
+### B6 — harness upkeep (cut 2026-07-17, decision pending)
+
+- **Items:** RF-09 (the coverage guard flakes at the budget its comment vouches for —
+  found by SSR-14/15's gate run, measured at ~14%/run).
+- **Entry:** maintainer picks among the issue's three options (recommendation recorded:
+  assert the guard only at the deep budget, which `yarn ci` always runs).
+- **Exit:** 50 default-budget runs with zero coverage-guard reds; one deep run asserting
+  and passing; the `:117` comment states a true claim.
+
 ## Grading
 
 | Item | Model / effort | Why |
@@ -71,6 +80,7 @@ Items live in [issues/](./issues/); status derives from rati git (`git log --gre
 | RF-05 | Opus, medium | mutation discipline: honest kills, honest reverts |
 | RF-07 | Opus, medium | one DOM read-back in Link + a refusal guard at the string choke points; small but the contract line must land exactly |
 | RF-08 | Sonnet, medium | one guard + pins + docs; the decision is already taken |
+| RF-09 | Sonnet, medium | a meta-check moves to the budget that can honor it; the measurement discipline is the work |
 
 The Agent tool sets `model` but not reasoning-effort — carry the effort tier as a
 thoroughness line in the prompt.
