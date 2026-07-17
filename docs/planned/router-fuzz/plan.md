@@ -49,12 +49,15 @@ Items live in [issues/](./issues/); status derives from rati git (`git log --gre
 
 ### B5 — round-2 hardening (execution; cut 2026-07-16, decisions taken)
 
-- **Items:** RF-07 (relative strings made coherent), RF-08 (getPath refuses dot-only
-  param values). Independent, any order.
-- **Entry:** none — both decisions are taken (README §Decisions, round-2 review).
-- **Exit:** the memory history resolves like the browser, the relative-spelling 1-cycle
-  bypass is closed, `<Link to="..">` is pinned and documented; `getPath` throws with its
-  pins and reference.md updated. `yarn ci` green. Effort ready to close.
+- **Items:** RF-07 (relative strings: the anchor resolves, the router refuses), RF-08
+  (getPath refuses dot-only param values). Independent, any order.
+- **Entry:** none — both decisions are taken (README §Decisions, round-2 review; RF-07's
+  corrected 2026-07-17).
+- **Exit:** Link navigates and prefetches via the anchor's DOM-resolved URL with active
+  state resolved before comparing, the router refuses non-absolute string targets (which
+  closes the relative-spelling 1-cycle bypass), `<Link to="..">` is pinned and
+  documented; `getPath` throws with its pins and reference.md updated. `yarn ci` green.
+  Effort ready to close.
 
 ## Grading
 
@@ -66,7 +69,7 @@ Items live in [issues/](./issues/); status derives from rati git (`git log --gre
 | RF-03 | Opus, high | invariant encoding over traversal interleavings — the subtle heart |
 | RF-04 | Opus, medium | pin audit against 21 existing suites; discipline over invention |
 | RF-05 | Opus, medium | mutation discipline: honest kills, honest reverts |
-| RF-07 | Opus, medium | a resolution-semantics change across two histories + a setPath comparison; small but load-bearing |
+| RF-07 | Opus, medium | one DOM read-back in Link + a refusal guard at the string choke points; small but the contract line must land exactly |
 | RF-08 | Sonnet, medium | one guard + pins + docs; the decision is already taken |
 
 The Agent tool sets `model` but not reasoning-effort — carry the effort tier as a

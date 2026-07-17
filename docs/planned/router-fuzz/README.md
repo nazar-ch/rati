@@ -94,15 +94,19 @@ deterministic pin), not the store consuming it.
 The maintainer reviewed RF-03…06 (and SSR-12/13) and re-opened the `.`/`..` topic against
 what the field does; two decisions, cut as **RF-07** and **RF-08**:
 
-- **Relative navigation strings are coherent passthrough** (RF-07): no route-hierarchy
-  semantics (rati's table is flat; named routes and `ContextualLink` are its relative
-  story), but every surface resolves a relative string the way the browser does — the
-  memory history resolves against its *current entry* rather than a placeholder root
-  (today they diverge on every relative input), the self-redirect comparison resolves
-  the target before comparing (a relative spelling of a 1-cycle bypasses it today —
-  confirmed, the stale route is back), and `<Link to="..">` is functional and
-  documented. Not: rejecting non-absolute strings (that would also reject `?query` /
-  `#hash` strings and break the verbatim rule for no gain).
+- **Relative navigation strings: the anchor resolves, the router refuses** (RF-07;
+  decision corrected 2026-07-17 — the first cut recorded "coherent passthrough", every
+  surface resolving like the browser, which was a misunderstanding). The router does not
+  support relative strings: neither `History` grows resolution semantics, and a string
+  target to `navigate`/`replace`/`redirect.to` must be an absolute path — refused
+  otherwise with a framework-shaped error (RF-08's shape), which is also what closes the
+  confirmed 1-cycle spelling bypass. `<Link to="..">` nonetheless works correctly,
+  because resolution belongs to the platform surface that owns the reference: the
+  rendered anchor's `href` IDL property is already the DOM-resolved absolute URL, so the
+  intercepted click reads that back (`new URL(event.currentTarget.href)`) instead of
+  re-submitting the raw prop — the router only ever sees absolute paths, and no
+  resolution code enters rati. No route-hierarchy semantics (the table is flat; named
+  routes and `ContextualLink` are its relative story).
 - **`getPath` refuses a dot-only param value** (RF-08) — the third take on RF-02's
   finding, superseding RF-06's *document the limitation*. The platform facts stand (no
   encoding survives; every peer router silently misnavigates — React Router's
@@ -127,8 +131,8 @@ grows. RF-03 adds the command alphabet and the behavioral invariants; RF-04 audi
 existing 21 suites against the pin list and adds only the missing pins — the two run as
 parallel lanes (RF-04 needs only RF-02). RF-05 closes with the kill audit and
 non-vacuity verification. RF-07 and RF-08 carry the round-2 decisions above (relative
-strings made coherent; dot-only param values refused) — hardening the review found, not
-new fuzz scope.
+strings resolved at the anchor and refused in the router; dot-only param values
+refused) — hardening the review found, not new fuzz scope.
 
 Batching, dependencies, grading: [plan.md](./plan.md).
 
@@ -549,16 +553,19 @@ by hand) and re-opened the `.`/`..` topic; the decisions are above, the findings
   `home` at URL `/self` with one hop recorded and **no loop reported** — the exact
   stale-route shape RF-06 fixed, back through a spelling. The comparison sees
   `'self' !== '/self'`, follows, the platform resolves the replace back to `/self`, and
-  the nested `setPath` takes the same-path early return. RF-07 §2 owns the fix.
-  Generalizes: a guard that compares what the *caller wrote* against what the *platform
-  resolves* has to resolve first, or every alternate spelling is a bypass.
+  the nested `setPath` takes the same-path early return. RF-07 §3 owns the fix — by
+  refusal, not resolution: a relative redirect target is out of contract and errors
+  before it can spell its way past the comparison. Generalizes: a guard that compares
+  what the *caller wrote* against what the *platform resolves* must either resolve
+  first or refuse the spellings it won't resolve — anything in between is a bypass.
 - **The two histories disagree on every relative navigation string.** The browser
   resolves against the current URL (`push('sub')` at `/a/b/c` → `/a/b/sub`); the memory
   history parses against a fixed placeholder origin (`/sub`) — confirmed by hand. So
   SSR (a relative redirect target's `Location`), tests, and the fuzz model all run on
   semantics the browser doesn't have. The model is only faithful because the arbitrary
-  draws absolute URLs exclusively; RF-07 §1 makes the memory history resolve against its
-  current entry, which is fidelity, not new semantics.
+  draws absolute URLs exclusively; RF-07 resolves the tension the other way — the
+  router refuses relative strings outright, so the divergence stays as the recorded
+  reason the input class is out of contract, and the histories stay resolution-free.
 - **The fresh-construction self-redirect had no deterministic pin** (agent finding): the
   1-cycle was hand-pinned only on the navigate-into path, while the fresh path — the one
   RF-06's own kill shrank to — was property-only. Pinned in-round
