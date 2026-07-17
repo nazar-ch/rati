@@ -46,6 +46,20 @@ afterEach(() => {
     consoleErrorSpy.mockRestore();
 });
 
+/**
+ * The console.error calls React meant. One message is tolerated: running
+ * react-dom/server and react-dom/client in a single process shares the module-level
+ * store context between two renderers, which cannot happen where the server and the
+ * browser are separate processes.
+ *
+ * This is the weaker of the two checks each mount below makes, and deliberately not the
+ * only one — see `recovered` at every hydrate: a mismatch React client-renders through
+ * is reported to `onRecoverableError`, not here.
+ */
+function reactErrors(calls: unknown[][]): unknown[][] {
+    return calls.filter((args) => !String(args[0]).includes('multiple renderers concurrently'));
+}
+
 async function ssrThenHydrate(url: string, routes: any) {
     // ----- Server -----
     const serverRouter = new RouterStore({}, routes, {
@@ -80,15 +94,23 @@ async function ssrThenHydrate(url: string, routes: any) {
         </RootStoreProvider>
     );
 
+    // The mismatch channel. React reports a mismatch it recovered from (by
+    // client-rendering the boundary) to `onRecoverableError`, whose default is
+    // `reportGlobalError` — *not* console.error. Under Vitest that default lands as an
+    // "Unhandled Error" the reporter prints and no assertion reads, so the console spy
+    // below cannot see a mismatch at all. Every test here asserts on this instead.
+    const recovered = vi.fn();
+
     let root: ReturnType<typeof hydrateRoot>;
     await act(async () => {
-        root = hydrateRoot(container, <ClientApp />);
+        root = hydrateRoot(container, <ClientApp />, { onRecoverableError: recovered });
     });
 
     return {
         prepared,
         html,
         container,
+        recovered,
         cleanup: () => {
             root.unmount();
             container.remove();
@@ -98,21 +120,23 @@ async function ssrThenHydrate(url: string, routes: any) {
 }
 
 describe('SSR + hydration', () => {
-    test('hydrates a static route without console errors', async () => {
-        const { html, cleanup } = await ssrThenHydrate('/', baseRoutes);
+    test('hydrates a static route with no mismatch', async () => {
+        const { html, recovered, cleanup } = await ssrThenHydrate('/', baseRoutes);
 
         expect(html).toContain('welcome home');
-        // The only call we tolerate is none — hydration mismatches and
-        // useDeferredValue mistakes both surface as console.error.
-        expect(consoleErrorSpy).not.toHaveBeenCalled();
+        // The server's markup was hydrated as-is: React neither recovered from a
+        // mismatch nor said anything of its own.
+        expect(recovered).not.toHaveBeenCalled();
+        expect(reactErrors(consoleErrorSpy.mock.calls)).toEqual([]);
         cleanup();
     });
 
-    test('hydrates a parameterized route without console errors', async () => {
-        const { html, cleanup } = await ssrThenHydrate('/users/42', baseRoutes);
+    test('hydrates a parameterized route with no mismatch', async () => {
+        const { html, recovered, cleanup } = await ssrThenHydrate('/users/42', baseRoutes);
 
         expect(html).toContain('data-testid="user"');
-        expect(consoleErrorSpy).not.toHaveBeenCalled();
+        expect(recovered).not.toHaveBeenCalled();
+        expect(reactErrors(consoleErrorSpy.mock.calls)).toEqual([]);
         cleanup();
     });
 
@@ -160,6 +184,7 @@ describe('SSR + hydration', () => {
         });
         const clientRoot = new RootStore({ router: clientRouter }, { isReady: true });
 
+        const recovered = vi.fn();
         let root: ReturnType<typeof hydrateRoot>;
         await act(async () => {
             root = hydrateRoot(
@@ -169,21 +194,17 @@ describe('SSR + hydration', () => {
                         <Router />
                     </RootStoreProvider>
                 </HydrationProvider>,
+                { onRecoverableError: recovered },
             );
         });
 
         // The promise was not re-run on the client and the content hydrated.
         expect(calls).toBe(1);
         expect(container.textContent).toContain('hello from server');
-        // No hydration *mismatch* surfaced. We tolerate one dev-only warning: running
-        // react-dom/static (server) and react-dom/client (hydrate) in a single process
-        // shares the module-level store context between two renderers — impossible in
-        // production, where server and browser are separate processes. A real mismatch
-        // would be a different message and still fail here.
-        const mismatchErrors = consoleErrorSpy.mock.calls.filter(
-            (args: unknown[]) => !String(args[0]).includes('multiple renderers concurrently'),
-        );
-        expect(mismatchErrors).toEqual([]);
+        // No hydration mismatch: the dehydrated value rendered the same markup the
+        // server shipped, so React had nothing to recover from.
+        expect(recovered).not.toHaveBeenCalled();
+        expect(reactErrors(consoleErrorSpy.mock.calls)).toEqual([]);
 
         root!.unmount();
         container.remove();

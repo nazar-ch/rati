@@ -161,12 +161,14 @@ describe('SSR sources — loader (ssr: true)', () => {
         const container = document.createElement('div');
         container.innerHTML = html;
         document.body.appendChild(container);
+        const recovered = vi.fn();
         await act(async () => {
             hydrateRoot(
                 container,
                 <HydrationProvider data={collector.data} seeds={collector.seeds}>
                     <Island id="ssr" />
                 </HydrationProvider>,
+                { onRecoverableError: recovered },
             );
         });
 
@@ -174,6 +176,10 @@ describe('SSR sources — loader (ssr: true)', () => {
         expect(created).toBe(1);
         expect(log).toEqual(['attach', 'detach']);
         expect(container.textContent).toContain('hello 1');
+        // …and the short-circuit was seamless: rendering the value the server rendered
+        // means React had no mismatch to recover from. The pins below are the contrast —
+        // there, a recovery is the degradation itself.
+        expect(recovered).not.toHaveBeenCalled();
     });
 });
 
@@ -210,12 +216,14 @@ describe('SSR sources — live (ssr: { dehydrate, hydrate })', () => {
         const container = document.createElement('div');
         container.innerHTML = html;
         document.body.appendChild(container);
+        const recovered = vi.fn();
         await act(async () => {
             hydrateRoot(
                 container,
                 <HydrationProvider data={collector.data} seeds={collector.seeds}>
                     <Island id="ssr" />
                 </HydrationProvider>,
+                { onRecoverableError: recovered },
             );
         });
 
@@ -224,6 +232,10 @@ describe('SSR sources — live (ssr: { dehydrate, hydrate })', () => {
         expect(created).toBe(2);
         expect(clientLog).toEqual(['hydrate:1', 'attach']);
         expect(container.textContent).toContain('n is 1');
+        // The seed's whole purpose, asserted where it shows: seeding *before* attach is
+        // what makes the first client render match the server's. Pin 7b below is the
+        // same source with a failing seed, and it mismatches.
+        expect(recovered).not.toHaveBeenCalled();
 
         // Still fully live: a later transition updates the content.
         instances[1]!.set(5);

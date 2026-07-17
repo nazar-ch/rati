@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach } from 'vite-plus/test';
+import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
 import { prerender } from 'react-dom/static';
 import { hydrateRoot } from 'react-dom/client';
 import { act, cleanup } from '@testing-library/react';
@@ -119,17 +119,24 @@ describe('island SSR dehydration', () => {
         const container = document.createElement('div');
         container.innerHTML = html;
         document.body.appendChild(container);
+        // "No loading flash" is a claim about mismatches, so it is asserted on the
+        // channel that carries them: a client that re-ran the promise would render the
+        // loading slot over the server's ready HTML, and React would report the recovery
+        // here — never to console.error, whose default handler is `reportGlobalError`.
+        const recovered = vi.fn();
         await act(async () => {
             hydrateRoot(
                 container,
                 <HydrationProvider data={collector.data}>
                     <Island id="ssr" />
                 </HydrationProvider>,
+                { onRecoverableError: recovered },
             );
         });
 
         expect(calls).toBe(1);
         expect(container.textContent).toContain('hello ssr');
+        expect(recovered).not.toHaveBeenCalled();
     });
 
     test('nested islands each collect their own slice (composition, no key collision)', async () => {

@@ -321,3 +321,16 @@ sync. Two findings became items, one was closed in-round:
 
 The built-artifact-behavior question (SSR-13's note above) deliberately stays a note,
 not an item — it is a testing-strategy direction, not a fix with a pin.
+
+### 2026-07-17 — from SSR-14 (the assertion, switched on)
+
+- **Nothing was hiding behind it.** The item cut room to be surprised — an assertion that
+  has never worked may be covering real mismatches — and the answer is that it wasn't:
+  every mount that claims a clean hydration (the router suite's three, `islandSsr`'s
+  rehydrate, `islandSsrSources`' dehydrated-value and seeded-source pair,
+  `scopeControls`' waterfall) hydrates with `onRecoverableError` never firing, and all
+  406 tests stay green with the channel now read. The suites were telling the truth; they
+  just had no way to know it. Recorded because "we looked and found nothing" is the
+  finding — the baseline's hydration claims now rest on an assertion that has been
+  demonstrated to fail (the canary, re-run per the item's step 2), which is the thing
+  they lacked, not on a fix.

@@ -1047,17 +1047,22 @@ describe('selective refresh — hydrated cells', () => {
         const container = document.createElement('div');
         container.innerHTML = html;
         document.body.appendChild(container);
+        // A producer that re-ran client-side would render the loading slot over the
+        // server's ready HTML; React reports that recovery here, not on console.error.
+        const recovered = vi.fn();
         await act(async () => {
             hydrateRoot(
                 container,
                 <HydrationProvider data={collector.data}>
                     <Island id="x" />
                 </HydrationProvider>,
+                { onRecoverableError: recovered },
             );
         });
         // Both keys came off the wire: neither producer ran client-side.
         expect(runs).toEqual({ a: 1, b: 1 });
         expect(container.textContent).toContain('b(a1)');
+        expect(recovered).not.toHaveBeenCalled();
 
         // `b` never ran, so it has no read-set — a changed `a` does not reach it.
         aValue = 'a2';

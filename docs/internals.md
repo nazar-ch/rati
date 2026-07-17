@@ -420,6 +420,18 @@ harness (`scopeHarness.tsx` / `model.ts`) and the router's route-table harness
 imports from the engine it mirrors — where the router compiles a regex, its model walks
 segments — so a bug cannot hide behind a model that shares the implementation.
 
+**A hydrating mount that claims "no mismatch" passes its own `onRecoverableError`** and
+asserts it never fired (SSR-14). A console spy cannot see a mismatch: React reports one it
+recovered from — by client-rendering the boundary, which is exactly the failure worth
+catching — to `onRecoverableError`, whose default is `reportGlobalError`, not
+`console.error`. Under Vitest that default lands as an "Unhandled Error" the reporter
+prints and no assertion reads, so a console-only check passes straight through. Both
+channels are worth asserting where a mount claims a clean hydration (`console.error` still
+carries React's own warnings), but only the first one is about mismatches. The deliberate
+mismatches — `mandala/islandSsrSources.test.tsx`'s pin 7/7b, where the recovery *is* the
+degradation being pinned — pass a no-op `onRecoverableError` for the same reason: to keep
+the report from leaking out of the run, per-mount rather than as global suppression.
+
 **Verifying SSR in a browser: use a visible tab.** React 19.2 gates the Suspense reveal on
 `requestAnimationFrame`, which never fires in a hidden or backgrounded tab — and since rati
 wraps every route in a boundary, a headless/background browser leaves the page at its
