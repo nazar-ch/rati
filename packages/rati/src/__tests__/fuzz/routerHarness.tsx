@@ -50,11 +50,12 @@ import {
  *   - '.' and '..' — a dot-only segment is a path operator rather than data, and no
  *     encoding rescues it: the URL parser resolves '/x/..' away to '/', and reads '%2E' as
  *     a dot too (that is what stops percent-encoding from smuggling a traversal past a
- *     path check). RF-06 confirmed both against the real histories and documented the
- *     value as unrepresentable instead of encoding it, so there is no round trip here for
- *     the codec to be held to — and describing what *does* happen would mean growing URL
- *     dot-segment normalization into the model, which is the URL parser's contract, not
- *     the router's.
+ *     path check). RF-06 confirmed both against the real histories; RF-08 turned that into
+ *     refused by contract — getPath throws instead of building a URL that resolves
+ *     elsewhere (deterministic pins in routeParams.test.ts). There is still no round trip
+ *     here for the codec to be held to, and describing what the platform *would* do to one
+ *     would mean growing URL dot-segment normalization into the model, which is the URL
+ *     parser's contract, not the router's.
  *   - '' — `getPath` with an empty param builds a URL that no longer identifies the route
  *     ('/users/'). A caller violating the param contract is not a router behavior.
  */

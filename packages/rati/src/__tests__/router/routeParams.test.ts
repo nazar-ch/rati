@@ -6,9 +6,10 @@ import { createMemoryHistory } from '../../router/history';
 // Every pin below was run once against the unfixed engine and observed red: raw
 // interpolation put `hello world` and `a/b` into the URL unencoded and handed the
 // browser's `hello%20world` back to the component, the substring scan turned
-// `/x/:idx/:id` into `/x/7x/:id`, and the malformed case threw a URIError out of
-// setPath. The base64url pin is the deliberate exception — it passes either way, and
-// exists to hold that jnana's URL shape does not move under the codec.
+// `/x/:idx/:id` into `/x/7x/:id`, the malformed case threw a URIError out of setPath,
+// and the dot-only pins (RF-08) built `/pages/.` and `/pages/..` instead of throwing.
+// The base64url pin is the deliberate exception — it passes either way, and exists to
+// hold that jnana's URL shape does not move under the codec.
 
 const NoopComponent = () => null;
 
@@ -163,6 +164,31 @@ describe('getPath param substitution', () => {
 
         expect(router.activeRoute?.name).toBe('prefixCollision');
         expect(router.activeRoute?.routeParams).toEqual({ idx: '9', id: '7' });
+        router.dispose();
+    });
+});
+
+describe('getPath dot-only param refusal', () => {
+    // RF-08: no URL carries a param value of exactly '.' or '..' (the parser resolves the
+    // segment away, and '%2E' is read as a dot for the same reason) — getPath refuses the
+    // value instead of building a URL that lands somewhere else. 'a.b'/'..x' round-trip
+    // unchanged (routeParams.test.ts above) — the boundary is "the whole segment is dots".
+    // Kill executed once: with the throw commented out, both tests below went red
+    // ("expected [Function] to throw an error"); the other 8 pins in this file, including
+    // the dot-carrying ones, stayed green. Throw restored afterward.
+    test('a param value of exactly "." throws, naming the route', () => {
+        const router = new RouterStore({}, routes);
+
+        expect(() => router.getPath({ name: 'page', pageId: '.' })).toThrow(/page/);
+
+        router.dispose();
+    });
+
+    test('a param value of exactly ".." throws, naming the route', () => {
+        const router = new RouterStore({}, routes);
+
+        expect(() => router.getPath({ name: 'page', pageId: '..' })).toThrow(/page/);
+
         router.dispose();
     });
 });

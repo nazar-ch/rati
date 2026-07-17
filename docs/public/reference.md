@@ -257,12 +257,13 @@ than throwing.
 
 **One value has no URL to carry it: a param that is exactly `.` or `..`.** A dot-only
 segment is a path operator, and every browser resolves it away before the router is
-reached — `/station/..` *is* `/`, so that navigation lands on whatever `/` matches.
-Percent-encoding does not rescue it: URLs treat `%2E` as a dot for exactly this purpose,
-so `/station/%2E%2E` resolves away too. If a param's values can be arbitrary (filenames,
-user input), keep them out of the path — put them in the query string, where a dot is
-ordinary — or map them to an id first. Dots *within* a value (`a.b`, `..x`) are fine and
-need nothing.
+reached — `/station/..` *is* `/`, so a URL built from that value would land wherever `/`
+matches. Percent-encoding does not rescue it: URLs treat `%2E` as a dot for exactly this
+purpose, so `/station/%2E%2E` resolves away too. `getPath` refuses the value instead of
+building a URL that quietly lands elsewhere — passing `.` or `..` throws, naming the
+param and the route. If a param's values can be arbitrary (filenames, user input), keep
+them out of the path — put them in the query string, where a dot is ordinary — or map
+them to an id first. Dots *within* a value (`a.b`, `..x`) are fine and need nothing.
 
 ```ts
 route('/station/:stationId', 'station', Board, {
