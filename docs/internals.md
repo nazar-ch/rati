@@ -324,6 +324,16 @@ fallback existed. `onError` still reports it either way. The fallback's
 `template === undefined` branch is thereby reached only by apps that really do render
 whole documents — every *render* failure still gets the shell.
 
+One sibling gap stays open, on purpose (post-close review, 2026-07-17): a fragment app
+whose template exists but lacks `<!--app-html-->` throws a plain `Error` from `fill`
+(not `Unservable`), routes to the fallback, and the fallback *tolerates* the missing
+placeholder — its `html` part is empty, and `fill` skips an absent slot for an empty
+value — so it serves the template as a 500 CSR shell. That shell boots iff the template
+carries a literal mount node (`<div id="root">`), which the handler cannot know. Left as
+is: in the common case (comment deleted, mount node kept) the fallback is strictly
+better than a plain 500, the same misconfiguration throws the same loud error in dev
+through the same `fillTemplate`, and `onError` reports it on every production request.
+
 `createRoot(document)` is undocumented-but-real (the types, `isValidContainer`'s
 `nodeType === 9`, and browsers all take it; react.dev names `document` only under
 `hydrateRoot`). The maintainer accepted that on condition of the canary in
