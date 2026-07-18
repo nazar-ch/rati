@@ -1,5 +1,6 @@
 // Opt-in debug tooling (`navTrace` and friends) lives in the `rati/debug` entry; the
-// MobX-coupled data layer (ActiveData / remoteData) in `rati/mobx`; the server-facing
+// MobX bindings (`observableSource`) in `rati/mobx`; the MobX-shaped data primitives
+// (`query` / `collection` / `mutation` / `form`) in `rati/data`; the server-facing
 // SSR surface (`HydrationProvider`, `createHydrationCollector`, `prepareRoute`) in
 // `rati/ssr` — all kept out of the client-focused main barrel.
 

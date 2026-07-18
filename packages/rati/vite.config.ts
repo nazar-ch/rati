@@ -22,6 +22,7 @@ export default defineConfig({
             entry: {
                 main: 'src/main.ts',
                 'mobx/index': 'src/mobx/index.ts',
+                'data/index': 'src/data/index.ts',
                 'ssr/index': 'src/ssr/index.ts',
                 'server/index': 'src/server/index.ts',
                 'vite/index': 'src/vite/index.ts',

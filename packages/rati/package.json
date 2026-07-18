@@ -24,6 +24,12 @@
             "import": "./dist/mobx/index.js",
             "source": "./src/mobx/index.ts"
         },
+        "./data": {
+            "rati-dev": "./src/data/index.ts",
+            "types": "./dist/data/index.d.ts",
+            "import": "./dist/data/index.js",
+            "source": "./src/data/index.ts"
+        },
         "./ssr": {
             "rati-dev": "./src/ssr/index.ts",
             "types": "./dist/ssr/index.d.ts",
