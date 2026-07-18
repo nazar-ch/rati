@@ -1,6 +1,5 @@
 import { defineConfig, lazyPlugins } from 'vite-plus';
 import react from '@vitejs/plugin-react';
-import babel from '@rolldown/plugin-babel';
 import { ratiSsr } from 'rati/vite';
 
 const conditions = ['rati-dev', 'import', 'module', 'browser', 'default'];
@@ -14,7 +13,6 @@ export default defineConfig({
     plugins:
         lazyPlugins(() => [
             react(),
-            babel({ presets: [decoratorPreset({ version: '2023-11' })] }),
             // The plugin is both halves of this app's tooling: `vp dev` renders every
             // request through src/entry-server.tsx (no dev server of its own), and
             // `vp build` builds src/entry-client.tsx → dist/client and the server entry
@@ -33,24 +31,3 @@ export default defineConfig({
         conditions,
     },
 });
-
-/*
-Vite guide:
-
-"Currently, the Oxc transformer does not support lowering native decorators 
-as we are waiting for the specification to progress, see (oxc-project/oxc#9170)."
--- https://github.com/oxc-project/oxc/issues/9170
-*/
-function decoratorPreset(options: Record<string, unknown>) {
-    return {
-        preset: () => ({
-            plugins: [['@babel/plugin-proposal-decorators', options]],
-        }),
-        rolldown: {
-            // Only run this transform if the file contains a decorator.
-            filter: {
-                code: '@',
-            },
-        },
-    };
-}

@@ -1,6 +1,5 @@
 import { defineConfig, lazyPlugins } from 'vite-plus';
 import react from '@vitejs/plugin-react';
-import babel from '@rolldown/plugin-babel';
 import { analyzer } from 'vite-bundle-analyzer';
 
 const debugBundleContent = false;
@@ -9,20 +8,17 @@ const debugBundlePreserveModules = false;
 const bundleWhitelist: string[] = [];
 
 export default defineConfig({
-    plugins: lazyPlugins(() => [
-        react(),
-        babel({ presets: [decoratorPreset({ version: '2023-11' })] }),
-        debugBundleContent && analyzer(),
-    ]),
+    plugins: lazyPlugins(() => [react(), debugBundleContent && analyzer()]),
     build: {
         emptyOutDir: true,
         lib: {
             // Entries: the MobX-free core, the optional `rati/mobx` bindings, the
-            // server-facing `rati/ssr` surface, the `rati/server` production handler,
-            // the `rati/vite` plugin, and the `rati/debug` tooling. Rolldown hoists the
-            // shared core modules into a common chunk, so SourceSymbol (and friends)
-            // keep one identity across all of them. `rati/vite` shares nothing but the
-            // HTML assembly — it type-imports the rest of the contract.
+            // MobX-shaped data primitives (`rati/data`), the server-facing `rati/ssr`
+            // surface, the `rati/server` production handler, the `rati/vite` plugin,
+            // and the `rati/debug` tooling. Rolldown hoists the shared core modules
+            // into a common chunk, so SourceSymbol (and friends) keep one identity
+            // across all of them. `rati/vite` shares nothing but the HTML assembly —
+            // it type-imports the rest of the contract.
             entry: {
                 main: 'src/main.ts',
                 'mobx/index': 'src/mobx/index.ts',
@@ -57,24 +53,3 @@ export default defineConfig({
         },
     },
 });
-
-/*
-Vite guide:
-
-"Currently, the Oxc transformer does not support lowering native decorators 
-as we are waiting for the specification to progress, see (oxc-project/oxc#9170)."
--- https://github.com/oxc-project/oxc/issues/9170
-*/
-function decoratorPreset(options: Record<string, unknown>) {
-    return {
-        preset: () => ({
-            plugins: [['@babel/plugin-proposal-decorators', options]],
-        }),
-        rolldown: {
-            // Only run this transform if the file contains a decorator.
-            filter: {
-                code: '@',
-            },
-        },
-    };
-}
