@@ -62,7 +62,9 @@ export interface FieldInternal<T> extends Field<T> {
     [FieldExternalErrors](messages: readonly string[]): void;
 }
 
-export function field<T>(initial: T, options: FieldOptions<T> = {}): Field<T> {
+// NoInfer: only `initial` drives T — otherwise a literal initial (`field('')`)
+// can get pinned to its literal type by a validator's generic constraint.
+export function field<T>(initial: T, options: FieldOptions<NoInfer<T>> = {}): Field<T> {
     const validators: readonly Validator<T>[] =
         options.validate === undefined
             ? []

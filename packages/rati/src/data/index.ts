@@ -5,10 +5,11 @@
     docs/research/directions-2026-07/data-package.md.
 
     Data in an app has four moments; each primitive owns exactly one, plus one
-    for fetch topology (pagination — not landed yet):
+    for fetch topology:
 
       - `query` — read one value (refreshable, race-guarded, honest phases)
       - `collection` — read a keyed set (identity-stable reconciliation)
+      - `pagedCollection` — read in pages (pages are queries; structural has-more)
       - `form` + `field` — stage local edits (baseline / dirty / validate)
       - `mutation` — write (optimistic patch + refresh choreography)
 
@@ -24,6 +25,12 @@
 
 export { query, type Query, type QueryOptions, type QueryPhase } from './query';
 export { collection, type Collection, type CollectionOptions } from './collection';
+export {
+    pagedCollection,
+    type PagedCollection,
+    type PagedCollectionOptions,
+    type PageResult,
+} from './pagedCollection';
 export { mutation, type Mutation, type MutationOptions } from './mutation';
 export { field, type Field, type FieldOptions, type FieldProps, type Validator } from './field';
 export { form, FormError, type Form, type FormValues } from './form';
