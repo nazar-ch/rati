@@ -543,9 +543,79 @@ MobX out of their bundle.
 | --- | --- |
 | `observableSource(getState, attach?, { ssr }?)` | adapt a MobX derivation to a `Source` — the bridge between MobX state and scope loads; `ssr` forwards the [SSR marker](#ssr-capable-sources--the-ssr-marker) |
 
-The remaining exports (`ActiveData`, `ActiveApiData`, `remoteData`, `remoteDataKey`,
-`responseKey`) are a legacy data layer pending extraction to its own package; not
-recommended for new code.
+The MobX-shaped data primitives (`query`, `collection`, `mutation`, `form`) live in the
+[`rati/data`](#ratidata) entry, which builds on this bridge. (The former legacy exports —
+`ActiveData`, `remoteData`, `remoteDataKey`, `responseKey` — are gone; `rati/data` is
+their successor.)
+
+---
+
+## `rati/data`
+
+**Experimental.** Optional — requires the `mobx` peer dependency, like
+[`rati/mobx`](#ratimobx) (whose `observableSource` it builds on). The successor of the
+legacy data layer and of app-side `FetchStore` families; design record:
+`docs/research/directions-2026-07/data-package.md`. The surface may still move; it is
+intended to eventually extract into a companion package.
+
+Data in an app has four moments; each primitive owns exactly one, plus one for fetch
+topology:
+
+| Export | Purpose |
+| --- | --- |
+| `query(producer, { debounce? }?)` | read one value: one async producer (`(signal: AbortSignal) => Promise<T>`), honest phases (`idle → loading → ready / refreshing / error`), race-guarded |
+| `collection({ fetch, key, equals?, into? })` | read a keyed set: identity-stable reconciliation, `patchItem`/`upsert`/`insert`/`remove` |
+| `pagedCollection({ fetchPage, key, equals?, into? })` | read in pages: pages *are* queries (per-page phase/error/retry), structural `hasMore`, cursor re-anchoring `refresh()` |
+| `mutation(perform, { optimistic?, refreshes?, onError? }?)` | write: callable with observable `isPending`/`error`, optimistic patch + refresh choreography |
+| `form(fields)`, `field(initial, { validate?, equals? }?)` | stage local edits: per-field baseline (`isDirty`/`reset()`/`commit()`), validate-on-submit, RAC-shaped `props`, action-compatible `submit()` |
+| `required`, `minLength`, `maxLength`, `min`, `max`, `pattern` | the validator kit — a validator is just `(value: T) => string \| undefined`; all but `required` skip empty values |
+| `FormError` | thrown by a submit handler to distribute `fieldErrors` onto matching fields (the API layer decides where a 422 becomes one) |
+
+Instance-owned data: each primitive is an object living in your store graph; sharing
+happens by sharing the instance — no keyed cache, no normalized store. Everything that
+fails normalizes to [`SourceError`](#sources), so one `code` switch
+works from island error slots to in-content badges.
+
+**The scope seam.** Read-side primitives expose `source()`: pending until the first
+ready, then ready forever with **the instance itself** as the resolved prop — later
+refreshes and refresh errors are the instance's own observable state and never re-trip
+the island. `attach()` triggers `load()` (ensure semantics); detach does nothing — the
+store owns the data's lifetime.
+
+```ts
+class SpacesManagementStore {
+    spaces = collection({ fetch: (signal) => fetchSpaces(signal), key: (s) => s.spaceId });
+
+    rename = mutation(renameRequest, {
+        optimistic: (id: string, title: string) =>
+            this.spaces.patchItem(id, (s) => void (s.title = title)),
+        refreshes: () => [this.spaces],
+    });
+}
+
+export const spacesScope = scope()
+    .load({ stores: hook(() => useStores()) })
+    .load({ spaces: ({ stores }) => stores.spacesManagement.spaces.source() });
+
+const SpacesPage = observer(({ spaces }: ScopeProps<typeof spacesScope>) => (
+    <List items={spaces.items} dimmed={spaces.query.phase === 'refreshing'} />
+));
+```
+
+Division of labor: the island covers loading/error for the **first** resolution; the
+primitives' phases drive everything after — `refreshing` for stale display, per-page
+phases for pagination rows, `isSubmitting` for buttons. `query.load()` is idempotent
+*ensure* (fetches from `idle`/`error`, no-ops when `ready`, dedupes in flight);
+`refresh()` is the only re-fetch and keeps stale data visible, even through a refresh
+failure. Under SSR the primitives stay pending (a `Source` attaches in effects) — this
+entry is for the interactive app, not the SSR path.
+
+Forms never touch the island: they are synchronous local state seeded from data the
+island already resolved — `form({ title: field(space.title, { validate: required() }) })`
+is the draft; `submit(handler)` validates, runs the handler (typically awaiting
+mutations), commits on success, distributes a thrown `FormError` onto fields, and lands
+anything else on `form.error`. The returned function never rejects, so it is usable
+directly as `<form action={store.save}>`.
 
 ---
 

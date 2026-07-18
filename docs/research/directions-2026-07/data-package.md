@@ -1,5 +1,12 @@
 # The companion data package — design
 
+> **Implemented 2026-07-18** as the `rati/data` entry (experimental stage; the legacy
+> `data/` layer and its decorator toolchain were dropped the same day). All five
+> primitives shipped; `reactive:` was deferred by maintainer choice. Deviations from
+> the sketches below, the remaining items (reactive params, guide coverage, the
+> consumer migrations, the extraction decision) and the still-open questions live in
+> [docs/planned/data-package/](../../planned/data-package/README.md).
+
 The successor of the legacy `data/` layer (`remoteData`, `ActiveData`, `apiUtils`, shipped via
 `rati/mobx`) and of Jnana's `FetchStore` family. Second revision: the first pass distilled the two
 live generations; this one adds the omni-admin archaeology — the `FormStore`/`FieldStore` forms

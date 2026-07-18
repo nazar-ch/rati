@@ -38,7 +38,9 @@ src/
              lazyModules (the specifier-recording transform), client.d.ts (types for
              the generated module). Node-side, never bundled into an app; type-imports
              the RenderAppResult contract and nothing else
-  data/      remoteData, apiUtils, ActiveData (legacy REST/data helpers)
+  data/      the rati/data entry: MobX-shaped data primitives (query, collection,
+             mutation, form/field) — experimental, pending extraction to a
+             companion package (docs/research/directions-2026-07/data-package.md)
   stores/    RootStore, GlobalStore (store roots)
   util/      utils.ts
   types/     generic.ts
@@ -192,6 +194,33 @@ resources, REST loaders and promises all implement the interface, so the resolve
 source-agnostic. `readySource` / `promiseSource` / `toSource` are the adapters; `toSourceError`
 normalizes thrown reasons. The optional `ssr` marker (`SourceSSR<T>`) declares a source
 server-resolvable — see the next section.
+
+## The data primitives (`data/` — the rati/data entry)
+
+Experimental, MobX-backed (the entry shares the optional `mobx` peer with `rati/mobx`);
+design record: `docs/research/directions-2026-07/data-package.md`. Factories return plain
+observable objects — no classes, no decorators; components read them under `observer`,
+scopes await first readiness through `source()`.
+
+- `query.ts` — the atom. `createQuery` is the package-internal factory carrying the
+  `onSuccess`/`onReset` hooks the collections build on; the race guard is a `requestId`
+  check plus an `AbortController` per fetch. `instanceSource` (shared) implements the
+  source contract every read-side primitive uses: pending until first ready, then ready
+  forever with the instance itself.
+- `itemMap.ts` — the shared reconciler under both collections: the keyed entry map,
+  identity-stable reconcile, in-place default updates (shallow-observable rows) or
+  app-owned `into` instances, and the `dirty` marking that makes a refresh reapply
+  server truth over optimistic patches.
+- `collection.ts` / `pagedCollection.ts` — thin compositions: a query (or an array of
+  page queries anchoring cursor-to-predecessor) feeding the item map. Pages materialize
+  structurally: a `nextCursor` appends an unloaded tail record, `hasMore` derives from
+  its existence, truncation drops stale successors when a refreshed page ends the list.
+- `mutation.ts`, `form.ts` + `field.ts`, `validators.ts` — the write side and staged
+  edits; `form` reaches fields' server-error seam through the package-internal
+  `FieldExternalErrors` symbol.
+
+Tests live in `src/__tests__/data/` — deferred-promise fakes walk every phase, no module
+mocking.
 
 ## SSR dehydration (`mandala/hydration.tsx` + `ssrSource.ts`)
 
@@ -477,10 +506,9 @@ Types: **tsgo** (`@typescript/native-preview`, the TS 7 native compiler) — the
 `typescript` dep. `vp run typecheck` type-checks (`tsconfig.json` for src,
 `tsconfig.test.json` for the test tree), `vp run build` emits `.d.ts` via
 `tsgo -p tsconfig.build.json`, and Vitest's `--typecheck` pass over `*.test-d.ts` uses tsgo
-through `test.typecheck.checker`. The core is decorator-free; the MobX-coupled data layer
-under `rati/mobx` (`data/`) still uses decorators (`@observable`/`@action`), which compile via
-`@babel/plugin-proposal-decorators` — oxc can't lower native decorators yet — see
-`vite.config.ts`/`vitest.config.ts`.
+through `test.typecheck.checker`. The whole repo is decorator-free (the legacy `data/`
+layer that needed `@babel/plugin-proposal-decorators` is gone; `rati/data` uses plain
+observable objects from factories), so there is no Babel in the toolchain.
 
 Lint deviates from a stock config for a generics-heavy framework: the type-machinery rules
 (`no-explicit-any`, `no-non-null-assertion`, `no-empty-object-type`,

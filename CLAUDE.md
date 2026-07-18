@@ -108,10 +108,13 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
 - `island/island.ts` — the public `island()` wrapper.
 - `router/` — `route.tsx`, `store.ts` (RouterStore), `Router`/`Link`/`Navigate`,
   `useRouteContext`, `prepareRoute`, `history`, `scrollRestoration`, `lazy`.
-- `data/` — the legacy MobX-coupled data layer (`remoteData` debounced loader + race-guard,
-  `apiUtils`, `ActiveData*` mutable drafts), shipped via the `rati/mobx` entry, not core.
-- `mobx/` — the `rati/mobx` entry: `observableSource` (a MobX-derivation→`Source` adapter)
-  plus the `data/` re-exports. The only code that touches MobX (an optional peer dep).
+- `data/` — the `rati/data` entry: the MobX-shaped data primitives (`query`, `collection`,
+  `mutation`, `form`/`field` + the validator kit), successor of the deleted legacy layer
+  (`remoteData`/`ActiveData`) and Jnana's `FetchStore` family. Experimental; design record:
+  `docs/research/directions-2026-07/data-package.md`; pending extraction to a companion
+  package. Plain observable objects from factories — no decorators, no classes.
+- `mobx/` — the `rati/mobx` entry: `observableSource` (a MobX-derivation→`Source` adapter).
+  Together with `data/`, the only code that touches MobX (an optional peer dep).
 - `ssr/` — the `rati/ssr` entry: the server-facing surface (`HydrationProvider`,
   `createHydrationCollector`, `prepareRoute` + the `Hydration`/`HydrationData` types),
   re-exported from `mandala/hydration.tsx` and `router/prepareRoute.ts`; plus `renderApp`
@@ -131,10 +134,9 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
   `subscribe`/`getSnapshot` pair, `RouterStore` is a plain external store, and components
   read both through uSES (no `observer`). Optional MobX bindings (`observableSource`) live in
   `rati/mobx`.
-- **MobX decorators** (`@observable`/`@action`/`@computed`) survive only in the `data/` layer
-  (shipped via `rati/mobx`); they compile via `@babel/plugin-proposal-decorators` (oxc can't
-  lower native decorators yet) — see `vite.config.ts`/`vitest.config.ts`. Core is
-  decorator-free.
+- **No decorators anywhere.** The legacy decorator-using `data/` layer is gone, and the
+  Babel lowering (`@babel/plugin-proposal-decorators`) went with it — the toolchain is
+  pure oxc. `rati/data` models state as plain observable objects from factories.
 - **`rati-dev` export condition** exposes `src/main.ts` so consumers (Jnana, the examples)
   type-check and bundle rati's *source* in dev — edits are picked up with no build. The
   published `import`/`types` conditions point at `dist/`.
