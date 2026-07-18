@@ -26,6 +26,8 @@ export interface Collection<T, Item = T> {
     readonly items: readonly Item[];
     /** The underlying fetch (phase / refresh / reset). */
     readonly query: Query<readonly T[]>;
+    /** Delegates to `query.refresh()`, so a collection can sit in a mutation's `refreshes` list. */
+    refresh(): Promise<void>;
     getByKey(key: string): Item | undefined;
     /**
      * Optimistic edit: mutate the item in place (return nothing) or return a
@@ -134,6 +136,9 @@ export function collection<T, Item = T>(options: CollectionOptions<T, Item>): Co
             return state.items;
         },
         query: q,
+        refresh() {
+            return q.refresh();
+        },
         getByKey(key) {
             return entries.get(key)?.item;
         },
