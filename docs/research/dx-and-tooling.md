@@ -1,5 +1,10 @@
 # DX & tooling — directions
 
+> **Being executed** — cut 2026-07-19 as the
+> [testing-and-dx effort](../planned/testing-and-dx/README.md), grounded in a survey of
+> what both repos hand-roll (recorded there) and grown by one member this doc missed (an
+> SSR round-trip test kit). Where a record and this doc disagree, the record wins.
+
 Small, high-leverage developer-experience items. **None built yet** (verified against the
 source: no `rati/testing` entry, no `dataTrace`, and only the mandala wrapper — not its inner
 `Step` components — carries a React `displayName`). From the July 2026 review, `improvements.md`
