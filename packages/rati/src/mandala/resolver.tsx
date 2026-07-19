@@ -21,6 +21,15 @@ import { asSourceError, isSource, type SourceError, type SourceState } from '../
 import { is, deepEqual } from '../util/utils';
 import { navTrace, navTraceEnabled } from '../util/navTrace';
 import {
+    errorLabel,
+    traceCellPromise,
+    traceCellRefresh,
+    traceCellStatus,
+    traceLevelStart,
+    traceResolved,
+    type DataTrace,
+} from '../util/dataTrace';
+import {
     makeProducedCell,
     makeStaticCell,
     trackReads,
@@ -181,6 +190,10 @@ export type Shared = {
     currentBuckets: () => Bucket[] | null;
     // The instance's refresh controller (undefined on the server — nothing refreshes).
     controller: RefreshController | undefined;
+    // This run's data-trace timeline (the `rati/debug` entry), undefined unless tracing is
+    // on — which is the only state that costs anything: every hook below hands it straight
+    // back to util/dataTrace.ts, which returns on the spot.
+    trace: DataTrace | undefined;
     // Server only: record a resolved promise value for dehydration. Undefined on client.
     collect: ((key: string, value: unknown, kind: 'value' | 'seed') => void) | undefined;
     // Server only: record a promise load that rejected during the collected render, so
@@ -269,6 +282,21 @@ function buildCell(
     return cell;
 }
 
+// Feed a freshly built (or re-run, or hook-produced) cell to the data tracer: a promise is
+// timed to its own settle, a sync value settles right here, and a source settles through
+// the transition read in the resolve pass below.
+function traceCell(
+    trace: DataTrace | undefined,
+    index: number,
+    key: string,
+    cell: Cell | CellBody,
+    detail?: string,
+): void {
+    if (!trace) return;
+    if (cell.kind === 'promise') traceCellPromise(trace, index, key, cell.promise);
+    else if (cell.kind === 'value') traceCellStatus(trace, index, key, 'ready', detail);
+}
+
 // Render-time halves of a selective refresh: re-run dirty cells against the current
 // `prev` (fresh upstream values — including values a cascade swapped in this very
 // pass, since levels render top-down). A promise re-run keeps the old value rendered
@@ -281,6 +309,7 @@ function processDirtyCells(
     prev: Record<string, unknown>,
     index: number,
     controller: RefreshController,
+    trace: DataTrace | undefined,
 ): void {
     for (const key of dataKeys) {
         const cell = bucket.cells.get(key);
@@ -288,7 +317,9 @@ function processDirtyCells(
         cell.dirty = false;
         if (!cell.rerunnable) continue;
 
+        traceCellRefresh(trace, index, key);
         const next = classifyEntry(level[key], prev, key);
+        traceCell(trace, index, key, next);
         cell.reads = next.reads;
 
         if (next.kind === 'promise') {
@@ -343,6 +374,7 @@ const recordedRejections = new WeakSet<Promise<unknown>>();
 type StepProps = {
     level: Scope['definition'];
     index: number;
+    keys: string[];
     hookKeys: string[];
     dataKeys: string[];
     prev: Record<string, unknown>;
@@ -357,20 +389,33 @@ type StepProps = {
     source-transition re-renders), and attached/detached in an effect. The hooks pass
     runs before any `use()` so an early `<Loading/>` return is hook-order safe.
 */
-function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: StepProps) {
+function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }: StepProps) {
     // Data cells for this level, built once into the mandala-held bucket (survives a
     // `use()` suspension). The inner tree remounts on a param change, so `prev` is
     // stable for a Step's lifetime and the bucket is fresh per mount.
     const bucket = shared.buckets[index]!;
+    const trace = shared.trace;
     if (!bucket.built) {
+        traceLevelStart(trace, index, keys);
         for (const key of dataKeys) {
             const cell = buildCell(level, key, prev, shared);
+            if (trace) {
+                const entry = level[key];
+                // Inputs arrive with the run — they are not loads, so they get no settle
+                // line. A dehydrated cell does, marked: it lands ready in zero time
+                // because the server already ran the load.
+                const isInput = is.object(entry) && InputSymbol in entry;
+                const hydrated = shared.hydration ? key in shared.hydration : false;
+                if (!isInput) {
+                    traceCell(trace, index, key, cell, hydrated ? '(hydrated)' : undefined);
+                }
+            }
             if (cell.kind === 'source') bucket.sources.push({ source: cell.source, detach: null });
             bucket.cells.set(key, cell);
         }
         bucket.built = true;
     } else if (shared.controller) {
-        processDirtyCells(level, dataKeys, bucket, prev, index, shared.controller);
+        processDirtyCells(level, dataKeys, bucket, prev, index, shared.controller, trace);
     }
     const dataCells = bucket.cells;
     const sources = bucket.sources;
@@ -461,7 +506,9 @@ function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: Step
     // safe, so the hook-call sequence is identical every render.
     const cells: [string, Cell | CellBody][] = [];
     for (const key of hookKeys) {
-        cells.push([key, classifyResult((level[key] as HookLoad)(prev))]);
+        const cell = classifyResult((level[key] as HookLoad)(prev));
+        traceCell(trace, index, key, cell);
+        cells.push([key, cell]);
     }
     for (const key of dataKeys) cells.push([key, dataCells.get(key)!]);
 
@@ -493,6 +540,13 @@ function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: Step
             resolved[key] = value;
         } else {
             const state = cell.source.getSnapshot();
+            traceCellStatus(
+                trace,
+                index,
+                key,
+                state.status,
+                state.status === 'error' ? errorLabel(state.error) : undefined,
+            );
             if (state.status === 'error') {
                 // A swap ending in error settles it the way a first ready would: the key
                 // leaves `pending` before the throw hands the tree to the boundary.
@@ -556,6 +610,8 @@ function Step({ level, index, hookKeys, dataKeys, prev, shared, children }: Step
 type LeafProps = { resolved: Record<string, unknown>; shared: Shared };
 
 function Leaf({ resolved, shared }: LeafProps) {
+    // Reaching the leaf is the run's finish line — the waterfall's total lands here.
+    traceResolved(shared.trace);
     const provideDef = shared.scope.provideDef;
     const Component = shared.component;
     const channel = shared.channel;
@@ -670,11 +726,12 @@ export function buildTree(
 ): ReactNode {
     if (index >= levels.length) return <Leaf resolved={prev} shared={shared} />;
     const level = levels[index]!;
-    const { hookKeys, dataKeys, LevelStep } = compileLevel(level);
+    const { keys, hookKeys, dataKeys, LevelStep } = compileLevel(level);
     return (
         <LevelStep
             level={level}
             index={index}
+            keys={keys}
             hookKeys={hookKeys}
             dataKeys={dataKeys}
             prev={prev}

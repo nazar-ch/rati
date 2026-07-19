@@ -3,6 +3,7 @@ import type { ComponentType, FC } from 'react';
 import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope';
 import type { SourceError } from '../scope/source';
 import { deepEqual } from '../util/utils';
+import { startDataTrace, type DataTrace, type DataTraceCause } from '../util/dataTrace';
 import { buildTree, flattenLevels, type Bucket, type Shared } from './resolver';
 import { registerScopeChannel, setScopeLabel } from './channel';
 import { registerScopeControlsChannel } from './controls';
@@ -62,6 +63,15 @@ export type MandalaComponent<S extends Scope<any>> = FC<ScopeInputs<S>> & {
 
 const DefaultLoading: FC<{ inputs: unknown }> = () => null;
 
+// Why a generation exists, for the data trace's opening line (`rati/debug`): there was no
+// previous one (the island mounted), the retry counter moved (an error-slot retry), or the
+// inputs version did (a param change). Read off `treeKey` — `${version}:${retry}` — which
+// is the identity the generation is keyed by anyway.
+function generationCause(previousKey: string | undefined, retry: number): DataTraceCause {
+    if (previousKey === undefined) return 'initial';
+    return previousKey.endsWith(`:${retry}`) ? 'inputs' : 'retry';
+}
+
 /**
  * Build a mandala component from a scope + component + slots. `kindLabel` is the public
  * concept the caller represents (`Island` / `Route`) — used for the React `displayName`
@@ -79,6 +89,13 @@ export function createMandala<S extends Scope<any>>(
     const ControlsChannel = registerScopeControlsChannel(scopeKey);
     const Loading = (config.loading ?? DefaultLoading) as ComponentType<{ inputs: unknown }>;
     const levels = flattenLevels(config.scope as Scope);
+
+    // The public identity of this mandala — the React displayName, the scope's read-error
+    // label, and the data trace's per-line prefix. Computed before the component so the
+    // render body can use it too.
+    const componentName =
+        config.component.displayName ?? (config.component as { name?: string }).name;
+    const displayName = `${kindLabel}(${componentName || 'Component'})`;
 
     // Plain function component: source reactivity now lives in each Step's
     // useSyncExternalStore, so the mandala no longer needs to be an observer.
@@ -128,7 +145,11 @@ export function createMandala<S extends Scope<any>>(
         // Per-level data-cell caches, rebuilt when the inner tree remounts (treeKey
         // change). Held on the mandala's committed ref so a Step's `use()` suspension
         // can't discard a half-built cell (which would re-run its load forever).
-        const cacheRef = useRef<{ key: string; buckets: Bucket[] } | null>(null);
+        const cacheRef = useRef<{
+            key: string;
+            buckets: Bucket[];
+            trace: DataTrace | undefined;
+        } | null>(null);
         // Buckets the line below replaced, awaiting the sweep in the commit effect. A Step
         // torn down while its bucket was still live keeps its sources attached on purpose
         // (it can't tell a source swap from an unmount — see the resolver's detach effect)
@@ -137,10 +158,14 @@ export function createMandala<S extends Scope<any>>(
         // would orphan that bucket and its still-attached sources would never detach.
         const orphanedRef = useRef<Bucket[][]>([]);
         if (!cacheRef.current || cacheRef.current.key !== treeKey) {
-            if (cacheRef.current) orphanedRef.current.push(cacheRef.current.buckets);
+            const previous = cacheRef.current;
+            if (previous) orphanedRef.current.push(previous.buckets);
             cacheRef.current = {
                 key: treeKey,
                 buckets: levels.map(() => ({ cells: new Map(), sources: [], built: false })),
+                // A generation is a data-trace run: fresh timeline, and a cause to open it
+                // with. Undefined unless `globalThis.__DEBUG__.data` is on.
+                trace: startDataTrace(displayName, generationCause(previous?.key, retry)),
             };
         }
 
@@ -211,6 +236,7 @@ export function createMandala<S extends Scope<any>>(
             claim,
             hydration: hydrationSlice,
             seeds: seedsSlice,
+            trace: cacheRef.current.trace,
         };
 
         return (
@@ -237,9 +263,7 @@ export function createMandala<S extends Scope<any>>(
         );
     } as MandalaComponent<S>;
 
-    const componentName =
-        config.component.displayName ?? (config.component as { name?: string }).name;
-    Mandala.displayName = `${kindLabel}(${componentName || 'Component'})`;
+    Mandala.displayName = displayName;
 
     // Stay transparent to chunk preloading: a `lazy()` component hangs `.preload` and
     // (built through rati/vite) its `.moduleId` on itself; surface both on the mandala,
@@ -254,7 +278,7 @@ export function createMandala<S extends Scope<any>>(
 
     // A readable identifier for this scope's read errors (best-effort: shared scopes keep
     // the last mandala's label).
-    setScopeLabel(scopeKey, Mandala.displayName);
+    setScopeLabel(scopeKey, displayName);
 
     return Mandala;
 }

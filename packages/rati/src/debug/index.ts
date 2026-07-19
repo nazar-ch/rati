@@ -1,8 +1,13 @@
 /*
     rati/debug — opt-in, framework-specific debug tooling, kept out of the main barrel.
 
-    Currently the navigation-timeline tracer (`navTrace` and friends): every call is one
-    cheap flag read, so the marks can live permanently on the navigation path and are
-    toggled live via `globalThis.__DEBUG__.nav`. See util/navTrace.ts for the mechanism.
+    Two sibling console tracers, each one cheap flag read per call site, so their marks live
+    permanently on their path and are toggled live:
+
+      - `navTrace` — the navigation timeline (click → pushState → render → resolution),
+        `globalThis.__DEBUG__.nav`. See util/navTrace.ts.
+      - `dataTrace` — data resolution per island run (level starts, per-cell settles with
+        durations), `globalThis.__DEBUG__.data`. See util/dataTrace.ts.
 */
 export { navTrace, navTraceStart, navTraceEnabled } from '../util/navTrace';
+export { dataTrace, dataTraceEnabled } from '../util/dataTrace';
