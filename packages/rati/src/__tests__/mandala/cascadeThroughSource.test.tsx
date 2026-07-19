@@ -2,9 +2,9 @@ import { describe, test, expect, afterEach } from 'vite-plus/test';
 import { render, screen, cleanup, act } from '@testing-library/react';
 import type { FC } from 'react';
 import { scope } from '../../scope/scope';
-import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
 import { useScopeControls, type ScopeControls } from '../../mandala/controls';
+import { controllableSource, flush } from '../../testing';
 
 /*
     A source key's value must reach the loads that read it — found while deciding whether the
@@ -22,28 +22,6 @@ import { useScopeControls, type ScopeControls } from '../../mandala/controls';
 const Loading: FC = () => <div>loading...</div>;
 
 afterEach(cleanup);
-
-type TestSource<T> = Source<T> & { set: (state: SourceState<T>) => void };
-
-function testSource<T>(): TestSource<T> {
-    let state: SourceState<T> = { status: 'pending' };
-    const listeners = new Set<() => void>();
-    return {
-        [SourceSymbol]: true,
-        getSnapshot: () => state,
-        subscribe(onChange) {
-            listeners.add(onChange);
-            return () => {
-                listeners.delete(onChange);
-            };
-        },
-        attach: () => () => {},
-        set: (next) => {
-            state = next;
-            for (const listener of listeners) listener();
-        },
-    };
-}
 
 function probeControls<S extends Parameters<typeof useScopeControls>[0]>(testScope: S) {
     const captured: { current: ScopeControls<S> | null } = { current: null };
@@ -65,8 +43,8 @@ describe('a cascade reaches through a source key', () => {
             .load({ a: async () => aValue })
             .load({
                 b: ({ a }: { a: number }) => {
-                    const source = testSource<string>();
-                    queueMicrotask(() => source.set({ status: 'ready', value: `b(a${a})` }));
+                    const source = controllableSource<string>();
+                    queueMicrotask(() => source.setReady(`b(a${a})`));
                     return source;
                 },
             })
@@ -86,15 +64,14 @@ describe('a cascade reaches through a source key', () => {
         await act(async () => {
             render(<Island />);
         });
-        await act(async () => {});
+        await flush();
         expect(screen.getByText('c(b(a1))')).toBeTruthy();
 
         aValue = 2;
         await act(async () => {
             await captured.current!.refresh('a');
         });
-        await act(async () => {});
-        await act(async () => {});
+        await flush(2);
 
         expect(screen.getByText('c(b(a2))')).toBeTruthy();
     });
@@ -104,7 +81,7 @@ describe('a cascade reaches through a source key', () => {
     // reads as a derivation, and now behaves as one — deriving in a dependent load is not
     // second-class next to deriving inside the source.
     test('a live source value change re-runs the loads that read it', async () => {
-        const source = testSource<string>();
+        const source = controllableSource<string>();
         const testScope = scope()
             .load({ a: () => source })
             .load({ b: ({ a }: { a: string }) => `b(${a})` });
@@ -118,14 +95,14 @@ describe('a cascade reaches through a source key', () => {
             render(<Island />);
         });
         await act(async () => {
-            source.set({ status: 'ready', value: 'v1' });
+            source.setReady('v1');
         });
         expect(screen.getByText('b(v1)')).toBeTruthy();
 
         await act(async () => {
-            source.set({ status: 'ready', value: 'v2' });
+            source.setReady('v2');
         });
-        await act(async () => {});
+        await flush();
 
         expect(screen.getByText('b(v2)')).toBeTruthy();
     });

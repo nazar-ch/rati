@@ -11,6 +11,7 @@ the [guide](./guide.md).
 | `rati/server` | Production serving: a fetch request handler, plus a Node listener. |
 | `rati/mobx` | Optional MobX bindings (`observableSource`) and the legacy data layer. |
 | `rati/debug` | Opt-in debug tooling (`navTrace`). |
+| `rati/testing` | Test utilities: `deferred`, `flush`, `controllableSource` (test-env only). |
 
 > **Status:** first public iteration. The stores container surface (§Stores) is being
 > finalized; names there may still move.
@@ -649,3 +650,55 @@ directly as `<form action={store.save}>`.
 | Export | Purpose |
 | --- | --- |
 | `navTrace`, `navTraceStart`, `navTraceEnabled` | navigation-timeline tracing; toggled live via `globalThis.__DEBUG__.nav`, near-zero cost when off |
+
+---
+
+## `rati/testing`
+
+Test-environment only — everything here calls React's `act` (imported from `react`, not
+`@testing-library/react`, which this entry does *not* depend on), which warns outside a
+configured test runner. It needs a React act environment: `@testing-library/react` sets one
+up on import, or set `globalThis.IS_REACT_ACT_ENVIRONMENT = true`. These are the primitives
+rati's own suites (and Jnana's) hand-rolled before this entry existed.
+
+| Export | Purpose |
+| --- | --- |
+| `deferred<T>()` | `{ promise, resolve, reject }` — a promise you settle by hand, to walk a load through its phases. `T = void` → no-arg `resolve()` |
+| `flush(times?)` | `await` `times` empty `act`-flushed microtask turns (default 1). A Suspense retry after a settle isn't synchronous with the resolving `act`, and a waterfall re-suspending one level deeper needs one flush per level — prefer a fixed count over a poll |
+| `controllableSource<T>(options?)` | a real `Source<T>` you drive by hand, with an attach/detach ledger |
+
+`controllableSource` is a genuine source — an island attaches it, subscribes, and
+re-renders on every transition. Its mutators are **raw**: they set state and notify
+synchronously, *without* wrapping `act` (a source is also driven from inside engine flow —
+a `queueMicrotask` in a load — where a nested `act` would misbehave). Wrap a top-level drive
+in `act` yourself, or follow it with `await flush()`.
+
+| Member | Purpose |
+| --- | --- |
+| `setReady(value)` | → `ready` (a fresh snapshot each call, so uSES re-renders). Repeatable |
+| `setPending()` | → `pending`. Repeatable — pair with `setReady` to bounce a live source |
+| `setError(error)` | → `error`; a bare string is taken as the `SourceError` `code` |
+| `emit()` | re-emit the last ready value with a *stable* value identity — a live source ticking/recovering without a value change (downstream loads don't re-run). Throws before the first `setReady` |
+| `attachCount` / `detachCount` / `attached` / `peakAttached` | the ledger: totals, whether it's live now (`false` after teardown = no leak), and the concurrent peak (`> 1` for one instance is a double-attach) |
+
+Options: `initial` (start `ready` with a value instead of `pending`), `ssr` (the
+`SourceSSR` marker — passed straight through), `loads` (the loader shape: on `attach`, if
+still pending, settle `ready` to this value on a microtask — pair with `ssr: true`),
+`onAttach` / `onDetach` (run at the ledger edges, for asserting attach ordering).
+
+```ts
+import { island } from 'rati';
+import { controllableSource, deferred, flush } from 'rati/testing';
+
+// The canonical flow: mount with a pending load, assert loading, resolve, assert content.
+const gate = deferred<string>();
+const feed = controllableSource<string>();          // a live source, driven below
+const scope = scope({ id: input<string>() })
+    .load({ page: () => gate.promise })
+    .load({ feed: () => feed });
+// … mount the island, assert the loading slot …
+gate.resolve('home');
+feed.setReady('live');
+await flush();                                        // let the Suspense retry land
+// … assert the content slot …
+```

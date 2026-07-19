@@ -1,18 +1,9 @@
 import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
 import { observable, runInAction } from 'mobx';
 import { query } from '../../data/query';
-
-// A deferred fake walks a query through every phase without module mocking —
-// the "testability by construction" ground rule (data-package.md).
-function deferred<T>() {
-    let resolve!: (value: T) => void;
-    let reject!: (reason?: unknown) => void;
-    const promise = new Promise<T>((res, rej) => {
-        resolve = res;
-        reject = rej;
-    });
-    return { promise, resolve, reject };
-}
+// A deferred fake walks a query through every phase without module mocking — the
+// "testability by construction" ground rule (data-package.md), now `rati/testing`'s.
+import { deferred } from '../../testing';
 
 afterEach(() => {
     vi.useRealTimers();

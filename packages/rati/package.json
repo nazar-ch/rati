@@ -36,6 +36,12 @@
             "import": "./dist/ssr/index.js",
             "source": "./src/ssr/index.ts"
         },
+        "./testing": {
+            "rati-dev": "./src/testing/index.ts",
+            "types": "./dist/testing/index.d.ts",
+            "import": "./dist/testing/index.js",
+            "source": "./src/testing/index.ts"
+        },
         "./server": {
             "rati-dev": "./src/server/index.ts",
             "types": "./dist/server/index.d.ts",

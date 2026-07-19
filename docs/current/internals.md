@@ -41,6 +41,9 @@ src/
   data/      the rati/data entry: MobX-shaped data primitives (query, collection,
              mutation, form/field) — experimental, pending extraction to a
              companion package (docs/archive/directions-2026-07/data-package.md)
+  testing/   the rati/testing entry: test utilities (deferred, flush,
+             controllableSource) — the generic cores promoted out of the suites'
+             hand-rolls. Test-environment only; shipped for consumers
   stores/    RootStore, GlobalStore (store roots)
   util/      utils.ts
   types/     generic.ts
@@ -461,6 +464,17 @@ deterministic pin list, the fuzz harness design — is
 [planned/mandala-fuzz/](../planned/mandala-fuzz/README.md). Suspense-facing testing rules
 (the async-act mount requirement above all) are cataloged in
 `packages/rati/src/__tests__/suspense-situations.md`.
+
+The utilities the suites lean on ship as the public **`rati/testing`** entry (`src/testing/`
+— `deferred`, `flush`, `controllableSource`), so both a consumer and rati's own suites use
+one implementation. It is *promotion*: the generic cores were extracted out of the ~8
+hand-rolled `testSource`/`loaderSource` copies and the `deferred`/`flush` idioms. The
+`fuzz/` harnesses keep their own **model-wired** drivers — `scopeHarness.tsx`'s
+`controllableSource` carries a ledger tied to the reference model (depth/`maxConcurrent`), a
+`recompute` closure, and testid-tagged slot readers — none of which belong in the generic
+core; that reconciliation (and deleting the remaining deterministic-suite duplicates behind
+the entry) is the [testing-and-dx effort](../planned/testing-and-dx/README.md)'s later
+dogfood sweep. Effort record for the entry: [planned/testing-and-dx/](../planned/testing-and-dx/README.md).
 
 `fuzz/` holds two targets sharing one budget convention (`fuzz(n)`, `FUZZ_RUNS`,
 `FUZZ_LEVEL`, `FUZZ_SEED` — documented in `fuzz/arbitraries.ts`): the mandala's scope
