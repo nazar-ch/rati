@@ -17,10 +17,12 @@ session deliberately left.
   at `src/data/` — the legacy layer was dropped rather than moved, so the dir name was
   free. Extraction to a companion package (the design's working name `rati-data`)
   remains the intent; DATA-04 owns that decision.
-- **`reactive: true` deferred** (maintainer-chosen): ship `query` with
-  load/refresh/debounce/abort; the reactive-params option is DATA-01, and its design
-  must be cross-checked against the mandala's selective-refresh machinery (also
-  maintainer-instructed — the two answer overlapping questions at different layers).
+- **`reactive: true`** — deferred 2026-07-18, then **shipped 2026-07-19 (DATA-01)** after
+  the design pass against the mandala's selective refresh (the line: URL params → scope,
+  store observables → reactive query). A per-primitive MobX `Reaction` tracks the producer's
+  synchronous prefix during the real fetch and re-runs `refresh()` (coalesced by `debounce`);
+  `pagedCollection` resets to the first page instead (cursors invalidate). Design pass +
+  the four cross-checks: [data-package.md §DATA-01](../../archive/directions-2026-07/data-package.md#data-01--reactive-params-design-pass-2026-07-19).
 - Deviations from the design record's sketched interfaces, made during implementation
   and reflected in reference.md:
   - `Collection.refresh()` exists, delegating to `query.refresh()` — the design's own
@@ -40,19 +42,19 @@ session deliberately left.
 
 ## Items
 
-- [DATA-01 — `reactive` params for query](./issues/DATA-01-reactive-query-params.md) —
-  the type-ahead/`JobsListStore` case; blocked on a design pass against the mandala's
-  refresh.
-- [DATA-02 — guide coverage for the data layer](./issues/DATA-02-guide-coverage.md) —
-  reference.md has the section; `docs/public/guide.md` doesn't teach the model yet.
+- ✅ [DATA-01 — `reactive` params for query](./issues/DATA-01-reactive-query-params.md) —
+  **done 2026-07-19**: the design pass + `reactive` on `query`/`collection`/`pagedCollection`,
+  tests, reference/design-record docs. (`Closes: DATA-01`.)
+- ✅ [DATA-02 — guide coverage for the data layer](./issues/DATA-02-guide-coverage.md) —
+  **done 2026-07-19**: `guide.md` now teaches the data-layer model end to end. (`Closes: DATA-02`.)
 - [DATA-03 — the load-bearing consumer migrations](./issues/DATA-03-consumer-migrations.md)
   — the design's own success test: three Jnana/omni shapes must get *shorter*.
 - [DATA-04 — extraction & entry-layout decision](./issues/DATA-04-extraction-decision.md)
   — companion package vs entry, `rati/mobx` absorption, forms subpath.
 
-DATA-01 and DATA-02 are independent. DATA-03 validates everything and should follow
-DATA-01 (JobsListStore needs reactive params). DATA-04 waits for DATA-03's verdict —
-extract what survived contact with real consumers.
+DATA-01 and DATA-02 were independent and are done. DATA-03 validates everything and follows
+DATA-01 (JobsListStore needed reactive params, now available). DATA-04 waits for DATA-03's
+verdict — extract what survived contact with real consumers.
 
 ## Per-item conventions
 
@@ -70,8 +72,9 @@ and DATA-04 is the backstop for the rest:
   last-write-wins on the reconciler). Today: last-write-wins — an upsert during a
   refresh is reconciled away if the refresh's rows disagree.
 - `pagedCollection.refresh()` drift: is sequential re-anchoring enough, or does a
-  truncating `restart` variant need to exist? And the contract when reactive filter
-  params change (cursors invalid → reset to first page) — depends on DATA-01.
+  truncating `restart` variant need to exist? (The reactive-filter contract is now
+  settled — DATA-01 resets to the first page; debounce for that reset is not wired in v1,
+  the one recorded gap.)
 - Mutation coalescing/serialization (the legacy write-debounce) — wait for a real need.
 - `FormError` field keys: `Record<string, string>` vs typed `keyof Values`.
 - Async validators (server-side uniqueness) — the seam would be a promise-returning

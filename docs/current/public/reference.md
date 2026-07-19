@@ -563,9 +563,9 @@ topology:
 
 | Export | Purpose |
 | --- | --- |
-| `query(producer, { debounce? }?)` | read one value: one async producer (`(signal: AbortSignal) => Promise<T>`), honest phases (`idle → loading → ready / refreshing / error`), race-guarded |
-| `collection({ fetch, key, equals?, into? })` | read a keyed set: identity-stable reconciliation, `patchItem`/`upsert`/`insert`/`remove` |
-| `pagedCollection({ fetchPage, key, equals?, into? })` | read in pages: pages *are* queries (per-page phase/error/retry), structural `hasMore`, cursor re-anchoring `refresh()` |
+| `query(producer, { debounce?, reactive? }?)` | read one value: one async producer (`(signal: AbortSignal) => Promise<T>`), honest phases (`idle → loading → ready / refreshing / error`), race-guarded |
+| `collection({ fetch, key, equals?, into?, debounce?, reactive? })` | read a keyed set: identity-stable reconciliation, `patchItem`/`upsert`/`insert`/`remove` |
+| `pagedCollection({ fetchPage, key, equals?, into?, reactive? })` | read in pages: pages *are* queries (per-page phase/error/retry), structural `hasMore`, cursor re-anchoring `refresh()` |
 | `mutation(perform, { optimistic?, refreshes?, onError? }?)` | write: callable with observable `isPending`/`error`, optimistic patch + refresh choreography |
 | `form(fields)`, `field(initial, { validate?, equals? }?)` | stage local edits: per-field baseline (`isDirty`/`reset()`/`commit()`), validate-on-submit, RAC-shaped `props`, action-compatible `submit()` |
 | `required`, `minLength`, `maxLength`, `min`, `max`, `pattern` | the validator kit — a validator is just `(value: T) => string \| undefined`; all but `required` skip empty values |
@@ -609,6 +609,31 @@ phases for pagination rows, `isSubmitting` for buttons. `query.load()` is idempo
 `refresh()` is the only re-fetch and keeps stale data visible, even through a refresh
 failure. Under SSR the primitives stay pending (a `Source` attaches in effects) — this
 entry is for the interactive app, not the SSR path.
+
+**Reactive params** (`reactive: true`, opt-in). A `query` marked `reactive` re-fetches when
+the observables its producer reads **synchronously** change — the type-ahead / filter case,
+replacing a store's manual `load()`-after-every-setter. The re-run is a `refresh()`, so
+`debounce` coalesces the burst; `collection` forwards both options to its query.
+
+```ts
+const results = query(
+    async (signal) => {
+        const term = store.searchTerm; // tracked — a change re-fetches
+        await tick();
+        const extra = store.extraFilter; // NOT tracked — read after the first await
+        return api.search(term, extra, signal);
+    },
+    { reactive: true, debounce: { waitMs: 200 } },
+);
+```
+
+The tracked window is the producer's **synchronous prefix only** — reads after the first
+`await` are outside MobX's tracking, so destructure every reactive dependency at the top.
+`pagedCollection`'s `reactive` is *reset*, not refresh: a tracked param change invalidates
+every cursor, so the list resets to the first page (the island drops to its loading slot).
+The rule for choosing between this and the scope's [selective refresh](#usescopecontrolsscope):
+a value in the URL belongs to the scope (a route-param change re-resolves); a value in a
+store observable belongs to the reactive query.
 
 Forms never touch the island: they are synchronous local state seeded from data the
 island already resolved — `form({ title: field(space.title, { validate: required() }) })`

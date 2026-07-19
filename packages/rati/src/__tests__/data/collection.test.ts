@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vite-plus/test';
-import { autorun } from 'mobx';
+import { autorun, observable, runInAction } from 'mobx';
 import { collection } from '../../data/collection';
 
 interface Row {
@@ -224,5 +224,37 @@ describe('source()', () => {
         expect(c.query.phase).toBe('error');
         expect(c.items).toHaveLength(1); // stale rows still on screen
         expect(source.getSnapshot()).toEqual({ status: 'ready', value: c });
+    });
+});
+
+describe('reactive (pass-through to the query)', () => {
+    test('a keystroke filter re-fetches through the reconciler, keeping identities', async () => {
+        const store = observable({ term: '' });
+        const dataset = [
+            { id: 'a', title: 'Alpha' },
+            { id: 'b', title: 'Beta' },
+            { id: 'c', title: 'Alfred' },
+        ];
+        const c = collection<Row>({
+            fetch: () => {
+                const term = store.term; // read synchronously → tracked
+                return Promise.resolve(
+                    dataset.filter((row) => row.title.startsWith(term)).map((row) => ({ ...row })),
+                );
+            },
+            key: (row) => row.id,
+            reactive: true,
+        });
+
+        await c.query.load(); // term '' → all three
+        expect(c.items.map((row) => row.id)).toEqual(['a', 'b', 'c']);
+        const alpha = c.items[0]!;
+
+        runInAction(() => {
+            store.term = 'Al';
+        });
+        await c.query.load(); // reactive re-fetch, filtered
+        expect(c.items.map((row) => row.id)).toEqual(['a', 'c']);
+        expect(c.items[0]).toBe(alpha); // surviving row keeps its instance
     });
 });

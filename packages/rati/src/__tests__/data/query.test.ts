@@ -1,4 +1,5 @@
 import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
+import { observable, runInAction } from 'mobx';
 import { query } from '../../data/query';
 
 // A deferred fake walks a query through every phase without module mocking —
@@ -271,5 +272,153 @@ describe('source()', () => {
         await loading;
         expect(onChange).toHaveBeenCalled();
         unsubscribe();
+    });
+});
+
+describe('reactive', () => {
+    test('a change to a tracked read re-fetches', async () => {
+        const store = observable({ term: 'a' });
+        const seen: string[] = [];
+        const q = query(
+            async () => {
+                seen.push(store.term); // read synchronously → tracked
+                return `result:${store.term}`;
+            },
+            { reactive: true },
+        );
+
+        await q.load(); // establishes tracking, reads term 'a'
+        expect(q.data).toBe('result:a');
+        expect(seen).toEqual(['a']);
+
+        runInAction(() => {
+            store.term = 'b';
+        });
+        await q.load(); // await the reactive re-fetch (joins the in-flight one)
+        expect(q.data).toBe('result:b');
+        expect(seen).toEqual(['a', 'b']);
+    });
+
+    test('reads after the first await are not tracked (the synchronous-prefix boundary)', async () => {
+        const store = observable({ tracked: 'a', untracked: 'x' });
+        const q = query(
+            async () => {
+                const before = store.tracked; // before the await → tracked
+                await Promise.resolve();
+                const after = store.untracked; // after the await → NOT tracked
+                return `${before}:${after}`;
+            },
+            { reactive: true },
+        );
+
+        await q.load();
+        expect(q.data).toBe('a:x');
+
+        // Changing the post-await read does not re-fetch.
+        runInAction(() => {
+            store.untracked = 'y';
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(q.data).toBe('a:x');
+
+        // Changing the pre-await read does — and now picks up untracked 'y' too.
+        runInAction(() => {
+            store.tracked = 'b';
+        });
+        await q.load();
+        expect(q.data).toBe('b:y');
+    });
+
+    test('a tracked change while loading supersedes the in-flight fetch, not dedupes it', async () => {
+        const store = observable({ term: 'a' });
+        const gates = [deferred<void>(), deferred<void>()];
+        let call = 0;
+        const q = query(
+            async () => {
+                const term = store.term; // tracked
+                const gate = gates[call++]!;
+                await gate.promise;
+                return `result:${term}`;
+            },
+            { reactive: true },
+        );
+
+        const first = q.load(); // fetch #0 for 'a', in flight
+        expect(q.isPending).toBe(true);
+
+        runInAction(() => {
+            store.term = 'b'; // reactive → aborts #0, starts fetch #1 for 'b'
+        });
+        gates[0]!.resolve(); // #0 settles late — superseded, ignored
+        gates[1]!.resolve();
+        await Promise.all([first, q.load()]);
+        expect(q.data).toBe('result:b');
+        expect(call).toBe(2); // two real fetches — the change was not deduped away
+    });
+
+    test('reactive + debounce coalesces a burst into one fetch reading the latest value', async () => {
+        vi.useFakeTimers();
+        const store = observable({ term: 'a' });
+        const producer = vi.fn(async () => `result:${store.term}`);
+        const q = query(producer, { reactive: true, debounce: { waitMs: 100 } });
+
+        await q.load(); // load() never debounces
+        expect(producer).toHaveBeenCalledTimes(1);
+        expect(q.data).toBe('result:a');
+
+        runInAction(() => {
+            store.term = 'ab';
+        });
+        await vi.advanceTimersByTimeAsync(30);
+        runInAction(() => {
+            store.term = 'abc';
+        });
+        await vi.advanceTimersByTimeAsync(30);
+        runInAction(() => {
+            store.term = 'abcd';
+        });
+        // Well past waitMs from the last change: one coalesced fetch, latest value.
+        await vi.advanceTimersByTimeAsync(200);
+        expect(producer).toHaveBeenCalledTimes(2);
+        expect(q.data).toBe('result:abcd');
+    });
+
+    test('a plain (non-reactive) query never tracks', async () => {
+        const store = observable({ term: 'a' });
+        const producer = vi.fn(async () => store.term);
+        const q = query(producer); // no reactive
+
+        await q.load();
+        runInAction(() => {
+            store.term = 'b';
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(producer).toHaveBeenCalledTimes(1); // opt-in only — no implicit tracking
+    });
+
+    test('reset() disposes the reaction; tracking resumes on the next load', async () => {
+        const store = observable({ term: 'a' });
+        const producer = vi.fn(async () => store.term);
+        const q = query(producer, { reactive: true });
+        await q.load();
+        expect(producer).toHaveBeenCalledTimes(1);
+
+        q.reset();
+        runInAction(() => {
+            store.term = 'b'; // no live reaction → no fetch
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(producer).toHaveBeenCalledTimes(1);
+        expect(q.phase).toBe('idle');
+
+        await q.load(); // re-establishes tracking
+        runInAction(() => {
+            store.term = 'c';
+        });
+        await q.load();
+        expect(q.data).toBe('c');
     });
 });

@@ -462,8 +462,8 @@ extraction time).
 - Package location: separate repo vs a workspace here (`packages/rati-data`). A workspace keeps
   the `rati-dev` source-consumption trick working for Jnana.
 - Entry layout: one entry, or a `rati-data/form` subpath so data-only consumers don't see forms.
-- `reactive: true` scheduling: reaction-per-query vs a shared scheduler; interaction with
-  `debounce`.
+- ~~`reactive: true` scheduling: reaction-per-query vs a shared scheduler; interaction with
+  `debounce`.~~ Resolved — see [DATA-01 — reactive params: design pass](#data-01--reactive-params-design-pass-2026-07-19) below.
 - `pagedCollection.refresh()` drift: is sequential re-anchoring enough in practice, or does a
   truncating `restart` variant need to exist from day one? And the exact contract when reactive
   filter params change (cursors invalid → reset to first page).
@@ -474,3 +474,79 @@ extraction time).
   but the error is usually constructed far from the form's type).
 - Async validators (server-side uniqueness checks) — out of v1; the seam would be a validator
   returning a promise plus a per-field pending flag. Wait for need.
+
+## DATA-01 — reactive params: design pass (2026-07-19)
+
+Resolving the four cross-checks the [planned item](../../planned/data-package/issues/DATA-01-reactive-query-params.md)
+required before code. `reactive: true` ships on `query`, and threads through `collection`
+and `pagedCollection`; the mechanism is a MobX `Reaction`, one per primitive.
+
+**1. The line between a reactive query and the mandala's selective refresh.** Both answer
+"my inputs changed, re-fetch" one layer apart, so the rule is drawn on *where the input
+lives*, not on the fact that it's a fetch:
+
+- A parameter carried in the **URL** belongs to the **scope**. A route-param change is a new
+  resolution — the island re-runs the load, or a `refresh(key)` cascade re-runs exactly the
+  downstream loads whose producers read the changed key (internals.md §Selective refresh).
+  The router owns the value; the scope owns the fetch.
+- A parameter carried in a **store observable** — a search box, a filter toggle, a sort
+  column the URL doesn't carry — belongs to the **reactive query**. The store owns the value;
+  the primitive that reads it owns the fetch. No island re-resolution: the instance refreshes
+  in place and observers see `refreshing`.
+
+They never compete because they never own the same value. The dividing question is "is this
+value in the URL?" — if a filter should be shareable/bookmarkable, promote it to a route
+param and let the scope drive it; if it's ephemeral view state, keep it in the store and let
+`reactive` drive it.
+
+**2. Scheduling: reaction-per-query, no shared scheduler.** Each reactive primitive owns one
+`Reaction`. MobX already batches at the layer below: observable writes inside one action
+flush their reactions once at the action's end, so a burst that touches several reactive
+queries in a single `runInAction` coalesces without a rati-side scheduler. A shared scheduler
+would only earn its keep for batching *across* actions, which no consumer needs yet —
+deferred until one does. Reaction-per-query keeps teardown local (`reset()` disposes the
+query's own reaction) and the mechanism auditable.
+
+**3. Debounce: one timer, the existing one.** A reactive re-run *is* a `refresh()`. The
+reaction's invalidation calls `refresh()`, which walks the same scheduled/coalesced path a
+manual `refresh()` does — so `debounce: { waitMs, maxWaitMs }` covers the keystroke burst
+with no second timer. `reactive` + `debounce` is the `JobsListStore` type-ahead shape: track
+the search box, coalesce the keystrokes, one fetch.
+
+Tracking is re-established on every fetch, not in the invalidation: the reaction `track()`s
+the producer *during* `startFetch`, so dependency capture piggybacks on the real fetch (zero
+extra producer executions) and re-tracks each cycle (conditional reads stay accurate). One
+consequence of routing invalidation through the debounce timer without re-tracking until it
+fires: a *continuous* burst re-arms only on the fetch that actually runs, so an unbroken
+burst fires at `waitMs` after its first change rather than its last (`maxWaitMs` already
+bounds that) — a normal type-then-pause coalesces exactly. The fetch always reads the
+observable's *current* value (the producer reads at fetch time), so the value is never stale;
+only the timing is approximate under a pathological burst.
+
+**4. The tracked window is the synchronous prefix — the sharp edge.** MobX tracks the reads a
+function makes *synchronously*. The producer runs its synchronous prefix, reads observables,
+hits its first `await`, and returns a promise; everything after that `await` is outside the
+tracking context and is **not** tracked:
+
+```ts
+query(async (signal) => {
+    const term = store.searchTerm;   // tracked — a change re-fetches
+    const scope = store.scope;       // tracked
+    await tick();
+    const extra = store.extraFilter; // NOT tracked — read after the first await
+    return api.search(term, scope, extra, signal);
+});
+```
+
+Read every reactive dependency **before the first `await`** (destructure them at the top).
+This is MobX's standard async-reaction boundary, not a rati quirk, but it is the one thing
+that will surprise a caller — the reference calls it out.
+
+**`pagedCollection` — reset, don't refresh.** A tracked-param change invalidates every cursor
+(page *k* anchors on page *k−1*'s now-defunct `nextCursor`), so a reactive paged collection
+can't re-anchor: it `reset()`s to the first page and reloads. The reaction tracks page 0's
+producer (which reads the filter params with `cursor = null`); on change it resets and
+re-fetches page 0, which re-tracks. Debounce is **not** wired for the paged reset in v1 — the
+reactive paged case is the infrequent dropdown/segmented filter, not per-keystroke; a
+keystroke filter over paged data uses the flat `collection`, or waits for a debounced reset
+(recorded, not built).

@@ -29,6 +29,16 @@ import { type Source } from '../scope/source';
     successors (the list shrank). Cursor drift under heavy concurrent mutation
     is bounded, not eliminated — the recorded fallback is a truncating restart
     variant, if drift proves visible in practice.
+
+    `reactive: true` is *reset*, not refresh: a tracked filter-param change
+    invalidates every cursor (each page anchors on its predecessor's now-defunct
+    `nextCursor`), so re-anchoring is impossible. The reaction tracks page 0's
+    producer (it reads the params at `cursor === null`); on change the whole list
+    resets to a fresh first page and reloads — so a mounted island drops to its
+    loading slot (an honest "new query", unlike a flat `collection`'s
+    stale-while-refetch). Design pass: data-package.md §DATA-01. Debounce is not
+    wired for the paged reset in v1 (the reactive paged case is the infrequent
+    dropdown filter; a keystroke filter uses the flat `collection`).
 */
 
 export interface PageResult<T, C> {
@@ -54,6 +64,13 @@ export interface PagedCollection<T, C = string, Item = T> {
 
 export interface PagedCollectionOptions<T, C, Item> extends ItemMapOptions<T, Item> {
     fetchPage: (cursor: C | null, signal: AbortSignal) => Promise<PageResult<T, C>>;
+    /**
+     * Opt-in: reset to the first page when the observables `fetchPage` reads at
+     * `cursor === null` change (a filter/sort param). Cursors can't survive a
+     * param change, so this resets rather than refreshes. See the file header and
+     * `QueryOptions.reactive` for the tracked-read boundary.
+     */
+    reactive?: boolean;
 }
 
 interface PageRecord<T, C> {
@@ -89,9 +106,25 @@ export function pagedCollection<T, C = string, Item = T>(
                 const cursor = index === 0 ? null : state.records[index - 1]!.nextCursor;
                 return options.fetchPage(cursor, signal);
             },
-            { onSuccess: (result) => commitPage(record, result) },
+            {
+                onSuccess: (result) => commitPage(record, result),
+                // Only page 0 tracks the filter params (it fetches at cursor null);
+                // deeper pages anchor on cursors and are dropped by the reset anyway.
+                ...(index === 0 && options.reactive
+                    ? { reactive: true, onReactiveInvalidate: reactivelyReset }
+                    : {}),
+            },
         );
         return record;
+    }
+
+    // A tracked filter param changed; every cursor is now invalid. Drop the whole
+    // list and reload from the first page (the source goes pending → the island
+    // shows its loading slot). `reset()` disposes the old page 0's reaction and
+    // makes a fresh page 0; `loadMore()` fetches it, re-tracking the params.
+    function reactivelyReset(): void {
+        self.reset();
+        void self.loadMore();
     }
 
     /** Inside the page query's settling action, race-guarded by it. */

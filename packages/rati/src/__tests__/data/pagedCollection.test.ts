@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from 'vite-plus/test';
+import { observable, runInAction } from 'mobx';
 import { pagedCollection } from '../../data/pagedCollection';
 
 interface Row {
@@ -135,6 +136,54 @@ describe('reset and source', () => {
         expect(source.getSnapshot()).toEqual({ status: 'ready', value: c });
 
         await c.loadMore(); // deeper pages never re-trip the island
+        expect(source.getSnapshot()).toEqual({ status: 'ready', value: c });
+    });
+});
+
+describe('reactive', () => {
+    // A cursor API whose result set depends on an observable filter param.
+    function filteredServer(dataset: Record<string, readonly Row[]>, pageSize: number) {
+        return vi.fn((cursor: string | null, filter: string) => {
+            const rows = dataset[filter] ?? [];
+            const start = cursor === null ? 0 : rows.findIndex((r) => r.id === cursor) + 1;
+            const page = rows.slice(start, start + pageSize).map((r) => ({ ...r }));
+            const nextCursor = start + pageSize < rows.length ? page[page.length - 1]!.id : null;
+            return Promise.resolve({ items: page, nextCursor });
+        });
+    }
+
+    test('a tracked filter change resets to the first page and reloads', async () => {
+        const store = observable({ filter: 'a' });
+        const fetchPage = filteredServer(
+            { a: [row('a1'), row('a2'), row('a3')], b: [row('b1'), row('b2')] },
+            2,
+        );
+        const c = pagedCollection<Row>({
+            fetchPage: (cursor) => fetchPage(cursor, store.filter), // filter read synchronously
+            key: (r) => r.id,
+            reactive: true,
+        });
+        const source = c.source();
+        source.attach();
+
+        await c.loadMore(); // filter 'a', page 0 → [a1, a2]
+        await c.loadMore(); // filter 'a', page 1 → [a3]
+        expect(c.items.map((item) => item.id)).toEqual(['a1', 'a2', 'a3']);
+        expect(c.pages).toHaveLength(2);
+        expect(source.getSnapshot()).toEqual({ status: 'ready', value: c });
+
+        runInAction(() => {
+            store.filter = 'b';
+        });
+        // Cursors are invalid → hard reset: the source drops to pending, so a
+        // mounted island shows its loading slot (unlike a flat collection).
+        expect(source.getSnapshot()).toEqual({ status: 'pending' });
+        expect(c.items).toEqual([]);
+
+        await c.pages[0]!.load(); // await the reload of the fresh first page
+        expect(fetchPage).toHaveBeenLastCalledWith(null, 'b'); // re-anchored at cursor null
+        expect(c.items.map((item) => item.id)).toEqual(['b1', 'b2']);
+        expect(c.pages).toHaveLength(1);
         expect(source.getSnapshot()).toEqual({ status: 'ready', value: c });
     });
 });

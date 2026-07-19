@@ -1,5 +1,5 @@
 import { itemMap, type ItemMapOptions } from './itemMap';
-import { createQuery, instanceSource, type Query } from './query';
+import { createQuery, instanceSource, type Query, type QueryOptions } from './query';
 import { type Source } from '../scope/source';
 
 /*
@@ -15,6 +15,11 @@ import { type Source } from '../scope/source';
     is marked so the next reconcile reapplies server truth over it even when the
     server row itself didn't change — that is what makes `onError: 'refresh'`
     recovery actually recover.
+
+    `debounce` and `reactive` pass straight through to the underlying `query`, so
+    a keystroke-driven filter over a flat list is `collection({ fetch, key,
+    reactive: true, debounce: { waitMs } })` — the fetch reads the store's search
+    term, a change re-runs it, coalesced.
 */
 
 export interface Collection<T, Item = T> {
@@ -40,7 +45,7 @@ export interface Collection<T, Item = T> {
     source(): Source<Collection<T, Item>>;
 }
 
-export interface CollectionOptions<T, Item> extends ItemMapOptions<T, Item> {
+export interface CollectionOptions<T, Item> extends ItemMapOptions<T, Item>, QueryOptions {
     fetch: (signal: AbortSignal) => Promise<readonly T[]>;
 }
 
@@ -51,6 +56,8 @@ export function collection<T, Item = T>(options: CollectionOptions<T, Item>): Co
     const q = createQuery<readonly T[]>((signal) => options.fetch(signal), {
         onSuccess: (rows) => map.reconcile(rows),
         onReset: () => map.clear(),
+        ...(options.debounce !== undefined && { debounce: options.debounce }),
+        ...(options.reactive !== undefined && { reactive: options.reactive }),
     });
 
     const self: Collection<T, Item> = {

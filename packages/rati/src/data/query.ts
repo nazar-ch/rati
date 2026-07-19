@@ -1,4 +1,4 @@
-import { observable, runInAction } from 'mobx';
+import { observable, Reaction, runInAction } from 'mobx';
 import { observableSource } from '../mobx/observableSource';
 import { toSourceError, type Source, type SourceError } from '../scope/source';
 
@@ -17,6 +17,11 @@ import { toSourceError, type Source, type SourceError } from '../scope/source';
         settle is ignored and its `AbortSignal` fires, so producers can cancel.
       - `load()`/`refresh()` resolve when the fetch settles either way — failure is
         state (`phase`/`error`), not a rejection.
+      - `reactive: true` re-fetches when the producer's *synchronous prefix* reads
+        change (opt-in — implicit refetching is never the default). A MobX
+        `Reaction` tracks those reads during the real fetch and re-runs `refresh()`
+        on change, coalesced by `debounce` if set. Design pass:
+        data-package.md §DATA-01.
 */
 
 export type QueryPhase = 'idle' | 'loading' | 'ready' | 'refreshing' | 'error';
@@ -29,6 +34,16 @@ export interface QueryOptions {
      * an ensure wants data now (it does join an already-scheduled fetch).
      */
     debounce?: { waitMs: number; maxWaitMs?: number };
+    /**
+     * Opt-in: re-fetch when the observables the producer reads *synchronously*
+     * (before its first `await`) change — the type-ahead / filter case, the fix
+     * for a store's manual `load()`-after-every-setter. The re-run is a
+     * `refresh()`, so it flows through `debounce` if set. Reads made after the
+     * first `await` are **not** tracked (MobX's async boundary) — destructure
+     * every reactive dependency at the top of the producer. Never the default;
+     * implicit refetching is opt-in in a package whose ethos is explicitness.
+     */
+    reactive?: boolean;
 }
 
 export interface Query<T> {
@@ -61,6 +76,12 @@ export interface QueryInternalOptions<T> extends QueryOptions {
     onSuccess?: (value: T) => void;
     /** Runs inside `reset()`'s action, after the query's own state cleared. */
     onReset?: () => void;
+    /**
+     * Replaces the default reactive invalidation (`refresh()`) — `pagedCollection`
+     * passes a reset-to-first-page here, since a tracked-param change invalidates
+     * every cursor. Only consulted when `reactive` is set.
+     */
+    onReactiveInvalidate?: () => void;
 }
 
 export function query<T>(
@@ -99,7 +120,33 @@ export function createQuery<T>(
         promise: Promise<void>;
         resolve: () => void;
     } | null = null;
+    let reaction: Reaction | null = null;
     let memoizedSource: Source<Query<T>> | undefined;
+
+    // Track the producer's synchronous reads during the *real* fetch (zero extra
+    // producer executions): a tracked observable changing re-runs the query. The
+    // reaction re-tracks on every fetch, so conditional reads stay accurate.
+    // Called inside the fetch IIFE's try, so a synchronous throw (either path)
+    // lands on the normal error path — but a throw inside `track` must be
+    // re-raised *outside* it, or the reaction's own error boundary swallows it.
+    function callProducer(signal: AbortSignal): Promise<T> {
+        if (!options.reactive) return producer(signal);
+        reaction ??= new Reaction('rati.query.reactive', () => {
+            if (options.onReactiveInvalidate) options.onReactiveInvalidate();
+            else reactiveRefresh();
+        });
+        let result!: Promise<T>;
+        let caught: { value: unknown } | undefined;
+        reaction.track(() => {
+            try {
+                result = producer(signal);
+            } catch (thrown) {
+                caught = { value: thrown };
+            }
+        });
+        if (caught) throw caught.value;
+        return result;
+    }
 
     function startFetch(): Promise<void> {
         const id = ++requestId;
@@ -111,7 +158,9 @@ export function createQuery<T>(
         });
         const promise = (async () => {
             try {
-                const value = await producer(ownController.signal);
+                // Runs synchronously up to the producer's first await (so the
+                // reactive track captures its prefix before this IIFE suspends).
+                const value = await callProducer(ownController.signal);
                 if (id !== requestId) return; // superseded — the guard invariant
                 runInAction(() => {
                     state.data = value;
@@ -183,6 +232,17 @@ export function createQuery<T>(
         return startFetch();
     }
 
+    // The default reactive invalidation. Unlike `refresh()` it does *not* dedupe
+    // against the in-flight fetch — a tracked input changed, so that fetch is now
+    // stale and must be superseded (startFetch aborts + bumps the race guard),
+    // not joined. Debounce still coalesces the burst; an in-flight stale fetch may
+    // settle and show briefly before the debounced re-fetch supersedes it.
+    function reactiveRefresh(): void {
+        const { debounce } = options;
+        if (debounce) void scheduleDebounced(debounce.waitMs, debounce.maxWaitMs);
+        else void startFetch();
+    }
+
     function reset(): void {
         requestId += 1; // anything in flight settles into the void
         controller?.abort();
@@ -193,6 +253,9 @@ export function createQuery<T>(
             scheduled.resolve(); // a cancelled coalesced refresh resolves, not hangs
             scheduled = null;
         }
+        // Stop reacting: the next explicit load()/refresh() re-establishes tracking.
+        reaction?.dispose();
+        reaction = null;
         runInAction(() => {
             state.data = undefined;
             state.hasData = false;
