@@ -283,6 +283,57 @@ artifacts; the durable deltas live in the amended issue files):
   instance silently skips `collectError` — its `errors` come back empty. Per-collector
   keying is the fix; a settle-budget option for `prerenderToString` rides along.
 
+### 2026-07-19 — DX-05 (the dogfood sweep landed)
+
+rati's own suites run on `rati/testing`; the duplicate helpers behind it are deleted. Test
+count identical before and after — **62 files / 555 tests / 0 type errors** both sides — and
+the deep fuzz lanes are bit-for-bit indifferent (`FUZZ_SEED=1` on both command properties
+unchanged; the mandala suites also pass a 300-run pinned-seed deepening). Six atomic commits,
+the survey's batch order: mechanical import swaps → simple source swaps → the islandSsr
+sources/errors acceptance test → scopeControls → the router migratables → the fuzz core.
+
+**Judgment calls (helpers kept as thin adapters over the entry, §Scope item 2).** Three
+suites keep small local *factories* that build a `controllableSource` and layer a
+test-specific concern the public ledger deliberately doesn't model — an **ordered string log
+across lifecycle events**, wired through `onAttach`/`onDetach` (and, for the seed shapes, the
+`hydrate` callback):
+
+- `islandSsrSources` — `loaderSource` / `liveSource` / `failingLoaderSource`. The pins read
+  `['attach', 'detach']` and `['hydrate:1', 'attach']` — an ordering *between* attach and a
+  seed's hydrate that `attachCount`/`peakAttached` can't express. The state machine is the
+  entry's; only the log wiring is local.
+- `scopeControls` — `testSource(log, id)`. The cascade-swap pins read `attach:s1` / `detach:s1`
+  / `attach:s2`, a per-*id* log the numeric ledger isn't keyed by. Its `.ready`/`.fail`
+  (which wrapped a sync `act`) became `act(() => src.setReady/setError)` at the call sites.
+- The fuzz `scopeHarness` core (`makeControllable`) `Object.assign`s the model driver
+  (`ready` = recompute-then-`setReady`, `restore` = `emit`, `pend`/`fail`) onto the entry's
+  `controllableSource`; `ledger()` reads the per-instance bounds off each source's own
+  `attachCount`/`detachCount`/`peakAttached`/`attached` (the 1:1 `SourceLedger` rename).
+
+**Survivors (kept on their existing scaffolding, one line each per §Verify).**
+
+- `strictModeLifecycle` — the RTL `render(<StrictMode>…)` stays: `renderIsland`'s async-act
+  mount skips the discard-remount the test exists to pin (the DX-02 friction note). Source
+  swapped to `controllableSource`; `probeControls` stays (no island `controls()` under RTL).
+- `scopeControls` — RTL `render` + `probeControls` + Pin 5's manual collector/`hydrateRoot`
+  stay: the suite reads `pending` at precise quiesce points and drives refreshes over a
+  hydrated tree, choreography the harness's own mount/`.hydrate()` would perturb (and Pin 5
+  on `.hydrate()` would force a dual-renderer `cleanup`). Only its four helpers moved.
+- `orphanedBucketLeak`, `head` — RTL `render` stays (bare-island DOM/`screen` assertions);
+  only the hand-rolled sources (and `head`'s `prerenderToString` drain) moved.
+- Router **store-level suites** (never mount — a 2-line `new RouterStore` + `router.dispose()`):
+  the `RouterStore.preloadRoute` block, `redirect`'s twelve navigation/`prepareRoute` tests,
+  and the `webRouter*` / `prepareRoute` / `hydration` files. Constructor wiring, no harness fit.
+- `router/link` (relative-href RF-07 pins resolve against `window.location`, a browser-history
+  suite), `router/navigateComponent` (StrictMode + browser history), `router/lazy` (no router
+  wiring), `router/ssrRender` (its `renderToString` contrast keeps a local drain; its
+  `prerenderToString` swapped in the batch-1 sweep) — all stay, per the pre-DX-05 intel.
+- The fuzz `routerHarness` delegation to `createTestRouter` is **not** taken: it would perturb
+  the sync-`buildHarness`-inside-command-`act` choreography the properties were tuned on
+  (keep-local is the sanctioned default). Its `flush` one-liner did move (batch 1).
+- `flushScrollRestoration` (`router/scrollRestoration`, `router/webRouterHashAnchor`) is a
+  scroll-rAF drain, not the act-microtask `flush` — unrelated to the entry, untouched.
+
 ## Per-item conventions
 
 Atomic commits on the current branch; subjects prefixed `DX-NN:`, a `Closes: DX-NN` trailer
