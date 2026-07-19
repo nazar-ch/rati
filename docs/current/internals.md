@@ -86,6 +86,12 @@ to its subtree, and owns the data lifecycle. That shared abstraction is the **ma
   `equals`, `dirty`, the `refreshing` token, the `lastValue` stale baseline). Function and
   class producers run against a read-tracking `Proxy` of the prior levels' values
   (`trackReads`); the recorded read-set is what a selective refresh cascades along.
+- **Cancellation = one `AbortController` per bucket.** A function load's second argument
+  (`LoadContext`) carries `bucketSignal(bucket)` — created with the level's cells and
+  fired by `discardRun` when the run is dropped (see the lifecycle section below). A
+  selective `refresh(key)` re-run is handed the same signal: it replaces a load *inside*
+  the run, it doesn't discard it. `hook()` loads and sources get none (`detach()` is a
+  source's cancellation).
 - **Loading = Suspense + slot.** A pending *promise* suspends (the `<Suspense>` fallback is
   the loading slot); a pending *source* sets a pending flag → the loading slot.
 - **Errors = the boundary.** A rejected promise (`use()`) or a thrown source error reaches
@@ -126,6 +132,15 @@ retry counter). The full catalog of Suspense-produced situations this design ans
   bucket still holds stay attached (a cleanup can't tell a deps-change from an unmount).
   The mandala's own unmount cleanup runs a **sweep** over the buckets as the backstop, so
   island teardown releases whatever is still attached.
+- A run that is **discarded** goes through `discardRun` — the sweep above plus firing each
+  bucket's `AbortController`, so the loads it still has in flight are cancelled. Two call
+  sites, both effect-time (a discarded *render* must not cancel a live run): the buckets a
+  new generation replaced (queued at render, released in the `treeCommitted` effect) and
+  the unmount cleanup. Before the abort, every producer-backed promise in the bucket gets
+  a no-op rejection handler: a load the level suspended past was never handed to `use()`,
+  so its abort rejection has no reader and would surface as an unhandled rejection. For
+  the same reason `refreshFailed` stays quiet when the bucket's signal has fired — a
+  cancelled re-fetch is not a failed one.
 - The `.provide()` value (at the `Leaf`) is built and disposed (`[Symbol.dispose]`) in a
   **layout** effect. On unmount React flushes **all layout cleanups before any passive
   cleanup**, and unmounts **children before parents** → the leaf's provided value disposes

@@ -134,6 +134,22 @@ A `.load()` entry can be more than an async function:
 | a `Source<T>` (or `() => Source<T>`) | the live value — see [Live data](#live-data-sources) |
 | `hook(fn)` | whatever the hook returns — see [`hook()`](#hook--context-and-other-data-libraries) |
 
+A function load takes a second argument if it wants one: the load's own **abort signal**,
+fired when the island discards the resolution that started it — an input changed, the
+island retried or refreshed, or it unmounted:
+
+```ts
+const stationScope = scope({ stationId: input<string>() })
+    .load({
+        departures: ({ stationId }, { signal }) =>
+            fetch(`/api/departures/${stationId}`, { signal }).then((res) => res.json()),
+    });
+```
+
+Ignoring it is fine — every load above does — and then a discarded request simply runs to
+completion the way it always did. Taking it means a station the user clicked past stops
+fetching. (Sources don't need one: detaching *is* their cancellation.)
+
 The class entry is worth a second look — it turns "a store per screen" into one line:
 
 ```ts
@@ -308,7 +324,8 @@ function MembersToolbar() {
 Two forms:
 
 - **`refresh()`** re-resolves the whole scope — the island goes back through its loading
-  slot, exactly like the error slot's `retry`.
+  slot, exactly like the error slot's `retry`, and whatever the old resolution still had in
+  flight is aborted (see the signal above).
 - **`refresh('departures')`** re-runs one load surgically. The previous data stays on
   screen while the re-fetch is in flight (`pending` reports the keys, for dimming); when it
   lands, downstream loads re-run **only if they read `departures` and its value actually

@@ -44,7 +44,7 @@ Accepted entry shapes:
 | Entry | Behavior | Resolved prop |
 | --- | --- | --- |
 | plain value | passed through | the value |
-| `(props) => T` / `(props) => Promise<T>` | called once per resolution, result cached per island instance | `T` (awaited) |
+| `(props, context?) => T` / `… => Promise<T>` | called once per resolution, result cached per island instance | `T` (awaited) |
 | `Promise<T>` | awaited | `T` |
 | a class | constructed with the resolved props so far | the instance |
 | `Source<T>` or `(props) => Source<T>` | attached on mount, detached on unmount/input change | `T` when ready |
@@ -52,6 +52,30 @@ Accepted entry shapes:
 
 A plain function load must not call React hooks (it is cached and would run its hook
 once) — use `hook()` for that.
+
+### The load context — `(props, { signal })`
+
+A function load may declare a second parameter, a `LoadContext`:
+
+```ts
+type LoadContext = { readonly signal: AbortSignal };
+
+scope({ stationId: input<string>() }).load({
+    departures: ({ stationId }, { signal }) => api.departures.list(stationId, { signal }),
+});
+```
+
+`signal` fires when the resolution that started the load is **discarded**: an input
+changed, `retry()` or `refresh()` re-resolved the whole scope, or the island unmounted.
+It does not fire on a re-render, and not on `refresh(key)` — a selective refresh replaces
+one load *inside* the current resolution, and the re-run receives the same signal. Under
+a server render it is created and never fires (there is no remount and no unmount).
+
+Declaring the parameter is optional and changes nothing else: a one-parameter load keeps
+its exact behavior, and a load that takes the signal but ignores it runs to completion as
+before. `hook()` loads and sources don't get one — a hook owns its own lifecycle, and a
+source's `detach()` is already its cancellation. A cancelled load's rejection is
+swallowed by the island (it has no reader left), so aborting is silent by design.
 
 ### `.provide(factory, options?)`
 
@@ -97,9 +121,9 @@ const C: ScopeComponent<typeof s> = …;    // component typed to the resolved p
 ```
 
 Also exported: `Scope`, `ChainableScope`, `Input`, `HookLoad`, `DataLoad`,
-`DataLoadOptions`, `ScopeProvideDef`, and the symbols `InputSymbol` / `ScopeSymbol` /
-`ScopeDefinitionsSymbol` / `ScopeProvidesSymbol` (advanced: identity checks and
-library-level introspection).
+`DataLoadOptions`, `LoadContext`, `ScopeProvideDef`, and the symbols `InputSymbol` /
+`ScopeSymbol` / `ScopeDefinitionsSymbol` / `ScopeProvidesSymbol` (advanced: identity
+checks and library-level introspection).
 
 ---
 
