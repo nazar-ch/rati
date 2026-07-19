@@ -194,9 +194,10 @@ export type Shared = {
     inputs: unknown;
     // Per-level data-cell caches, held on the mandala's committed ref (see Bucket).
     buckets: Bucket[];
-    // Live view of the mandala's committed cache — lets a Step's teardown tell a source
-    // swap (its bucket is still current) from a stale run (remount/unmount).
-    currentBuckets: () => Bucket[] | null;
+    // Does the mandala still own this bucket? True for the run being rendered and for the
+    // one `keepStale` is holding on screen — which is what lets a Step's teardown tell a
+    // source swap (or a kept run) from a discarded one (remount/unmount).
+    bucketRetained: (index: number, bucket: Bucket) => boolean;
     // The instance's refresh controller (undefined on the server — nothing refreshes).
     controller: RefreshController | undefined;
     // This run's data-trace timeline (the `rati/debug` entry), undefined unless tracing is
@@ -219,6 +220,25 @@ export type Shared = {
     hydration: Record<string, unknown> | undefined;
     // Client only: server-dehydrated live-source seeds (scope key -> hydrate() input).
     seeds: Record<string, unknown> | undefined;
+    // `keepStale` only (undefined otherwise). The leaf reports what it committed, which
+    // becomes the baseline the next re-resolve keeps on screen — and the report is the
+    // swap: recording the new output is what releases the run it replaces.
+    commit:
+        | ((
+              buckets: Bucket[],
+              resolved: Record<string, unknown>,
+              provided: { value: unknown } | null,
+          ) => void)
+        | undefined;
+    // `keepStale` only. Called from the leaf's passive effect once its run is on screen —
+    // the moment the run it replaced can be let go (see the mandala's swapRun).
+    swap: ((buckets: Bucket[]) => void) | undefined;
+    // `keepStale` only. A retiring `ProvideLeaf` offers its dispose here; taken (true) when
+    // its run is the kept one, so the value stays alive while it is still being published.
+    retainProvided: ((buckets: Bucket[], dispose: () => void) => boolean) | undefined;
+    // The kept run's content, rendered wherever the loading slot would be while a stale
+    // window is open. Undefined the rest of the time — which is always, without `keepStale`.
+    staleContent: ReactNode | undefined;
 };
 
 // Build one cell — the hydration short-circuit, the live-source seeding, and the
@@ -485,9 +505,9 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
             // swap's leavers detach here, but entries the live bucket still holds must
             // stay attached. A stale bucket (inner-tree remount) detaches everything;
             // plain unmount leaves the live entries to the mandala's sweep (a cleanup
-            // can't tell deps-change from unmount).
-            const currentBuckets = shared.currentBuckets();
-            const bucketIsLive = currentBuckets?.[index] === bucket;
+            // can't tell deps-change from unmount). A run `keepStale` is holding on
+            // screen counts as live for exactly the same reason: it is still rendering.
+            const bucketIsLive = shared.bucketRetained(index, bucket);
             for (let i = sources.length - 1; i >= 0; i--) {
                 const entry = sources[i]!;
                 if (bucketIsLive && bucket.sources.includes(entry)) continue;
@@ -624,6 +644,12 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
 
     if (pending) {
         if (navTraceEnabled()) navTrace(`level ${index} render loading slot (pending)`);
+        // Under `keepStale`, the previous run stands in for the slot — the same substitution
+        // the mandala makes for its Suspense fallback, so a level pending on a source and a
+        // level suspended on a promise look the same from outside. (The kept run reports its
+        // own phase as it renders; this branch only owns the bare slot.)
+        if (shared.staleContent !== undefined) return shared.staleContent;
+        shared.controller?.reportPhase('loading', false);
         const Loading = shared.loading;
         return <Loading inputs={shared.inputs} />;
     }
@@ -639,9 +665,25 @@ type LeafProps = { resolved: Record<string, unknown>; shared: Shared };
 function Leaf({ resolved, shared }: LeafProps) {
     // Reaching the leaf is the run's finish line — the waterfall's total lands here.
     traceResolved(shared.trace);
+    // ...and the island is showing content. A `.provide()` scope is not there yet — its
+    // value still has to build — so ProvideLeaf reports for itself.
+    if (!shared.scope.provideDef) shared.controller?.reportPhase('ready', false);
     const provideDef = shared.scope.provideDef;
     const Component = shared.component;
     const channel = shared.channel;
+
+    // Provide-by-default: this render *is* the output, so the commit is the whole story
+    // (a `.provide()` scope waits for its value — see ProvideLeaf). A layout effect, so
+    // the baseline `keepStale` keeps is one that actually reached the screen.
+    const commit = shared.commit;
+    const swap = shared.swap;
+    const buckets = shared.buckets;
+    useLayoutEffect(() => {
+        if (!provideDef) commit?.(buckets, resolved, null);
+    });
+    useEffect(() => {
+        if (!provideDef) swap?.(buckets);
+    });
 
     if (!provideDef) {
         // Provide-by-default: publish the resolved props to the subtree (useScope).
@@ -658,9 +700,13 @@ function Leaf({ resolved, shared }: LeafProps) {
             component={Component}
             channel={channel}
             loading={shared.loading}
+            staleContent={shared.staleContent}
             inputs={shared.inputs}
             cacheToken={shared.buckets}
             controller={shared.controller}
+            commit={commit}
+            swap={swap}
+            retainProvided={shared.retainProvided}
         />
     );
 }
@@ -671,7 +717,11 @@ type ProvideLeafProps = {
     component: ComponentType<any>;
     channel: Context<unknown>;
     loading: ComponentType<{ inputs: unknown }>;
+    staleContent: ReactNode | undefined;
     inputs: unknown;
+    commit: Shared['commit'];
+    swap: Shared['swap'];
+    retainProvided: Shared['retainProvided'];
     // The mandala's bucket array — a new identity whenever the cache is rebuilt (param
     // change / StrictMode remount), and stable across plain re-renders + live source
     // updates. Used as the rebuild key so the provided value tracks the surviving run
@@ -686,9 +736,13 @@ function ProvideLeaf({
     component: Component,
     channel,
     loading: Loading,
+    staleContent,
     inputs,
     cacheToken,
     controller,
+    commit,
+    swap,
+    retainProvided,
 }: ProvideLeafProps) {
     const [built, setBuilt] = useState<{ value: unknown } | null>(null);
     // Bumped when a selective refresh changes a key the factory consumed — the effect
@@ -710,14 +764,22 @@ function ProvideLeaf({
         readsRef.current = reads;
         setBuilt({ value });
         return () => {
-            const dispose = (value as Partial<Disposable> | undefined)?.[Symbol.dispose];
-            if (typeof dispose === 'function') {
-                try {
-                    dispose.call(value);
-                } catch (error) {
-                    console.error('Provided value dispose failed', error);
+            const disposeValue = () => {
+                const dispose = (value as Partial<Disposable> | undefined)?.[Symbol.dispose];
+                if (typeof dispose === 'function') {
+                    try {
+                        dispose.call(value);
+                    } catch (error) {
+                        console.error('Provided value dispose failed', error);
+                    }
                 }
-            }
+            };
+            // A run `keepStale` is holding on screen is still publishing this value, so the
+            // mandala takes the dispose and runs it at the swap — before it detaches the
+            // sources the value was built over, which is the order that matters. Everything
+            // else (a rebuild, a discarded run, unmount) disposes right here, as always.
+            if (retainProvided?.(cacheToken as Bucket[], disposeValue)) return;
+            disposeValue();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by cacheToken + version
     }, [cacheToken, version]);
@@ -729,7 +791,23 @@ function ProvideLeaf({
         });
     }, [controller]);
 
-    if (!built) return <Loading inputs={inputs} />;
+    // The output of a `.provide()` run is its props *and* the value it publishes, so the
+    // commit waits for the build above — which is also why it can't ride the same effect.
+    useLayoutEffect(() => {
+        if (built) commit?.(cacheToken as Bucket[], resolved, { value: built.value });
+    });
+    useEffect(() => {
+        if (built) swap?.(cacheToken as Bucket[]);
+    });
+
+    // The build frame: one render with the value not yet made. Under `keepStale` the
+    // previous run covers it, like every other not-ready instant.
+    if (!built) {
+        if (staleContent !== undefined) return staleContent;
+        controller?.reportPhase('loading', false);
+        return <Loading inputs={inputs} />;
+    }
+    controller?.reportPhase('ready', false);
 
     let content: ReactNode = (
         <channel.Provider value={built.value}>

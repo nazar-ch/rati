@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import type { ComponentType, ErrorInfo, ReactNode } from 'react';
 import { asSourceError, type SourceError } from '../scope/source';
+import type { RefreshController } from './refresh';
 
 // Catches a rejected promise (`use()`) or a thrown source error and renders the mandala's
 // error slot — or rethrows to the nearest outer boundary when there's no slot. `resetKey`
@@ -12,6 +13,8 @@ type ErrorBoundaryProps = {
     inputs: unknown;
     retry: () => void;
     resetKey: unknown;
+    /** Reports the error phase while the slot is up — see RefreshController.reportPhase. */
+    controller: RefreshController;
     children: ReactNode;
 };
 
@@ -37,6 +40,9 @@ export class MandalaErrorBoundary extends Component<ErrorBoundaryProps, { error:
     override render() {
         if (this.state.error !== null) {
             const { errorSlot: ErrorSlot, inputs, retry } = this.props;
+            // The slot replaces the whole inner tree, kept content included — an error is
+            // not something stale content should sit in front of.
+            this.props.controller.reportPhase('error', false);
             if (!ErrorSlot) {
                 // No slot — propagate to the nearest outer ErrorBoundary.
                 throw this.state.error;

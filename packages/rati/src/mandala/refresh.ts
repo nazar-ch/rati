@@ -204,6 +204,19 @@ export function sweepDetach(buckets: readonly Bucket[] | null | undefined): void
     }
 }
 
+/**
+ * Which of the island's three slots is on screen — its aggregate phase, not any one load's.
+ * `'ready'` means content is rendering, which includes the stale window: kept content *is*
+ * content, and a subtree gating a skeleton on `phase === 'loading'` must not flip back to
+ * it under content the user is reading. `isStale` is what tells the two apart.
+ */
+export type IslandPhase = 'loading' | 'ready' | 'error';
+
+/** The island's status, as `useScopeControls` reports it. */
+export type IslandStatus = { phase: IslandPhase; isStale: boolean };
+
+const initialStatus: IslandStatus = { phase: 'loading', isStale: false };
+
 type ControllerWiring = {
     levels: Scope['definition'][];
     buckets: Bucket[];
@@ -234,9 +247,50 @@ export class RefreshController {
     private readonly changedListeners = new Set<(key: string) => void>();
     private readonly waiters = new Map<string, Array<() => void>>();
 
+    private status: IslandStatus = initialStatus;
+    private readonly statusListeners = new Set<() => void>();
+    private statusNotifyScheduled = false;
+
     wire(wiring: ControllerWiring): void {
         this.wiring = wiring;
     }
+
+    /**
+     * Whatever is rendering says so — the leaf ('ready'), the kept run ('ready', stale), the
+     * loading slot, the error slot. Which slot is on screen is the only honest definition of
+     * the island's phase: no single piece of bookkeeping knows it (a level can be suspended
+     * on a promise, pending on a source, or thrown to the boundary, all without the mandala
+     * itself re-rendering).
+     *
+     * Called from render, like `addPending` — so a subtree reading the status further down
+     * the same pass sees the value that pass produced, rather than the previous one. The
+     * notification is microtask-deferred for the same reason it is there: a listener
+     * setState during render is not allowed.
+     */
+    reportPhase(phase: IslandPhase, isStale: boolean): void {
+        if (this.status.phase === phase && this.status.isStale === isStale) return;
+        this.status = { phase, isStale };
+        if (this.statusNotifyScheduled) return;
+        this.statusNotifyScheduled = true;
+        queueMicrotask(() => {
+            this.statusNotifyScheduled = false;
+            for (const listener of this.statusListeners) listener();
+        });
+    }
+
+    subscribeStatus = (onChange: () => void): (() => void) => {
+        this.statusListeners.add(onChange);
+        return () => {
+            this.statusListeners.delete(onChange);
+        };
+    };
+
+    getStatus = (): IslandStatus => this.status;
+
+    /** The error slot's retry, as a verb the whole subtree can reach. */
+    retry = (): void => {
+        this.wiring?.fullRefresh();
+    };
 
     /** Effect-time, on inner-tree commit: a remount (inputs change / retry) tears the
      * old cells down, so outstanding refresh bookkeeping is settled wholesale. */

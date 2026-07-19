@@ -1,7 +1,7 @@
 import { createContext, useContext, useSyncExternalStore, type Context } from 'react';
 import type { Scope, ScopeLoadKeys } from '../scope/scope';
 import { describeScope } from './channel';
-import type { RefreshController } from './refresh';
+import type { IslandPhase, IslandStatus, RefreshController } from './refresh';
 
 /*
     The controls channel — `useScopeControls`. A second scope-keyed channel next to the
@@ -36,16 +36,43 @@ export type ScopeControls<S extends Scope<any>> = {
     refresh: (key?: ScopeLoadKeys<S>) => Promise<void>;
     /** Keys currently re-fetching — selective refreshes and their cascade. */
     pending: ReadonlySet<ScopeLoadKeys<S>>;
+    /**
+     * Which slot the island is showing: `'loading'`, `'ready'`, or `'error'`. Aggregate —
+     * the island resolves all-or-nothing, so there is no per-load phase to read. A stale
+     * window is `'ready'` (content *is* on screen); {@link ScopeControls.isStale} is what
+     * distinguishes it.
+     */
+    phase: IslandPhase;
+    /**
+     * Is the content on screen the *previous* resolution's? True only inside a `keepStale`
+     * island's stale window — between a re-resolve starting and the new run committing.
+     * Dim it, badge it, disable its actions.
+     *
+     * Not a per-key flag: a selective `refresh(key)` also keeps its previous value
+     * rendered, and that one is `pending` — which says *which* keys, where this says the
+     * whole view belongs to a resolution that is no longer current.
+     */
+    isStale: boolean;
+    /**
+     * Re-resolve from scratch — the error slot's `retry`, as a verb the whole subtree can
+     * reach, so a component can offer the affordance without being the error slot. The same
+     * action as `refresh()` with no key.
+     */
+    retry: () => void;
 };
 
 const emptyPending: ReadonlySet<string> = new Set();
 const noopSubscribe = () => () => {};
 const emptySnapshot = () => emptyPending;
+const inertStatus: IslandStatus = { phase: 'loading', isStale: false };
+const inertStatusSnapshot = () => inertStatus;
 
 /**
  * Read the nearest island's controls for a scope — imperative refresh (whole-scope or
- * per-key) plus the live set of keys currently re-fetching. Keyed by the **scope**, like
- * {@link useScope}: a descendant imports the scope, never the island component.
+ * per-key) and retry, plus what the island is doing right now: its `phase`, whether the
+ * content is `isStale`, and the live set of keys currently re-fetching. Keyed by the
+ * **scope**, like {@link useScope}: a descendant imports the scope, never the island
+ * component.
  *
  * Throws when no island for the scope is above the calling component.
  */
@@ -58,6 +85,11 @@ export function useScopeControls<S extends Scope<any>>(scope: S): ScopeControls<
         controller ? controller.subscribePending : noopSubscribe,
         controller ? controller.getPending : emptySnapshot,
         controller ? controller.getPending : emptySnapshot,
+    );
+    const status = useSyncExternalStore(
+        controller ? controller.subscribeStatus : noopSubscribe,
+        controller ? controller.getStatus : inertStatusSnapshot,
+        controller ? controller.getStatus : inertStatusSnapshot,
     );
     if (!channel) {
         throw new Error(
@@ -74,5 +106,8 @@ export function useScopeControls<S extends Scope<any>>(scope: S): ScopeControls<
     return {
         refresh: controller.refresh as ScopeControls<S>['refresh'],
         pending: pending as ReadonlySet<ScopeLoadKeys<S>>,
+        phase: status.phase,
+        isStale: status.isStale,
+        retry: controller.retry,
     };
 }

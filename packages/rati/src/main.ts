@@ -91,6 +91,8 @@ export {
 
 export { useScope, useOptionalScope } from './mandala/channel';
 export { useScopeControls, type ScopeControls } from './mandala/controls';
+// The island's aggregate phase, for a component that stores or switches on one.
+export type { IslandPhase } from './mandala/refresh';
 
 export { island, type IslandComponent, type IslandConfig } from './island/island';
 

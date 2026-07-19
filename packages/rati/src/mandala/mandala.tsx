@@ -1,5 +1,5 @@
 import { Fragment, Suspense, useContext, useEffect, useId, useReducer, useRef } from 'react';
-import type { ComponentType, FC } from 'react';
+import type { ComponentType, Context, FC, ReactNode } from 'react';
 import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope';
 import type { SourceError } from '../scope/source';
 import { deepEqual } from '../util/utils';
@@ -62,6 +62,22 @@ export type MandalaConfig<S extends Scope<any>> = {
      * On a client-only render (no server in the picture) the option does nothing.
      */
     ssr?: boolean;
+
+    /**
+     * Keep the previous content on screen while re-resolving? Default `false`.
+     *
+     * A param change or `refresh()` re-resolves the whole scope, which normally blanks the
+     * screen back to the `loading` slot. With `keepStale`, the island keeps rendering what
+     * it last committed until the new resolution is ready, then swaps — the islands
+     * reading of stale-while-revalidate. The first load has nothing to keep and is
+     * unchanged; an error during the re-resolve shows the `error` slot rather than leaving
+     * stale content passing for current.
+     *
+     * The kept props were resolved for the *previous* inputs, so the subtree can briefly
+     * see old data under a new URL — that is the feature, and `useScopeControls().isStale`
+     * is how a component knows to say so (dim it, badge it).
+     */
+    keepStale?: boolean;
 };
 
 export type MandalaComponent<S extends Scope<any>> = FC<ScopeInputs<S>> & {
@@ -77,6 +93,86 @@ export type MandalaComponent<S extends Scope<any>> = FC<ScopeInputs<S>> & {
 };
 
 const DefaultLoading: FC<{ inputs: unknown }> = () => null;
+
+/** What a run's leaf put on screen, recorded at commit — the baseline `keepStale` keeps. */
+type CommittedOutput = {
+    buckets: Bucket[];
+    resolved: Record<string, unknown>;
+    /** The `.provide()` value, when the scope declares one; null for provide-by-default. */
+    provided: { value: unknown } | null;
+};
+
+/**
+ * A committed run held on screen while its successor resolves (`keepStale`). It is the
+ * whole run, not a snapshot of it: `buckets` stays out of the discard path, so the Steps'
+ * cleanups leave its sources attached and `ProvideLeaf` hands over `disposeProvided`
+ * instead of running it. Released — dispose first, then detach — when the successor's leaf
+ * commits, or at unmount.
+ */
+type KeptRun = CommittedOutput & { disposeProvided: (() => void) | null };
+
+/**
+ * Let a kept run go, in the order the engine guarantees everywhere else: the `.provide()`
+ * value it was still publishing disposes *before* `discardRun` detaches the sources that
+ * value was built over. `successor` is the run taking over (null at unmount) — passing it
+ * makes the call a no-op when the same run commits again, so this is safe to call on every
+ * commit rather than only on the swap.
+ */
+function releaseKept(keptRef: { current: KeptRun | null }, successor: Bucket[] | null): void {
+    const kept = keptRef.current;
+    if (!kept || kept.buckets === successor) return;
+    keptRef.current = null;
+    kept.disposeProvided?.();
+    discardRun(kept.buckets);
+}
+
+/**
+ * The loading slot, reporting itself. A wrapper rather than a call in the mandala's render
+ * because React is what decides to show a Suspense fallback — by the time this renders, the
+ * mandala's own render has long since returned.
+ */
+function LoadingSlot({
+    controller,
+    children,
+}: {
+    controller: RefreshController;
+    children: ReactNode;
+}) {
+    controller.reportPhase('loading', false);
+    return children;
+}
+
+/**
+ * The stale window's content: the kept run's component, fed the props it committed with,
+ * publishing what it published. Not a re-resolution — nothing here runs a load or touches
+ * a cell; it renders a run that is already finished and is being held on screen.
+ */
+function KeptContent({
+    kept,
+    channel,
+    appChannel,
+    component: Component,
+    controller,
+}: {
+    kept: KeptRun;
+    channel: Context<unknown>;
+    appChannel: Context<any> | undefined;
+    component: ComponentType<any>;
+    controller: RefreshController;
+}) {
+    // Content is on screen — it just belongs to the run before this one.
+    controller.reportPhase('ready', true);
+    // `.provide()` value when the scope declares one, else the resolved props — the same
+    // choice the leaf makes, so `useScope` reads one type across the swap.
+    const value = kept.provided ? kept.provided.value : kept.resolved;
+    const content = (
+        <channel.Provider value={value}>
+            <Component {...kept.resolved} />
+        </channel.Provider>
+    );
+    if (!appChannel) return content;
+    return <appChannel.Provider value={value}>{content}</appChannel.Provider>;
+}
 
 // Why a generation exists, for the data trace's opening line (`rati/debug`): there was no
 // previous one (the island mounted), the retry counter moved (an error-slot retry), or the
@@ -104,8 +200,10 @@ export function createMandala<S extends Scope<any>>(
     const ControlsChannel = registerScopeControlsChannel(scopeKey);
     const Loading = (config.loading ?? DefaultLoading) as ComponentType<{ inputs: unknown }>;
     const levels = flattenLevels(config.scope as Scope);
-    // Build-time constant, so the element tree below keeps one stable shape per mandala.
+    // Build-time constants, so the element tree below keeps one stable shape per mandala.
     const ssrEnabled = config.ssr !== false;
+    const keepStale = config.keepStale === true;
+    const provideChannel = (config.scope as Scope).provideDef?.channel;
 
     // The public identity of this mandala — the React displayName, the scope's read-error
     // label, and the data trace's per-line prefix. Computed before the component so the
@@ -175,9 +273,40 @@ export function createMandala<S extends Scope<any>>(
         // pending tears levels down with *no* remount, so without this the next generation
         // would orphan that bucket and its still-attached sources would never detach.
         const orphanedRef = useRef<Bucket[][]>([]);
+        // What the current run's leaf last put on screen, and the run it belongs to. Written
+        // at commit (the leaf's layout effect), so a discarded render never becomes the
+        // stale baseline. Null until this run's leaf commits.
+        const committedRef = useRef<CommittedOutput | null>(null);
+        // The previous run, still on screen while this one resolves (`keepStale`). Whole,
+        // not a snapshot: its buckets stay live, so its sources stay attached and its
+        // `.provide()` value stays alive — the stale content is the run that produced it,
+        // frozen, rather than a re-render over torn-down resources.
+        const keptRef = useRef<KeptRun | null>(null);
         if (!cacheRef.current || cacheRef.current.key !== treeKey) {
             const previous = cacheRef.current;
-            if (previous) orphanedRef.current.push(previous.buckets);
+            const committed = committedRef.current;
+            if (previous) {
+                // Only a run that reached the screen is worth keeping — and only if none
+                // already is. A second re-resolve mid-stale-window discards the run that
+                // never committed and keeps showing the original: swapping in a half-built
+                // replacement would blank exactly what `keepStale` exists to preserve.
+                if (
+                    keepStale &&
+                    !keptRef.current &&
+                    committed &&
+                    committed.buckets === previous.buckets
+                ) {
+                    keptRef.current = {
+                        buckets: previous.buckets,
+                        resolved: committed.resolved,
+                        provided: committed.provided,
+                        disposeProvided: null,
+                    };
+                } else {
+                    orphanedRef.current.push(previous.buckets);
+                }
+            }
+            committedRef.current = null;
             cacheRef.current = {
                 key: treeKey,
                 buckets: levels.map(() => ({
@@ -249,9 +378,58 @@ export function createMandala<S extends Scope<any>>(
                 // unswept (the effect above never ran for it).
                 for (const buckets of orphanedRef.current) discardRun(buckets);
                 orphanedRef.current = [];
+                // The run `keepStale` was holding on screen: the island is gone, so there
+                // is nothing left to keep it for. Same order as the swap below.
+                releaseKept(keptRef, null);
                 cacheRef.current = null;
             };
         }, []);
+
+        // The leaf's commit — where a run becomes "what is on screen". Recording the
+        // output here rather than during render is what makes the kept baseline a
+        // *committed* one: a render React discards never reaches this.
+        const commitRun = (
+            buckets: Bucket[],
+            resolved: Record<string, unknown>,
+            provided: { value: unknown } | null,
+        ) => {
+            committedRef.current = { buckets, resolved, provided };
+        };
+
+        // The swap: the successor is on screen, so the run it replaced can go. Split from
+        // `commitRun` and driven from the leaf's *passive* effect for two reasons. The
+        // phase: every layout effect of the commit — including the new Steps' source
+        // attach — has run by then, so a source both runs hold is never detached and
+        // re-attached across the window. And the caller: a Suspense retry re-renders the
+        // boundary's children, not the mandala, so an effect of the mandala's own would
+        // simply not run on the commit that ends the window.
+        const swapRun = (buckets: Bucket[]) => {
+            releaseKept(keptRef, buckets);
+        };
+
+        // A retiring `ProvideLeaf` offering its dispose: taken only when its run is the one
+        // being kept, in which case the value stays alive (and published) until the swap
+        // releases it. Everything else disposes on the spot, as always.
+        const retainProvided = (buckets: Bucket[], dispose: () => void): boolean => {
+            const kept = keptRef.current;
+            if (!kept || kept.buckets !== buckets) return false;
+            kept.disposeProvided = dispose;
+            return true;
+        };
+
+        // The kept run's content, standing in for the loading slot at every site the slot
+        // can appear. Built here so all three share one element — and one identity, so the
+        // component doesn't remount as the tree moves between them.
+        const kept = keptRef.current;
+        const staleContent = kept ? (
+            <KeptContent
+                kept={kept}
+                channel={Channel}
+                appChannel={provideChannel}
+                component={config.component as ComponentType<any>}
+                controller={controller}
+            />
+        ) : undefined;
 
         const shared: Shared = {
             scope: config.scope as Scope,
@@ -260,7 +438,9 @@ export function createMandala<S extends Scope<any>>(
             loading: Loading,
             inputs,
             buckets: cacheRef.current.buckets,
-            currentBuckets: () => cacheRef.current?.buckets ?? null,
+            bucketRetained: (index, bucket) =>
+                cacheRef.current?.buckets[index] === bucket ||
+                keptRef.current?.buckets[index] === bucket,
             controller: collect ? undefined : controller,
             collect,
             collectError,
@@ -269,11 +449,22 @@ export function createMandala<S extends Scope<any>>(
             hydration: hydrationSlice,
             seeds: seedsSlice,
             trace: cacheRef.current.trace,
+            // The leaf reports its commit only where something reads it: with `keepStale`
+            // off there is no baseline to keep, and the default path stays untouched.
+            commit: keepStale ? commitRun : undefined,
+            swap: keepStale ? swapRun : undefined,
+            retainProvided: keepStale ? retainProvided : undefined,
+            staleContent,
         };
 
         // The one element the loading slot is: the Suspense fallback, and — under
         // `ssr: false` — what stands in for the whole tree until the client has hydrated.
-        const loadingSlot = <Loading inputs={inputs} />;
+        // While a kept run is on screen it stands in for the slot itself (`keepStale`).
+        const loadingSlot = staleContent ?? (
+            <LoadingSlot controller={controller}>
+                <Loading inputs={inputs} />
+            </LoadingSlot>
+        );
         const tree = <Fragment key={treeKey}>{buildTree(levels, 0, inputs, shared)}</Fragment>;
 
         return (
@@ -291,6 +482,7 @@ export function createMandala<S extends Scope<any>>(
                     inputs={inputs}
                     retry={bumpRetry}
                     resetKey={treeKey}
+                    controller={controller}
                 >
                     <Suspense fallback={loadingSlot}>
                         {ssrEnabled ? (

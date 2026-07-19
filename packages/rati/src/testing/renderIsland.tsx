@@ -87,14 +87,24 @@ export type RenderIslandOptions<S extends Scope<any>> = {
       });
 
 function visibleNode(container: HTMLElement, slot: SlotName): Element | null {
-    const node = container.querySelector(`[${SLOT_ATTR}="${slot}"]`);
-    if (!node) return null;
-    // React hides a suspended boundary's *children* (ancestors of this marker), not the
-    // marker itself — walk up to the container looking for a display:none ancestor.
-    for (let el: Element | null = node; el && el !== container; el = el.parentElement) {
-        if (el instanceof HTMLElement && el.style.display === 'none') return null;
+    // *All* markers for the slot, not the first: a boundary showing its fallback keeps the
+    // previous children in the DOM (hidden) alongside it, so the same slot name can appear
+    // twice — once dead, once live. Under `keepStale` that pair is `content` next to
+    // `content` (the kept run renders in the fallback's place), where taking the first
+    // match reads the hidden one and reports the island as blank.
+    for (const node of container.querySelectorAll(`[${SLOT_ATTR}="${slot}"]`)) {
+        // React hides a suspended boundary's *children* (ancestors of this marker), not the
+        // marker itself — walk up to the container looking for a display:none ancestor.
+        let hidden = false;
+        for (let el: Element | null = node; el && el !== container; el = el.parentElement) {
+            if (el instanceof HTMLElement && el.style.display === 'none') {
+                hidden = true;
+                break;
+            }
+        }
+        if (!hidden) return node;
     }
-    return node;
+    return null;
 }
 
 function readSlot(container: HTMLElement): SlotName {

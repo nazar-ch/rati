@@ -148,6 +148,13 @@ export type RouteOptions<TScope extends Scope<any> | undefined, Path extends str
      */
     ssr?: TScope extends Scope<any> ? boolean : undefined;
     /**
+     * Keep the previous page's content on screen while a param change re-resolves, instead
+     * of blanking to the `loading` slot — the mandala's `keepStale` (see `island`). Read
+     * `useScopeControls(scope).isStale` in the subtree to mark it. Only meaningful
+     * alongside `scope`.
+     */
+    keepStale?: TScope extends Scope<any> ? boolean : undefined;
+    /**
      * Declare this route a redirect — see {@link RouteRedirect}. The component never
      * renders on the happy path (pass `() => null`); it shows only if a redirect loop
      * is detected and following stops.
@@ -197,6 +204,7 @@ export function buildRouteComponent(
         loading?: ComponentType<any> | undefined;
         error?: ComponentType<any> | undefined;
         ssr?: boolean | undefined;
+        keepStale?: boolean | undefined;
     },
 ): ComponentType<any> {
     return createMandala(
@@ -206,6 +214,7 @@ export function buildRouteComponent(
             loading: fold.loading ?? (() => null),
             ...(fold.error ? { error: fold.error } : {}),
             ...(fold.ssr !== undefined ? { ssr: fold.ssr } : {}),
+            ...(fold.keepStale !== undefined ? { keepStale: fold.keepStale } : {}),
         },
         'Route',
     );
@@ -221,8 +230,10 @@ export type RouteFoldInputs = {
     component: ComponentType<any>;
     loading?: ComponentType<any> | undefined;
     error?: ComponentType<any> | undefined;
-    // Carried so a group's re-fold doesn't silently turn a route's SSR opt-out back on.
+    // Carried so a group's re-fold doesn't silently drop a route's own resolution
+    // options (an opt-out turned back on, a stale window that stops keeping).
     ssr?: boolean | undefined;
+    keepStale?: boolean | undefined;
 };
 
 /**
@@ -272,6 +283,7 @@ export function route<
                   loading: options.loading as ComponentType<any> | undefined,
                   error: options.error as ComponentType<any> | undefined,
                   ssr: options.ssr as boolean | undefined,
+                  keepStale: options.keepStale as boolean | undefined,
               })
             : component;
 
@@ -294,6 +306,7 @@ export function route<
                       loading: options.loading as ComponentType<any> | undefined,
                       error: options.error as ComponentType<any> | undefined,
                       ssr: options.ssr as boolean | undefined,
+                      keepStale: options.keepStale as boolean | undefined,
                   } satisfies RouteFoldInputs,
               }
             : {}),

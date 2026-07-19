@@ -54,8 +54,9 @@ export function group<const T extends readonly GenericRouteType[]>(
                     scope: route.scope as Scope<any>,
                     loading: fold.loading ?? defaults.loading,
                     error: fold.error ?? defaults.error,
-                    // Not a group default — the route's own, carried through the rebuild.
+                    // Not group defaults — the route's own, carried through the rebuild.
                     ssr: fold.ssr,
+                    keepStale: fold.keepStale,
                 });
             }
         }
