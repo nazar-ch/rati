@@ -667,7 +667,9 @@ rati's own suites (and Jnana's) hand-rolled before this entry existed.
 | `flush(times?)` | `await` `times` empty `act`-flushed microtask turns (default 1). A Suspense retry after a settle isn't synchronous with the resolving `act`, and a waterfall re-suspending one level deeper needs one flush per level — prefer a fixed count over a poll |
 | `controllableSource<T>(options?)` | a real `Source<T>` you drive by hand, with an attach/detach ledger |
 | `renderIsland(target, options?)` | mount an island (or `{ scope, component, … }` config) and drive it; async, returns a handle. See below |
-| `cleanup()` | unmount every island `renderIsland` mounted — wire up `afterEach(cleanup)` |
+| `createTestRouter(routes, options?)` | memory history + router + provider, rendered and disposed for you; async, returns a handle. See below |
+| `renderWithStores(ui, options?)` | render a tree with a *partial* stores container — the fake-container cast, gone. See below |
+| `cleanup()` | unmount every tree the harness mounted (islands, routers, stores renders) — wire up `afterEach(cleanup)` |
 
 `controllableSource` is a genuine source — an island attaches it, subscribes, and
 re-renders on every transition. Its mutators are **raw**: they set state and notify
@@ -734,4 +736,50 @@ test('loading → content', async () => {
     expect(handle.slot()).toBe('content');
     expect(handle.text()).toBe('ready home');
 });
+```
+
+**`createTestRouter(routes, options?)`** wires a **memory** history + `RouterStore` +
+`RootStoreProvider` and renders it — replacing the `createMemoryHistory` / `new RouterStore` /
+provider / `<Router>` boilerplate. `options`: `url` (initial URL, default `/`), `state`
+(initial entry state), `ui` (what to render — defaults to `<Router />`; pass a custom tree, or
+`<Router Loading={…} />`), `stores` (extra stores merged alongside the router). Because a real
+router is mounted, **`<Link>` works with no `vi.mock`**. Scroll restoration is off (jsdom has
+no layout), and `cleanup()` disposes the router — detaching its history.
+
+| Handle member | Purpose |
+| --- | --- |
+| `router` / `history` | the live `RouterStore` and its memory `History` — navigate, read `path`/`activeRoute`, spy, or `push`/`go` directly |
+| `container` / `text()` | the mounted node and its trimmed text |
+| `navigate(to)` / `back()` / `forward()` | drive navigation, settled (async) |
+| `rerender(node)` / `unmount()` / `dispose()` | re-render, unmount; `dispose()` also disposes the router |
+
+```ts
+import { createTestRouter, cleanup } from 'rati/testing';
+
+afterEach(cleanup);
+
+test('a Link navigates — no mocks', async () => {
+    const tr = await createTestRouter([
+        route('/', 'home', () => <Link href="/about">go</Link>),
+        route('/about', 'about', () => <div>about page</div>),
+    ]);
+    tr.container.querySelector('a')!.click();
+    await tr.navigate('/about');            // or let the click settle
+    expect(tr.text()).toBe('about page');
+});
+```
+
+**`renderWithStores(ui, options?)`** renders a tree under a stores container built from
+`options.stores` — a **partial** of the app's stores, so a component test provides only what
+it reads. Parameterize with the app's stores type; the partial is checked against the real
+shape, and the `as unknown as GlobalStores` cast the hand-rolled fake containers needed lives
+once inside the helper instead of in every test.
+
+```ts
+interface AppStores extends GlobalStores { foo: FooStore; bar: BarStore }
+
+const handle = await renderWithStores<AppStores>(<TwoStoreReader />, {
+    stores: { foo, bar },   // only the two this component reads — no cast
+});
+expect(handle.text()).toBe('hi/3');
 ```

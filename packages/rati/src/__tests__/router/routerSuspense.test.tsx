@@ -1,47 +1,22 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vite-plus/test';
-import { lazy, type FC } from 'react';
-import { act, render, screen, cleanup } from '@testing-library/react';
-import { RouterStore } from '../../router/store';
+import { describe, test, expect, afterEach } from 'vite-plus/test';
+import { act, lazy, type FC } from 'react';
+import { screen } from '@testing-library/react';
 import { route } from '../../router/route';
 import { Router } from '../../router/Router';
-import { GenericStoresContext } from '../../stores/RootStore';
+import { createTestRouter, cleanup } from '../../testing';
 
 const HomePage: FC = () => <div data-testid="home">home</div>;
 
-beforeEach(() => {
-    window.history.replaceState(null, '', 'http://localhost/');
-});
+afterEach(cleanup);
 
-afterEach(() => {
-    cleanup();
-});
-
-interface RenderRouterOptions {
-    routes: ReturnType<typeof route>[];
-}
-
-function renderWithRouter({ routes }: RenderRouterOptions) {
-    const router = new RouterStore({}, routes);
-    const stores = { router };
-    const result = render(
-        <GenericStoresContext.Provider value={stores}>
-            <Router Loading={() => <div data-testid="loading">loading…</div>} />
-        </GenericStoresContext.Provider>,
-    );
-    return { router, ...result };
-}
+// The route-level Suspense fallback (for a lazy chunk), tagged so the tests can see it.
+const loadingRouter = <Router Loading={() => <div data-testid="loading">loading…</div>} />;
 
 describe('Router + Suspense', () => {
     test('renders an eager component synchronously without showing Loading', async () => {
-        const routes = [route('/', 'home', HomePage)];
-        const { router } = renderWithRouter({ routes });
-        // Let the constructor's setPath promise resolve.
-        await act(async () => {
-            await Promise.resolve();
-        });
+        await createTestRouter([route('/', 'home', HomePage)], { ui: loadingRouter });
         expect(screen.getByTestId('home')).toBeDefined();
         expect(screen.queryByTestId('loading')).toBeNull();
-        router.dispose();
     });
 
     test('renders Loading while a React.lazy component imports, then swaps in the chunk', async () => {
@@ -51,12 +26,8 @@ describe('Router + Suspense', () => {
             resolveImport = resolve;
         });
         const LazyPage = lazy(() => importPromise);
-        const routes = [route('/', 'lazy', LazyPage)];
 
-        const { router } = renderWithRouter({ routes });
-        await act(async () => {
-            await Promise.resolve();
-        });
+        await createTestRouter([route('/', 'lazy', LazyPage)], { ui: loadingRouter });
 
         // Suspense fallback is showing while the import is pending.
         expect(screen.getByTestId('loading')).toBeDefined();
@@ -71,7 +42,6 @@ describe('Router + Suspense', () => {
 
         expect(screen.getByTestId('lazy-page')).toBeDefined();
         expect(screen.queryByTestId('loading')).toBeNull();
-        router.dispose();
     });
 
     test('keeps showing the previous page while the next lazy route loads (no fallback flash)', async () => {
@@ -84,10 +54,8 @@ describe('Router + Suspense', () => {
         });
         const LazyB = lazy(() => importB);
 
-        const routes = [route('/', 'home', HomePage), route('/b', 'b', LazyB)];
-        const { router } = renderWithRouter({ routes });
-        await act(async () => {
-            await Promise.resolve();
+        const tr = await createTestRouter([route('/', 'home', HomePage), route('/b', 'b', LazyB)], {
+            ui: loadingRouter,
         });
         expect(screen.getByTestId('home')).toBeDefined();
 
@@ -95,7 +63,7 @@ describe('Router + Suspense', () => {
         // the home page on screen instead of switching to the Suspense
         // fallback.
         await act(async () => {
-            router.history.push('/b');
+            tr.router.history.push('/b');
             await Promise.resolve();
         });
         expect(screen.getByTestId('home')).toBeDefined();
@@ -107,6 +75,5 @@ describe('Router + Suspense', () => {
         });
         expect(screen.getByTestId('b')).toBeDefined();
         expect(screen.queryByTestId('home')).toBeNull();
-        router.dispose();
     });
 });

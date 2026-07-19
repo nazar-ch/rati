@@ -466,11 +466,19 @@ deterministic pin list, the fuzz harness design — is
 `packages/rati/src/__tests__/suspense-situations.md`.
 
 The utilities the suites lean on ship as the public **`rati/testing`** entry (`src/testing/`
-— `deferred`, `flush`, `controllableSource`, `renderIsland`), so both a consumer and rati's
-own suites use one implementation. It is *promotion*: the generic cores were extracted out of
-the ~8 hand-rolled `testSource`/`loaderSource` copies, the `deferred`/`flush` idioms, and the
-island mount + slot-reader hand-inlined across the mandala suites (now `renderIsland` +
-`slot()`, which wraps each slot in a private marker so testids stay out of the island API).
+— `deferred`, `flush`, `controllableSource`, `renderIsland`, `createTestRouter`,
+`renderWithStores`), so both a consumer and rati's own suites use one implementation. It is
+*promotion*: the generic cores were extracted out of the ~8 hand-rolled `testSource`/
+`loaderSource` copies, the `deferred`/`flush` idioms, the island mount + slot-reader
+hand-inlined across the mandala suites (now `renderIsland` + `slot()`, which wraps each slot
+in a private marker so testids stay out of the island API), and the `createMemoryHistory` +
+`new RouterStore` + provider dance inlined across ~20 router suites (now `createTestRouter`,
+over a memory history it disposes). The three render harnesses share one mount (`testing/
+dom.tsx`: `mountTree` + a single `cleanup()` + a per-mount dispose hook — where a test
+router's history is detached). `renderWithStores` is the stores-injection seam: a partial
+container behind `RootStoreProvider`, killing the `as unknown as GlobalStores` cast the
+component suites hand-roll (it builds on the shipped `RootStore`/`RootStoreProvider`, not on
+any internalized context — see the effort README's DX-03 delta).
 The `fuzz/` harnesses keep their own **model-wired** drivers — `scopeHarness.tsx`'s
 `controllableSource` carries a ledger tied to the reference model (depth/`maxConcurrent`), a
 `recompute` closure, and its own testid slot readers, and its mount is instrumented for the

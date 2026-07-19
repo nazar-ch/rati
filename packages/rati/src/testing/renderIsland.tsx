@@ -1,8 +1,8 @@
-import { act, createElement, type ComponentProps, type ComponentType, type ReactNode } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement, type ComponentProps, type ComponentType, type ReactNode } from 'react';
 import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope';
 import { useScopeControls, type ScopeControls } from '../mandala/controls';
 import { island, type IslandComponent, type IslandConfig } from '../island/island';
+import { mountTree, type MountedTree } from './dom';
 
 /*
     renderIsland — mount an island, drive it to resolution, and read which slot is showing.
@@ -10,7 +10,7 @@ import { island, type IslandComponent, type IslandConfig } from '../island/islan
     mount + readSlot/readContent + testids); the deterministic mandala suites hand-inlined it,
     and consumers had nothing at all.
 
-    It renders with `react-dom/client` directly — it does *not* depend on
+    It renders with `react-dom/client` directly (via ./dom) — it does *not* depend on
     `@testing-library/react`. It returns the container (query it however you like) plus the
     island-specific reads RTL can't give you: which slot is visible, and the island's
     controls (`useScopeControls`) from the test side.
@@ -30,17 +30,6 @@ import { island, type IslandComponent, type IslandConfig } from '../island/islan
 
 const SLOT_ATTR = 'data-rati-testing-slot';
 type SlotName = 'loading' | 'content' | 'error';
-
-/**
- * Render, then settle — one async `act` around the render, which drives React's Suspense
- * retries so a self-resolving load reaches content. A load still pending (a `deferred`, an
- * un-driven `controllableSource`) simply stays on its loading slot.
- */
-async function settleRender(root: Root, node: ReactNode): Promise<void> {
-    await act(async () => {
-        root.render(node);
-    });
-}
 
 /** The handle {@link renderIsland} returns. */
 export interface IslandHandle<S extends Scope<any>> {
@@ -76,21 +65,6 @@ export interface RenderIslandOptions<S extends Scope<any>> {
     wrapper?: ComponentType<{ children: ReactNode }>;
 }
 
-/** Live roots, so a single `cleanup()` (or `afterEach(cleanup)`) tears them all down. */
-const mounted = new Set<{ root: Root; container: HTMLElement }>();
-
-/**
- * Unmount every island `renderIsland` has mounted and remove its container — the RTL
- * `cleanup` analogue for this harness. Wire it up as `afterEach(cleanup)`.
- */
-export function cleanup(): void {
-    for (const entry of mounted) {
-        act(() => entry.root.unmount());
-        entry.container.remove();
-    }
-    mounted.clear();
-}
-
 function visibleNode(container: HTMLElement, slot: SlotName): Element | null {
     const node = container.querySelector(`[${SLOT_ATTR}="${slot}"]`);
     if (!node) return null;
@@ -119,10 +93,6 @@ export async function renderIsland<S extends Scope<any>>(
     target: IslandConfig<S> | IslandComponent<S>,
     options: RenderIslandOptions<S> = {},
 ): Promise<IslandHandle<S>> {
-    // A configured test runner sets this (`@testing-library/react` does on import); set it
-    // defensively so a standalone consumer's `act` calls don't warn. Respects an explicit false.
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT ??= true;
-
     const isConfig = typeof target !== 'function';
     const captured: { current: ScopeControls<S> | null } = { current: null };
 
@@ -174,19 +144,14 @@ export async function renderIsland<S extends Scope<any>>(
         Island = target;
     }
 
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    const root = createRoot(container);
-    const entry = { root, container };
-    mounted.add(entry);
-
     const { wrapper: Wrapper } = options;
     const element = (props: ScopeInputs<S> | undefined) => {
         const node = createElement(Island, (props ?? {}) as ScopeInputs<S>);
         return Wrapper ? createElement(Wrapper, null, node) : node;
     };
 
-    await settleRender(root, element(options.props));
+    const mount: MountedTree = await mountTree(element(options.props));
+    const { container } = mount;
 
     const requireConfig = (what: string) => {
         if (!isConfig) {
@@ -211,8 +176,8 @@ export async function renderIsland<S extends Scope<any>>(
                 visibleNode(container, 'loading');
             return node?.textContent?.trim() ?? null;
         },
-        async rerender(props) {
-            await settleRender(root, element(props));
+        rerender(props) {
+            return mount.rerender(element(props));
         },
         controls() {
             requireConfig('controls()');
@@ -221,10 +186,6 @@ export async function renderIsland<S extends Scope<any>>(
             }
             return captured.current;
         },
-        unmount() {
-            act(() => root.unmount());
-            container.remove();
-            mounted.delete(entry);
-        },
+        unmount: mount.unmount,
     };
 }

@@ -130,6 +130,35 @@ The B1 style decisions, for every later item to copy:
   widens `ScopeControls`, the handle gets `phase`/`isStale` for free (it returns the whole
   `useScopeControls` value), no harness change needed.
 
+### 2026-07-19 — DX-03 (router + stores seams), reconcile + frictions
+
+- **The stores-container work this record's cut assumed did NOT land.** The plan named
+  `StoresProvider` / `createStoresHook` and a now-internal `GenericStoresContext`. What
+  actually shipped (`packages/rati/src/stores/RootStore.tsx`): `RootStore` (a class wrapping
+  `stores` + `isReady`/`init`), `RootStoreProvider`, `createUseStoresHook`, and a still-**public**
+  `GenericStoresContext`. So the "the context is internalized, the seam is lost" premise is
+  moot — the Jnana pattern still compiles. Per the boundary rule, `renderWithStores` is built
+  as a new designed surface on `RootStore` + `RootStoreProvider` (a partial container marked
+  ready), **not** a re-export of `GenericStoresContext`. The value it adds is the typed partial
+  that kills the `as unknown as GlobalStores` cast, not access to the seam (which was never
+  taken away). DX-06 (Jnana) migrates the ten fake-container files onto it.
+- **`createTestRouter` uses memory history; `<Link>` relative-href tests can't move to it.**
+  A `<Link href="..">` is resolved by the *DOM* against `window.location`, not the router's
+  history — so `router/link.test.tsx` (the RF-07 relative-resolution pins: `..`, `sub`, `?q`,
+  `#h`) is inherently a **browser**-history suite and stays on `window.history.replaceState` +
+  a browser `RouterStore`. `createTestRouter` fits every test that drives *absolute* navigation
+  (route matching, `navigate`, `back`/`forward`, `<Link href="/abs">`), which is the bulk. DX-05
+  should leave the relative-`Link` suite on the browser history rather than force it.
+- **Shared mount factored out.** `renderIsland` (DX-02), `createTestRouter`, and
+  `renderWithStores` now share `src/testing/dom.tsx` (`mountTree` + the one `cleanup()` +
+  a per-mount dispose hook — the router's `dispose` runs there). `renderIsland`'s public API
+  is unchanged; `cleanup` moved to `./dom` and is re-exported.
+- Converted with assertions preserved: `router/routerIsland.test.tsx` (8, its source hand-roll
+  now a `controllableSource`) and `router/routerSuspense.test.tsx` (3). Both dropped the local
+  `renderWithRouter` helper, `window.history.replaceState`, and the manual `router.dispose()`.
+  New example tests (Link-no-mocks, two-store partial container, the RF-01 dispose pin) in
+  `__tests__/testing/routerAndStores.test.tsx`.
+
 ## Per-item conventions
 
 Atomic commits on the current branch; subjects prefixed `DX-NN:`, a `Closes: DX-NN` trailer

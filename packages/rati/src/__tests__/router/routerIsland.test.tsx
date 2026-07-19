@@ -1,47 +1,24 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
-import { Component, type FC, type ReactNode } from 'react';
-import { act, render, screen, cleanup } from '@testing-library/react';
-import { RouterStore } from '../../router/store';
-import { route, type GenericRouteType } from '../../router/route';
-import { Router } from '../../router/Router';
-import { GenericStoresContext } from '../../stores/RootStore';
+import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
+import { act, Component, type FC, type ReactNode } from 'react';
+// RTL is kept for the island-auto-context block below — those render an island (or a bare
+// reader) directly, not a router. The router tests use createTestRouter.
+import { render, screen, cleanup as rtlCleanup } from '@testing-library/react';
+import { route } from '../../router/route';
 import { scope, input, type ScopeComponent } from '../../scope/scope';
-import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
 import { useScope } from '../../mandala/channel';
 import { useRouteContext } from '../../router/useRouteContext';
+import { controllableSource, createTestRouter, deferred, cleanup } from '../../testing';
 
 // The 'product' route's context type is registered globally via the app-routes
 // augmentation in `routeContext.test-d.ts` (`RatiUserTypes['routes']`), so the
 // `useRouteContext('product')` call below is typed straight off the route's scope —
 // no separate context registration.
 
-beforeEach(() => {
-    window.history.replaceState(null, '', 'http://localhost/');
+afterEach(() => {
+    cleanup();
+    rtlCleanup();
 });
-
-afterEach(cleanup);
-
-function renderWithRouter(routes: readonly GenericRouteType[]) {
-    const router = new RouterStore({}, routes);
-    const stores = { router };
-    const result = render(
-        <GenericStoresContext.Provider value={stores}>
-            <Router Loading={() => <div>route loading…</div>} />
-        </GenericStoresContext.Provider>,
-    );
-    return { router, ...result };
-}
-
-// A promise the test resolves by hand, so a suspended (Suspense) render can be
-// observed in its loading state before the value lands.
-function deferred<T>() {
-    let resolve!: (value: T) => void;
-    const promise = new Promise<T>((res) => {
-        resolve = res;
-    });
-    return { promise, resolve };
-}
 
 const Home: FC = () => <div>home</div>;
 const IslandLoading: FC = () => <div>island loading…</div>;
@@ -55,21 +32,16 @@ describe('route + islands', () => {
             loading: IslandLoading,
         });
 
-        window.history.replaceState(null, '', '/products/42');
-        let router!: RouterStore<readonly GenericRouteType[]>;
-        await act(async () => {
-            ({ router } = renderWithRouter([
-                route('/products/:productId', 'product', Product),
-                route('*', 'home', Home),
-            ]));
-        });
+        await createTestRouter(
+            [route('/products/:productId', 'product', Product), route('*', 'home', Home)],
+            { url: '/products/42' },
+        );
 
         expect(screen.getByText('island loading…')).toBeTruthy();
         await act(async () => {
             label.resolve('env:42');
         });
         expect(await screen.findByText('product env:42')).toBeTruthy();
-        router.dispose();
     });
 
     test('navigating away from an island route detaches its sources', async () => {
@@ -77,42 +49,29 @@ describe('route + islands', () => {
 
         const Product = island({
             scope: scope({ productId: input<string>() }).load({
-                res: ({ productId }): Source<{ productId: string }> => {
-                    const state: SourceState<{ productId: string }> = {
-                        status: 'ready',
-                        value: { productId },
-                    };
-                    return {
-                        [SourceSymbol]: true,
-                        getSnapshot: () => state,
-                        subscribe: () => () => {},
-                        attach() {
-                            log.push(`attach:${productId}`);
-                            return () => log.push(`detach:${productId}`);
-                        },
-                    };
-                },
+                res: ({ productId }) =>
+                    controllableSource({
+                        initial: { productId },
+                        onAttach: () => log.push(`attach:${productId}`),
+                        onDetach: () => log.push(`detach:${productId}`),
+                    }),
             }),
             component: ({ res }) => <div>product {res.productId}</div>,
             loading: IslandLoading,
         });
 
-        window.history.replaceState(null, '', '/products/42');
-        const { router } = renderWithRouter([
-            route('/products/:productId', 'product', Product),
-            route('*', 'home', Home),
-        ]);
+        const tr = await createTestRouter(
+            [route('/products/:productId', 'product', Product), route('*', 'home', Home)],
+            { url: '/products/42' },
+        );
 
         await screen.findByText('product 42');
         expect(log).toEqual(['attach:42']);
 
-        act(() => {
-            router.navigate('/');
-        });
+        await tr.navigate('/');
 
         expect(await screen.findByText('home')).toBeTruthy();
         expect(log).toEqual(['attach:42', 'detach:42']);
-        router.dispose();
     });
 
     test('options.scope resolves through the island engine (loading slot, then content)', async () => {
@@ -122,15 +81,12 @@ describe('route + islands', () => {
             <div>scope says {greeting}</div>
         );
 
-        let router!: RouterStore<readonly GenericRouteType[]>;
-        await act(async () => {
-            ({ router } = renderWithRouter([
-                route('/', 'home', HomeWithScope, {
-                    scope: homeScope,
-                    loading: () => <div>resolving…</div>,
-                }),
-            ]));
-        });
+        await createTestRouter([
+            route('/', 'home', HomeWithScope, {
+                scope: homeScope,
+                loading: () => <div>resolving…</div>,
+            }),
+        ]);
 
         // The per-route loading slot is the Suspense fallback while the promise
         // entry resolves — proof route runs on the island engine (the
@@ -140,7 +96,6 @@ describe('route + islands', () => {
             greeting.resolve('hello');
         });
         expect(await screen.findByText('scope says hello')).toBeTruthy();
-        router.dispose();
     });
 
     test('options.error renders the island error slot on failure', async () => {
@@ -151,20 +106,16 @@ describe('route + islands', () => {
         });
         const FailComponent: ScopeComponent<typeof failScope> = ({ data }) => <div>{data}</div>;
 
-        let router!: RouterStore<readonly GenericRouteType[]>;
-        await act(async () => {
-            ({ router } = renderWithRouter([
-                route('/', 'home', FailComponent, {
-                    scope: failScope,
-                    error: ({ error }) => <div>error: {error.code}</div>,
-                }),
-            ]));
-        });
+        await createTestRouter([
+            route('/', 'home', FailComponent, {
+                scope: failScope,
+                error: ({ error }) => <div>error: {error.code}</div>,
+            }),
+        ]);
 
         // A throwing load function maps to a SourceError (code 'failed'); the
         // island renders the route's error slot instead of the component.
         expect(await screen.findByText('error: failed')).toBeTruthy();
-        router.dispose();
     });
 
     test('options.wrapper renders around the route component', async () => {
@@ -172,11 +123,10 @@ describe('route + islands', () => {
             <section aria-label="frame">{children}</section>
         );
 
-        const { router } = renderWithRouter([route('/', 'home', Home, { wrapper: Frame })]);
+        await createTestRouter([route('/', 'home', Home, { wrapper: Frame })]);
 
         const frame = await screen.findByLabelText('frame');
         expect(frame.textContent).toBe('home');
-        router.dispose();
     });
 
     test('useRouteContext reads a route island context by route name', async () => {
@@ -192,14 +142,15 @@ describe('route + islands', () => {
         };
         const ProductBody: ScopeComponent<typeof productScope> = () => <Deep />;
 
-        window.history.replaceState(null, '', '/products/7');
-        const { router } = renderWithRouter([
-            route('/products/:productId', 'product', ProductBody, { scope: productScope }),
-            route('*', 'home', Home),
-        ]);
+        await createTestRouter(
+            [
+                route('/products/:productId', 'product', ProductBody, { scope: productScope }),
+                route('*', 'home', Home),
+            ],
+            { url: '/products/7' },
+        );
 
         expect(await screen.findByText('ctx #7')).toBeTruthy();
-        router.dispose();
     });
 });
 
