@@ -59,6 +59,8 @@ export interface DataTrace {
     marks: Map<string, number>;
     /** `${level}:${key}` → last reported status — the guard that keeps a re-read silent. */
     status: Map<string, DataTraceStatus>;
+    /** Promises this run already timed — see {@link traceCellPromise}. */
+    timed: WeakSet<Promise<unknown>>;
     resolved: boolean;
 }
 
@@ -71,6 +73,7 @@ export function startDataTrace(label: string, cause: DataTraceCause): DataTrace 
         t0: performance.now(),
         marks: new Map(),
         status: new Map(),
+        timed: new WeakSet(),
         resolved: false,
     };
 }
@@ -119,21 +122,24 @@ export function traceCellStatus(
     log(trace, `level ${index} ${key} ${status}${detail ? ` ${detail}` : ''}`, now, mark);
 }
 
-// Settle handlers attach once per promise: a suspended level re-renders on resume and its
-// cached cell (same promise identity) passes through again — the same guard the SSR
-// rejection recording keeps, for the same reason. A hook load handing back a fresh promise
-// each render is traced each time, honestly: it re-ran.
-const tracedPromises = new WeakSet<Promise<unknown>>();
-
-/** A cell that resolves through a promise — timed from here to its settle. */
+/**
+ * A cell that resolves through a promise — timed from here to its settle.
+ *
+ * Settle handlers attach once per promise *per run*: a suspended level re-renders on resume
+ * and its cached cell (same promise identity) passes through again — the same guard the SSR
+ * rejection recording keeps, on an equally run-scoped ledger, for the same reason. Two runs
+ * sharing one promise instance — a module-level load, or a retry rebuilding a static promise
+ * cell — each get their own settle line rather than the second silently going without. A
+ * hook load handing back a fresh promise each render is traced each time, honestly: it re-ran.
+ */
 export function traceCellPromise(
     trace: DataTrace | undefined,
     index: number,
     key: string,
     promise: Promise<unknown>,
 ): void {
-    if (!trace || tracedPromises.has(promise)) return;
-    tracedPromises.add(promise);
+    if (!trace || trace.timed.has(promise)) return;
+    trace.timed.add(promise);
     const id = `${index}:${key}`;
     trace.marks.set(id, performance.now());
     trace.status.set(id, 'pending');

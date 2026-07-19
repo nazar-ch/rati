@@ -186,6 +186,32 @@ describe('dataTrace — the resolution timeline', () => {
         ]);
     });
 
+    // The settle guard is per run, like the SSR rejection recorder it mirrors: one line
+    // however often a suspended level resumes, but a *second* run over the same promise
+    // instance (here two mounts of an island holding a module-level load) is its own
+    // timeline and gets its own settle line — a module-wide guard left the second silent.
+    test('two runs sharing one promise each log their own settle', async () => {
+        const log = traceLog();
+        const shared = Promise.resolve('cached');
+        const Page = island({
+            scope: scope().load({ page: shared }),
+            component: function Page({ page }) {
+                return <div>{page}</div>;
+            },
+            loading: Loading,
+        });
+
+        await renderIsland(Page);
+        await flush();
+        await renderIsland(Page);
+        await flush();
+
+        expect(log.lines().filter((line) => line.includes('page ready'))).toEqual([
+            '[data] Island(Page) +Nms (ΔNms) level 1 page ready',
+            '[data] Island(Page) +Nms (ΔNms) level 1 page ready',
+        ]);
+    });
+
     // The one public emitter: your own mark, interleaved with the island's lines.
     test('dataTrace() adds an ad-hoc mark', async () => {
         const log = traceLog();
