@@ -1,10 +1,8 @@
 import { describe, test, expect } from 'vite-plus/test';
-import { prerender } from 'react-dom/static';
-import type { ReactElement } from 'react';
 import { scope, input } from '../../scope/scope';
 import { NotAvailableError } from '../../scope/source';
 import { island } from '../../island/island';
-import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
+import { ssrRender } from '../../testing';
 
 /*
     What a rejecting promise load does under a collected server render — pinned by
@@ -14,19 +12,6 @@ import { createHydrationCollector, HydrationProvider } from '../../mandala/hydra
     collector's `errors` is the piece rati adds: the server's input for the response
     status (not-available → 404) before that degraded 200 goes out.
 */
-
-async function prerenderToString(element: ReactElement): Promise<string> {
-    const { prelude } = await prerender(element, { onError: () => {} });
-    const reader = prelude.getReader();
-    const decoder = new TextDecoder();
-    let html = '';
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        html += decoder.decode(value, { stream: true });
-    }
-    return html;
-}
 
 describe('island SSR error collection', () => {
     test('a rejecting load records a normalized failed error; the render degrades to the loading slot', async () => {
@@ -41,22 +26,17 @@ describe('island SSR error collection', () => {
             error: ({ error }) => <div>ERROR-SLOT: {error.code}</div>,
         });
 
-        const collector = createHydrationCollector();
-        const html = await prerenderToString(
-            <HydrationProvider collect={collector.collect} collectError={collector.collectError}>
-                <Island id="x" />
-            </HydrationProvider>,
-        );
+        const server = await ssrRender(<Island id="x" />, { onError: () => {} });
 
         // prerender resolved and emitted the loading slot — never the error slot.
-        expect(html).toContain('LOADING-SLOT');
-        expect(html).not.toContain('ERROR-SLOT');
+        expect(server.html).toContain('LOADING-SLOT');
+        expect(server.html).not.toContain('ERROR-SLOT');
 
-        expect(collector.errors).toHaveLength(1);
-        expect(collector.errors[0]!.key).toBe('greeting');
-        expect(collector.errors[0]!.error.code).toBe('failed');
-        expect(collector.errors[0]!.error.message).toBe('backend exploded');
-        expect(collector.data).toEqual({});
+        expect(server.errors).toHaveLength(1);
+        expect(server.errors[0]!.key).toBe('greeting');
+        expect(server.errors[0]!.error.code).toBe('failed');
+        expect(server.errors[0]!.error.message).toBe('backend exploded');
+        expect(server.data).toEqual({});
     });
 
     test('NotAvailableError keeps its code across the collector — the 404 signal', async () => {
@@ -70,15 +50,10 @@ describe('island SSR error collection', () => {
             loading: () => <div>loading</div>,
         });
 
-        const collector = createHydrationCollector();
-        await prerenderToString(
-            <HydrationProvider collect={collector.collect} collectError={collector.collectError}>
-                <Island slug="missing" />
-            </HydrationProvider>,
-        );
+        const server = await ssrRender(<Island slug="missing" />, { onError: () => {} });
 
-        expect(collector.errors).toHaveLength(1);
-        expect(collector.errors[0]!.error.code).toBe('not-available');
+        expect(server.errors).toHaveLength(1);
+        expect(server.errors[0]!.error.code).toBe('not-available');
     });
 
     test('a failing dependent level still records; earlier levels dehydrate normally', async () => {
@@ -94,15 +69,10 @@ describe('island SSR error collection', () => {
             loading: () => <div>loading</div>,
         });
 
-        const collector = createHydrationCollector();
-        await prerenderToString(
-            <HydrationProvider collect={collector.collect} collectError={collector.collectError}>
-                <Island />
-            </HydrationProvider>,
-        );
+        const server = await ssrRender(<Island />, { onError: () => {} });
 
-        expect(collector.errors.map((entry) => entry.key)).toEqual(['posts']);
-        const dehydrated = Object.values(collector.data)[0];
+        expect(server.errors.map((entry) => entry.key)).toEqual(['posts']);
+        const dehydrated = Object.values(server.data)[0];
         expect(dehydrated).toEqual({ user: { name: 'Ada' } });
     });
 
@@ -113,14 +83,9 @@ describe('island SSR error collection', () => {
             loading: () => <div>loading</div>,
         });
 
-        const collector = createHydrationCollector();
-        const html = await prerenderToString(
-            <HydrationProvider collect={collector.collect} collectError={collector.collectError}>
-                <Island />
-            </HydrationProvider>,
-        );
+        const server = await ssrRender(<Island />, { onError: () => {} });
 
-        expect(html).toContain('hello');
-        expect(collector.errors).toEqual([]);
+        expect(server.html).toContain('hello');
+        expect(server.errors).toEqual([]);
     });
 });

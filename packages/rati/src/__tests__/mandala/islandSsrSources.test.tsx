@@ -1,112 +1,52 @@
 import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
-import { prerender } from 'react-dom/static';
-import { hydrateRoot } from 'react-dom/client';
-import { act, cleanup } from '@testing-library/react';
-import type { ReactElement } from 'react';
+import { act } from 'react';
 import { scope, input } from '../../scope/scope';
-import {
-    SourceSymbol,
-    type Source,
-    type SourceError,
-    type SourceSSR,
-    type SourceState,
-} from '../../scope/source';
+import type { SourceError } from '../../scope/source';
 import { island } from '../../island/island';
-import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
+import { controllableSource, prerenderToString, ssrRender, cleanup } from '../../testing';
 
 afterEach(cleanup);
 
-async function prerenderToString(
-    element: ReactElement,
-    options?: { onError?: () => void },
-): Promise<string> {
-    const { prelude } = await prerender(element, options);
-    const reader = prelude.getReader();
-    const decoder = new TextDecoder();
-    let html = '';
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        html += decoder.decode(value, { stream: true });
-    }
-    return html;
-}
+// The SSR-source shapes, built on the entry's `controllableSource`. The attach/detach (and
+// hydrate) *string log* they push into is what the pins below assert against — an ordering
+// between lifecycle events that the source's own numeric ledger deliberately doesn't model —
+// so it is wired through the `onAttach`/`onDetach` hooks (and the seed's `hydrate`), not
+// hand-rolled onto a bespoke source.
 
-// A source whose attach starts an async "load" that settles with `value` — the loader
-// shape (`ssr: true`): a promise in source clothing. Logs attach/detach.
-function loaderSource<T>(value: T, log: string[]): Source<T> {
-    let state: SourceState<T> = { status: 'pending' };
-    const listeners = new Set<() => void>();
-    return {
-        [SourceSymbol]: true,
-        getSnapshot: () => state,
-        subscribe(onChange) {
-            listeners.add(onChange);
-            return () => {
-                listeners.delete(onChange);
-            };
-        },
-        attach() {
-            log.push('attach');
-            queueMicrotask(() => {
-                state = { status: 'ready', value };
-                for (const listener of listeners) listener();
-            });
-            return () => log.push('detach');
-        },
+// The loader shape (`ssr: true`): a promise in source clothing that settles with `value` on
+// attach.
+function loaderSource<T>(value: T, log: string[]) {
+    return controllableSource<T>({
         ssr: true,
-    };
+        loads: value,
+        onAttach: () => log.push('attach'),
+        onDetach: () => log.push('detach'),
+    });
 }
 
 // A live, seedable source over a tiny mutable store — the query-backed shape
-// (`ssr: { dehydrate, hydrate }`). `hydrate` seeds the store so the first snapshot is
-// already ready; `set` drives live transitions after hydration.
+// (`ssr: { dehydrate, hydrate }`). `hydrate` seeds the source so the first snapshot is
+// already ready; `loads` drives the on-attach resolve when unseeded, and `setReady` the live
+// transitions after hydration.
 function liveSource(
     log: string[],
     // Replaces the default seeding — the drifted-store case (a `hydrate` that throws).
-    hydrate?: (data: unknown) => void,
-): Source<{ n: number }> & { set: (n: number) => void } {
-    let state: SourceState<{ n: number }> = { status: 'pending' };
-    const listeners = new Set<() => void>();
-    const emit = () => {
-        for (const listener of listeners) listener();
-    };
-    const ssr: SourceSSR<{ n: number }> = {
-        dehydrate: (value) => value.n,
-        hydrate:
-            hydrate ??
-            ((data) => {
-                log.push(`hydrate:${String(data)}`);
-                state = { status: 'ready', value: { n: data as number } };
-            }),
-    };
-    return {
-        [SourceSymbol]: true,
-        getSnapshot: () => state,
-        subscribe(onChange) {
-            listeners.add(onChange);
-            return () => {
-                listeners.delete(onChange);
-            };
+    hydrate?: (data: unknown) => { n: number },
+) {
+    return controllableSource<{ n: number }>({
+        loads: { n: 1 },
+        seed: {
+            dehydrate: (value) => value.n,
+            hydrate:
+                hydrate ??
+                ((data) => {
+                    log.push(`hydrate:${String(data)}`);
+                    return { n: data as number };
+                }),
         },
-        attach() {
-            log.push('attach');
-            // A real store would skip the load when already seeded; mirror that.
-            if (state.status === 'pending') {
-                queueMicrotask(() => {
-                    state = { status: 'ready', value: { n: 1 } };
-                    emit();
-                });
-            }
-            return () => log.push('detach');
-        },
-        ssr,
-        set: (n: number) =>
-            act(() => {
-                state = { status: 'ready', value: { n } };
-                emit();
-            }),
-    };
+        onAttach: () => log.push('attach'),
+        onDetach: () => log.push('detach'),
+    });
 }
 
 describe('SSR sources — loader (ssr: true)', () => {
@@ -120,20 +60,15 @@ describe('SSR sources — loader (ssr: true)', () => {
             loading: () => <div>loading slot</div>,
         });
 
-        const collector = createHydrationCollector();
-        const html = await prerenderToString(
-            <HydrationProvider collect={collector.collect}>
-                <Island id="ssr" />
-            </HydrationProvider>,
-        );
+        const server = await ssrRender(<Island id="ssr" />);
 
-        expect(html).toContain('hello ssr-source');
-        expect(html).not.toContain('loading slot');
+        expect(server.html).toContain('hello ssr-source');
+        expect(server.html).not.toContain('loading slot');
         // Attached during render (the marker's authorization), detached once settled.
         expect(log).toEqual(['attach', 'detach']);
         // Dehydrated as a plain value — promise semantics on the wire.
-        expect(Object.values(collector.data)).toEqual([{ greeting: 'hello ssr-source' }]);
-        expect(Object.keys(collector.seeds)).toHaveLength(0);
+        expect(Object.values(server.data)).toEqual([{ greeting: 'hello ssr-source' }]);
+        expect(Object.keys(server.seeds)).toHaveLength(0);
     });
 
     test('hydrates as a plain value — the loader never runs client-side', async () => {
@@ -150,36 +85,19 @@ describe('SSR sources — loader (ssr: true)', () => {
             loading: () => <div>loading slot</div>,
         });
 
-        const collector = createHydrationCollector();
-        const html = await prerenderToString(
-            <HydrationProvider collect={collector.collect}>
-                <Island id="ssr" />
-            </HydrationProvider>,
-        );
+        const server = await ssrRender(<Island id="ssr" />);
         expect(created).toBe(1);
 
-        const container = document.createElement('div');
-        container.innerHTML = html;
-        document.body.appendChild(container);
-        const recovered = vi.fn();
-        await act(async () => {
-            hydrateRoot(
-                container,
-                <HydrationProvider data={collector.data} seeds={collector.seeds}>
-                    <Island id="ssr" />
-                </HydrationProvider>,
-                { onRecoverableError: recovered },
-            );
-        });
+        const client = await server.hydrate();
 
         // Short-circuited to the dehydrated value: no second instance, no client attach.
         expect(created).toBe(1);
         expect(log).toEqual(['attach', 'detach']);
-        expect(container.textContent).toContain('hello 1');
+        expect(client.text()).toContain('hello 1');
         // …and the short-circuit was seamless: rendering the value the server rendered
         // means React had no mismatch to recover from. The pins below are the contrast —
-        // there, a recovery is the degradation itself.
-        expect(recovered).not.toHaveBeenCalled();
+        // there, a recovery is the degradation itself. (`.hydrate()` would throw on one.)
+        expect(client.recovered).toEqual([]);
     });
 });
 
@@ -202,44 +120,27 @@ describe('SSR sources — live (ssr: { dehydrate, hydrate })', () => {
             loading: () => <div>loading slot</div>,
         });
 
-        const collector = createHydrationCollector();
-        const html = await prerenderToString(
-            <HydrationProvider collect={collector.collect}>
-                <Island id="ssr" />
-            </HydrationProvider>,
-        );
-        expect(html).toContain('n is 1');
+        const server = await ssrRender(<Island id="ssr" />);
+        expect(server.html).toContain('n is 1');
         // Dehydrated through `dehydrate` into the seeds section, not as a value.
-        expect(Object.values(collector.seeds)).toEqual([{ counter: 1 }]);
-        expect(Object.keys(collector.data)).toHaveLength(0);
+        expect(Object.values(server.seeds)).toEqual([{ counter: 1 }]);
+        expect(Object.keys(server.data)).toHaveLength(0);
 
-        const container = document.createElement('div');
-        container.innerHTML = html;
-        document.body.appendChild(container);
-        const recovered = vi.fn();
-        await act(async () => {
-            hydrateRoot(
-                container,
-                <HydrationProvider data={collector.data} seeds={collector.seeds}>
-                    <Island id="ssr" />
-                </HydrationProvider>,
-                { onRecoverableError: recovered },
-            );
-        });
+        const client = await server.hydrate();
 
         // The client created its own instance, seeded it before attaching (hydrate
         // precedes attach in the log), and rendered ready HTML with no loading flash.
         expect(created).toBe(2);
         expect(clientLog).toEqual(['hydrate:1', 'attach']);
-        expect(container.textContent).toContain('n is 1');
+        expect(client.text()).toContain('n is 1');
         // The seed's whole purpose, asserted where it shows: seeding *before* attach is
         // what makes the first client render match the server's. Pin 7b below is the
-        // same source with a failing seed, and it mismatches.
-        expect(recovered).not.toHaveBeenCalled();
+        // same source with a failing seed, and it mismatches (`.hydrate()` would throw).
+        expect(client.recovered).toEqual([]);
 
         // Still fully live: a later transition updates the content.
-        instances[1]!.set(5);
-        expect(container.textContent).toContain('n is 5');
+        act(() => instances[1]!.setReady({ n: 5 }));
+        expect(client.text()).toContain('n is 5');
     });
 });
 
@@ -249,29 +150,18 @@ describe('SSR sources — live (ssr: { dehydrate, hydrate })', () => {
     source that fails must cost the server render, never the page.
 */
 
-// The loader shape's error path: attach starts work that fails instead of resolving.
-function failingLoaderSource(log: string[], error: SourceError): Source<string> {
-    let state: SourceState<string> = { status: 'pending' };
-    const listeners = new Set<() => void>();
-    return {
-        [SourceSymbol]: true,
-        getSnapshot: () => state,
-        subscribe(onChange) {
-            listeners.add(onChange);
-            return () => {
-                listeners.delete(onChange);
-            };
-        },
-        attach() {
-            log.push('attach');
-            queueMicrotask(() => {
-                state = { status: 'error', error };
-                for (const listener of listeners) listener();
-            });
-            return () => log.push('detach');
-        },
+// The loader shape's error path: attach starts work that fails instead of resolving —
+// driven from `onAttach` (the loader-that-fails pattern controllableSource documents).
+function failingLoaderSource(log: string[], error: SourceError) {
+    const source = controllableSource<string>({
         ssr: true,
-    };
+        onAttach: () => {
+            log.push('attach');
+            queueMicrotask(() => source.setError(error));
+        },
+        onDetach: () => log.push('detach'),
+    });
+    return source;
 }
 
 describe('SSR sources — error paths', () => {
@@ -312,49 +202,32 @@ describe('SSR sources — error paths', () => {
             error: ({ error }) => <div>ERROR-SLOT: {error.code}</div>,
         });
 
-        const collector = createHydrationCollector();
-        const html = await prerenderToString(
-            <HydrationProvider collect={collector.collect} collectError={collector.collectError}>
-                <Island id="ssr" />
-            </HydrationProvider>,
-            { onError: () => {} },
-        );
+        const server = await ssrRender(<Island id="ssr" />, { onError: () => {} });
 
-        expect(html).toContain('LOADING-SLOT');
-        expect(html).not.toContain('ERROR-SLOT');
+        expect(server.html).toContain('LOADING-SLOT');
+        expect(server.html).not.toContain('ERROR-SLOT');
         // Attached during render and released once settled — the error settles it too.
         expect(serverLog).toEqual(['attach', 'detach']);
         // Nothing on the wire: no value to dehydrate, no seed.
-        expect(collector.data).toEqual({});
-        expect(collector.seeds).toEqual({});
+        expect(server.data).toEqual({});
+        expect(server.seeds).toEqual({});
         // The source's own code survives to the server's status decision — a marked
         // source is a 404 signal exactly like a rejecting promise load.
-        expect(collector.errors).toHaveLength(1);
-        expect(collector.errors[0]!.key).toBe('feed');
-        expect(collector.errors[0]!.error.code).toBe('not-available');
+        expect(server.errors).toHaveLength(1);
+        expect(server.errors[0]!.key).toBe('feed');
+        expect(server.errors[0]!.error.code).toBe('not-available');
 
-        const container = document.createElement('div');
-        container.innerHTML = html;
-        document.body.appendChild(container);
-        await act(async () => {
-            hydrateRoot(
-                container,
-                <HydrationProvider data={collector.data} seeds={collector.seeds}>
-                    <Island id="ssr" />
-                </HydrationProvider>,
-                // The server's boundary errored, so its HTML carries React's
-                // client-retry marker and hydration reports the switch as a recoverable
-                // error. That report *is* the degradation being visible; swallowed here
-                // so it doesn't leak out of the run as an unhandled error.
-                { onRecoverableError: () => {} },
-            );
-        });
+        // The server's boundary errored, so its HTML carries React's client-retry marker
+        // and hydration reports the switch as a recoverable error. That report *is* the
+        // degradation being visible; `allowMismatch` collects it on `.recovered` instead
+        // of throwing, so it doesn't leak out of the run as an unhandled error.
+        const client = await server.hydrate(undefined, { allowMismatch: true });
 
         // The failure did not travel: the client created and attached its own instance
         // and resolved it live.
         expect(created).toBe(2);
         expect(clientLog).toEqual(['attach']);
-        expect(container.textContent).toContain('feed live');
+        expect(client.text()).toContain('feed live');
     });
 
     // Pin 7b. A seed the client cannot apply (a `hydrate()` that throws — a store shape
@@ -386,31 +259,15 @@ describe('SSR sources — error paths', () => {
             loading: () => <div>loading slot</div>,
         });
 
-        const collector = createHydrationCollector();
-        const html = await prerenderToString(
-            <HydrationProvider collect={collector.collect}>
-                <Island id="ssr" />
-            </HydrationProvider>,
-        );
-        expect(Object.values(collector.seeds)).toEqual([{ counter: 1 }]);
+        const server = await ssrRender(<Island id="ssr" />);
+        expect(Object.values(server.seeds)).toEqual([{ counter: 1 }]);
 
-        const container = document.createElement('div');
-        container.innerHTML = html;
-        document.body.appendChild(container);
-        await act(async () => {
-            hydrateRoot(
-                container,
-                <HydrationProvider data={collector.data} seeds={collector.seeds}>
-                    <Island id="ssr" />
-                </HydrationProvider>,
-                // A seed that fails to apply *guarantees* a hydration mismatch: the
-                // server shipped ready HTML over a source the client now renders
-                // pending. React recovers by client-rendering the boundary — the second
-                // half of this degradation's cost, and the reason a seedable source's
-                // `hydrate` must be total.
-                { onRecoverableError: () => {} },
-            );
-        });
+        // A seed that fails to apply *guarantees* a hydration mismatch: the server shipped
+        // ready HTML over a source the client now renders pending. React recovers by
+        // client-rendering the boundary — the second half of this degradation's cost, and
+        // the reason a seedable source's `hydrate` must be total. `allowMismatch` observes
+        // the recovery instead of throwing.
+        const client = await server.hydrate(undefined, { allowMismatch: true });
 
         expect(
             errorSpy.mock.calls.some((args) =>
@@ -420,7 +277,7 @@ describe('SSR sources — error paths', () => {
         // Unseeded, so it went through its own pending window and attached as usual —
         // the page still arrives at live content.
         expect(clientLog).toEqual(['attach']);
-        expect(container.textContent).toContain('n is 1');
+        expect(client.text()).toContain('n is 1');
         errorSpy.mockRestore();
     });
 });
