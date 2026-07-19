@@ -1,5 +1,12 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
-import { scope, input, type ScopeInputs, type ScopeProps } from '../../scope/scope';
+import {
+    scope,
+    input,
+    data,
+    type LoadContext,
+    type ScopeInputs,
+    type ScopeProps,
+} from '../../scope/scope';
 
 class TestStore {
     constructor(_params: { productName: string }) {}
@@ -58,6 +65,51 @@ describe('scope', () => {
             // @ts-expect-error - `b` is not provided by the prior levels
             broken: (params: { b: string }) => params.b,
         });
+    });
+});
+
+describe('the load context (SI-01)', () => {
+    test('a load taking it keeps the same props and return inference', () => {
+        const scopeDef = scope({ productName: input<string>() })
+            .load({ id: async () => 7 })
+            .load({
+                // Taking the second argument must cost nothing on the first: the props bag
+                // is still the prior levels' resolved values, and the return still unwraps.
+                label: async (params, context) => {
+                    expectTypeOf(params).toEqualTypeOf<{ productName: string; id: number }>();
+                    expectTypeOf(context).toEqualTypeOf<LoadContext>();
+                    expectTypeOf(context.signal).toEqualTypeOf<AbortSignal>();
+                    return params.id;
+                },
+            });
+
+        expectTypeOf<ScopeProps<typeof scopeDef>>().toEqualTypeOf<{
+            productName: string;
+            id: number;
+            label: number;
+        }>();
+    });
+
+    test('a data() load takes it too', () => {
+        const scopeDef = scope({ productName: input<string>() }).load({
+            label: data((_params, context) => {
+                expectTypeOf(context).toEqualTypeOf<LoadContext>();
+                return Promise.resolve(1);
+            }),
+        });
+
+        expectTypeOf<ScopeProps<typeof scopeDef>['label']>().toEqualTypeOf<number>();
+    });
+
+    test('declaring it is optional — a one-argument load is unchanged', () => {
+        const scopeDef = scope({ productName: input<string>() }).load({
+            label: async (params) => {
+                expectTypeOf(params).toEqualTypeOf<{ productName: string }>();
+                return params.productName.length;
+            },
+        });
+
+        expectTypeOf<ScopeProps<typeof scopeDef>['label']>().toEqualTypeOf<number>();
     });
 });
 
