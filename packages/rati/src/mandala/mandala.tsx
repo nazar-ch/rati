@@ -10,6 +10,7 @@ import { registerScopeControlsChannel } from './controls';
 import { discardRun, RefreshController } from './refresh';
 import { MandalaErrorBoundary } from './boundary';
 import { HydrationContext } from './hydration';
+import { AfterHydration } from './afterHydration';
 
 /*
     The mandala — rati's core renderable unit, the shared abstraction under `island()`
@@ -47,6 +48,20 @@ export type MandalaConfig<S extends Scope<any>> = {
      * is thrown during render so the nearest ErrorBoundary handles it.
      */
     error?: ComponentType<MandalaFallbackProps<S> & { error: SourceError }>;
+
+    /**
+     * Resolve this island's data during a server render? Default `true`.
+     *
+     * `prerender` is all-or-nothing: every promise load on the page gates TTFB. Set
+     * `false` on an island that shouldn't hold the document up — below the fold,
+     * expensive, or personalized — and the server ships its `loading` slot instead. The
+     * client renders that same slot through hydration, then resolves normally.
+     *
+     * The opt-out is the island's, so it wins over anything inside its scope: a source
+     * marked `ssr: true` in an `ssr: false` island does not resolve server-side either.
+     * On a client-only render (no server in the picture) the option does nothing.
+     */
+    ssr?: boolean;
 };
 
 export type MandalaComponent<S extends Scope<any>> = FC<ScopeInputs<S>> & {
@@ -89,6 +104,8 @@ export function createMandala<S extends Scope<any>>(
     const ControlsChannel = registerScopeControlsChannel(scopeKey);
     const Loading = (config.loading ?? DefaultLoading) as ComponentType<{ inputs: unknown }>;
     const levels = flattenLevels(config.scope as Scope);
+    // Build-time constant, so the element tree below keeps one stable shape per mandala.
+    const ssrEnabled = config.ssr !== false;
 
     // The public identity of this mandala — the React displayName, the scope's read-error
     // label, and the data trace's per-line prefix. Computed before the component so the
@@ -254,6 +271,11 @@ export function createMandala<S extends Scope<any>>(
             trace: cacheRef.current.trace,
         };
 
+        // The one element the loading slot is: the Suspense fallback, and — under
+        // `ssr: false` — what stands in for the whole tree until the client has hydrated.
+        const loadingSlot = <Loading inputs={inputs} />;
+        const tree = <Fragment key={treeKey}>{buildTree(levels, 0, inputs, shared)}</Fragment>;
+
         return (
             <ControlsChannel.Provider value={controller}>
                 <MandalaErrorBoundary
@@ -270,8 +292,14 @@ export function createMandala<S extends Scope<any>>(
                     retry={bumpRetry}
                     resetKey={treeKey}
                 >
-                    <Suspense fallback={<Loading inputs={inputs} />}>
-                        <Fragment key={treeKey}>{buildTree(levels, 0, inputs, shared)}</Fragment>
+                    <Suspense fallback={loadingSlot}>
+                        {ssrEnabled ? (
+                            tree
+                        ) : (
+                            // Opted out: no Step renders server-side, so no load starts and
+                            // the collector stays empty for this island.
+                            <AfterHydration fallback={loadingSlot}>{tree}</AfterHydration>
+                        )}
                     </Suspense>
                 </MandalaErrorBoundary>
             </ControlsChannel.Provider>

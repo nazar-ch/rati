@@ -97,4 +97,34 @@ describe('renderToString with RouterStore + memory history', () => {
         expect(html).toContain('hello from server');
         router.dispose();
     });
+
+    test('a route with ssr: false ships its loading slot and never runs the load', async () => {
+        let runs = 0;
+        const greetingScope = scope().load({
+            greeting: async () => {
+                runs++;
+                return 'hello from server';
+            },
+        });
+        const Greeting: ScopeComponent<typeof greetingScope> = ({ greeting }) => (
+            <div data-testid="greeting">{greeting}</div>
+        );
+
+        const { router, App } = buildAppFor('/', [
+            route('/', 'greet', Greeting, {
+                scope: greetingScope,
+                loading: () => <div data-testid="greet-loading">loading route</div>,
+                ssr: false,
+            }),
+        ] as const);
+
+        await prepareRoute(router);
+        const html = await prerenderToString(<App />);
+
+        expect(html).toContain('loading route');
+        expect(html).not.toContain('hello from server');
+        // The option's whole point at the route level: this page didn't wait for the load.
+        expect(runs).toBe(0);
+        router.dispose();
+    });
 });

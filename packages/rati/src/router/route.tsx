@@ -141,6 +141,13 @@ export type RouteOptions<TScope extends Scope<any> | undefined, Path extends str
      */
     error?: TScope extends Scope<any> ? MandalaConfig<TScope>['error'] : undefined;
     /**
+     * Resolve this route's scope during a server render? Default `true`. `false` ships the
+     * `loading` slot in the HTML and resolves on the client after hydration — the mandala's
+     * `ssr` option (see `island`), for a page that shouldn't gate TTFB. Only meaningful
+     * alongside `scope`.
+     */
+    ssr?: TScope extends Scope<any> ? boolean : undefined;
+    /**
      * Declare this route a redirect — see {@link RouteRedirect}. The component never
      * renders on the happy path (pass `() => null`); it shows only if a redirect loop
      * is detected and following stops.
@@ -189,6 +196,7 @@ export function buildRouteComponent(
         scope: Scope<any>;
         loading?: ComponentType<any> | undefined;
         error?: ComponentType<any> | undefined;
+        ssr?: boolean | undefined;
     },
 ): ComponentType<any> {
     return createMandala(
@@ -197,6 +205,7 @@ export function buildRouteComponent(
             component,
             loading: fold.loading ?? (() => null),
             ...(fold.error ? { error: fold.error } : {}),
+            ...(fold.ssr !== undefined ? { ssr: fold.ssr } : {}),
         },
         'Route',
     );
@@ -212,6 +221,8 @@ export type RouteFoldInputs = {
     component: ComponentType<any>;
     loading?: ComponentType<any> | undefined;
     error?: ComponentType<any> | undefined;
+    // Carried so a group's re-fold doesn't silently turn a route's SSR opt-out back on.
+    ssr?: boolean | undefined;
 };
 
 /**
@@ -260,6 +271,7 @@ export function route<
                   scope: scopeOption as Scope<any>,
                   loading: options.loading as ComponentType<any> | undefined,
                   error: options.error as ComponentType<any> | undefined,
+                  ssr: options.ssr as boolean | undefined,
               })
             : component;
 
@@ -281,6 +293,7 @@ export function route<
                       component: component as ComponentType<any>,
                       loading: options.loading as ComponentType<any> | undefined,
                       error: options.error as ComponentType<any> | undefined,
+                      ssr: options.ssr as boolean | undefined,
                   } satisfies RouteFoldInputs,
               }
             : {}),

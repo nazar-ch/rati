@@ -3,6 +3,7 @@ import type { FC, ReactNode } from 'react';
 import { route } from '../../router/route';
 import { group } from '../../router/group';
 import { scope, input } from '../../scope/scope';
+import { prerenderToString } from '../../testing';
 
 const Page: FC = () => null;
 const ScopedPage: FC<{ id: string }> = () => null;
@@ -57,6 +58,31 @@ describe('group', () => {
         const original = route('/p/:id', 'p', ScopedPage, { scope: idScope(), error: ErrorSlot });
         const [r] = group({ error: OtherError }, [original]);
         expect(r.component).toBe(original.component);
+    });
+
+    test("carries a child's ssr: false through a re-fold", async () => {
+        let runs = 0;
+        const optedOut = scope().load({
+            note: async () => {
+                runs++;
+                return 'resolved';
+            },
+        });
+        const Note: FC<{ note: string }> = ({ note }) => <div>{note}</div>;
+        const original = route('/p', 'p', Note, { scope: optedOut, ssr: false });
+
+        // A group loading slot the route lacks — the condition that rebuilds the mandala.
+        const [refolded] = group({ loading: () => <div>group loading</div> }, [original]);
+        expect(refolded.component).not.toBe(original.component);
+
+        // The route's folded mandala takes the scope's inputs (none here), not the
+        // component's resolved props — which is what `group`'s pass-through type still says.
+        const Refolded = refolded.component as FC;
+        const html = await prerenderToString(<Refolded />);
+
+        // The rebuild kept the opt-out: the group's slot is what shipped, not the load.
+        expect(html).toContain('group loading');
+        expect(runs).toBe(0);
     });
 
     test('preserves the route tuple type (literal names) for the router type machinery', () => {
