@@ -42,6 +42,44 @@ describe('prerenderToString', () => {
     });
 });
 
+describe('settleTimeout — the hung-render diagnostic', () => {
+    test('a marked source nobody drives fails with the budget, the census, and where', async () => {
+        // No `loads`, so the source never leaves pending; under a collector the SSR marker
+        // promotes it to the promise path, and the prerender waits forever. Without the
+        // budget this test would end at the *runner's* timeout, saying nothing.
+        const Island = island({
+            scope: scope().load({ live: () => controllableSource({ ssr: true }) }),
+            component: ({ live }) => <div>value {String(live)}</div>,
+            loading: () => <div>loading slot</div>,
+        });
+
+        const failure = await ssrRender(<Island />, { settleTimeout: 50 }).then(
+            () => null,
+            (error: unknown) => error as Error,
+        );
+
+        expect(failure).toBeInstanceOf(Error);
+        expect(failure!.message).toContain('did not settle within its 50ms `settleTimeout`');
+        expect(failure!.message).toContain('1 Suspense boundary was still pending');
+        expect(failure!.message).toContain('`controllableSource({ ssr: true })` with no `loads`');
+        // React hands the abort each pending task's component stack — the closest thing to
+        // naming the suspense, and the reason the abort is worth doing over a bare race.
+        expect(failure!.message).toMatch(/Still pending at:\n\s+at Step/);
+    });
+
+    test('a render that settles in time is untouched by the budget', async () => {
+        const Island = island({
+            scope: scope().load({ greeting: async () => 'hello' }),
+            component: ({ greeting }) => <div>{greeting}</div>,
+            loading: () => <div>loading slot</div>,
+        });
+
+        const html = await prerenderToString(<Island />, { settleTimeout: 5000 });
+        expect(html).toContain('hello');
+        expect(html).not.toContain('loading slot');
+    });
+});
+
 describe('ssrRender — the server half', () => {
     test('collects each resolved promise value, keyed by mandala then chain key', async () => {
         const Island = island({

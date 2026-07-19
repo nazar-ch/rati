@@ -857,8 +857,24 @@ and the [`rati/server`](#ratiserver) handler keep their own setups.
 `renderToString`, which can't await Suspense) reduced to one HTML string, with every resolved
 boundary inline. `options`: `onError` (forwarded to `prerender` — pass `() => {}` to swallow
 an expected server-side throw), `progressiveChunkSize` (the outlining budget; defaults to
-never outlining). Use it for a server-only assertion — a promise load resolving into the HTML,
-or a marked source staying pending with no collector to carry it.
+never outlining), `settleTimeout` (below). Use it for a server-only assertion — a promise load
+resolving into the HTML, or a marked source staying pending with no collector to carry it.
+
+**When a server render hangs**, `settleTimeout` (milliseconds, on either function) is the
+diagnostic: it fails the drain with *which* budget ran out, how many Suspense boundaries were
+still pending, and their component stack — instead of leaving your runner to report a generic
+"test timed out" some seconds later. The usual causes are a load whose promise never settles
+and an `ssr`-marked source nobody drove to ready (a `controllableSource({ ssr: true })` with
+no `loads`, say). It is **off by default**: any budget rati picked would sit either above your
+runner's own timeout, doing nothing, or below a legitimately slow load, failing a good test.
+It arms a real `setTimeout`, so under fake timers it fires only when you advance them.
+
+```ts
+await ssrRender(<Page />, { settleTimeout: 1000 });
+// Error: The server render did not settle within its 1000ms `settleTimeout` — 1 Suspense
+// boundary was still pending when the budget ran out. […] Still pending at:
+//     at Step (…/mandala/resolver.tsx)
+```
 
 **`ssrRender(node, options?)`** is the round-trip. It wraps `node` in a `HydrationProvider`
 carrying a fresh collector, drains the prerender, and returns the **server half** — the HTML

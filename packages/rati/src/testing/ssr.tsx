@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { prerender } from 'react-dom/static';
+import type { PrerenderOptions } from 'react-dom/static';
 import {
     createHydrationCollector,
     HydrationProvider,
@@ -19,6 +20,9 @@ import { hydrateTree, type MountedTree } from './dom';
       - `prerenderToString(node, options?)` — the bare drain loop over `react-dom/static`
         `prerender` (the reference impl at islandSsr*.test.tsx). No dehydration wiring: what a
         server-only render or a "marked source stays pending without a collector" test wants.
+        Its one addition over the hand-rolls: an opt-in `settleTimeout`, so a render that
+        never settles fails saying *what* was still pending instead of running out the
+        runner's clock (see startSettleWatchdog).
       - `ssrRender(node, options?)` — a collected server render: wraps `node` in a
         HydrationProvider carrying a fresh collector, drains it, and returns the HTML plus the
         dehydrated `data` / `seeds` / `errors`. The server half.
@@ -52,6 +56,18 @@ export interface PrerenderToStringOptions {
     onError?: (error: unknown) => void;
     /** Override the outlining budget. Defaults to never outlining (everything inline). */
     progressiveChunkSize?: number;
+    /**
+     * Milliseconds to give the render before the drain fails instead of hanging: the
+     * diagnostic for a load whose promise never settles, or an `ssr`-marked source nobody
+     * drove to ready. Off by default — a budget rati picks would either sit above the
+     * runner's own timeout (useless) or below a legitimately slow load (a false failure),
+     * and rati can't know which. The value is the *message*: which budget ran out, how many
+     * Suspense boundaries were still pending, and where they were — instead of the runner's
+     * generic "test timed out".
+     *
+     * A real `setTimeout`, so under fake timers it fires only when the test advances them.
+     */
+    settleTimeout?: number;
 }
 
 /**
@@ -64,11 +80,34 @@ export async function prerenderToString(
     node: ReactNode,
     options: PrerenderToStringOptions = {},
 ): Promise<string> {
-    const { prelude } = await prerender(node, {
+    const watchdog =
+        options.settleTimeout === undefined
+            ? undefined
+            : startSettleWatchdog(options.settleTimeout, options.onError);
+    const prerenderOptions: PrerenderOptions = {
         progressiveChunkSize: options.progressiveChunkSize ?? NO_OUTLINING,
-        ...(options.onError ? { onError: options.onError } : {}),
-    });
-    const reader = prelude.getReader();
+    };
+    if (watchdog) {
+        prerenderOptions.signal = watchdog.signal;
+        prerenderOptions.onError = watchdog.onError;
+    } else if (options.onError) {
+        prerenderOptions.onError = options.onError;
+    }
+
+    let result;
+    try {
+        result = await prerender(node, prerenderOptions);
+    } catch (error) {
+        // The abort resolves the prerender rather than rejecting it (pinned below), so this
+        // is a genuine render failure — unless the budget expired, in which case the better
+        // message wins.
+        throw watchdog?.expired() ? watchdog.failure() : error;
+    } finally {
+        // Armed for the render only; the drain below is bounded by the stream React closed.
+        watchdog?.stop();
+    }
+
+    const reader = result.prelude.getReader();
     const decoder = new TextDecoder();
     let html = '';
     for (;;) {
@@ -79,7 +118,74 @@ export async function prerenderToString(
     // Flush the decoder: a multibyte sequence held back at the final chunk boundary would
     // otherwise be dropped. Unreachable for React's always-valid UTF-8, but free insurance.
     html += decoder.decode();
+
+    // `postponed` is React's own "this prerender did not complete" flag — null on a clean
+    // drain. Gating on it (not on the timer alone) keeps a budget that expired during the
+    // *drain* of an already-finished render from failing a good test.
+    if (watchdog?.expired() && result.postponed !== null) throw watchdog.failure();
     return html;
+}
+
+/*
+    The settle budget, over `prerender`'s own `signal`. Aborting is what turns a hung render
+    into a reportable one: React resolves the prerender (it does not reject), closes the
+    stream, and calls `onError` once per still-pending task — with the abort reason and that
+    task's component stack. So the abort reason is both the release valve and the census.
+
+    Racing a timer instead would leave the render running and report nothing but the elapsed
+    budget.
+*/
+function startSettleWatchdog(budget: number, forward: ((error: unknown) => void) | undefined) {
+    const controller = new AbortController();
+    // Identity, not message matching, is how the abort is told apart from the app's own
+    // errors below — React hands this exact object back.
+    const reason = new Error(`rati/testing settle budget of ${budget}ms expired`);
+    let expired = false;
+    let stillPending = 0;
+    let firstStack: string | undefined;
+    const timer = setTimeout(() => {
+        expired = true;
+        controller.abort(reason);
+    }, budget);
+
+    return {
+        signal: controller.signal,
+        onError(error: unknown, errorInfo?: { componentStack?: string }): void {
+            if (error === reason) {
+                // Ours: counted into the failure below, never reported twice.
+                stillPending++;
+                firstStack ??= errorInfo?.componentStack;
+                return;
+            }
+            // Everything else is the render's own error, and must land where it would have
+            // without a budget — the caller's handler, or React's default (which is this
+            // exact call: see `defaultErrorHandler` in react-dom's server build).
+            if (forward) forward(error);
+            else console.error(error);
+        },
+        stop: () => clearTimeout(timer),
+        expired: () => expired,
+        failure: () => new Error(settleTimeoutMessage(budget, stillPending, firstStack)),
+    };
+}
+
+function settleTimeoutMessage(
+    budget: number,
+    stillPending: number,
+    componentStack: string | undefined,
+): string {
+    const boundaries =
+        stillPending === 1 ? '1 Suspense boundary was' : `${stillPending} Suspense boundaries were`;
+    // The innermost frames name the level; a deep app tree's outer frames are noise.
+    const frames = (componentStack ?? '').split('\n').filter(Boolean).slice(0, 8);
+    const where = frames.length ? `\nStill pending at:\n${frames.join('\n')}` : '';
+    return (
+        `The server render did not settle within its ${budget}ms \`settleTimeout\` — ` +
+        `${boundaries} still pending when the budget ran out. The usual causes are a load ` +
+        `whose promise never settles and an \`ssr\`-marked source nobody drove to ready (a ` +
+        `\`controllableSource({ ssr: true })\` with no \`loads\`). Raise \`settleTimeout\` ` +
+        `if the render is merely slow.${where}`
+    );
 }
 
 /** Options for {@link ssrRender} — the server render (same shape as a bare prerender). */

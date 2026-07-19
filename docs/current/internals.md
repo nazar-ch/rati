@@ -503,9 +503,15 @@ like `rati/ssr`'s `renderToHtml`); `ssrRender` wraps a fresh `createHydrationCol
 `HydrationProvider` around it and returns the HTML + `data`/`seeds`/`errors`, with a
 `.hydrate()` that feeds the payload back through a client-side `HydrationProvider` and
 `hydrateRoot` (a fourth `testing/dom.tsx` mount, `hydrateTree`, so `cleanup()` tears
-round-trips down too). Its one added judgment over the hand-rolls: a recoverable hydration
+round-trips down too). Its two added judgments over the hand-rolls: a recoverable hydration
 error (React client-rendering over mismatched markup) throws by default — the mismatch made
-loud — with an `allowMismatch` opt-out for the deliberate-degradation pins. The route-level
+loud — with an `allowMismatch` opt-out for the deliberate-degradation pins; and an opt-in
+`settleTimeout` that turns a render which never settles into a report instead of a runner
+timeout. The budget runs over `prerender`'s own `signal`: aborting *resolves* the prerender
+(it never rejects) and calls `onError` once per still-pending task, with the abort reason and
+that task's component stack — so the abort is both the release valve and the census the
+failure message quotes. `postponed !== null` (React's "did not complete" flag) gates the
+throw, so a budget expiring during the drain of a finished render can't fail a good test. The route-level
 round-trip stays a *documented composition* (build the two routers + `prepareRoute`, pass both
 trees to `ssrRender`/`.hydrate`) rather than a helper, to keep the router-SSR wiring out of the
 entry.
