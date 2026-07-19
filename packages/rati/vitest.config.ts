@@ -11,6 +11,7 @@ export default defineConfig({
             },
         },
         include: ['src/__tests__/**/*.test.{ts,tsx}'],
+        setupFiles: ['./vitest.setup.ts'],
         typecheck: {
             enabled: true,
             checker: 'tsgo',

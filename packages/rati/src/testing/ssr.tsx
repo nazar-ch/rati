@@ -76,6 +76,9 @@ export async function prerenderToString(
         if (done) break;
         html += decoder.decode(value, { stream: true });
     }
+    // Flush the decoder: a multibyte sequence held back at the final chunk boundary would
+    // otherwise be dropped. Unreachable for React's always-valid UTF-8, but free insurance.
+    html += decoder.decode();
     return html;
 }
 

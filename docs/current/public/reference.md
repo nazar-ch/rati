@@ -656,10 +656,13 @@ directly as `<form action={store.save}>`.
 ## `rati/testing`
 
 Test-environment only — everything here calls React's `act` (imported from `react`, not
-`@testing-library/react`, which this entry does *not* depend on), which warns outside a
-configured test runner. It needs a React act environment: `@testing-library/react` sets one
-up on import, or set `globalThis.IS_REACT_ACT_ENVIRONMENT = true`. These are the primitives
-rati's own suites (and Jnana's) hand-rolled before this entry existed.
+`@testing-library/react`, which this entry does *not* depend on). Each helper scopes
+`IS_REACT_ACT_ENVIRONMENT` around its own `act` calls and restores it after (the RTL
+pattern), so the entry works even in a suite that deliberately leaves the global unset —
+and never changes your runner's policy. Your own bare `act(…)` drives still need a runner
+environment: `@testing-library/react` sets one up on import, or set
+`globalThis.IS_REACT_ACT_ENVIRONMENT = true`. These are the primitives rati's own suites
+(and Jnana's) hand-rolled before this entry existed.
 
 | Export | Purpose |
 | --- | --- |
@@ -669,6 +672,7 @@ rati's own suites (and Jnana's) hand-rolled before this entry existed.
 | `renderIsland(target, options?)` | mount an island (or `{ scope, component, … }` config) and drive it; async, returns a handle. See below |
 | `createTestRouter(routes, options?)` | memory history + router + provider, rendered and disposed for you; async, returns a handle. See below |
 | `renderWithStores(ui, options?)` | render a tree with a *partial* stores container — the fake-container cast, gone. See below |
+| `storesWrapper(stores?)` | just the provider component for that partial container — pass it as RTL's `wrapper` (or wrap any harness's tree) when you keep your own renderer. See below |
 | `prerenderToString(node, options?)` | drain `react-dom/static` `prerender` to an HTML string (it awaits Suspense; `renderToString` cannot). See below |
 | `ssrRender(node, options?)` | a collected server render — HTML + dehydrated payload, plus `.hydrate()` for the client half. The SSR round-trip. See below |
 | `cleanup()` | unmount every tree the harness mounted (islands, routers, stores renders, hydrated round-trips) — wire up `afterEach(cleanup)` |
@@ -690,12 +694,17 @@ in `act` yourself, or follow it with `await flush()`.
 Options: `initial` (start `ready` with a value instead of `pending`), `ssr` (the
 `SourceSSR` marker — passed straight through), `loads` (the loader shape: on `attach`, if
 still pending, settle `ready` to this value on a microtask — pair with `ssr: true`),
-`onAttach` / `onDetach` (run at the ledger edges, for asserting attach ordering).
+`seed` (the seedable-live-source shape: `{ dehydrate?, hydrate }` where `hydrate` decodes
+the wire value and *returns* the seeded value — the source is `ready` before `attach`;
+throw from it to model a store rejecting a stale seed; combines with `loads` for
+"load on attach unless already seeded"; mutually exclusive with `ssr`), `onAttach` /
+`onDetach` (run at the ledger edges, for asserting attach ordering).
 
 **`renderIsland(target, options?)`** mounts an island and hands back a handle for driving
 it. Pass a `{ scope, component, loading?, error? }` config (the full-featured path) or an
-already-built `island()` component; `options` takes `props` (the island's inputs) and a
-`wrapper` (app-level providers). It renders with `react-dom/client` — no
+already-built `island()` component; `options` takes `props` (the island's inputs —
+**required** when the scope declares required inputs, mirroring what JSX would demand) and
+a `wrapper` (app-level providers). It renders with `react-dom/client` — no
 `@testing-library/react` dependency — and returns the container, so query it however you
 already do. It is **async**: the mount settles the scope as far as it can, so a self-settling
 load is already `content` while a still-pending one (a `deferred`, an un-driven
@@ -704,10 +713,10 @@ load is already `content` while a still-pending one (a `deferred`, an un-driven
 | Handle member | Purpose |
 | --- | --- |
 | `container` | the mounted DOM node (appended to `document.body`) |
-| `slot()` | which slot is on screen — `'loading'` / `'content'` / `'error'`; reads visibility, so a Suspense-hidden stale subtree doesn't count as content. Config mode only |
+| `slot()` | which slot is on screen — `'loading'` / `'content'` / `'error'`; reads visibility, so a Suspense-hidden stale subtree doesn't count as content. Throws when no marker is in the DOM at all (the island unmounted, or threw past its slots to an ErrorBoundary). Config mode only |
 | `text()` | the visible slot's trimmed `textContent`. Config mode only |
 | `controls()` | the island's `useScopeControls` (imperative `refresh` + the live `pending` set), from the test side. Config mode only |
-| `rerender(props?)` | re-render with new inputs — the param-change path. Async, like the mount |
+| `rerender(props?)` | re-render with new inputs — the param-change path. `props` is required when the scope has required inputs (no silent input wipe). Async, like the mount |
 | `unmount()` | unmount and remove the container |
 
 Config mode wraps each slot in a private marker element to read `slot()` — testids never
@@ -744,7 +753,9 @@ test('loading → content', async () => {
 `RootStoreProvider` and renders it — replacing the `createMemoryHistory` / `new RouterStore` /
 provider / `<Router>` boilerplate. `options`: `url` (initial URL, default `/`), `state`
 (initial entry state), `ui` (what to render — defaults to `<Router />`; pass a custom tree, or
-`<Router Loading={…} />`), `stores` (extra stores merged alongside the router). Because a real
+`<Router Loading={…} />`), `stores` (extra stores merged alongside the router — each store
+itself partial-able, see `renderWithStores`), `basename` (mount the table under a prefix),
+`hydratedState` (seed the router from a dehydrated navigation — the SSR client path). Because a real
 router is mounted, **`<Link>` works with no `vi.mock`**. Scroll restoration is off (jsdom has
 no layout), and `cleanup()` disposes the router — detaching its history.
 
@@ -772,18 +783,29 @@ test('a Link navigates — no mocks', async () => {
 ```
 
 **`renderWithStores(ui, options?)`** renders a tree under a stores container built from
-`options.stores` — a **partial** of the app's stores, so a component test provides only what
-it reads. Parameterize with the app's stores type; the partial is checked against the real
-shape, and the `as unknown as GlobalStores` cast the hand-rolled fake containers needed lives
-once inside the helper instead of in every test.
+`options.stores` — a **partial** of the app's stores, and each provided store may itself be
+a partial (the slice the component actually reads, typed against the real store). A
+component test provides only what it reads; the `as unknown as GlobalStores` cast the
+hand-rolled fake containers needed lives once inside the helper instead of in every test.
 
 ```ts
 interface AppStores extends GlobalStores { foo: FooStore; bar: BarStore }
 
 const handle = await renderWithStores<AppStores>(<TwoStoreReader />, {
-    stores: { foo, bar },   // only the two this component reads — no cast
+    stores: { foo, bar: { count: 3 } },   // only what this component reads — no cast
 });
 expect(handle.text()).toBe('hi/3');
+```
+
+**`storesWrapper(stores?)`** is the same seam without the mount: it returns just the
+provider component, for suites that keep their own renderer — pass it as
+`@testing-library/react`'s `wrapper` option, or wrap the tree handed to
+`vitest-browser-react` (or any other harness). `renderWithStores` is this wrapper plus the
+entry's own mount.
+
+```ts
+const wrapper = storesWrapper<AppStores>({ foo, bar: { count: 3 } });
+render(<TwoStoreReader />, { wrapper });   // RTL stays the renderer
 ```
 
 ### The SSR round-trip kit

@@ -21,10 +21,10 @@ export interface ControllableSourceOptions<T> {
     /**
      * SSR capability marker, passed straight through to the source's `ssr` field —
      * `true` for a loader (a promise in source clothing), or `{ hydrate, dehydrate? }`
-     * for a seedable live source. See the `SourceSSR` docs. A seedable source's `hydrate`
-     * can reference the source itself: the closure runs during hydration, long after
-     * construction, so `const s = controllableSource({ ssr: { hydrate: (d) =>
-     * s.setReady(decode(d)) } })` is not a real cycle.
+     * for a seedable live source. See the `SourceSSR` docs. For the seedable shape, prefer
+     * {@link ControllableSourceOptions.seed}, which builds this marker and settles the
+     * source for you; a raw `ssr` object is the escape hatch when the test needs the
+     * marker's exact `hydrate(data): void` semantics.
      */
     ssr?: SourceSSR<T>;
     /**
@@ -35,6 +35,20 @@ export interface ControllableSourceOptions<T> {
      * `onAttach: () => queueMicrotask(() => s.setError('not-available'))`.
      */
     loads?: T;
+    /**
+     * The seedable-live-source shape, spelled without the self-referential `ssr.hydrate`
+     * closure: `dehydrate` serializes the ready value on the server; `hydrate` decodes the
+     * wire value and *returns* the seeded value — the source transitions to `ready` with it
+     * before `attach()` (throw from it to model a store that rejects a stale seed).
+     * Mutually exclusive with `ssr` (it builds that marker for you); combines with `loads`
+     * for the real-store shape "load on attach unless already seeded".
+     */
+    seed?: {
+        /** Serialize the ready value for the wire. Defaults to the value itself. */
+        dehydrate?: (value: T) => unknown;
+        /** Decode the wire value; the return becomes the seeded `ready` value. */
+        hydrate: (data: unknown) => T;
+    };
     /** Run synchronously at the end of `attach()`, after the ledger updates — for
      *  asserting attach ordering against other lifecycle events. */
     onAttach?: () => void;
@@ -52,8 +66,9 @@ export interface ControllableSource<T> extends Source<T> {
     /** Transition to `error`. A bare string is taken as the `SourceError` `code`. */
     setError(error: SourceError | string): void;
     /** Re-emit the last ready value with a *stable* value identity — a live source ticking
-     *  or recovering without a value change (the island's equals-gate sees the same object,
-     *  so downstream loads do not re-run). Throws before the first {@link setReady}. */
+     *  or recovering without a value change (the island's equals-gate compares values, and
+     *  the identical identity passes its `===` fast path, so downstream loads do not
+     *  re-run). Throws before the first {@link setReady}. */
     emit(): void;
     /** Total `attach()` calls over the source's life. */
     readonly attachCount: number;
@@ -62,8 +77,10 @@ export interface ControllableSource<T> extends Source<T> {
     /** Attached right now (`attachCount − detachCount > 0`) — `false` after teardown is
      *  the no-leak assertion. */
     readonly attached: boolean;
-    /** Peak concurrent attaches. `> 1` for one instance is a double-attach of a live
-     *  entry (a StrictMode remount swaps instances, so it never legitimately exceeds 1). */
+    /** Peak concurrent attaches. `> 1` for one instance under one island key is a
+     *  double-attach of a live entry (a StrictMode remount swaps instances, so that case
+     *  never legitimately exceeds 1) — but the same instance shared across keys or islands
+     *  legitimately attaches concurrently, one entry per key. */
     readonly peakAttached: number;
 }
 
@@ -76,11 +93,19 @@ type State<T> =
 export function controllableSource<T>(
     options: ControllableSourceOptions<T> = {},
 ): ControllableSource<T> {
-    const { initial, ssr, loads, onAttach, onDetach } = options;
+    const { ssr, seed, onAttach, onDetach } = options;
+    if (ssr !== undefined && seed !== undefined) {
+        throw new Error('controllableSource: pass either `ssr` or `seed`, not both');
+    }
 
-    let state: State<T> =
-        initial === undefined ? { status: 'pending' } : { status: 'ready', value: initial };
-    let lastReady: { value: T } | null = initial === undefined ? null : { value: initial };
+    // `in` checks, not `!== undefined` sentinels, so `T = undefined` can start ready / load.
+    const hasInitial = 'initial' in options;
+    const hasLoads = 'loads' in options;
+
+    let state: State<T> = hasInitial
+        ? { status: 'ready', value: options.initial as T }
+        : { status: 'pending' };
+    let lastReady: { value: T } | null = hasInitial ? { value: options.initial as T } : null;
     const listeners = new Set<() => void>();
     let depth = 0;
     let attaches = 0;
@@ -98,9 +123,19 @@ export function controllableSource<T>(
         notify();
     };
 
+    // The `seed` shape builds the seedable SSR marker: hydrate decodes, and the source is
+    // ready before attach — exactly what a hand-rolled `ssr: { hydrate: (d) => src.setReady(…) }`
+    // closure did, minus the circular-initializer annotation it forced.
+    const ssrMarker: SourceSSR<T> | undefined = seed
+        ? {
+              ...(seed.dehydrate && { dehydrate: seed.dehydrate }),
+              hydrate: (data) => set({ status: 'ready', value: seed.hydrate(data) }),
+          }
+        : ssr;
+
     return {
         [SourceSymbol]: true,
-        ...(ssr !== undefined && { ssr }),
+        ...(ssrMarker !== undefined && { ssr: ssrMarker }),
         getSnapshot: () => state,
         subscribe(onChange) {
             listeners.add(onChange);
@@ -112,9 +147,11 @@ export function controllableSource<T>(
             attaches++;
             depth++;
             if (depth > peak) peak = depth;
-            if (loads !== undefined && state.status === 'pending') {
+            if (hasLoads && state.status === 'pending') {
                 queueMicrotask(() => {
-                    if (state.status === 'pending') set({ status: 'ready', value: loads });
+                    if (state.status === 'pending') {
+                        set({ status: 'ready', value: options.loads as T });
+                    }
                 });
             }
             onAttach?.();

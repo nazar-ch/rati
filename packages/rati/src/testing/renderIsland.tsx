@@ -31,6 +31,14 @@ import { mountTree, type MountedTree } from './dom';
 const SLOT_ATTR = 'data-rati-testing-slot';
 type SlotName = 'loading' | 'content' | 'error';
 
+/**
+ * Inputs as a call-site tuple: required when the scope declares required inputs, optional
+ * otherwise. Closes the hole where `rerender()` on an input-ful scope would type-check and
+ * silently re-render with `{}` — wiping every input.
+ */
+type InputsArg<S extends Scope<any>> =
+    {} extends ScopeInputs<S> ? [props?: ScopeInputs<S>] : [props: ScopeInputs<S>];
+
 /** The handle {@link renderIsland} returns. */
 export interface IslandHandle<S extends Scope<any>> {
     /** The DOM node the island is mounted into (appended to `document.body`). */
@@ -38,14 +46,17 @@ export interface IslandHandle<S extends Scope<any>> {
     /**
      * Which slot is on screen right now — `content` / `loading` / `error`. Presence in the
      * DOM is not enough: mid-Suspense-transition React keeps stale content mounted but hidden
-     * (`display: none`), so this reads visibility, not just `querySelector`. Config mode only.
+     * (`display: none`), so this reads visibility, not just `querySelector`. Throws when no
+     * slot marker is in the DOM at all — an island that unmounted, or threw past its slots
+     * to an ErrorBoundary (no `error` slot declared). Config mode only.
      */
     slot(): SlotName;
     /** The visible slot's trimmed `textContent` (what it says), or `null`. Config mode only. */
     text(): string | null;
     /** Re-render with new inputs — the param-change path (a new run, old sources detached).
-     *  Async like the mount: resolves as far as the new inputs allow before returning. */
-    rerender(props?: ScopeInputs<S>): Promise<void>;
+     *  Required when the scope has required inputs. Async like the mount: resolves as far
+     *  as the new inputs allow before returning. */
+    rerender(...args: InputsArg<S>): Promise<void>;
     /**
      * The nearest island's controls for this scope — imperative `refresh` plus the live
      * `pending` set, read from the test side (no probe component of your own). Reads the
@@ -57,13 +68,23 @@ export interface IslandHandle<S extends Scope<any>> {
     unmount(): void;
 }
 
-/** Options for {@link renderIsland}. */
-export interface RenderIslandOptions<S extends Scope<any>> {
-    /** The island's inputs (its `input()` head). Omit for an input-less scope. */
-    props?: ScopeInputs<S>;
+/**
+ * Options for {@link renderIsland}. `props` (the island's inputs) is required when the
+ * scope declares required inputs — mirroring what JSX would demand of the built island —
+ * and absent-able only for an input-less scope.
+ */
+export type RenderIslandOptions<S extends Scope<any>> = {
     /** Wrap the island in app-level providers (a store context, a theme, …). */
     wrapper?: ComponentType<{ children: ReactNode }>;
-}
+} & ({} extends ScopeInputs<S>
+    ? {
+          /** The island's inputs (its `input()` head). Omittable: the scope has none. */
+          props?: ScopeInputs<S>;
+      }
+    : {
+          /** The island's inputs (its `input()` head). */
+          props: ScopeInputs<S>;
+      });
 
 function visibleNode(container: HTMLElement, slot: SlotName): Element | null {
     const node = container.querySelector(`[${SLOT_ATTR}="${slot}"]`);
@@ -79,7 +100,16 @@ function visibleNode(container: HTMLElement, slot: SlotName): Element | null {
 function readSlot(container: HTMLElement): SlotName {
     if (visibleNode(container, 'error')) return 'error';
     if (visibleNode(container, 'content')) return 'content';
-    return 'loading';
+    if (visibleNode(container, 'loading')) return 'loading';
+    // Markers present but all hidden is a mid-transition instant — the fallback is about to
+    // show; loading is the honest read. NO marker at all means the island isn't rendering
+    // its slots anymore — don't silently report 'loading' for a dead island.
+    if (container.querySelector(`[${SLOT_ATTR}]`)) return 'loading';
+    throw new Error(
+        'renderIsland: no slot marker is in the DOM — the island unmounted or threw past ' +
+            'its slots (a scope error with no `error` slot rethrows to the nearest ' +
+            'ErrorBoundary; pass one via `wrapper` and assert on the container instead).',
+    );
 }
 
 /**
@@ -91,8 +121,15 @@ function readSlot(container: HTMLElement): SlotName {
  */
 export async function renderIsland<S extends Scope<any>>(
     target: IslandConfig<S> | IslandComponent<S>,
-    options: RenderIslandOptions<S> = {},
+    // A rest tuple so `options` itself is only omittable when the scope is input-less.
+    ...rest: {} extends ScopeInputs<S>
+        ? [options?: RenderIslandOptions<S>]
+        : [options: RenderIslandOptions<S>]
 ): Promise<IslandHandle<S>> {
+    const options = (rest[0] ?? {}) as {
+        props?: ScopeInputs<S>;
+        wrapper?: ComponentType<{ children: ReactNode }>;
+    };
     const isConfig = typeof target !== 'function';
     const captured: { current: ScopeControls<S> | null } = { current: null };
 
@@ -176,9 +213,9 @@ export async function renderIsland<S extends Scope<any>>(
                 visibleNode(container, 'loading');
             return node?.textContent?.trim() ?? null;
         },
-        rerender(props) {
-            return mount.rerender(element(props));
-        },
+        // The cast bridges the conditional tuple (unresolvable while S is generic).
+        rerender: ((props?: ScopeInputs<S>) =>
+            mount.rerender(element(props))) as IslandHandle<S>['rerender'],
         controls() {
             requireConfig('controls()');
             if (!captured.current) {

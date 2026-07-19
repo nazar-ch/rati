@@ -3,7 +3,7 @@ import { act, type FC } from 'react';
 import { route, type GenericRouteType } from '../../router/route';
 import { Link } from '../../router/Link';
 import { createUseStoresHook, type GlobalStores } from '../../stores/RootStore';
-import { createTestRouter, renderWithStores, cleanup } from '../../testing';
+import { createTestRouter, renderWithStores, storesWrapper, cleanup } from '../../testing';
 
 afterEach(cleanup);
 
@@ -122,5 +122,55 @@ describe('createTestRouter — state', () => {
     test('seeds the initial entry state', async () => {
         const tr = await createTestRouter(routes, { url: '/', state: { panel: 'left' } });
         expect(tr.router.state).toEqual({ panel: 'left' });
+    });
+});
+
+describe('createTestRouter — basename', () => {
+    test('matches and navigates under a basename (the fuzz-harness / preload shape)', async () => {
+        const tr = await createTestRouter(routes, { url: '/admin/about', basename: '/admin' });
+        expect(tr.text()).toBe('about page');
+        expect(tr.router.path).toBe('/about'); // route-space path, basename stripped
+
+        await tr.navigate('/');
+        expect(tr.text()).toBe('home page');
+    });
+});
+
+describe('storesWrapper — the mount-free seam', () => {
+    // The provider alone, for suites that keep their own renderer (RTL's `wrapper` option,
+    // vitest-browser-react). Here it wraps a renderWithStores-free mount path: any harness
+    // that takes a component tree works the same way.
+    test('wraps a tree so useStores resolves, with no mount of its own', async () => {
+        const Wrapper = storesWrapper<AppStores>({ foo: { label: 'wrapped' }, bar: { count: 9 } });
+        const handle = await renderWithStores(
+            <Wrapper>
+                <TwoStoreReader />
+            </Wrapper>,
+        );
+        expect(handle.text()).toBe('wrapped/9');
+    });
+});
+
+describe('renderWithStores — per-store slices', () => {
+    // The Jnana shape: stores are classes with methods, but a component reads a flat slice.
+    // The container-level cast died in DX-03; the per-store slice cast dies here.
+    class CountedBarStore implements BarStore {
+        count = 5;
+        recount(): void {
+            this.count += 1;
+        }
+    }
+    interface ClassyStores extends GlobalStores {
+        bar: CountedBarStore;
+    }
+    const useClassyStores = createUseStoresHook<ClassyStores>();
+    const BarReader: FC = () => <div>bar {useClassyStores().bar.count}</div>;
+
+    test('a store slice type-checks without any cast (methods omitted)', async () => {
+        const handle = await renderWithStores<ClassyStores>(<BarReader />, {
+            // Just the field the component reads — `recount()` is not provided, no cast.
+            stores: { bar: { count: 5 } },
+        });
+        expect(handle.text()).toBe('bar 5');
     });
 });

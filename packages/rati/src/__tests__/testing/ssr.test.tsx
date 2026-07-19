@@ -89,6 +89,37 @@ describe('ssrRender().hydrate() — the round-trip', () => {
         expect(client.recovered).toEqual([]);
     });
 
+    test('a seed-shaped controllableSource dehydrates on the server and seeds the client', async () => {
+        const hydrateLog: string[] = [];
+        const makeUserSource = () =>
+            controllableSource<{ name: string }>({
+                // The real-store shape: load on attach unless already seeded.
+                loads: { name: 'Ada' },
+                seed: {
+                    dehydrate: (value) => value.name,
+                    hydrate: (data) => {
+                        hydrateLog.push(`hydrate:${String(data)}`);
+                        return { name: String(data) };
+                    },
+                },
+            });
+        const Island = island({
+            scope: scope().load({ user: () => makeUserSource() }),
+            component: ({ user }) => <div>{`hello ${user.name}`}</div>,
+            loading: () => <div>loading</div>,
+        });
+
+        const server = await ssrRender(<Island />);
+        expect(server.html).toContain('hello Ada'); // the loader settled during the prerender
+        expect(Object.values(server.seeds)).toEqual([{ user: 'Ada' }]); // dehydrated seed
+        expect(hydrateLog).toEqual([]); // dehydrate only — the server never hydrates
+
+        const client = await server.hydrate();
+        expect(client.text()).toContain('hello Ada');
+        expect(hydrateLog).toEqual(['hydrate:Ada']); // the client seeded instead of loading
+        expect(client.recovered).toEqual([]);
+    });
+
     test('a controllableSource loader (ssr: true) dehydrates as a value and never re-runs', async () => {
         let created = 0;
         const Island = island({

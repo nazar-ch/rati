@@ -34,6 +34,20 @@ describe('flush', () => {
         await flush();
         expect(ran).toBe(true);
     });
+
+    test('scopes the act flag: works without a runner environment and restores it after', async () => {
+        // The suite's setup file sets the flag; simulate a runner (like Jnana's) that
+        // deliberately leaves it unset, and check flush neither warns-fails nor leaks it.
+        const scope = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean | undefined };
+        const runnerValue = scope.IS_REACT_ACT_ENVIRONMENT;
+        scope.IS_REACT_ACT_ENVIRONMENT = undefined;
+        try {
+            await flush();
+            expect(scope.IS_REACT_ACT_ENVIRONMENT).toBeUndefined();
+        } finally {
+            scope.IS_REACT_ACT_ENVIRONMENT = runnerValue;
+        }
+    });
 });
 
 describe('controllableSource — state machine', () => {
@@ -178,5 +192,89 @@ describe('controllableSource — the loader shape (ssr: true + loads)', () => {
         expect(typeof source.ssr).toBe('object');
         (source.ssr as { hydrate: (d: unknown) => void }).hydrate(7);
         expect(source.getSnapshot()).toEqual({ status: 'ready', value: { n: 7 } });
+    });
+});
+
+describe('controllableSource — the seed shape', () => {
+    test('builds the seedable marker: hydrate decodes and settles ready before attach', () => {
+        const log: string[] = [];
+        const source = controllableSource<{ n: number }>({
+            seed: {
+                dehydrate: (value) => value.n,
+                hydrate: (data) => {
+                    log.push(`hydrate:${String(data)}`);
+                    return { n: data as number };
+                },
+            },
+        });
+        const marker = source.ssr as {
+            dehydrate: (value: { n: number }) => unknown;
+            hydrate: (data: unknown) => void;
+        };
+        expect(marker.dehydrate({ n: 7 })).toBe(7);
+        marker.hydrate(7);
+        expect(log).toEqual(['hydrate:7']);
+        expect(source.getSnapshot()).toEqual({ status: 'ready', value: { n: 7 } });
+    });
+
+    test('dehydrate is optional (the wire value defaults to the value itself)', () => {
+        const source = controllableSource<string>({ seed: { hydrate: (data) => String(data) } });
+        const marker = source.ssr as { dehydrate?: unknown; hydrate: (data: unknown) => void };
+        expect(marker.dehydrate).toBeUndefined();
+        marker.hydrate('wire');
+        expect(source.getSnapshot()).toEqual({ status: 'ready', value: 'wire' });
+    });
+
+    test('combines with loads — load on attach unless already seeded (the real-store shape)', async () => {
+        const make = () =>
+            controllableSource<string>({
+                loads: 'loaded',
+                seed: { hydrate: (data) => String(data) },
+            });
+
+        const unseeded = make();
+        unseeded.attach();
+        await Promise.resolve();
+        expect(unseeded.getSnapshot()).toEqual({ status: 'ready', value: 'loaded' });
+
+        const seeded = make();
+        (seeded.ssr as { hydrate: (d: unknown) => void }).hydrate('seeded');
+        seeded.attach();
+        await Promise.resolve();
+        expect(seeded.getSnapshot()).toEqual({ status: 'ready', value: 'seeded' });
+    });
+
+    test('a throwing hydrate models a store that rejects a stale seed', () => {
+        const source = controllableSource<string>({
+            seed: {
+                hydrate: () => {
+                    throw new Error('seed drifted');
+                },
+            },
+        });
+        expect(() => (source.ssr as { hydrate: (d: unknown) => void }).hydrate('x')).toThrow(
+            'seed drifted',
+        );
+        expect(source.getSnapshot()).toEqual({ status: 'pending' });
+    });
+
+    test('seed and ssr are mutually exclusive', () => {
+        expect(() =>
+            controllableSource<string>({ ssr: true, seed: { hydrate: (data) => String(data) } }),
+        ).toThrow(/either `ssr` or `seed`/);
+    });
+});
+
+describe('controllableSource — undefined-tolerant options', () => {
+    test('T = undefined can start ready via initial', () => {
+        const source = controllableSource<undefined>({ initial: undefined });
+        expect(source.getSnapshot()).toEqual({ status: 'ready', value: undefined });
+    });
+
+    test('T = undefined can load on attach', async () => {
+        const source = controllableSource<undefined>({ loads: undefined });
+        source.attach();
+        await Promise.resolve();
+        expect(source.getSnapshot()).toEqual({ status: 'ready', value: undefined });
     });
 });

@@ -1,13 +1,15 @@
 import { act } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
+import { withActEnvironment, withActEnvironmentSync } from './actEnvironment';
 
 /*
     The shared mount plumbing behind renderIsland / createTestRouter / renderWithStores / the
     SSR round-trip kit: a `react-dom/client` mount (or `hydrateRoot`) into document.body, an
     async-act render (so a self-settling load reaches content), a per-mount dispose hook (the
     router harness detaches its history through it), and one `cleanup()` that tears them all
-    down. It does not depend on `@testing-library/react`.
+    down. It does not depend on `@testing-library/react`. The act flag is scoped around each
+    of its own `act` calls (see ./actEnvironment) — the consuming suite's policy is untouched.
 */
 
 interface Mount {
@@ -18,12 +20,6 @@ interface Mount {
 
 const mounts = new Set<Mount>();
 
-function ensureActEnvironment(): void {
-    // A configured test runner sets this (`@testing-library/react` does on import); set it
-    // defensively so a standalone consumer's `act` calls don't warn. Respects an explicit false.
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT ??= true;
-}
-
 /**
  * Render `node` into `root` under one async `act`, which drives React's Suspense retries so
  * a self-resolving load reaches content. A load still pending (a `deferred`, an un-driven
@@ -32,9 +28,11 @@ function ensureActEnvironment(): void {
  * discard-the-first-run behavior must render synchronously instead.
  */
 async function settleRender(root: Root, node: ReactNode): Promise<void> {
-    await act(async () => {
-        root.render(node);
-    });
+    await withActEnvironment(() =>
+        act(async () => {
+            root.render(node);
+        }),
+    );
 }
 
 /** A mounted React tree: its container, a re-render, and teardown. */
@@ -50,7 +48,6 @@ export interface MountedTree {
  * Tracked for {@link cleanup}.
  */
 export async function mountTree(node: ReactNode, onDispose?: () => void): Promise<MountedTree> {
-    ensureActEnvironment();
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -77,30 +74,42 @@ export async function hydrateTree(
     node: ReactNode,
     options: { onRecoverableError?: (error: unknown) => void; onDispose?: () => void } = {},
 ): Promise<MountedTree> {
-    ensureActEnvironment();
     const container = document.createElement('div');
     container.innerHTML = html;
     document.body.appendChild(container);
-    let root!: Root;
-    await act(async () => {
-        root = hydrateRoot(
-            container,
-            node,
-            options.onRecoverableError ? { onRecoverableError: options.onRecoverableError } : {},
+    let root: Root | undefined;
+    try {
+        await withActEnvironment(() =>
+            act(async () => {
+                root = hydrateRoot(
+                    container,
+                    node,
+                    options.onRecoverableError
+                        ? { onRecoverableError: options.onRecoverableError }
+                        : {},
+                );
+            }),
         );
-    });
-    const mount: Mount = { root, container, onDispose: options.onDispose };
+    } catch (error) {
+        // A hydration that throws out of the act must not leak its container across tests:
+        // track the root for cleanup() if it got created, else remove the container outright.
+        // (mountTree is immune — its mount is on the ledger before the first render.)
+        if (root) mounts.add({ root, container, onDispose: options.onDispose });
+        else container.remove();
+        throw error;
+    }
+    const mount: Mount = { root: root as Root, container, onDispose: options.onDispose };
     mounts.add(mount);
     return {
         container,
         // A hydrated root's `.render()` is a normal client update — the rerender path.
-        rerender: (next) => settleRender(root, next),
+        rerender: (next) => settleRender(mount.root, next),
         unmount: () => teardown(mount),
     };
 }
 
 function teardown(mount: Mount): void {
-    act(() => mount.root.unmount());
+    withActEnvironmentSync(() => act(() => mount.root.unmount()));
     mount.onDispose?.();
     mount.container.remove();
     mounts.delete(mount);

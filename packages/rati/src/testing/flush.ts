@@ -1,11 +1,14 @@
 import { act } from 'react';
+import { withActEnvironment } from './actEnvironment';
 
 /*
     `act` is imported from `react` (not `react-dom/test-utils`, which is gone in React 19,
     nor `@testing-library/react`, which the entry does not depend on). Everything in
-    `rati/testing` is test-environment-only: calling `act` outside a configured test
-    environment warns. A test runner that sets up React (`@testing-library/react` on import,
-    or `globalThis.IS_REACT_ACT_ENVIRONMENT = true`) is assumed.
+    `rati/testing` is test-environment-only; the act flag is scoped around this helper's own
+    `act` call (see ./actEnvironment), so `flush()` works even in a suite that deliberately
+    leaves the global unset. A test's own bare `act(…)` drives still need the runner's
+    environment (`@testing-library/react` sets one up on import, or set
+    `globalThis.IS_REACT_ACT_ENVIRONMENT = true`).
 */
 
 /**
@@ -26,5 +29,5 @@ import { act } from 'react';
  * ```
  */
 export async function flush(times = 1): Promise<void> {
-    for (let i = 0; i < times; i++) await act(async () => {});
+    for (let i = 0; i < times; i++) await withActEnvironment(() => act(async () => {}));
 }

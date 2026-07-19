@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
-import { act, createContext, useContext } from 'react';
+import { act, Component, createContext, useContext, type ReactNode } from 'react';
 import { scope, input } from '../../scope/scope';
 import { NotAvailableError } from '../../scope/source';
 import { island } from '../../island/island';
@@ -141,6 +141,40 @@ describe('renderIsland — wrapper and provide', () => {
 
         await flush();
         expect(handle.text()).toBe('app/#a1');
+    });
+});
+
+describe('renderIsland — a dead island reads honestly', () => {
+    class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+        override state = { failed: false };
+        static getDerivedStateFromError() {
+            return { failed: true };
+        }
+        override render() {
+            return this.state.failed ? <div>caught outside</div> : this.props.children;
+        }
+    }
+
+    test('slot() throws when the island threw past its slots (no error slot declared)', async () => {
+        const handle = await renderIsland(
+            {
+                // No `error` slot: the scope error rethrows to the wrapper's boundary and the
+                // island's markers unmount with it.
+                scope: scope().load({
+                    page: async (): Promise<string> => {
+                        throw new NotAvailableError('gone');
+                    },
+                }),
+                component: ({ page }: { page: string }) => <div>ready {page}</div>,
+                loading: () => <div>loading…</div>,
+            },
+            { wrapper: Boundary },
+        );
+
+        await flush();
+        expect(handle.container.textContent).toContain('caught outside');
+        // Before the fix this read 'loading' — a silently wrong answer for a dead island.
+        expect(() => handle.slot()).toThrow(/no slot marker/);
     });
 });
 

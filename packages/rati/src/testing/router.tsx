@@ -1,10 +1,11 @@
 import { act, type ReactNode } from 'react';
 import { createMemoryHistory, type History } from '../router/history';
-import { RouterStore } from '../router/store';
+import { RouterStore, type RouterHydratedState } from '../router/store';
 import { Router } from '../router/Router';
 import { RootStore, RootStoreProvider, type GlobalStores } from '../stores/RootStore';
 import type { GenericRouteType } from '../router/route';
 import { mountTree, type MountedTree } from './dom';
+import type { PartialStores } from './stores';
 
 /*
     createTestRouter — memory history + RouterStore + the RootStoreProvider wiring, rendered
@@ -31,8 +32,14 @@ export interface CreateTestRouterOptions<S extends GlobalStores> {
      * `<Link>`s, say — e.g. `ui: <Router Loading={…} />` or `ui: <MyNav />`.
      */
     ui?: ReactNode;
-    /** Extra stores merged alongside the router, for a tree that reads app stores too. */
-    stores?: Partial<S>;
+    /** Extra stores merged alongside the router, for a tree that reads app stores too —
+     *  each store itself partial-able (see {@link PartialStores}). */
+    stores?: PartialStores<S>;
+    /** Mount the route table under a basename (forwarded to the RouterStore). */
+    basename?: string;
+    /** Seed the router from a dehydrated navigation (forwarded to the RouterStore) — the
+     *  SSR client path, for pins like redirect replay on hydration. */
+    hydratedState?: RouterHydratedState;
 }
 
 /** The handle {@link createTestRouter} returns. */
@@ -63,7 +70,12 @@ export async function createTestRouter<S extends GlobalStores = GlobalStores>(
     // before the store listens — so the store's first setPath reads the seeded state.
     if (options.state !== undefined) history.replace(url, options.state);
 
-    const router = new RouterStore({}, routes, { history, scrollRestoration: false });
+    const router = new RouterStore({}, routes, {
+        history,
+        scrollRestoration: false,
+        ...(options.basename !== undefined && { basename: options.basename }),
+        ...(options.hydratedState !== undefined && { hydratedState: options.hydratedState }),
+    });
     const stores = { ...options.stores, router } as S;
     const root = new RootStore(stores, { isReady: true });
 
