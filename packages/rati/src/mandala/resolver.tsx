@@ -82,23 +82,49 @@ export function flattenLevels(scope: Scope): Scope['definition'][] {
     return levels;
 }
 
-// hook keys vs data keys per level — static (a level is frozen at build time), so
-// memoized once per level object. `hook()` loads run every render; everything else
-// (props, functions, promises, sources, classes, values) is a cached data load.
-const partitionCache = new WeakMap<object, { hookKeys: string[]; dataKeys: string[] }>();
-function partition(level: Scope['definition']): { hookKeys: string[]; dataKeys: string[] } {
-    let parts = partitionCache.get(level);
-    if (!parts) {
+// What a level compiles to, memoized once per level object (a level is frozen at build
+// time): the hook/data key split — `hook()` loads run every render, everything else
+// (props, functions, promises, sources, classes, values) is a cached data load — plus the
+// level's own `Step` identity, named for its keys.
+type CompiledLevel = {
+    keys: string[];
+    hookKeys: string[];
+    dataKeys: string[];
+    LevelStep: typeof Step;
+};
+const levelCache = new WeakMap<object, CompiledLevel>();
+function compileLevel(level: Scope['definition']): CompiledLevel {
+    let compiled = levelCache.get(level);
+    if (!compiled) {
+        const keys = Object.keys(level);
         const hookKeys: string[] = [];
         const dataKeys: string[] = [];
-        for (const key of Object.keys(level)) {
+        for (const key of keys) {
             if (isHookLoad(level[key])) hookKeys.push(key);
             else dataKeys.push(key);
         }
-        parts = { hookKeys, dataKeys };
-        partitionCache.set(level, parts);
+        compiled = { keys, hookKeys, dataKeys, LevelStep: namedStep(keys) };
+        levelCache.set(level, compiled);
     }
-    return parts;
+    return compiled;
+}
+
+// A per-level alias of `Step` carrying the level's keys as its displayName, so the React
+// DevTools tree reads `Island(Prefs) → Step(user,prefs) → Step(tree)` instead of a stack
+// of anonymous `Step`s. A *bound copy*, not a wrapper component: no extra fiber, no extra
+// hook context — and memoized on the frozen level object above, so a level's component
+// identity is stable across renders and React reconciles the tree exactly as before. The
+// island's own label sits right above it in the tree, so it isn't repeated here (and a
+// level object is shared by every mandala built from the same scope, which would make one
+// island's name wrong anyway).
+function namedStep(keys: string[]): typeof Step {
+    const named = Step.bind(null) as typeof Step & { displayName?: string };
+    const label = keys.join(',');
+    // Bare `Step` for the empty level — the inputs head of an input-less scope.
+    named.displayName = !label
+        ? 'Step'
+        : `Step(${label.length > 48 ? `${label.slice(0, 47)}…` : label})`;
+    return named;
 }
 
 // Classify a *data entry* (the value written in the scope definition) into a cell.
@@ -644,9 +670,9 @@ export function buildTree(
 ): ReactNode {
     if (index >= levels.length) return <Leaf resolved={prev} shared={shared} />;
     const level = levels[index]!;
-    const { hookKeys, dataKeys } = partition(level);
+    const { hookKeys, dataKeys, LevelStep } = compileLevel(level);
     return (
-        <Step
+        <LevelStep
             level={level}
             index={index}
             hookKeys={hookKeys}
@@ -655,7 +681,7 @@ export function buildTree(
             shared={shared}
         >
             {(resolved) => buildTree(levels, index + 1, resolved, shared)}
-        </Step>
+        </LevelStep>
     );
 }
 
