@@ -262,7 +262,11 @@ registry, keyed `mandalaId (useId) → scopeKey → value`, in two wire sections
   the error slot — server rendering has no error-boundary recovery; React emits the loading
   slot with a client-retry marker and the prerender *resolves* (pinned in
   `islandSsrErrors.test.tsx`). The Step attaches a once-per-promise rejection recorder
-  (WeakSet-guarded) when `collectError` is present; the collector's `errors` carries
+  when `collectError` is present, guarded by a WeakSet held on the *run* (the generation's
+  cache, beside its data trace) — a resumed level must not stack a second handler on the
+  same cell, while a later render reusing the same promise instance is a new report, not a
+  duplicate (a module-global guard silently emptied the second render's `errors`); the
+  collector's `errors` carries
   `{ mandalaId, key, error: SourceError }` — the server's status input (`not-available` →
   404). `asSourceError` (scope/source.ts) is the shared normalization with the boundary.
 - **Claim watchdog** (`hydrationDiagnostics.ts`): on a rehydrating client, `buildCell`

@@ -149,6 +149,7 @@ export function createMandala<S extends Scope<any>>(
             key: string;
             buckets: Bucket[];
             trace: DataTrace | undefined;
+            recordedRejections: WeakSet<Promise<unknown>> | undefined;
         } | null>(null);
         // Buckets the line below replaced, awaiting the sweep in the commit effect. A Step
         // torn down while its bucket was still live keeps its sources attached on purpose
@@ -166,6 +167,11 @@ export function createMandala<S extends Scope<any>>(
                 // A generation is a data-trace run: fresh timeline, and a cause to open it
                 // with. Undefined unless `globalThis.__DEBUG__.data` is on.
                 trace: startDataTrace(displayName, generationCause(previous?.key, retry)),
+                // Which rejecting loads this generation already reported to the render's
+                // error collector (see the resolver's recordRejection). Scoped to the run
+                // for the same reason the trace is: a *later* render reusing the same
+                // promise instance is a new report, not a duplicate of this one.
+                recordedRejections: collectError ? new WeakSet<Promise<unknown>>() : undefined,
             };
         }
 
@@ -233,6 +239,7 @@ export function createMandala<S extends Scope<any>>(
             controller: collect ? undefined : controller,
             collect,
             collectError,
+            recordedRejections: cacheRef.current.recordedRejections,
             claim,
             hydration: hydrationSlice,
             seeds: seedsSlice,

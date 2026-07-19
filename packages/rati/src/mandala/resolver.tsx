@@ -200,6 +200,9 @@ export type Shared = {
     // the server can derive a response status (not-available → 404) — the render itself
     // degrades to the loading slot + React's client-retry marker without rati's help.
     collectError: ((key: string, error: SourceError) => void) | undefined;
+    // The promises this run has already handed to `collectError` (see recordRejection).
+    // Lives on the run, next to the collector it feeds — present exactly when that is.
+    recordedRejections: WeakSet<Promise<unknown>> | undefined;
     // Client only, diagnostic: notes a hydration/seed slice as consumed, feeding the
     // unclaimed-payload watchdog (hydrationDiagnostics.ts).
     claim: ((key: string, section: 'data' | 'seeds') => void) | undefined;
@@ -366,10 +369,24 @@ function processDirtyCells(
     }
 }
 
-// Rejection recording attaches once per promise: a suspended level re-renders on
-// resume and its cached cell (same promise identity) passes through here again —
-// without the guard every pass would stack another handler.
-const recordedRejections = new WeakSet<Promise<unknown>>();
+// Hand a rejecting promise load to the render's error collector, once per promise: a
+// suspended level re-renders on resume and its cached cell (same promise identity) passes
+// through here again — without the guard every pass would stack another handler.
+//
+// The ledger is the *run's* (created with its bucket cache, dies with it), not the
+// module's. A module-global WeakSet guards one render just as well but outlives it: a
+// second collected render of a tree that reuses the same promise instance — a module-level
+// promise, or one promise captured across two `ssrRender`s — found it already recorded and
+// skipped `collectError` entirely, so that render's `errors` came back empty and the
+// server's 404/5xx signal went quiet with nothing to say so.
+function recordRejection(shared: Shared, key: string, promise: Promise<unknown>): void {
+    const { collectError, recordedRejections } = shared;
+    if (!collectError || !recordedRejections || recordedRejections.has(promise)) return;
+    recordedRejections.add(promise);
+    void promise.then(undefined, (thrown: unknown) => {
+        collectError(key, asSourceError(thrown));
+    });
+}
 
 type StepProps = {
     level: Scope['definition'];
@@ -518,13 +535,7 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
         if (cell.kind === 'value') {
             resolved[key] = cell.value;
         } else if (cell.kind === 'promise') {
-            if (shared.collectError && !recordedRejections.has(cell.promise)) {
-                recordedRejections.add(cell.promise);
-                const collectError = shared.collectError;
-                void cell.promise.then(undefined, (thrown: unknown) => {
-                    collectError(key, asSourceError(thrown));
-                });
-            }
+            recordRejection(shared, key, cell.promise);
             const value = use(cell.promise);
             // Render-time write, but only on the server (client has no `collect`) and
             // idempotent per key — the established SSR data-collection pattern. A

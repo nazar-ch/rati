@@ -2,7 +2,7 @@ import { describe, test, expect } from 'vite-plus/test';
 import { scope, input } from '../../scope/scope';
 import { NotAvailableError } from '../../scope/source';
 import { island } from '../../island/island';
-import { ssrRender } from '../../testing';
+import { deferred, ssrRender } from '../../testing';
 
 /*
     What a rejecting promise load does under a collected server render — pinned by
@@ -74,6 +74,49 @@ describe('island SSR error collection', () => {
         expect(server.errors.map((entry) => entry.key)).toEqual(['posts']);
         const dehydrated = Object.values(server.data)[0];
         expect(dehydrated).toEqual({ user: { name: 'Ada' } });
+    });
+
+    // The recording guard's two halves — it must fire once *within* a render and once
+    // *per* render. Both directions are load-bearing: the first keeps a resumed level from
+    // stacking handlers, the second is what a module-global guard silently broke (DX-08).
+    test('one render records a rejection once, however often the suspended level resumes', async () => {
+        const gate = deferred<string>();
+        const Island = island({
+            scope: scope().load({ post: () => gate.promise }),
+            component: ({ post }) => <div>{post}</div>,
+            loading: () => <div>loading</div>,
+        });
+
+        // Rejected *after* the level suspended, so the Step renders a second time on
+        // resume and passes the same cached promise cell through the recorder again.
+        setTimeout(() => gate.reject(new Error('backend exploded')), 0);
+        const server = await ssrRender(<Island />, { onError: () => {} });
+
+        expect(server.errors).toHaveLength(1);
+        expect(server.errors[0]!.error.message).toBe('backend exploded');
+    });
+
+    test('a promise reused across two renders is recorded by both collectors', async () => {
+        // One promise instance, two server renders — the shape of a module-level load, or
+        // of a promise a test builds once and renders twice. The rejection ledger is the
+        // run's, so the second render's collector sees the rejection too; when it was the
+        // module's, `errors` came back empty and the 404 signal went quiet.
+        const failing = Promise.reject(new NotAvailableError('gone'));
+        // The resolver attaches its handler mid-render, later than node's
+        // unhandled-rejection watch — this keeps the runner quiet, nothing else.
+        failing.catch(() => {});
+
+        const Island = island({
+            scope: scope().load({ post: failing }),
+            component: ({ post }) => <div>{String(post)}</div>,
+            loading: () => <div>loading</div>,
+        });
+
+        const first = await ssrRender(<Island />, { onError: () => {} });
+        const second = await ssrRender(<Island />, { onError: () => {} });
+
+        expect(first.errors.map((entry) => entry.error.code)).toEqual(['not-available']);
+        expect(second.errors.map((entry) => entry.error.code)).toEqual(['not-available']);
     });
 
     test('a clean render records no errors', async () => {
