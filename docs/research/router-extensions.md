@@ -3,7 +3,7 @@
 Forward-looking, intentionally **not built** — each waits for a real need so the shape is
 pinned by a concrete use case. What ships today: `route()` and `group()` (see
 [`router/group.tsx`](../../packages/rati/src/router/group.tsx) and
-[the public guide](../public/guide.md)).
+[the public guide](../current/public/guide.md)).
 
 ## The invariant everything here preserves
 
@@ -43,7 +43,7 @@ route." e.g. `AppLayout` needs the resolved space; today each page scope re-reso
 `group({ wrapper, scope }, …)` would build a layout mandala whose value the children read via
 `useRouteContext`. Open questions: caching/identity of the shared resolution across child
 navigations, and how it composes with per-route scopes (the `.extend()` question in
-[deferred-scope-features.md](./deferred-scope-features.md)).
+[undecided/deferred-scope-features.md](./undecided/deferred-scope-features.md)).
 
 ## Django-inspired directions
 
@@ -128,3 +128,40 @@ the escape hatch under typed converters above.
 - **No runtime URLconf.** Django loads URLconfs dynamically and reverses by string at runtime.
   rati's value is the literal tuple and compile-time `to`/params — keep registration static
   (`as const`); never a runtime route table.
+
+## Resolution & navigation state (from the July 2026 improvements review §3)
+
+Router-side items from the same review, none built. Of the Django directions above, **guards**
+and **typed path converters** are the two with visible Jnana pull today (the auth/admin wrappers
+re-implement guarding ad hoc; `input<Base64Uuid>()` params arrive unvalidated).
+
+### Typed search params
+
+Path params are typed end-to-end; the query string is stringly (`setSearchParams({ q })`).
+A per-route search schema would give `?q=&page=` the same treatment as `:pageId`:
+
+```ts
+route('/admin/jobs', 'admin-jobs', AdminJobsPage, {
+    search: { name: str.optional(), limit: int.default(100) },   // converter vocabulary
+});
+
+const [{ name, limit }, setSearch] = useSearchParams('admin-jobs');  // typed both ways
+<Link to={{ name: 'admin-jobs', search: { limit: 500 } }} />          // typed in links too
+```
+
+Reuses the converter vocabulary from typed path converters (parse + format round-trip), so
+the two features should be designed together. Open questions: whether unknown params pass
+through untouched (they should), and whether a search change re-resolves the route's scope
+(probably not by default — search is view state; an opt-in `resolveOnSearch` could cover
+scopes that read it).
+
+### Navigation status & blocking
+
+- **Pending navigation indicator**: with route scopes resolving on navigation, a global
+  `useNavigationStatus()` (`idle | resolving`) enables a top progress bar without app
+  bookkeeping. Needs the router to know when the destination island reached ready — a small
+  mandala→router signal.
+- **Navigation blocking** (`useBlocker` / `beforeLeave`): "unsaved changes" guarding.
+  Jnana's CRDT editor mostly saves continuously, so no pull yet; noted for form-heavy apps.
+- **View Transitions API**: a `viewTransition` option on `navigate` wrapping the route swap
+  in `document.startViewTransition`. One-liner-sized, cosmetic, wait for need.

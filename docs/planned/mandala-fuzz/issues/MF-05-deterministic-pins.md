@@ -8,7 +8,7 @@ disposition: —
 
 The 13 tests that landed with selective refresh + SSR sources cover happy paths and headline
 behaviors; the specific gaps (twelve pins as of this writing) are enumerated in
-[mandala-testing.md](../../../research/mandala-testing.md) §"Deterministic pins" — races
+[mandala-testing.md](../../../archive/mandala-testing.md) §"Deterministic pins" — races
 (superseded refresh, remount mid-flight), semantics (transitive cascade with mid-chain cutoff,
 lazy read-set re-recording, hydrated-cell asymmetry, `equals` on cascade re-runs), SSR /
 StrictMode edges, and the Suspense-produced situations (re-suspension of committed content,
@@ -21,7 +21,7 @@ independent of the fuzz harness — they can land first or in parallel.
 
 1. Implement the pins from the strategy doc (its numbered list is the specification; read the
    implementation note
-   `docs/research/directions-2026-07/mandala-refresh-and-ssr-sources.md` for the behaviors each
+   `docs/archive/directions-2026-07/mandala-refresh-and-ssr-sources.md` for the behaviors each
    pins). Homes: `__tests__/mandala/scopeControls.test.tsx` (1–6, 9, 11–12),
    `__tests__/mandala/islandSsrSources.test.tsx` (7), a new
    `__tests__/mandala/strictModeLifecycle.test.tsx` if 8 doesn't fit an existing file, and a

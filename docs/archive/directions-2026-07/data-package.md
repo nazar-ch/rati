@@ -46,11 +46,11 @@ layer and the `Chunks.ts` pagination layer — and turns the options into one co
   graph; sharing happens by sharing the instance. No keyed shared cache, no normalized store —
   deliberately out of scope to keep the design iterable. (The ref-counting layer,
   `ResourceContainer`, may move to rati core separately — see
-  [improvements.md §5](./improvements.md).)
+  [scope-and-island-directions.md §3](../../research/scope-and-island-directions.md).)
 - **Phases are data; presentation is the mandala's.** The package reports honest phases
   (`loading` vs `refreshing`, per-page phases, `isSubmitting`). Pending-indication delay
   (`loadingDelayMs`) and stale-content display live in the island
-  ([improvements.md §2](./improvements.md)) — the package never owns a timer that exists only to
+  ([scope-and-island-directions.md §2](../../research/scope-and-island-directions.md)) — the package never owns a timer that exists only to
   decide what a user sees.
 - **One error shape.** Everything that fails — query, page, mutation, form submit — normalizes to
   `SourceError` (`toSourceError`), so the same `code` switch works everywhere and the island error
@@ -70,7 +70,7 @@ layer and the `Chunks.ts` pagination layer — and turns the options into one co
   `pagedCollection`, `form`, `field` — words React developers already know from the ecosystem.
 - **Testability by construction.** Every primitive is driven by a producer function, so a deferred
   promise fake can walk any primitive through every phase in tests — no module mocking (pairs with
-  the `rati/testing` direction, [improvements.md §7](./improvements.md)).
+  the `rati/testing` direction, [dx-and-tooling.md](../../research/dx-and-tooling.md)).
 
 ## The shape: five primitives, one lifecycle
 
@@ -124,7 +124,7 @@ Decisions:
   error badge.
 - **Race guard is an invariant, not an option** (the `requestId` pattern all three generations
   carry). The producer receives an `AbortSignal` so superseded requests can actually cancel,
-  mirroring the core abort proposal ([improvements.md §1](./improvements.md)).
+  mirroring the core abort proposal ([scope-and-island-directions.md §1](../../research/scope-and-island-directions.md)).
 - **Debounce as an option** — `remoteData`'s coalescing of keystroke-driven calls survives as
   `options.debounce: { waitMs, maxWaitMs }`; its pending-indication half does not (mandala's job).
 - **Reactive parameters, opt-in** — `options.reactive: true` tracks the producer's observable
@@ -422,7 +422,7 @@ const SpacesPage = observer(({ spaces }: ScopeProps<typeof spacesScope>) => (
 Division of labor: the island covers `loading`/`error` for the **first** resolution (with
 `loadingDelayMs` for flicker); the primitives' phases drive everything after — `refreshing` for
 stale display (directly, or via the island's `keepStale` once it exists —
-[improvements.md §2](./improvements.md)), per-page phases for pagination rows, `isSubmitting` for
+[scope-and-island-directions.md §2](../../research/scope-and-island-directions.md)), per-page phases for pagination rows, `isSubmitting` for
 buttons. `not-available` vs `failed` rides on `SourceError.code` end to end. Under SSR the
 primitives stay pending (a `Source` attaches in effects), which is correct — this package is for
 the interactive app, not the SSR path.

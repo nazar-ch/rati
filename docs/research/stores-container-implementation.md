@@ -1,7 +1,7 @@
 # Stores container + router: Option A implementation plan
 
 The deferred structural piece from [stores-and-router.md](./stores-and-router.md) (Option A)
-plus the [naming.md §6](./naming.md) stores-cluster renames. The mechanical renames
+plus the [naming.md §6](../archive/directions-2026-07/naming.md) stores-cluster renames. The mechanical renames
 (input vocabulary, `RouterStore`/`useRouter`, the `rati/ssr` + `rati/debug` entries) already
 landed; this is the one change that alters *shape*, not just names, so it wants its own
 session. This doc is the plan for that session.
@@ -114,8 +114,8 @@ so its body is unchanged.
 
 ### 6. Barrel + docs
 
-Update `main.ts`, `docs/public/guide.md` + `reference.md` (app-setup snippet: `new RouterStore(routes)`,
-`StoresProvider`, `createStoresHook`), `docs/internals.md`, `CLAUDE.md`, and the two examples.
+Update `main.ts`, `docs/current/public/guide.md` + `reference.md` (app-setup snippet: `new RouterStore(routes)`,
+`StoresProvider`, `createStoresHook`), `docs/current/internals.md`, `CLAUDE.md`, and the two examples.
 
 ## Jnana changes
 

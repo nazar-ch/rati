@@ -2,7 +2,7 @@
     rati/data — MobX-shaped data primitives: the successor of the legacy
     `remoteData`/`ActiveData` layer and of app-side `FetchStore` families.
     Experimental; pending extraction to a companion package. Design record:
-    docs/research/directions-2026-07/data-package.md.
+    docs/archive/directions-2026-07/data-package.md.
 
     Data in an app has four moments; each primitive owns exactly one, plus one
     for fetch topology:

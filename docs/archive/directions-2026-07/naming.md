@@ -144,7 +144,7 @@ Specific legacy names, for the record:
 The current set mixes three qualifiers for one axis: **Root**Store, **Global**Store(s),
 **Generic**StoresContext / use**Generic**Stores — plus `createUseStoresHook`, a name about
 hook-creation mechanics rather than meaning. Final names should follow the container
-redesign ([stores-and-router.md](./stores-and-router.md)); the direction:
+redesign ([stores-and-router.md](../../research/stores-and-router.md)); the direction:
 
 - One noun for the container concept. `stores` is the word both apps already use —
   `StoresProvider` (for `RootStoreProvider`), `createStoresHook` (for

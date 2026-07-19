@@ -10,7 +10,7 @@ seams need and a small hardening item the pre-cut review produced. The disciplin
 over wholesale — the altitude rule, kill-tested invariants, `fuzz(n)` budgets with
 `FUZZ_RUNS` / `FUZZ_LEVEL` / `FUZZ_SEED`, jnana's fuzz conventions
 (`~/Sites/jnana/.claude/fuzz-testing.md`) — and the strategy record for *why* these shapes
-work is [mandala-testing.md](../../research/mandala-testing.md); this effort does not
+work is [mandala-testing.md](../../archive/mandala-testing.md); this effort does not
 duplicate it.
 
 The subject is `packages/rati/src/router/`: `RouterStore` (matching, redirects, the

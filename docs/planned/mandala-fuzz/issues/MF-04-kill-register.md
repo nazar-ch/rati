@@ -1,6 +1,6 @@
 # MF-04 — kill register: prove the harness bites, file the recipes
 
-area: packages/rati/src/__tests__/fuzz, docs/research/mandala-testing.md
+area: packages/rati/src/__tests__/fuzz, docs/archive/mandala-testing.md
 needs: MF-02, MF-03
 disposition: —
 
@@ -11,7 +11,7 @@ disposition: —
 planned kill — a one-line reintroduction of a bug-shaped mutation — has been run red, shrunk, and
 reverted. A harness that survives its kill is the counterfeit-provider failure mode and gets
 fixed, not shipped. The six planned kills are listed in
-[mandala-testing.md](../../../research/mandala-testing.md) §"Kill register".
+[mandala-testing.md](../../../archive/mandala-testing.md) §"Kill register".
 
 ## Scope
 

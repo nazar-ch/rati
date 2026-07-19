@@ -9,10 +9,10 @@ disposition: —
 The refresh work restructured source lifetimes: a cascade can swap a source mid-flight (the
 level's `sources` array re-keys), Step teardown keeps entries the live bucket still holds, and
 the mandala's unmount sweep is the backstop (see
-`docs/research/directions-2026-07/mandala-refresh-and-ssr-sources.md` §"Source-lifetime
+`docs/archive/directions-2026-07/mandala-refresh-and-ssr-sources.md` §"Source-lifetime
 rework"). Leaks and double-attaches in this machinery are exactly the class a fuzz ledger
 catches and example tests miss — invariant 6 of
-[mandala-testing.md](../../../research/mandala-testing.md) §"Invariants".
+[mandala-testing.md](../../../archive/mandala-testing.md) §"Invariants".
 
 ## Scope
 

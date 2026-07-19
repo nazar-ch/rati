@@ -3,7 +3,7 @@
 > Decision note. **Decision: keep the current mechanism for now.** This documents what it
 > is, the React-native alternative, and the trade-offs, so the move can be made deliberately
 > later. (The mechanism lives in `mandala/hydration.tsx`; see
-> [internals.md](../internals.md#ssr-dehydration-mandalahydrationtsx).)
+> [internals.md](../current/internals.md#ssr-dehydration-mandalahydrationtsx).)
 
 ## What we do today (kept)
 

@@ -8,7 +8,7 @@ disposition: —
 
 Prod serving is still per-consumer plumbing: status mapping, template assembly, static
 files with a copy-pasted MIME table, 500 fallback. Design:
-[ssr-server-kit.md](../../../research/directions-2026-07/ssr-server-kit.md) §Layer 3.
+[ssr-server-kit.md](../../../archive/directions-2026-07/ssr-server-kit.md) §Layer 3.
 Fetch `Request`/`Response` is the one interface all three real hosts consume (plain
 Node via adapter, Vercel natively, Hono directly).
 

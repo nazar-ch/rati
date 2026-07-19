@@ -2,7 +2,7 @@
 
 Implementation notes for contributors. The public API lives in
 [docs/public/](./public/guide.md) (the guide + [reference](./public/reference.md) — the
-website's source of truth); future-facing explorations are in [research/](./research/).
+website's source of truth); future-facing explorations are in [research/](../research/).
 
 ## Source layout
 
@@ -40,7 +40,7 @@ src/
              the RenderAppResult contract and nothing else
   data/      the rati/data entry: MobX-shaped data primitives (query, collection,
              mutation, form/field) — experimental, pending extraction to a
-             companion package (docs/research/directions-2026-07/data-package.md)
+             companion package (docs/archive/directions-2026-07/data-package.md)
   stores/    RootStore, GlobalStore (store roots)
   util/      utils.ts
   types/     generic.ts
@@ -97,7 +97,7 @@ rebuilt on the retry, re-run its load, and re-suspend on a brand-new promise for
 the bucket on the committed mandala ref makes the load run once per inner-tree generation.
 The bucket array is rebuilt only when the inner tree remounts (`treeKey` = inputs version +
 retry counter). The full catalog of Suspense-produced situations this design answers is
-[suspense-situations.md](../packages/rati/src/__tests__/suspense-situations.md)
+[suspense-situations.md](../../packages/rati/src/__tests__/suspense-situations.md)
 (`packages/rati/src/__tests__/`).
 
 ### Lifecycle & teardown ordering (structural)
@@ -126,7 +126,7 @@ same-inputs source transitions re-render in place, keeping promise/source identi
 `useScopeControls(scope)` reads a per-mandala-instance `RefreshController` off the
 **controls channel** — a second scope-keyed context registry next to the value channel,
 provided by the mandala around its whole inner tree. Design + decisions:
-[research/directions-2026-07/mandala-refresh-and-ssr-sources.md](./research/directions-2026-07/mandala-refresh-and-ssr-sources.md).
+[archive/directions-2026-07/mandala-refresh-and-ssr-sources.md](../archive/directions-2026-07/mandala-refresh-and-ssr-sources.md).
 The moving parts:
 
 - **Re-runs happen in render.** `refresh(key)` marks the cell dirty and triggers a bare
@@ -198,7 +198,7 @@ server-resolvable — see the next section.
 ## The data primitives (`data/` — the rati/data entry)
 
 Experimental, MobX-backed (the entry shares the optional `mobx` peer with `rati/mobx`);
-design record: `docs/research/directions-2026-07/data-package.md`. Factories return plain
+design record: `docs/archive/directions-2026-07/data-package.md`. Factories return plain
 observable objects — no classes, no decorators; components read them under `observer`,
 scopes await first readiness through `source()`.
 
@@ -307,7 +307,7 @@ walking the manifest's static-import closure minus whatever the entry already br
 through the module graph, so there is nothing to hash and nothing to preload.
 
 `lazyModules.ts` is the specifier transform (design record:
-`docs/research/directions-2026-07/ssr-server-kit.md` — the primary, not the `routeChunks`
+`docs/archive/directions-2026-07/ssr-server-kit.md` — the primary, not the `routeChunks`
 fallback). It parses with `parseSync` (which takes the filename: route tables are TSX,
 and the deprecated `parseAst` throws on them), matches only calls to a local bound to
 *rati's* `lazy` import, and appends the root-relative id — which is exactly how the
@@ -450,15 +450,15 @@ change. `route()`
 - A data producer runs **at most once per inner-tree generation** (Suspense replays and
   render discards never re-run it), plus explicitly modeled refresh re-runs — the contract
   the fuzz suite's run-count invariant pins
-  ([research/mandala-testing.md](./research/mandala-testing.md)).
+  ([archive/mandala-testing.md](../archive/mandala-testing.md)).
 
 ## Testing
 
 Suites live in `packages/rati/src/__tests__/` (deterministic `mandala/`, `router/`, `scope/`
 plus the randomized `fuzz/`). The testing strategy — the contract-altitude rule, the
 deterministic pin list, the fuzz harness design — is
-[research/mandala-testing.md](./research/mandala-testing.md); the execution effort is
-[planned/mandala-fuzz/](./planned/mandala-fuzz/README.md). Suspense-facing testing rules
+[archive/mandala-testing.md](../archive/mandala-testing.md); the execution effort is
+[planned/mandala-fuzz/](../planned/mandala-fuzz/README.md). Suspense-facing testing rules
 (the async-act mount requirement above all) are cataloged in
 `packages/rati/src/__tests__/suspense-situations.md`.
 
@@ -466,7 +466,7 @@ deterministic pin list, the fuzz harness design — is
 `FUZZ_LEVEL`, `FUZZ_SEED` — documented in `fuzz/arbitraries.ts`): the mandala's scope
 harness (`scopeHarness.tsx` / `model.ts`) and the router's route-table harness
 (`routerHarness.tsx` / `routerModel.ts`, effort
-[planned/router-fuzz/](./planned/router-fuzz/README.md)). Each model is plain JS with no
+[planned/router-fuzz/](../planned/router-fuzz/README.md)). Each model is plain JS with no
 imports from the engine it mirrors — where the router compiles a regex, its model walks
 segments — so a bug cannot hide behind a model that shares the implementation.
 

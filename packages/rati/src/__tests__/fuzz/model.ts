@@ -2,7 +2,7 @@
     The reference model — the mandala contract's semantics as plain JS, plus the vocabulary
     the harness and the commands share (the spec shape, the value formula, the declared
     state). No React, no engine imports, no `deepEqual` borrowed from `util/` — the file's
-    import list is the altitude rule made structural (docs/research/mandala-testing.md
+    import list is the altitude rule made structural (docs/archive/mandala-testing.md
     §"The altitude rule"). If a rule here needed engine code to express, it would not be a
     contract.
 
@@ -392,7 +392,7 @@ export function createModel(spec: ScopeSpec, declared: DeclaredState): Reference
             one is not reached either. Both surface later, when the loop gets that far.
 
             *When* the engine notices is loop order — mechanism, below the altitude line
-            (docs/research/mandala-testing.md). So rather than model it, the alphabet only
+            (docs/archive/mandala-testing.md). So rather than model it, the alphabet only
             rejects where the answer is unambiguous:
 
               - a re-fetch in flight — content is showing, so the Step is committed and

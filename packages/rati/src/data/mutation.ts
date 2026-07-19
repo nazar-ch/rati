@@ -3,7 +3,7 @@ import { toSourceError, type SourceError } from '../scope/source';
 
 /*
     `mutation` — an imperative operation with visible state. Design record:
-    docs/research/directions-2026-07/data-package.md §4.
+    docs/archive/directions-2026-07/data-package.md §4.
 
     The optimistic choreography apps hand-roll per method, owned once:
     `optimistic` patches the read side synchronously before the request (expected

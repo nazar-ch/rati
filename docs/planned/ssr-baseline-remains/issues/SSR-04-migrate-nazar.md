@@ -11,7 +11,7 @@ main-barrel imports) and hand-rolls everything the baseline absorbed from it: `h
 (HeadStore/Title/TitleManager), `escapeJsonForScript` ×2, `prerenderToString`, the
 route-name-convention 404, the post-prerender title injection. It is the first
 real-world test of both the rename diff and the absorbed APIs
-([ssr-nazar-patterns.md](../../../research/directions-2026-07/ssr-nazar-patterns.md)).
+([ssr-nazar-patterns.md](../../../archive/directions-2026-07/ssr-nazar-patterns.md)).
 
 ## Scope
 

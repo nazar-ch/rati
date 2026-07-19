@@ -16,7 +16,7 @@ Items live in [issues/](./issues/); status derives from rati git
 - **Items:** SSR-01 → SSR-02 → SSR-03 (each builds on the previous; one agent may take
   the chain).
 - **Entry:** none (design is settled in
-  [ssr-server-kit.md](../../research/directions-2026-07/ssr-server-kit.md)).
+  [ssr-server-kit.md](../../archive/directions-2026-07/ssr-server-kit.md)).
 - **Exit / checkpoint:** `examples/ssr/server.ts` deleted — dev runs on `vite dev`,
   prod on `rati/server`'s `serve()`; the example's behaviors re-verified (statuses
   200/404/301, head tags, payload, hydration console-clean). **User reviews the plugin's

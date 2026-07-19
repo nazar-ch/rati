@@ -2,7 +2,7 @@ import { observable, runInAction } from 'mobx';
 
 /*
     `field` — one staged value: current + baseline + validation + binding props.
-    Design record: docs/research/directions-2026-07/data-package.md §5.
+    Design record: docs/archive/directions-2026-07/data-package.md §5.
 
     One generic field, zero widget subclasses — widget kind is the component's
     business; with React Aria Components the widgets already speak domain types,

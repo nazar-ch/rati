@@ -13,7 +13,7 @@ import { buildHarness, readContent, readSlot, scopeSpecArb } from './scopeHarnes
     the loading slot until the last key, then content carrying the model's values (convergence).
     Teardown balance is asserted in a `finally`, so a lifecycle leak fails the run even when
     every mid-run assert passed. All asserts sit at the contract altitude
-    (docs/research/mandala-testing.md §"The altitude rule").
+    (docs/archive/mandala-testing.md §"The altitude rule").
 
     Initial resolution only — the event alphabet (refreshes, rejections, source transitions,
     remounts) is the MF-02 command property next door.

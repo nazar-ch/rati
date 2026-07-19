@@ -3,7 +3,7 @@
 Status: planned 2026-07-18, cut at the close of the implementation session.
 
 The 2026-07-18 session shipped the design record's v1 in rati
-([data-package.md](../../research/directions-2026-07/data-package.md)): the legacy
+([data-package.md](../../archive/directions-2026-07/data-package.md)): the legacy
 `data/` layer (and its Babel decorator toolchain) removed, and the `rati/data` entry
 landed with all five primitives — `query`, `collection`, `pagedCollection`, `mutation`,
 `form`/`field` + the validator kit — plus the shared `itemMap` reconciler, `source()`

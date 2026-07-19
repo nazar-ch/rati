@@ -25,7 +25,7 @@ after every command, fast-check shrinks failures to a minimal command sequence.
    marks it in flight and, on settle, cascades to transitive readers; a `stable` payload settles
    with no cascade; `refreshAll`/`changeInput` reset to initial-resolution semantics.
 3. Invariants after every command (the numbered list in
-   [mandala-testing.md](../../../research/mandala-testing.md) §"Invariants" — encode 1–5 and 7
+   [mandala-testing.md](../../../archive/mandala-testing.md) §"Invariants" — encode 1–5 and 7
    here; 6, the lifecycle ledger, is MF-03's): slot correctness, no-blank during selective
    refresh, identity stability for `stable` payloads, run-count **upper bounds** + no idle runs,
    `pending` agreement at quiesce points.

@@ -555,7 +555,7 @@ their successor.)
 **Experimental.** Optional — requires the `mobx` peer dependency, like
 [`rati/mobx`](#ratimobx) (whose `observableSource` it builds on). The successor of the
 legacy data layer and of app-side `FetchStore` families; design record:
-`docs/research/directions-2026-07/data-package.md`. The surface may still move; it is
+`docs/archive/directions-2026-07/data-package.md`. The surface may still move; it is
 intended to eventually extract into a companion package.
 
 Data in an app has four moments; each primitive owns exactly one, plus one for fetch

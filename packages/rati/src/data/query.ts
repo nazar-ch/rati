@@ -5,7 +5,7 @@ import { toSourceError, type Source, type SourceError } from '../scope/source';
 /*
     `query` — the refreshable unit (the rati/data atom): one async producer, one
     current value, honest phases, race-guarded. Design record:
-    docs/research/directions-2026-07/data-package.md §1.
+    docs/archive/directions-2026-07/data-package.md §1.
 
       - `load()` is idempotent *ensure*: it fetches from `idle` or `error`, no-ops
         when `ready`, and returns the in-flight promise while pending. Scopes (via

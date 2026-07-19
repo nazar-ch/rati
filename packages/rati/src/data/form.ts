@@ -4,7 +4,7 @@ import { FieldExternalErrors, type Field, type FieldInternal } from './field';
 
 /*
     `form` — an aggregate over fields: staged edits with one submit seam. Design
-    record: docs/research/directions-2026-07/data-package.md §5–6.
+    record: docs/archive/directions-2026-07/data-package.md §5–6.
 
     The form is the draft: fields enumerate the edited set explicitly, the
     baseline lives per field, dirty is a comparison, not an overlay. Before

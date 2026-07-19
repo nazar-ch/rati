@@ -5,7 +5,7 @@ import { type Source } from '../scope/source';
 
 /*
     `pagedCollection` — pages are queries. Design record:
-    docs/research/directions-2026-07/data-package.md §3.
+    docs/archive/directions-2026-07/data-package.md §3.
 
     The page, not the list, is the unit of load state (the `Chunks.ts` lasting
     idea), and a page *is* a `query` — so per-page phase, stale-on-refresh,

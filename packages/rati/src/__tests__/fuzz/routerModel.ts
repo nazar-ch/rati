@@ -2,7 +2,7 @@
     The router's reference model — the routing contract's semantics as plain JS, plus the
     vocabulary the harness and the property share (the table spec, the redirect forms).
     No React, no router imports: the file's empty import list is the altitude rule made
-    structural, as in the mandala model next door (docs/research/mandala-testing.md
+    structural, as in the mandala model next door (docs/archive/mandala-testing.md
     §"The altitude rule"). If a rule here needed router code to express, it would not be
     a contract.
 

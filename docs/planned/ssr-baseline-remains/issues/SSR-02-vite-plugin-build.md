@@ -9,7 +9,7 @@ disposition: —
 Prod consumers read the client manifest by hand to emit the hashed entry script and CSS
 links (nazar's Vercel function additionally fights serverless path resolution), and
 lazy routes ship no `modulepreload` — the client hydrates, then waterfalls on the route
-chunk. Design: [ssr-server-kit.md](../../../research/directions-2026-07/ssr-server-kit.md)
+chunk. Design: [ssr-server-kit.md](../../../archive/directions-2026-07/ssr-server-kit.md)
 §Layer 2 (build half).
 
 ## Scope

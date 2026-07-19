@@ -244,7 +244,7 @@ describe('SSR sources — live (ssr: { dehydrate, hydrate })', () => {
 });
 
 /*
-    Pin 7 (MF-05; docs/research/mandala-testing.md §"Deterministic pins"): what the two
+    Pin 7 (MF-05; docs/archive/mandala-testing.md §"Deterministic pins"): what the two
     SSR-source failure modes do. Both pin the *degraded* behavior on purpose — an SSR
     source that fails must cost the server render, never the page.
 */

@@ -227,7 +227,7 @@ this file is the design of record.
 - Fetch `Request`/`Response` is the only server interface — no Express/Koa/framework
   adapters beyond the Node listener.
 - No streaming SSR (`prerender` stays all-or-nothing; the per-island `ssr: false`
-  option in [improvements.md §2](./improvements.md) is the pressure valve).
+  option in [scope-and-island-directions.md §2](../../research/scope-and-island-directions.md) is the pressure valve).
 - Fetch-shaped means edge runtimes *probably* work; untested is unsupported — no
   promises.
 - No basename/i18n/proxy/caching features in the kit; escape hatches at every seam.

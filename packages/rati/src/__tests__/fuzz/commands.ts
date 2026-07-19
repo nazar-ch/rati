@@ -23,7 +23,7 @@ import { readContent, readSlot, type BuiltHarness } from './scopeHarness';
         tick after the resolution — `suspense-situations.md` S2. Never poll-until-green: a
         fixed flush count is what makes a failure mean something.
 
-    The invariants encoded here are 1-5 and 7 of docs/research/mandala-testing.md
+    The invariants encoded here are 1-5 and 7 of docs/archive/mandala-testing.md
     §"Invariants"; the lifecycle ledger (6) is MF-03's — its mid-run bounds ride along in
     `assertContract` (ledger.ts), its balance is the property's teardown.
 */

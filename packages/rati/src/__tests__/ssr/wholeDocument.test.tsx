@@ -260,7 +260,7 @@ describe('the CSR fallback', () => {
     synthesized document instead and let React's mismatch recovery client-render it — the
     same working page, at the cost of a reported error (`onRecoverableError` →
     `reportGlobalError`, an uncaught error in the console) on every fallback. See
-    docs/research/directions-2026-07/ssr-server-kit.md §The fallback for whole-document
+    docs/archive/directions-2026-07/ssr-server-kit.md §The fallback for whole-document
     apps, and docs/public/ssr.md §When a render throws.
 */
 describe('createRoot(document) — the React contract the fallback rests on', () => {

@@ -7,7 +7,7 @@ import { island } from '../../island/island';
 import { useScopeControls, type ScopeControls } from '../../mandala/controls';
 
 /*
-    Pin 8 (docs/research/mandala-testing.md §"Deterministic pins"): StrictMode accounting
+    Pin 8 (docs/archive/mandala-testing.md §"Deterministic pins"): StrictMode accounting
     for the machinery the selective-refresh / SSR-sources work added. island.test.tsx
     pins the double-mount for the *old* lifecycle (the surviving run's identities, the
     discarded run's dispose-before-detach); what needs its own home is what the rework

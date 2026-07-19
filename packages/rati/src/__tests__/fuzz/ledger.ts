@@ -3,7 +3,7 @@ import type { Slot } from './model';
 import type { BuiltHarness } from './scopeHarness';
 
 /*
-    MF-03 — invariant 6 of docs/research/mandala-testing.md §"Invariants": the lifecycle
+    MF-03 — invariant 6 of docs/archive/mandala-testing.md §"Invariants": the lifecycle
     ledger, read off the harness's per-source-instance attach/detach counters and its
     `.provide()` value's build/dispose record. The machinery under it is the refresh work's
     source-lifetime rework (a cascade swaps a source mid-flight, a Step's teardown keeps

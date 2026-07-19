@@ -8,9 +8,9 @@ The 2026-07 SSR baseline shipped in rati core: head management (`Title`/`Meta`/
 recording with status derivation, route-level redirects + `matchedCatchAll`, and the
 composed `renderApp` — documented in [docs/public/ssr.md](../../public/ssr.md), with
 per-item deltas stamped into
-[ssr-nazar-patterns.md](../../research/directions-2026-07/ssr-nazar-patterns.md). This
+[ssr-nazar-patterns.md](../../archive/directions-2026-07/ssr-nazar-patterns.md). This
 effort finishes what that round deliberately left: the **server kit** (Layers 2/3 —
-design record: [ssr-server-kit.md](../../research/directions-2026-07/ssr-server-kit.md),
+design record: [ssr-server-kit.md](../../archive/directions-2026-07/ssr-server-kit.md),
 maintainer-confirmed), the **consumer migrations** (nazar.ch, jnana website), and the
 **coverage tail** the implementing session consciously left thin.
 

@@ -4,7 +4,7 @@ import { type Source } from '../scope/source';
 
 /*
     `collection` — keyed items, reconciliation, nested reactivity. Design record:
-    docs/research/directions-2026-07/data-package.md §2.
+    docs/archive/directions-2026-07/data-package.md §2.
 
     A refresh returns fresh JSON; naive replacement destroys object identity, so
     rows re-render wholesale and selection/DnD/refs churn. The reconciler (the

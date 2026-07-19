@@ -10,8 +10,8 @@ Standing rules for every task: run `vp run rati#typecheck` (or `website#typechec
 keep `docs/*.md` in sync with behavior changes; never publish.
 
 **Prerequisite (in execution, not a task here):** the stores/router redesign —
-[naming.md §6](./research/directions-2026-07/naming.md) +
-[stores-and-router.md Option A](./research/directions-2026-07/stores-and-router.md)
+[naming.md §6](../../archive/directions-2026-07/naming.md) +
+[stores-and-router.md Option A](../../research/stores-and-router.md)
 (router constructed outside the container, `new RouterStore(routes, options?)`,
 `StoresProvider` / `createStoresHook`). DOC-2 and SITE-1 consume its result.
 
@@ -29,7 +29,7 @@ keep `docs/*.md` in sync with behavior changes; never publish.
 > ssr-baseline-remains effort (docs/planned/ssr-baseline-remains/).
 
 All grounded in
-[ssr-nazar-patterns.md](./research/directions-2026-07/ssr-nazar-patterns.md); mutually
+[ssr-nazar-patterns.md](../../archive/directions-2026-07/ssr-nazar-patterns.md); mutually
 independent.
 
 - **CORE-1 — Hydration payload type + safe serialization.** In `rati/ssr`: a combined

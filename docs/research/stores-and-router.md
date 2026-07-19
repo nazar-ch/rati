@@ -181,6 +181,6 @@ it reintroduces per-edge wiring — but useful where a store touches a sibling d
    `hook()` loads — that split is already working well in Jnana and needs no framework
    change.
 4. Rename the rati skeleton pieces together with this work — see
-   [naming.md §6](./naming.md) (`GlobalStore`'s fate: with the router decoupled, an empty
+   [naming.md §6](../archive/directions-2026-07/naming.md) (`GlobalStore`'s fate: with the router decoupled, an empty
    base class that only stores `stores` is hardly worth its export; a
    `constructor(protected stores: T)` in app code says the same thing).
