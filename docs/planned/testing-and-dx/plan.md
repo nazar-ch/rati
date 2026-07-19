@@ -45,6 +45,13 @@ Items live in [issues/](./issues/); status derives from rati git (`git log --gre
 
 - **Items:** DX-07. Any time, no dependencies.
 
+### B-side — SSR error channel (independent)
+
+- **Items:** DX-08 (cut 2026-07-19 from the pre-DX-05 review). Any time; before or during
+  B3 is natural — DX-05's `islandSsrErrors` conversion is easier to trust once `errors`
+  can't silently drop a reused rejection (fresh-promise-per-render suites are unaffected,
+  so it is not a blocker).
+
 ## Grading
 
 | Item | Model / effort | Why |
@@ -56,6 +63,7 @@ Items live in [issues/](./issues/); status derives from rati git (`git log --gre
 | DX-05 | Sonnet, medium | mechanical sweep with a hard no-lost-pins rule |
 | DX-06 | Opus, medium | cross-repo judgment: migrate honestly, file friction instead of forcing fits |
 | DX-07 | Sonnet, low | two small additions with existing patterns to copy |
+| DX-08 | Opus, medium | a semantics-sensitive engine dedup change (per-collector keying must not break the within-render pin) plus one kit option |
 
 The Agent tool sets `model` but not reasoning-effort — carry the effort tier as a
 thoroughness line in the prompt.

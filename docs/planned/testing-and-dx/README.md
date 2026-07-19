@@ -74,6 +74,7 @@ whenever.
 - [DX-05 — dogfood: rati's suites adopt the entry](./issues/DX-05-dogfood-migration.md)
 - [DX-06 — Jnana adoption leg (the success test)](./issues/DX-06-jnana-adoption.md)
 - [DX-07 — `dataTrace` + `Step` displayName](./issues/DX-07-observability.md)
+- [DX-08 — SSR error-channel hardening: per-collector rejection dedup + a prerender settle budget](./issues/DX-08-ssr-error-channel.md)
 
 Batching, dependencies, grading: [plan.md](./plan.md).
 
@@ -212,6 +213,75 @@ The B1 style decisions, for every later item to copy:
   live-seed + failing-seed shapes carry per-instance seed logic the current
   `controllableSource` doesn't model. DX-05 should convert what maps cleanly and leave the
   seed-shape sources hand-rolled (or file a `controllableSource` seed-hook gap), not force it.
+
+### 2026-07-19 — pre-DX-05 review of B1+B2 (three-lens audit; hardening landed)
+
+DX-01..04 were audited before opening the dogfood/adoption legs: an adversarial review of
+the utilities against the real engine contracts, a DX-05 coverage inventory over rati's
+suites, and a DX-06 fit check against Jnana's actual test files. The engine contracts all
+held (source contract incl. uSES snapshot stability and mid-notify unsubscribe; the controls
+channel does wrap every slot, so the Probe never misses; `ssrRender(...).hydrate()` twice is
+safe — the collector is read-only on hydration and claims are per-provider; the
+`display:none` slot walk matches React 19's `hideInstance`, marker-self and ancestor both;
+`createTestRouter`'s replace-before-listen state seeding and sync memory-history emits are
+real). What didn't hold was fixed in the same pass:
+
+- **Act-flag policy** — the entry no longer sets `IS_REACT_ACT_ENVIRONMENT` permanently
+  ("defensively") on first mount; every helper now scopes set→restore around its own `act`
+  (`testing/actEnvironment.ts`, the RTL pattern). Trigger: Jnana's `unitSetup.ts` documents
+  a deliberate decision *not* to set the global (Tiptap portal re-renders would warn), and
+  the permanent set would have overridden that from inside a library. rati's own suites now
+  declare the env runner-level (`vitest.setup.ts`).
+- **`renderIsland` input holes** — `props` (and `rerender`'s argument) are now conditionally
+  *required* when the scope has required inputs; before, `handle.rerender()` type-checked
+  and silently remounted with `{}`, wiping every input. `slot()` now throws when no marker
+  is in the DOM at all (an island that unmounted or threw past its slots used to read as
+  `'loading'`).
+- **`controllableSource.seed`** — the DX-04-flagged gap, closed ahead of DX-05:
+  `{ dehydrate?, hydrate }` where `hydrate` *returns* the seeded value (throw = a store
+  rejecting a stale seed); combines with `loads` for "load on attach unless seeded";
+  mutually exclusive with raw `ssr`. Kills the self-referential `ssr.hydrate` closure (and
+  its forced type annotation) that `islandSsrSources`' three `liveSource` shapes would have
+  needed. Also: `initial`/`loads` now use `in`-checks, so `T = undefined` works.
+- **`createTestRouter`** gained `basename` + `hydratedState` passthrough — without
+  `basename` the fuzz `routerHarness` could never delegate, and `redirect.test.tsx`'s
+  hydration-replay pin needs `hydratedState`.
+- **Stores seam, recalibrated for Jnana** — `stores` options are now `PartialStores<S>`
+  (each store itself a typed partial: the flat slice a component reads type-checks with no
+  cast), and `storesWrapper(stores?)` ships the provider *without* the mount, so RTL /
+  `vitest-browser-react` files keep their renderer (8 of Jnana's 10 fake-container files
+  want exactly that; the two `.browser` files have no other clean migration).
+  `renderWithStores` is now sugar over it.
+- Small: `hydrateTree` tracks (or removes) its container when hydration throws mid-act;
+  `prerenderToString` flushes its TextDecoder after the drain.
+
+Intel the reviews produced for the open items (the full agent reports are conversation
+artifacts; the durable deltas live in the amended issue files):
+
+- **DX-05**: the "~20 inline router wirings" split into three populations — 14 store-level
+  suites that never mount (their wiring is a 2-line constructor; they stay), a small
+  mounting-migratable set (`preloadRoute`'s Link-prefetch block, `redirect`), and
+  stays-by-design files (`link` relative-href pins, `navigateComponent`'s
+  StrictMode+browser-history pin, `ssrRender.test`'s deliberate `renderToString` contrast).
+  `scopeControls.test.tsx` is the largest single job (4 local helpers die, ~63 act call
+  sites re-audited). Fuzz seams: `flush` and `controllableSource` swaps are behavior-neutral
+  (the public ledger is a 1:1 rename of `SourceLedger`; `emit()`'s throw-before-ready is
+  unreachable under valid command sequences); the `routerHarness` delegation is *possible*
+  after `basename` but perturbs the mount choreography the properties were tuned on —
+  keep-local is the honest default, README-noted. Suggested batch order is in DX-05.
+- **DX-06**: the ten stores files are functionally covered, but 8 of 10 should adopt
+  `storesWrapper` + their existing renderer, not `renderWithStores`; the grep gate's
+  "no `as unknown as GlobalStores`" is achievable, but *nested* fakes (a `user` model on a
+  store) still need a per-field cast — the container-level cast is what dies by design.
+  `fakeRouter` (boot harness) was mis-scoped to `createTestRouter` (it's a store-level fake
+  consumed by `bootHarness.ts`, which Boundaries exclude) — the issue file is amended.
+  Real-route legs should use minimal local route tables (importing `frontend/src/routes.ts`
+  drags ~40 page modules into unit tests). Five non-render files fake the container as a
+  *constructor argument* — out of any render-utility's reach, documented as survivors.
+- **Engine finding, filed as DX-08**: the resolver's `recordedRejections` WeakSet is
+  module-global, so a *second* `ssrRender` of a tree reusing the same rejected promise
+  instance silently skips `collectError` — its `errors` come back empty. Per-collector
+  keying is the fix; a settle-budget option for `prerenderToString` rides along.
 
 ## Per-item conventions
 
