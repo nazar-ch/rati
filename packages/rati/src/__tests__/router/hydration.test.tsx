@@ -1,29 +1,21 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vite-plus/test';
-import { renderToString } from 'react-dom/server';
-import { prerender } from 'react-dom/static';
-import { hydrateRoot } from 'react-dom/client';
 import { RouterStore } from '../../router/store';
-import { route } from '../../router/route';
+import { route, type GenericRouteType } from '../../router/route';
 import { RootStore, RootStoreProvider } from '../../stores/RootStore';
 import { Router } from '../../router/Router';
 import { createBrowserHistory, createMemoryHistory } from '../../router/history';
 import { prepareRoute } from '../../router/prepareRoute';
 import { scope, type ScopeComponent } from '../../scope/scope';
-import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
-import { act } from '@testing-library/react';
+import { ssrRender, cleanup } from '../../testing';
 
-async function prerenderToString(element: React.ReactElement): Promise<string> {
-    const { prelude } = await prerender(element);
-    const reader = prelude.getReader();
-    const decoder = new TextDecoder();
-    let html = '';
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        html += decoder.decode(value, { stream: true });
-    }
-    return html;
-}
+/*
+    Route-level SSR round-trips, through the testing kit's `ssrRender` / `.hydrate()` — with
+    the router wiring as a *documented composition* rather than a kit helper (the kit owns the
+    prerender→collect→hydrate mechanics; the router-SSR shape stays the app's to assemble, so
+    the entry doesn't freeze it). The composition: a memory-history router on the server, a
+    browser-history router on the client seeded from `prepareRoute`'s snapshot, and the two
+    trees handed to `ssrRender` / `.hydrate`.
+*/
 
 function Home() {
     return <div data-testid="home">welcome home</div>;
@@ -43,101 +35,77 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    cleanup();
     consoleErrorSpy.mockRestore();
 });
 
 /**
- * The console.error calls React meant. One message is tolerated: running
- * react-dom/server and react-dom/client in a single process shares the module-level
- * store context between two renderers, which cannot happen where the server and the
- * browser are separate processes.
+ * The console.error calls React meant. One message is tolerated: running two react-dom
+ * renderers (static/server for the prerender, client for the hydrate) in a single process
+ * shares the module-level store context, which cannot happen where the server and the browser
+ * are separate processes.
  *
- * This is the weaker of the two checks each mount below makes, and deliberately not the
- * only one — see `recovered` at every hydrate: a mismatch React client-renders through
- * is reported to `onRecoverableError`, not here.
+ * This is the weaker of the two checks each round-trip makes, and deliberately not the only
+ * one — see `client.recovered` below: a mismatch React client-renders through is reported to
+ * `onRecoverableError`, which the round-trip's guard turns into a thrown failure (so a
+ * mismatched route never even reaches these assertions).
  */
 function reactErrors(calls: unknown[][]): unknown[][] {
     return calls.filter((args) => !String(args[0]).includes('multiple renderers concurrently'));
 }
 
-async function ssrThenHydrate(url: string, routes: any) {
-    // ----- Server -----
-    const serverRouter = new RouterStore({}, routes, {
-        history: createMemoryHistory({ url }),
-    });
+/**
+ * The documented route round-trip: prerender the server tree (memory history) collecting its
+ * payload, then hydrate the client tree (browser history) seeded from `prepareRoute`. The
+ * client mount (and its router disposal) is tracked by `cleanup()`; the server router is
+ * disposed inline once its render is done.
+ */
+async function ssrThenHydrate(url: string, routes: readonly GenericRouteType[]) {
+    // ----- Server: memory history, collect the dehydration payload -----
+    const serverRouter = new RouterStore({}, routes, { history: createMemoryHistory({ url }) });
     const serverRoot = new RootStore({ router: serverRouter }, { isReady: true });
     const prepared = await prepareRoute(serverRouter);
-
-    const ServerApp = () => (
+    const server = await ssrRender(
         <RootStoreProvider rootStore={serverRoot}>
             <Router />
-        </RootStoreProvider>
+        </RootStoreProvider>,
     );
-    const html = renderToString(<ServerApp />);
     serverRouter.dispose();
 
-    // ----- Client -----
+    // ----- Client: browser history seeded from the routing snapshot, hydrate -----
     window.history.replaceState(null, '', url);
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    document.body.appendChild(container);
-
     const clientRouter = new RouterStore({}, routes, {
         history: createBrowserHistory(),
         hydratedState: prepared!.hydratedState,
     });
     const clientRoot = new RootStore({ router: clientRouter }, { isReady: true });
-
-    const ClientApp = () => (
+    const client = await server.hydrate(
         <RootStoreProvider rootStore={clientRoot}>
             <Router />
-        </RootStoreProvider>
+        </RootStoreProvider>,
+        { onDispose: () => clientRouter.dispose() },
     );
 
-    // The mismatch channel. React reports a mismatch it recovered from (by
-    // client-rendering the boundary) to `onRecoverableError`, whose default is
-    // `reportGlobalError` — *not* console.error. Under Vitest that default lands as an
-    // "Unhandled Error" the reporter prints and no assertion reads, so the console spy
-    // below cannot see a mismatch at all. Every test here asserts on this instead.
-    const recovered = vi.fn();
-
-    let root: ReturnType<typeof hydrateRoot>;
-    await act(async () => {
-        root = hydrateRoot(container, <ClientApp />, { onRecoverableError: recovered });
-    });
-
-    return {
-        prepared,
-        html,
-        container,
-        recovered,
-        cleanup: () => {
-            root.unmount();
-            container.remove();
-            clientRouter.dispose();
-        },
-    };
+    return { prepared, server, client };
 }
 
 describe('SSR + hydration', () => {
     test('hydrates a static route with no mismatch', async () => {
-        const { html, recovered, cleanup } = await ssrThenHydrate('/', baseRoutes);
+        const { server, client } = await ssrThenHydrate('/', baseRoutes);
 
-        expect(html).toContain('welcome home');
-        // The server's markup was hydrated as-is: React neither recovered from a
-        // mismatch nor said anything of its own.
-        expect(recovered).not.toHaveBeenCalled();
+        expect(server.html).toContain('welcome home');
+        // The server's markup was hydrated as-is: React neither recovered from a mismatch
+        // (the round-trip guard would have thrown) nor said anything of its own.
+        expect(client.recovered).toEqual([]);
         expect(reactErrors(consoleErrorSpy.mock.calls)).toEqual([]);
-        cleanup();
     });
 
     test('hydrates a parameterized route with no mismatch', async () => {
-        const { html, recovered, cleanup } = await ssrThenHydrate('/users/42', baseRoutes);
+        const { server, client } = await ssrThenHydrate('/users/42', baseRoutes);
 
-        expect(html).toContain('data-testid="user"');
-        expect(recovered).not.toHaveBeenCalled();
+        expect(server.html).toContain('data-testid="user"');
+        expect(client.recovered).toEqual([]);
         expect(reactErrors(consoleErrorSpy.mock.calls)).toEqual([]);
-        cleanup();
     });
 
     test('hydrates a scope route from dehydrated island data without re-running its promise', async () => {
@@ -153,61 +121,19 @@ describe('SSR + hydration', () => {
         );
         const routesWithScope = [route('/', 'home', Greeting, { scope: greetingScope })] as const;
 
-        // ----- Server: prerender (awaits the promise) + collect its resolved value -----
-        const serverRouter = new RouterStore({}, routesWithScope, {
-            history: createMemoryHistory({ url: '/' }),
-        });
-        const serverRoot = new RootStore({ router: serverRouter }, { isReady: true });
-        const prepared = await prepareRoute(serverRouter);
-        const collector = createHydrationCollector();
-        const html = await prerenderToString(
-            <HydrationProvider collect={collector.collect}>
-                <RootStoreProvider rootStore={serverRoot}>
-                    <Router />
-                </RootStoreProvider>
-            </HydrationProvider>,
-        );
-        serverRouter.dispose();
+        const { server, client } = await ssrThenHydrate('/', routesWithScope);
 
-        expect(html).toContain('hello from server');
+        // The promise resolved once, server-side (the prerender awaited it), and its value
+        // was dehydrated into the payload.
+        expect(server.html).toContain('hello from server');
         expect(calls).toBe(1);
 
-        // ----- Client: hydrate from the routing snapshot + dehydrated island data -----
-        window.history.replaceState(null, '', '/');
-        const container = document.createElement('div');
-        container.innerHTML = html;
-        document.body.appendChild(container);
-
-        const clientRouter = new RouterStore({}, routesWithScope, {
-            history: createBrowserHistory(),
-            hydratedState: prepared!.hydratedState,
-        });
-        const clientRoot = new RootStore({ router: clientRouter }, { isReady: true });
-
-        const recovered = vi.fn();
-        let root: ReturnType<typeof hydrateRoot>;
-        await act(async () => {
-            root = hydrateRoot(
-                container,
-                <HydrationProvider data={collector.data}>
-                    <RootStoreProvider rootStore={clientRoot}>
-                        <Router />
-                    </RootStoreProvider>
-                </HydrationProvider>,
-                { onRecoverableError: recovered },
-            );
-        });
-
-        // The promise was not re-run on the client and the content hydrated.
+        // The client hydrated from that payload: the content rendered and the promise was
+        // not re-run. No mismatch — the dehydrated value rendered the same markup the server
+        // shipped, so React had nothing to recover from.
+        expect(client.text()).toContain('hello from server');
         expect(calls).toBe(1);
-        expect(container.textContent).toContain('hello from server');
-        // No hydration mismatch: the dehydrated value rendered the same markup the
-        // server shipped, so React had nothing to recover from.
-        expect(recovered).not.toHaveBeenCalled();
+        expect(client.recovered).toEqual([]);
         expect(reactErrors(consoleErrorSpy.mock.calls)).toEqual([]);
-
-        root!.unmount();
-        container.remove();
-        clientRouter.dispose();
     });
 });

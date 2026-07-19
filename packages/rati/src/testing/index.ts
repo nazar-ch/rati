@@ -22,3 +22,12 @@ export { cleanup } from './dom';
 export { renderIsland, type IslandHandle, type RenderIslandOptions } from './renderIsland';
 export { renderWithStores, type StoresHandle, type RenderWithStoresOptions } from './stores';
 export { createTestRouter, type TestRouter, type CreateTestRouterOptions } from './router';
+export {
+    prerenderToString,
+    ssrRender,
+    type PrerenderToStringOptions,
+    type SsrRenderOptions,
+    type ServerRender,
+    type HydratedTree,
+    type HydrateOptions,
+} from './ssr';

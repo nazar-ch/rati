@@ -42,8 +42,9 @@ src/
              mutation, form/field) — experimental, pending extraction to a
              companion package (docs/archive/directions-2026-07/data-package.md)
   testing/   the rati/testing entry: test utilities (deferred, flush,
-             controllableSource) — the generic cores promoted out of the suites'
-             hand-rolls. Test-environment only; shipped for consumers
+             controllableSource, the island/router/stores render harnesses, and
+             the SSR round-trip kit) — the generic cores promoted out of the
+             suites' hand-rolls. Test-environment only; shipped for consumers
   stores/    RootStore, GlobalStore (store roots)
   util/      utils.ts
   types/     generic.ts
@@ -467,18 +468,32 @@ deterministic pin list, the fuzz harness design — is
 
 The utilities the suites lean on ship as the public **`rati/testing`** entry (`src/testing/`
 — `deferred`, `flush`, `controllableSource`, `renderIsland`, `createTestRouter`,
-`renderWithStores`), so both a consumer and rati's own suites use one implementation. It is
-*promotion*: the generic cores were extracted out of the ~8 hand-rolled `testSource`/
-`loaderSource` copies, the `deferred`/`flush` idioms, the island mount + slot-reader
-hand-inlined across the mandala suites (now `renderIsland` + `slot()`, which wraps each slot
-in a private marker so testids stay out of the island API), and the `createMemoryHistory` +
-`new RouterStore` + provider dance inlined across ~20 router suites (now `createTestRouter`,
-over a memory history it disposes). The three render harnesses share one mount (`testing/
-dom.tsx`: `mountTree` + a single `cleanup()` + a per-mount dispose hook — where a test
-router's history is detached). `renderWithStores` is the stores-injection seam: a partial
-container behind `RootStoreProvider`, killing the `as unknown as GlobalStores` cast the
-component suites hand-roll (it builds on the shipped `RootStore`/`RootStoreProvider`, not on
-any internalized context — see the effort README's DX-03 delta).
+`renderWithStores`, `prerenderToString`/`ssrRender`), so both a consumer and rati's own suites
+use one implementation. It is *promotion*: the generic cores were extracted out of the ~8
+hand-rolled `testSource`/`loaderSource` copies, the `deferred`/`flush` idioms, the island
+mount + slot-reader hand-inlined across the mandala suites (now `renderIsland` + `slot()`,
+which wraps each slot in a private marker so testids stay out of the island API), and the
+`createMemoryHistory` + `new RouterStore` + provider dance inlined across ~20 router suites
+(now `createTestRouter`, over a memory history it disposes). The three render harnesses share
+one mount (`testing/dom.tsx`: `mountTree` + a single `cleanup()` + a per-mount dispose hook —
+where a test router's history is detached). `renderWithStores` is the stores-injection seam: a
+partial container behind `RootStoreProvider`, killing the `as unknown as GlobalStores` cast
+the component suites hand-roll (it builds on the shipped `RootStore`/`RootStoreProvider`, not
+on any internalized context — see the effort README's DX-03 delta).
+
+The **SSR round-trip kit** (`testing/ssr.tsx`) is the same promotion for the prerender→
+collect→hydrate loop hand-rolled across the `islandSsr*`, `router/hydration`, and `ssr/*`
+suites: `prerenderToString` is the bare `react-dom/static` drain loop (no-outlining budget,
+like `rati/ssr`'s `renderToHtml`); `ssrRender` wraps a fresh `createHydrationCollector` +
+`HydrationProvider` around it and returns the HTML + `data`/`seeds`/`errors`, with a
+`.hydrate()` that feeds the payload back through a client-side `HydrationProvider` and
+`hydrateRoot` (a fourth `testing/dom.tsx` mount, `hydrateTree`, so `cleanup()` tears
+round-trips down too). Its one added judgment over the hand-rolls: a recoverable hydration
+error (React client-rendering over mismatched markup) throws by default — the mismatch made
+loud — with an `allowMismatch` opt-out for the deliberate-degradation pins. The route-level
+round-trip stays a *documented composition* (build the two routers + `prepareRoute`, pass both
+trees to `ssrRender`/`.hydrate`) rather than a helper, to keep the router-SSR wiring out of the
+entry.
 The `fuzz/` harnesses keep their own **model-wired** drivers — `scopeHarness.tsx`'s
 `controllableSource` carries a ledger tied to the reference model (depth/`maxConcurrent`), a
 `recompute` closure, and its own testid slot readers, and its mount is instrumented for the

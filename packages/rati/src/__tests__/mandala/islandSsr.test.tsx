@@ -1,29 +1,9 @@
-import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
-import { prerender } from 'react-dom/static';
-import { hydrateRoot } from 'react-dom/client';
-import { act, cleanup } from '@testing-library/react';
-import type { ReactElement } from 'react';
+import { describe, test, expect, afterEach } from 'vite-plus/test';
 import { scope, input } from '../../scope/scope';
-import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
-import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
+import { prerenderToString, ssrRender, controllableSource, cleanup } from '../../testing';
 
 afterEach(cleanup);
-
-// Drive react-dom/static `prerender` (which awaits all Suspense before producing
-// HTML) to a string — the server-render path islands resolve their promises on.
-async function prerenderToString(element: ReactElement): Promise<string> {
-    const { prelude } = await prerender(element);
-    const reader = prelude.getReader();
-    const decoder = new TextDecoder();
-    let html = '';
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        html += decoder.decode(value, { stream: true });
-    }
-    return html;
-}
 
 describe('island SSR (prerender)', () => {
     test('resolves a promise-backed scope server-side', async () => {
@@ -44,13 +24,11 @@ describe('island SSR (prerender)', () => {
     });
 
     test('renders the loading slot for a source-backed scope (sources stay pending under SSR)', async () => {
-        const pendingState: SourceState<{ id: string }> = { status: 'pending' };
-        const pending: Source<{ id: string }> = {
-            [SourceSymbol]: true,
-            subscribe: () => () => {},
-            getSnapshot: () => pendingState,
-            attach: () => () => {},
-        };
+        // A source is a reactive state machine, not a promise: its `attach` runs from an
+        // effect, which `prerender` never runs — so the server leaves it pending and renders
+        // the loading slot, and the client resolves it after hydration. A never-driven
+        // controllableSource is exactly that pending source.
+        const pending = controllableSource();
         const Island = island({
             scope: scope({ id: input<string>() }).load({ data: () => pending }),
             component: () => <div>ready</div>,
@@ -59,8 +37,6 @@ describe('island SSR (prerender)', () => {
 
         const html = await prerenderToString(<Island id="ssr" />);
 
-        // A source is a reactive state machine, not a promise — the server leaves it
-        // pending and renders the loading slot; the client resolves it after hydration.
         expect(html).toContain('loading slot');
         expect(html).not.toContain('ready');
     });
@@ -76,16 +52,11 @@ describe('island SSR dehydration', () => {
             loading: () => <div>loading</div>,
         });
 
-        const collector = createHydrationCollector();
-        await prerenderToString(
-            <HydrationProvider collect={collector.collect}>
-                <Island id="ssr" />
-            </HydrationProvider>,
-        );
+        const server = await ssrRender(<Island id="ssr" />);
 
         // One island → one slice, holding the resolved promise value under its key.
         // (The id is React's useId, so we assert on the slice rather than the literal.)
-        const slices = Object.values(collector.data);
+        const slices = Object.values(server.data);
         expect(slices).toHaveLength(1);
         expect(slices[0]).toEqual({ greeting: 'hello ssr' });
     });
@@ -104,39 +75,21 @@ describe('island SSR dehydration', () => {
         });
 
         // Server: render + collect. The promise runs exactly once.
-        const collector = createHydrationCollector();
-        const html = await prerenderToString(
-            <HydrationProvider collect={collector.collect}>
-                <Island id="ssr" />
-            </HydrationProvider>,
-        );
-        expect(html).toContain('hello ssr');
+        const server = await ssrRender(<Island id="ssr" />);
+        expect(server.html).toContain('hello ssr');
         expect(calls).toBe(1);
 
-        // Client: hydrate the server HTML, feeding the collected data back. The
-        // island's useId matches the server's (same tree position), so its slice is
-        // found and the promise is short-circuited — not run again, no loading flash.
-        const container = document.createElement('div');
-        container.innerHTML = html;
-        document.body.appendChild(container);
-        // "No loading flash" is a claim about mismatches, so it is asserted on the
-        // channel that carries them: a client that re-ran the promise would render the
-        // loading slot over the server's ready HTML, and React would report the recovery
-        // here — never to console.error, whose default handler is `reportGlobalError`.
-        const recovered = vi.fn();
-        await act(async () => {
-            hydrateRoot(
-                container,
-                <HydrationProvider data={collector.data}>
-                    <Island id="ssr" />
-                </HydrationProvider>,
-                { onRecoverableError: recovered },
-            );
-        });
+        // Client: hydrate the server HTML, feeding the collected data back. The island's
+        // useId matches the server's (same tree position), so its slice is found and the
+        // promise is short-circuited — not run again, no loading flash. "No loading flash"
+        // is a claim about mismatches, and the round-trip's guard is exactly that channel: a
+        // client that re-ran the promise would render the loading slot over the server's
+        // ready HTML, React would report the recovery, and `.hydrate()` would have thrown.
+        const client = await server.hydrate();
 
         expect(calls).toBe(1);
-        expect(container.textContent).toContain('hello ssr');
-        expect(recovered).not.toHaveBeenCalled();
+        expect(client.text()).toContain('hello ssr');
+        expect(client.recovered).toEqual([]);
     });
 
     test('nested islands each collect their own slice (composition, no key collision)', async () => {
@@ -156,19 +109,14 @@ describe('island SSR dehydration', () => {
             loading: () => <div>l</div>,
         });
 
-        const collector = createHydrationCollector();
-        const html = await prerenderToString(
-            <HydrationProvider collect={collector.collect}>
-                <Parent />
-            </HydrationProvider>,
-        );
+        const server = await ssrRender(<Parent />);
 
-        expect(html).toContain('parent-data');
-        expect(html).toContain('child-data');
+        expect(server.html).toContain('parent-data');
+        expect(server.html).toContain('child-data');
 
         // Two distinct island ids, each with its own slice — even though both chains
         // use the key `value`, the useId scope keeps them apart.
-        const slices = Object.values(collector.data);
+        const slices = Object.values(server.data);
         expect(slices).toHaveLength(2);
         expect(slices).toContainEqual({ value: 'parent-data' });
         expect(slices).toContainEqual({ value: 'child-data' });

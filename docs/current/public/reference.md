@@ -11,7 +11,7 @@ the [guide](./guide.md).
 | `rati/server` | Production serving: a fetch request handler, plus a Node listener. |
 | `rati/mobx` | Optional MobX bindings (`observableSource`) and the legacy data layer. |
 | `rati/debug` | Opt-in debug tooling (`navTrace`). |
-| `rati/testing` | Test utilities: `deferred`, `flush`, `controllableSource` (test-env only). |
+| `rati/testing` | Test utilities: `deferred`/`flush`/`controllableSource`, island/router/stores render harnesses, an SSR round-trip kit (test-env only). |
 
 > **Status:** first public iteration. The stores container surface (§Stores) is being
 > finalized; names there may still move.
@@ -669,7 +669,9 @@ rati's own suites (and Jnana's) hand-rolled before this entry existed.
 | `renderIsland(target, options?)` | mount an island (or `{ scope, component, … }` config) and drive it; async, returns a handle. See below |
 | `createTestRouter(routes, options?)` | memory history + router + provider, rendered and disposed for you; async, returns a handle. See below |
 | `renderWithStores(ui, options?)` | render a tree with a *partial* stores container — the fake-container cast, gone. See below |
-| `cleanup()` | unmount every tree the harness mounted (islands, routers, stores renders) — wire up `afterEach(cleanup)` |
+| `prerenderToString(node, options?)` | drain `react-dom/static` `prerender` to an HTML string (it awaits Suspense; `renderToString` cannot). See below |
+| `ssrRender(node, options?)` | a collected server render — HTML + dehydrated payload, plus `.hydrate()` for the client half. The SSR round-trip. See below |
+| `cleanup()` | unmount every tree the harness mounted (islands, routers, stores renders, hydrated round-trips) — wire up `afterEach(cleanup)` |
 
 `controllableSource` is a genuine source — an island attaches it, subscribes, and
 re-renders on every transition. Its mutators are **raw**: they set state and notify
@@ -782,4 +784,107 @@ const handle = await renderWithStores<AppStores>(<TwoStoreReader />, {
     stores: { foo, bar },   // only the two this component reads — no cast
 });
 expect(handle.text()).toBe('hi/3');
+```
+
+### The SSR round-trip kit
+
+Testing SSR means: drain `react-dom/static` `prerender` to a string, wire the
+hydration collector/provider, then `hydrateRoot` the output and assert the client didn't
+re-run its loads. This kit is that flow, so nobody hand-rolls the reader loop and the
+container juggling again. **jsdom-environment only** (where SSR tests run); no streaming (the
+engine's non-goal), and no whole-`document` hydration or HTTP-level rendering — `renderApp`
+and the [`rati/server`](#ratiserver) handler keep their own setups.
+
+**`prerenderToString(node, options?)`** is the bare drain loop — `prerender` (not
+`renderToString`, which can't await Suspense) reduced to one HTML string, with every resolved
+boundary inline. `options`: `onError` (forwarded to `prerender` — pass `() => {}` to swallow
+an expected server-side throw), `progressiveChunkSize` (the outlining budget; defaults to
+never outlining). Use it for a server-only assertion — a promise load resolving into the HTML,
+or a marked source staying pending with no collector to carry it.
+
+**`ssrRender(node, options?)`** is the round-trip. It wraps `node` in a `HydrationProvider`
+carrying a fresh collector, drains the prerender, and returns the **server half** — the HTML
+plus the dehydrated payload — with a `.hydrate()` for the **client half**.
+
+| `ssrRender` handle | Purpose |
+| --- | --- |
+| `html` | the server-rendered HTML string (pre-hydration) — assert with `toContain` |
+| `data` | dehydrated resolved values (promise loads, `ssr: true` loaders): `mandalaId → key → value` |
+| `seeds` | dehydrated live-source seeds (`ssr: { dehydrate, hydrate }`) |
+| `errors` | loads that rejected during the render — the server's 404/5xx signal |
+| `hydrate(clientNode?, options?)` | hydrate the HTML on the client, feeding the payload back. See below |
+
+**`.hydrate(clientNode?, options?)`** pre-fills a container with the server HTML, wraps
+`clientNode` (defaulting to the server node) in a client-side `HydrationProvider`, and
+`hydrateRoot`s it. `clientNode` differs from the server node only when the trees must — a
+route round-trip renders the server under memory history and the client under browser history.
+
+By default a **hydration mismatch fails the test loudly**: if React reports a recoverable
+error (it client-rendered over markup that didn't match — the signature of a load that re-ran
+and re-suspended its loading slot), `.hydrate()` throws, naming the mismatch. `options`:
+`allowMismatch` (collect those errors on `.recovered` instead of throwing — for
+deliberate-degradation tests, an SSR-error baseline whose loading slot the client re-renders
+through), `onDispose` (runs at unmount — dispose a client router here).
+
+| `.hydrate()` handle | Purpose |
+| --- | --- |
+| `container` | the hydrated DOM node (appended to `document.body`) |
+| `text()` | its trimmed `textContent` |
+| `recovered` | React's recoverable hydration errors — empty on a clean round-trip; populated only under `allowMismatch` |
+| `rerender(node)` / `unmount()` | re-render (a client update) / unmount and remove the container |
+
+Wire up `afterEach(cleanup)` — it unmounts hydrated round-trips too, running each `onDispose`.
+
+```ts
+import { ssrRender, cleanup } from 'rati/testing';
+
+afterEach(cleanup);
+
+test('the page hydrates without refetching', async () => {
+    let fetches = 0;
+    const Page = island({
+        scope: scope().load({
+            user: async () => { fetches++; return { name: 'Ada' }; },
+        }),
+        component: ({ user }) => <h1>{user.name}</h1>,
+        loading: () => <p>loading</p>,
+    });
+
+    const server = await ssrRender(<Page />);
+    expect(server.html).toContain('Ada');    // resolved server-side, in the HTML
+    expect(fetches).toBe(1);
+
+    const client = await server.hydrate();
+    expect(client.text()).toContain('Ada');  // hydrated from the payload
+    expect(fetches).toBe(1);                  // the load did NOT re-run
+    expect(client.recovered).toEqual([]);     // …and a re-run's mismatch would have thrown
+});
+```
+
+**Route-level round-trips are a documented composition**, not a helper — the kit owns the
+prerender→collect→hydrate mechanics; the router-SSR wiring stays yours to assemble (so the
+entry doesn't freeze it). Build a memory-history router for the server and a browser-history
+one for the client seeded from [`prepareRoute`](#ratissr), and hand the two trees to
+`ssrRender` / `.hydrate`:
+
+```ts
+const serverRouter = new RouterStore({}, routes, { history: createMemoryHistory({ url }) });
+const serverRoot = new RootStore({ router: serverRouter }, { isReady: true });
+const prepared = await prepareRoute(serverRouter);
+const server = await ssrRender(
+    <RootStoreProvider rootStore={serverRoot}><Router /></RootStoreProvider>,
+);
+serverRouter.dispose();
+
+window.history.replaceState(null, '', url);
+const clientRouter = new RouterStore({}, routes, {
+    history: createBrowserHistory(),
+    hydratedState: prepared!.hydratedState,
+});
+const clientRoot = new RootStore({ router: clientRouter }, { isReady: true });
+const client = await server.hydrate(
+    <RootStoreProvider rootStore={clientRoot}><Router /></RootStoreProvider>,
+    { onDispose: () => clientRouter.dispose() },
+);
+expect(client.recovered).toEqual([]);   // hydrated the route with no mismatch
 ```

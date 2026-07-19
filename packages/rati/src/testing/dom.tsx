@@ -1,13 +1,13 @@
 import { act } from 'react';
 import type { ReactNode } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
 
 /*
-    The shared mount plumbing behind renderIsland / createTestRouter / renderWithStores: a
-    `react-dom/client` mount into document.body, an async-act render (so a self-settling load
-    reaches content), a per-mount dispose hook (the router harness detaches its history
-    through it), and one `cleanup()` that tears them all down. It does not depend on
-    `@testing-library/react`.
+    The shared mount plumbing behind renderIsland / createTestRouter / renderWithStores / the
+    SSR round-trip kit: a `react-dom/client` mount (or `hydrateRoot`) into document.body, an
+    async-act render (so a self-settling load reaches content), a per-mount dispose hook (the
+    router harness detaches its history through it), and one `cleanup()` that tears them all
+    down. It does not depend on `@testing-library/react`.
 */
 
 interface Mount {
@@ -59,6 +59,41 @@ export async function mountTree(node: ReactNode, onDispose?: () => void): Promis
     await settleRender(root, node);
     return {
         container,
+        rerender: (next) => settleRender(root, next),
+        unmount: () => teardown(mount),
+    };
+}
+
+/**
+ * Hydrate `html` (a prior server render) with `node` under one async `act` — the client
+ * half of an SSR round-trip. The container is pre-filled with `html` before `hydrateRoot`,
+ * so React attaches to the existing markup instead of re-creating it. `onRecoverableError`
+ * observes the mismatches React recovers from (the round-trip kit turns them into failures);
+ * `onDispose` runs at unmount, after teardown (the route round-trip disposes its client
+ * router here). Tracked for {@link cleanup}, exactly like {@link mountTree}.
+ */
+export async function hydrateTree(
+    html: string,
+    node: ReactNode,
+    options: { onRecoverableError?: (error: unknown) => void; onDispose?: () => void } = {},
+): Promise<MountedTree> {
+    ensureActEnvironment();
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    document.body.appendChild(container);
+    let root!: Root;
+    await act(async () => {
+        root = hydrateRoot(
+            container,
+            node,
+            options.onRecoverableError ? { onRecoverableError: options.onRecoverableError } : {},
+        );
+    });
+    const mount: Mount = { root, container, onDispose: options.onDispose };
+    mounts.add(mount);
+    return {
+        container,
+        // A hydrated root's `.render()` is a normal client update — the rerender path.
         rerender: (next) => settleRender(root, next),
         unmount: () => teardown(mount),
     };

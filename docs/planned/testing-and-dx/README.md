@@ -159,6 +159,60 @@ The B1 style decisions, for every later item to copy:
   New example tests (Link-no-mocks, two-store partial container, the RF-01 dispose pin) in
   `__tests__/testing/routerAndStores.test.tsx`.
 
+### 2026-07-19 — DX-04 (SSR round-trip kit) shipped + decisions
+
+- **Surface** (`src/testing/ssr.tsx`, additive on the barrel): `prerenderToString(node,
+  options?)` (the bare drain loop), `ssrRender(node, options?)` → a `ServerRender` handle
+  (`html` / `data` / `seeds` / `errors` / `hydrate()`), and `ServerRender.hydrate(clientNode?,
+  options?)` → a `HydratedTree` (`container` / `text()` / `recovered` / `rerender` /
+  `unmount`). Options: `prerenderToString`/`ssrRender` take `onError` + `progressiveChunkSize`;
+  `.hydrate()` takes `allowMismatch` + `onDispose`.
+- **Two-phase, not one-shot.** The kit splits at the server/client seam (`ssrRender` returns,
+  then `.hydrate()`), because the suites split there too — a third of the SSR tests are
+  *server-only* (assert the HTML + the dehydrated `data`/`seeds`/`errors`, never hydrate). One
+  merged `ssrRoundTrip()` would have forced those to hydrate pointlessly. `prerenderToString`
+  stays separate below both, for the no-collector pins (a marked source staying pending with
+  no `HydrationProvider` — which `ssrRender` always adds — is a real behavior a test asserts).
+- **Mismatch → failure via `onRecoverableError`, not console.** `.hydrate()` collects React's
+  recoverable hydration errors and throws by default, naming the mismatch. That is the channel
+  the suites already established as the real signal (a re-run load re-suspends its loading slot
+  over the server's content → React client-renders → `onRecoverableError`); console.error
+  can't see it (its default is `reportGlobalError`). `allowMismatch: true` collects on
+  `.recovered` instead — the deliberate-degradation pins (SSR-error baseline, a seed whose
+  `hydrate` throws).
+- **`prerenderToString` is its own thin loop, not a re-export of `rati/ssr`'s `renderToHtml`.**
+  Same shape (`prerender` + no-outlining budget), but coupling the testing kit to the
+  production renderer is exactly the "freeze an internal" risk the grading flagged — a change
+  to `renderToHtml`'s option surface would ripple into every test. The duplication the effort
+  kills is the ~20 *in-suite* copies (DX-05), not the one prod renderer.
+- **Route-level = documented composition, no helper** (item 3's "helper only if composition is
+  ugly", weighed against the grading's don't-freeze-internals). The kit owns
+  prerender→collect→hydrate; the router-SSR wiring (two routers, `prepareRoute`, memory vs
+  browser history) stays the caller's, handed to `ssrRender`/`.hydrate` as two trees.
+  `createTestRouter` (DX-03) can't be reused for it — that mounts with `createRoot`, and SSR
+  needs `hydrateRoot` over server HTML — so the composition shares *building blocks*
+  (`RouterStore`/`RootStore`/`prepareRoute`), not the function. Reference docs carry the full
+  snippet; a converted suite proves it.
+- **Shared mount extended, not forked.** `.hydrate()` runs through a fourth `testing/dom.tsx`
+  primitive, `hydrateTree` (pre-fill container → `hydrateRoot` under async act → track for
+  `cleanup()`), alongside `mountTree`. So `afterEach(cleanup)` tears round-trips down too, and
+  the client router's `dispose` rides the same per-mount `onDispose` hook the test router uses.
+- **The "one `ssr/` suite" reconciliation.** Converted `islandSsr.test.tsx` (5, the island
+  round-trip — `prerenderToString` + `ssrRender` + `.hydrate()`, all three flavors) and
+  `router/hydration.test.tsx` (3, the route-level composition, proving item 3). The literal
+  `ssr/` *directory* holds no round-trip suite to convert: `payload` is serialization (no
+  prerender→hydrate), and `renderApp`/`wholeDocument` are HTTP-/whole-document-level — the
+  boundaries explicitly exclude those. `router/hydration` is the faithful stand-in, and the one
+  the item's own §Problem names. New example tests in `__tests__/testing/ssr.test.tsx` (the
+  worked docs example verbatim + a `controllableSource`-loader round-trip + the negative
+  mismatch pin, both throw and opt-out).
+- **Friction for DX-05:** the `islandSsr*Sources`/`ssrErrors` suites hand-roll
+  `loaderSource`/`liveSource`/`failingLoaderSource` (marked sources with attach/detach logs);
+  several map onto `controllableSource({ ssr, loads, onAttach, onDetach })`, but the
+  live-seed + failing-seed shapes carry per-instance seed logic the current
+  `controllableSource` doesn't model. DX-05 should convert what maps cleanly and leave the
+  seed-shape sources hand-rolled (or file a `controllableSource` seed-hook gap), not force it.
+
 ## Per-item conventions
 
 Atomic commits on the current branch; subjects prefixed `DX-NN:`, a `Closes: DX-NN` trailer
