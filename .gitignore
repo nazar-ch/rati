@@ -62,6 +62,7 @@ jspm_packages/
 **/.rush/temp/
 
 .vscode
+.obsidian
 
 dist
 
