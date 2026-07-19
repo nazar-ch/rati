@@ -1,8 +1,8 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
 import { render, screen, cleanup, act } from '@testing-library/react';
 import { scope, input } from '../../scope/scope';
-import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
+import { controllableSource, flush } from '../../testing';
 
 /*
     A source must not leak when an inner-tree teardown is followed by a new generation —
@@ -31,39 +31,9 @@ import { island } from '../../island/island';
 
 afterEach(cleanup);
 
-type TestSource<T> = Source<T> & { set: (state: SourceState<T>) => void };
-
-function testSource<T>(log: string[], id: string): TestSource<T> {
-    let state: SourceState<T> = { status: 'pending' };
-    const listeners = new Set<() => void>();
-    return {
-        [SourceSymbol]: true,
-        getSnapshot: () => state,
-        subscribe(onChange) {
-            listeners.add(onChange);
-            return () => {
-                listeners.delete(onChange);
-            };
-        },
-        attach() {
-            log.push(`attach:${id}`);
-            return () => log.push(`detach:${id}`);
-        },
-        set: (next) => {
-            state = next;
-            for (const listener of listeners) listener();
-        },
-    };
-}
-
-const balanced = (log: string[], id: string) =>
-    log.filter((entry) => entry === `attach:${id}`).length ===
-    log.filter((entry) => entry === `detach:${id}`).length;
-
 describe('teardown followed by a new generation releases its sources', () => {
     test('a source attached before an error detaches once the tree is replaced', async () => {
-        const log: string[] = [];
-        const live = testSource<string>(log, 'live');
+        const live = controllableSource<string>();
         const testScope = scope({ n: input<string>() }).load({ feed: () => live });
         const Island = island({
             scope: testScope,
@@ -73,28 +43,30 @@ describe('teardown followed by a new generation releases its sources', () => {
         });
 
         const view = await act(async () => render(<Island n="a" />));
-        expect(log).toContain('attach:live');
+        expect(live.attached).toBe(true);
 
         // The source errors: the boundary swaps the subtree for the error slot. The Step's
         // cleanup keeps the entry (its bucket is still live) and defers to the sweep.
         await act(async () => {
-            live.set({ status: 'error', error: { code: 'failed' } });
+            live.setError('failed');
         });
         expect(screen.getByText('error failed')).toBeTruthy();
 
         // A new generation: `cacheRef` becomes a fresh bucket array, so the old one — still
         // holding the attached source — must be swept as it is replaced.
         view.rerender(<Island n="b" />);
-        await act(async () => {});
+        await flush();
         view.unmount();
 
-        expect(balanced(log, 'live'), `unbalanced: ${log.join(' ')}`).toBe(true);
+        expect(
+            live.attached,
+            `live leaked: ${live.attachCount} attach / ${live.detachCount} detach`,
+        ).toBe(false);
     });
 
     test('a source under a pending mid-tree source detaches once the tree is replaced', async () => {
-        const log: string[] = [];
-        const top = testSource<string>(log, 'top');
-        const deep = testSource<string>(log, 'deep');
+        const top = controllableSource<string>();
+        const deep = controllableSource<string>();
         const testScope = scope({ n: input<string>() })
             .load({ a: () => top })
             .load({ b: () => deep });
@@ -106,26 +78,29 @@ describe('teardown followed by a new generation releases its sources', () => {
 
         const view = await act(async () => render(<Island n="a" />));
         await act(async () => {
-            top.set({ status: 'ready', value: 'up' });
+            top.setReady('up');
         });
         await act(async () => {
-            deep.set({ status: 'ready', value: 'down' });
+            deep.setReady('down');
         });
         expect(screen.getByText('b down')).toBeTruthy();
-        expect(log).toContain('attach:deep');
+        expect(deep.attached).toBe(true);
 
         // S8: the mid-tree source drops to pending, so the level below unmounts for real.
         // Its cleanup keeps `deep` attached — the bucket is still live.
         await act(async () => {
-            top.set({ status: 'pending' });
+            top.setPending();
         });
         expect(screen.getByText('loading...')).toBeTruthy();
 
         // A new generation replaces that bucket, `deep` included. No error involved.
         view.rerender(<Island n="b" />);
-        await act(async () => {});
+        await flush();
         view.unmount();
 
-        expect(balanced(log, 'deep'), `unbalanced: ${log.join(' ')}`).toBe(true);
+        expect(
+            deep.attached,
+            `deep leaked: ${deep.attachCount} attach / ${deep.detachCount} detach`,
+        ).toBe(false);
     });
 });

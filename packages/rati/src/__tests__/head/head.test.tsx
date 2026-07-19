@@ -1,7 +1,6 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
-import { prerender } from 'react-dom/static';
 import { act, cleanup, render, screen } from '@testing-library/react';
-import { StrictMode, useState, type ReactElement } from 'react';
+import { StrictMode, useState } from 'react';
 import { createHeadStore } from '../../head/store';
 import { HeadProvider } from '../../head/HeadProvider';
 import { Title } from '../../head/Title';
@@ -9,8 +8,8 @@ import { useTitle } from '../../head/useTitle';
 import { Meta } from '../../head/Meta';
 import { island } from '../../island/island';
 import { scope } from '../../scope/scope';
-import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { headTags } from '../../ssr/headTags';
+import { controllableSource, prerenderToString } from '../../testing';
 
 afterEach(() => {
     cleanup();
@@ -50,45 +49,6 @@ const managedMetas = () => [...document.head.querySelectorAll('meta[data-rati-he
 
 const metaContent = (name: string) =>
     document.head.querySelector(`meta[data-rati-head][name="${name}"]`)?.getAttribute('content');
-
-async function prerenderToString(element: ReactElement): Promise<string> {
-    const { prelude } = await prerender(element);
-    const reader = prelude.getReader();
-    const decoder = new TextDecoder();
-    let html = '';
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        html += decoder.decode(value, { stream: true });
-    }
-    return html;
-}
-
-/** A source driven by hand, to walk an island through ready → error on the client. */
-function testSource<T>(): Source<T> & {
-    ready: (value: T) => void;
-    fail: (code: string) => void;
-} {
-    let state: SourceState<T> = { status: 'pending' };
-    const listeners = new Set<() => void>();
-    const set = (next: SourceState<T>) => {
-        state = next;
-        for (const listener of listeners) listener();
-    };
-    return {
-        [SourceSymbol]: true,
-        getSnapshot: () => state,
-        subscribe(onChange) {
-            listeners.add(onChange);
-            return () => {
-                listeners.delete(onChange);
-            };
-        },
-        attach: () => () => {},
-        ready: (value) => act(() => set({ status: 'ready', value })),
-        fail: (code) => act(() => set({ status: 'error', error: { code } })),
-    };
-}
 
 describe('HeadStore winners', () => {
     test('deepest declaration wins; unmount falls back to the outer one', async () => {
@@ -235,7 +195,9 @@ describe('HeadStore winners', () => {
 
     test('a Title inside an island that errors after committing falls back to the outer winner', async () => {
         const store = createHeadStore();
-        const page = testSource<string>();
+        // Driven by hand to walk the island ready → error on the client; its raw mutators
+        // drive a sync act (the head reconciler applies from an effect, flushed at act end).
+        const page = controllableSource<string>();
 
         const Island = island({
             scope: scope().load({ page: () => page }),
@@ -251,12 +213,12 @@ describe('HeadStore winners', () => {
             </HeadProvider>,
         );
 
-        page.ready('Page');
+        act(() => page.setReady('Page'));
         expect(document.title).toBe('Page');
 
         // The source errors *after* the Title committed: the island swaps in its error
         // slot, so the declaration unmounts and its `remove` hands the win back out.
-        page.fail('failed');
+        act(() => page.setError('failed'));
         expect(await screen.findByText('error: failed')).toBeTruthy();
         expect(document.title).toBe('Layout');
     });

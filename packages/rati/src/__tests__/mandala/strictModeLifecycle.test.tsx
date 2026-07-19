@@ -2,9 +2,9 @@ import { describe, test, expect, afterEach } from 'vite-plus/test';
 import { render, screen, cleanup, act } from '@testing-library/react';
 import { StrictMode, type FC } from 'react';
 import { scope } from '../../scope/scope';
-import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
 import { useScopeControls, type ScopeControls } from '../../mandala/controls';
+import { controllableSource, type ControllableSource } from '../../testing';
 
 /*
     Pin 8 (docs/archive/mandala-testing.md §"Deterministic pins"): StrictMode accounting
@@ -51,17 +51,11 @@ const Loading: FC = () => <div>loading...</div>;
 
 afterEach(cleanup);
 
-// Attach/detach as bounds, not a transcript (see suspenseEdges.test.tsx): `live` is what
-// is attached now, `peak` the most ever attached at once — 2 is a double attach.
-function ledger(log: string[]) {
-    let live = 0;
-    let peak = 0;
-    for (const event of log) {
-        if (event === 'attach') live++;
-        else if (event === 'detach') live--;
-        peak = Math.max(peak, live);
-    }
-    return { live, peak };
+// Attach/detach as bounds, not a transcript (see suspenseEdges.test.tsx), read off the
+// source's own counters: `live` is what is attached now, `peak` the most ever attached at
+// once — 2 is a double attach.
+function ledger(source: ControllableSource<string>) {
+    return { live: source.attachCount - source.detachCount, peak: source.peakAttached };
 }
 
 function probeControls<S extends Parameters<typeof useScopeControls>[0]>(testScope: S) {
@@ -71,21 +65,6 @@ function probeControls<S extends Parameters<typeof useScopeControls>[0]>(testSco
         return null;
     };
     return { captured, Probe };
-}
-
-// One source instance with its own log — the double-mount and the swap between them
-// build three, and a log keyed by name could not tell the generations apart.
-function makeSource(log: string[], value: string): Source<string> {
-    const state: SourceState<string> = { status: 'ready', value };
-    return {
-        [SourceSymbol]: true,
-        getSnapshot: () => state,
-        subscribe: () => () => {},
-        attach() {
-            log.push('attach');
-            return () => log.push('detach');
-        },
-    };
 }
 
 describe('StrictMode — the refresh machinery', () => {
@@ -99,7 +78,9 @@ describe('StrictMode — the refresh machinery', () => {
     // source stays in the level's array, so its Step keeps it attached (a live bucket
     // still holds it) and it feeds nothing for the rest of the island's life: live 1.
     test('a refresh-driven source swap on the surviving run is released at teardown', async () => {
-        const logs: string[][] = [];
+        // One source instance per generation — the double-mount and the swap between them
+        // build three, and each carries its own ledger so the generations stay distinct.
+        const sources: ControllableSource<string>[] = [];
         let version = 1;
         const testScope = scope()
             // Sync, so the initial mount reaches the level below and the double-mount
@@ -107,9 +88,9 @@ describe('StrictMode — the refresh machinery', () => {
             .load({ v: () => version })
             .load({
                 live: ({ v }: { v: number }) => {
-                    const log: string[] = [];
-                    logs.push(log);
-                    return makeSource(log, `s${v}`);
+                    const source = controllableSource<string>({ initial: `s${v}` });
+                    sources.push(source);
+                    return source;
                 },
             });
         const { captured, Probe } = probeControls(testScope);
@@ -135,9 +116,9 @@ describe('StrictMode — the refresh machinery', () => {
 
         // Two generations, two instances: the discarded run's is already released, and
         // the survivor's is attached exactly once.
-        expect(logs).toHaveLength(2);
-        expect(ledger(logs[0]!)).toEqual({ live: 0, peak: 1 });
-        expect(ledger(logs[1]!)).toEqual({ live: 1, peak: 1 });
+        expect(sources).toHaveLength(2);
+        expect(ledger(sources[0]!)).toEqual({ live: 0, peak: 1 });
+        expect(ledger(sources[1]!)).toEqual({ live: 1, peak: 1 });
 
         version = 2;
         await act(async () => {
@@ -146,11 +127,11 @@ describe('StrictMode — the refresh machinery', () => {
 
         // The refresh found the surviving run, and its cascade swapped the source there.
         expect(screen.getByText('live s2')).toBeTruthy();
-        expect(logs).toHaveLength(3);
-        expect(ledger(logs[1]!)).toEqual({ live: 0, peak: 1 });
-        expect(ledger(logs[2]!)).toEqual({ live: 1, peak: 1 });
+        expect(sources).toHaveLength(3);
+        expect(ledger(sources[1]!)).toEqual({ live: 0, peak: 1 });
+        expect(ledger(sources[2]!)).toEqual({ live: 1, peak: 1 });
 
         cleanup();
-        for (const log of logs) expect(ledger(log)).toEqual({ live: 0, peak: 1 });
+        for (const source of sources) expect(ledger(source)).toEqual({ live: 0, peak: 1 });
     });
 });
