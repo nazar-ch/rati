@@ -1,86 +1,49 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
-import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
-import { createContext, StrictMode, useContext, type FC } from 'react';
+// RTL is kept for the two mounts that are *not* a single island (a bare reader with no
+// island above; two sibling islands sharing a scope) — renderIsland covers everything else.
+import { render, screen, cleanup as rtlCleanup } from '@testing-library/react';
+import { act, createContext, StrictMode, useContext, type FC } from 'react';
 import { scope, input, hook } from '../../scope/scope';
-import { NotAvailableError, SourceSymbol, type Source, type SourceState } from '../../scope/source';
+import { NotAvailableError } from '../../scope/source';
 import { island } from '../../island/island';
 import { useScope, useOptionalScope } from '../../mandala/channel';
+import {
+    controllableSource,
+    deferred,
+    flush,
+    renderIsland,
+    cleanup,
+    type ControllableSource,
+} from '../../testing';
 
 const Loading: FC = () => <div>loading...</div>;
 
-afterEach(cleanup);
-
-// A promise the test resolves by hand, so a suspended (Suspense) render can be
-// observed in its loading state before the value lands.
-function deferred<T>() {
-    let resolve!: (value: T) => void;
-    let reject!: (reason: unknown) => void;
-    const promise = new Promise<T>((res, rej) => {
-        resolve = res;
-        reject = rej;
-    });
-    return { promise, resolve, reject };
-}
-
-// A hand-rolled source the test drives, logging attach/detach so lifetime is
-// observable. Mirrors what a CRDT/REST adapter implements.
-type TestSource<T> = Source<T> & {
-    ready: (value: T) => void;
-    fail: (code: string) => void;
-    pend: () => void;
-};
-
-function testSource<T>(log: string[], id: string): TestSource<T> {
-    // Hand-rolled subscribable (the new Source contract): a listener set + a stored
-    // state object whose identity changes on each transition, so getSnapshot is
-    // uSES-stable. Mirrors what an adapter (e.g. rati/mobx's observableSource) does.
-    let state: SourceState<T> = { status: 'pending' };
-    const listeners = new Set<() => void>();
-    const set = (next: SourceState<T>) => {
-        state = next;
-        for (const listener of listeners) listener();
-    };
-    return {
-        [SourceSymbol]: true,
-        getSnapshot: () => state,
-        subscribe(onChange) {
-            listeners.add(onChange);
-            return () => {
-                listeners.delete(onChange);
-            };
-        },
-        attach() {
-            log.push(`attach:${id}`);
-            return () => log.push(`detach:${id}`);
-        },
-        ready: (value) => act(() => set({ status: 'ready', value })),
-        fail: (code) => act(() => set({ status: 'error', error: { code } })),
-        pend: () => act(() => set({ status: 'pending' })),
-    };
-}
+afterEach(() => {
+    cleanup();
+    rtlCleanup();
+});
 
 describe('island', () => {
     test('shows loading, then the component with waterfall-resolved values', async () => {
         // A promise entry suspends; the loading slot is the Suspense fallback. The
         // dependent level then resolves off the first level's value.
         const name = deferred<string>();
-        const Island = island({
-            scope: scope({ id: input<string>() })
-                .load({ name: () => name.promise })
-                .load({ label: async ({ name }) => `[${name}]` }),
-            component: ({ label }) => <div>ready {label}</div>,
-            loading: Loading,
-        });
+        const handle = await renderIsland(
+            {
+                scope: scope({ id: input<string>() })
+                    .load({ name: () => name.promise })
+                    .load({ label: async ({ name }) => `[${name}]` }),
+                component: ({ label }) => <div>ready {label}</div>,
+                loading: Loading,
+            },
+            { props: { id: 'a1' } },
+        );
+        expect(handle.slot()).toBe('loading');
 
-        await act(async () => {
-            render(<Island id="a1" />);
-        });
-        expect(screen.getByText('loading...')).toBeTruthy();
-
-        await act(async () => {
-            name.resolve('env:a1');
-        });
-        expect(await screen.findByText('ready [env:a1]')).toBeTruthy();
+        name.resolve('env:a1');
+        await flush();
+        expect(handle.slot()).toBe('content');
+        expect(handle.text()).toBe('ready [env:a1]');
     });
 
     test('a hook() load reads React context every render and feeds downstream loads', async () => {
@@ -90,28 +53,28 @@ describe('island', () => {
         const StoresContext = createContext('default');
         let calls = 0;
 
-        const Island = island({
-            scope: scope({ id: input<string>() })
-                .load({
-                    prefix: hook(() => {
-                        calls++;
-                        return useContext(StoresContext);
-                    }),
-                })
-                .load({ label: ({ prefix, id }) => `${prefix}:${id}` }),
-            component: ({ label }) => <div>hooked {label}</div>,
-            loading: Loading,
-        });
+        const handle = await renderIsland(
+            {
+                scope: scope({ id: input<string>() })
+                    .load({
+                        prefix: hook(() => {
+                            calls++;
+                            return useContext(StoresContext);
+                        }),
+                    })
+                    .load({ label: ({ prefix, id }) => `${prefix}:${id}` }),
+                component: ({ label }) => <div>hooked {label}</div>,
+                loading: Loading,
+            },
+            {
+                props: { id: 'a1' },
+                wrapper: ({ children }) => (
+                    <StoresContext.Provider value="ctx">{children}</StoresContext.Provider>
+                ),
+            },
+        );
 
-        await act(async () => {
-            render(
-                <StoresContext.Provider value="ctx">
-                    <Island id="a1" />
-                </StoresContext.Provider>,
-            );
-        });
-
-        expect(await screen.findByText('hooked ctx:a1')).toBeTruthy();
+        expect(handle.text()).toBe('hooked ctx:a1');
         // The hook ran during render (not cached once like a data load).
         expect(calls).toBeGreaterThan(0);
     });
@@ -138,214 +101,210 @@ describe('island', () => {
     });
 
     test('routes a failed source to the error slot with the unified code', async () => {
-        const Island = island({
-            scope: scope({ id: input<string>() }).load({
-                page: async (): Promise<string> => {
-                    throw new NotAvailableError('no such page', { code: 'not-available' });
-                },
-            }),
-            component: () => <div>ready</div>,
-            loading: Loading,
-            error: ({ error }) => <div>error: {error.code}</div>,
-        });
+        const handle = await renderIsland(
+            {
+                scope: scope({ id: input<string>() }).load({
+                    page: async (): Promise<string> => {
+                        throw new NotAvailableError('no such page', { code: 'not-available' });
+                    },
+                }),
+                component: () => <div>ready</div>,
+                loading: Loading,
+                error: ({ error }) => <div>error: {error.code}</div>,
+            },
+            { props: { id: 'a1' } },
+        );
 
-        await act(async () => {
-            render(<Island id="a1" />);
-        });
-
-        expect(await screen.findByText('error: not-available')).toBeTruthy();
+        expect(handle.slot()).toBe('error');
+        expect(handle.text()).toBe('error: not-available');
     });
 
     test('renders the error slot and retries successfully', async () => {
         let failures = 1;
 
-        const Island = island({
-            scope: scope({ id: input<string>() }).load({
-                data: async ({ id }) => {
-                    if (failures > 0) {
-                        failures--;
-                        throw new Error('boom');
-                    }
-                    return `data:${id}`;
-                },
-            }),
-            component: ({ data }) => <div>ready {data}</div>,
-            loading: Loading,
-            error: ({ retry }) => (
-                <button type="button" onClick={retry}>
-                    retry
-                </button>
-            ),
-        });
+        const handle = await renderIsland(
+            {
+                scope: scope({ id: input<string>() }).load({
+                    data: async ({ id }) => {
+                        if (failures > 0) {
+                            failures--;
+                            throw new Error('boom');
+                        }
+                        return `data:${id}`;
+                    },
+                }),
+                component: ({ data }) => <div>ready {data}</div>,
+                loading: Loading,
+                error: ({ retry }) => (
+                    <button type="button" onClick={retry}>
+                        retry
+                    </button>
+                ),
+            },
+            { props: { id: 'a1' } },
+        );
 
+        expect(handle.slot()).toBe('error');
+        const retryButton = handle.container.querySelector('button')!;
         await act(async () => {
-            render(<Island id="a1" />);
+            retryButton.click();
         });
+        await flush();
 
-        const retryButton = await screen.findByText('retry');
-        await act(async () => {
-            fireEvent.click(retryButton);
-        });
-
-        expect(await screen.findByText('ready data:a1')).toBeTruthy();
+        expect(handle.slot()).toBe('content');
+        expect(handle.text()).toBe('ready data:a1');
     });
 
     test('attaches sources and detaches them on unmount', async () => {
-        const log: string[] = [];
-        const res = testSource<{ id: string }>(log, 'res');
+        const res = controllableSource<{ id: string }>();
 
-        const Island = island({
-            scope: scope({ id: input<string>() }).load({ res: () => res }),
-            component: ({ res: r }) => <div>ready {r.id}</div>,
-            loading: Loading,
-        });
+        const handle = await renderIsland(
+            {
+                scope: scope({ id: input<string>() }).load({ res: () => res }),
+                component: ({ res: r }) => <div>ready {r.id}</div>,
+                loading: Loading,
+            },
+            { props: { id: 'a1' } },
+        );
+        expect(res.attached).toBe(true);
 
-        const { unmount } = render(<Island id="a1" />);
-        expect(log).toContain('attach:res');
+        await act(async () => res.setReady({ id: 'a1' }));
+        expect(handle.text()).toBe('ready a1');
 
-        res.ready({ id: 'a1' });
-        await screen.findByText('ready a1');
-
-        unmount();
-        expect(log).toContain('detach:res');
+        handle.unmount();
+        expect(res.attached).toBe(false);
     });
 
     test('builds a dependent level only once the prior source is ready', async () => {
-        const log: string[] = [];
-        const space = testSource<string>(log, 'space');
-        const page = testSource<{ id: string }>(log, 'page');
+        const space = controllableSource<string>();
+        const page = controllableSource<{ id: string }>();
 
-        const Island = island({
-            scope: scope({ id: input<string>() })
-                .load({ space: () => space })
-                .load({ page: () => page }),
-            component: ({ page: p }) => <div>ready {p.id}</div>,
-            loading: Loading,
-        });
-
-        render(<Island id="a1" />);
+        const handle = await renderIsland(
+            {
+                scope: scope({ id: input<string>() })
+                    .load({ space: () => space })
+                    .load({ page: () => page }),
+                component: ({ page: p }) => <div>ready {p.id}</div>,
+                loading: Loading,
+            },
+            { props: { id: 'a1' } },
+        );
 
         // The page level must not be built until `space` is ready.
-        expect(log).toContain('attach:space');
-        expect(log).not.toContain('attach:page');
+        expect(space.attached).toBe(true);
+        expect(page.attached).toBe(false);
 
-        space.ready('s1');
-        expect(log).toContain('attach:page');
+        await act(async () => space.setReady('s1'));
+        expect(page.attached).toBe(true);
 
-        page.ready({ id: 'p1' });
-        expect(await screen.findByText('ready p1')).toBeTruthy();
+        await act(async () => page.setReady({ id: 'p1' }));
+        expect(handle.text()).toBe('ready p1');
     });
 
     test('resolves a source level that depends on a promise level', async () => {
         // The page route's shape: a promise (slug → spaceId) feeds a source (the doc
         // keyed by that id). The source level can't build until the promise resolves.
-        const log: string[] = [];
         const spaceId = deferred<string>();
-        const tree = testSource<{ id: string }>(log, 'tree');
+        const buildLog: string[] = [];
+        const tree = controllableSource<{ id: string }>();
 
-        const Island = island({
-            scope: scope({ id: input<string>() })
-                .load({ spaceId: () => spaceId.promise })
-                .load({
-                    tree: ({ spaceId }) => {
-                        log.push(`build-tree:${spaceId}`);
-                        return tree;
-                    },
-                }),
-            component: ({ tree: t }) => <div>ready {t.id}</div>,
-            loading: Loading,
-        });
-
-        await act(async () => {
-            render(<Island id="a1" />);
-        });
+        const handle = await renderIsland(
+            {
+                scope: scope({ id: input<string>() })
+                    .load({ spaceId: () => spaceId.promise })
+                    .load({
+                        tree: ({ spaceId }) => {
+                            buildLog.push(`build-tree:${spaceId}`);
+                            return tree;
+                        },
+                    }),
+                component: ({ tree: t }) => <div>ready {t.id}</div>,
+                loading: Loading,
+            },
+            { props: { id: 'a1' } },
+        );
         // Suspended on the promise — the source level hasn't been built yet.
-        expect(screen.getByText('loading...')).toBeTruthy();
-        expect(log).not.toContain('build-tree:s1');
+        expect(handle.slot()).toBe('loading');
+        expect(buildLog).not.toContain('build-tree:s1');
 
-        await act(async () => {
-            spaceId.resolve('s1');
-        });
+        spaceId.resolve('s1');
+        await flush();
         // The promise resolved, so the source level builds (with the resolved id) and
         // attaches; still loading until the source itself is ready.
-        expect(log).toContain('build-tree:s1');
-        expect(log).toContain('attach:tree');
+        expect(buildLog).toContain('build-tree:s1');
+        expect(tree.attached).toBe(true);
 
-        tree.ready({ id: 'p1' });
-        expect(await screen.findByText('ready p1')).toBeTruthy();
+        await act(async () => tree.setReady({ id: 'p1' }));
+        expect(handle.text()).toBe('ready p1');
     });
 
     test('a ready source returning to pending drops back to loading', async () => {
-        const log: string[] = [];
-        const res = testSource<{ id: string }>(log, 'res');
+        const res = controllableSource<{ id: string }>();
 
-        const Island = island({
-            scope: scope({ id: input<string>() }).load({ res: () => res }),
-            component: ({ res: r }) => <div>ready {r.id}</div>,
-            loading: Loading,
-        });
+        const handle = await renderIsland(
+            {
+                scope: scope({ id: input<string>() }).load({ res: () => res }),
+                component: ({ res: r }) => <div>ready {r.id}</div>,
+                loading: Loading,
+            },
+            { props: { id: 'a1' } },
+        );
+        await act(async () => res.setReady({ id: 'a1' }));
+        expect(handle.slot()).toBe('content');
 
-        render(<Island id="a1" />);
-        res.ready({ id: 'a1' });
-        await screen.findByText('ready a1');
-
-        res.pend();
-        expect(await screen.findByText('loading...')).toBeTruthy();
+        await act(async () => res.setPending());
+        expect(handle.slot()).toBe('loading');
     });
 
     test('detaches the previous run and re-resolves when params change', async () => {
-        const log: string[] = [];
-        const sources = new Map<string, TestSource<{ id: string }>>();
+        const sources = new Map<string, ControllableSource<{ id: string }>>();
         const sourceFor = (id: string) => {
             let source = sources.get(id);
             if (!source) {
-                source = testSource<{ id: string }>(log, id);
+                source = controllableSource<{ id: string }>();
                 sources.set(id, source);
             }
             return source;
         };
 
-        const Island = island({
-            scope: scope({ id: input<string>() }).load({ res: ({ id }) => sourceFor(id) }),
-            component: ({ res }) => <div>ready {res.id}</div>,
-            loading: Loading,
-        });
+        const handle = await renderIsland(
+            {
+                scope: scope({ id: input<string>() }).load({ res: ({ id }) => sourceFor(id) }),
+                component: ({ res }) => <div>ready {res.id}</div>,
+                loading: Loading,
+            },
+            { props: { id: 'a1' } },
+        );
+        await act(async () => sourceFor('a1').setReady({ id: 'a1' }));
+        expect(handle.text()).toBe('ready a1');
 
-        const { rerender } = render(<Island id="a1" />);
-        sourceFor('a1').ready({ id: 'a1' });
-        await screen.findByText('ready a1');
+        await handle.rerender({ id: 'a2' });
+        expect(sourceFor('a1').attached).toBe(false);
 
-        rerender(<Island id="a2" />);
-        expect(log).toContain('detach:a1');
-
-        sourceFor('a2').ready({ id: 'a2' });
-        expect(await screen.findByText('ready a2')).toBeTruthy();
+        await act(async () => sourceFor('a2').setReady({ id: 'a2' }));
+        expect(handle.text()).toBe('ready a2');
     });
 
     test('builds the .provide() value from the resolved chain and provides it to the subtree', async () => {
         const ctxScope = scope({ id: input<string>() })
             .load({ name: async ({ id }) => `env:${id}` })
             .provide(({ name }) => ({ label: `<${name}>` }));
-        const Island = island({
-            scope: ctxScope,
-            component: () => <Consumer />,
-            loading: Loading,
-        });
 
         function Consumer() {
             const ctx = useScope(ctxScope);
             return <div>ctx {ctx.label}</div>;
         }
 
-        await act(async () => {
-            render(<Island id="a1" />);
-        });
-        expect(await screen.findByText('ctx <env:a1>')).toBeTruthy();
+        const handle = await renderIsland(
+            { scope: ctxScope, component: () => <Consumer />, loading: Loading },
+            { props: { id: 'a1' } },
+        );
+        expect(handle.text()).toBe('ctx <env:a1>');
     });
 
     test('disposes the context before detaching the sources it was built from', async () => {
         const log: string[] = [];
-        const res = testSource<{ id: string }>(log, 'res');
+        const res = controllableSource<{ id: string }>({ onDetach: () => log.push('detach:res') });
 
         const ctxScope = scope({ id: input<string>() })
             .load({ res: () => res })
@@ -358,23 +317,21 @@ describe('island', () => {
                     },
                 };
             });
-        const Island = island({
-            scope: ctxScope,
-            component: () => <Mounted />,
-            loading: Loading,
-        });
 
         function Mounted() {
             const ctx = useScope(ctxScope);
             return <div>ctx {ctx.id}</div>;
         }
 
-        const { unmount } = render(<Island id="a1" />);
-        res.ready({ id: 'a1' });
-        await screen.findByText('ctx a1');
+        const handle = await renderIsland(
+            { scope: ctxScope, component: () => <Mounted />, loading: Loading },
+            { props: { id: 'a1' } },
+        );
+        await act(async () => res.setReady({ id: 'a1' }));
+        expect(handle.text()).toBe('ctx a1');
         expect(log).toContain('context-mount');
 
-        unmount();
+        handle.unmount();
         // The context teardown must run while the grab is still live — i.e. before
         // the source it was built from detaches.
         expect(log.indexOf('context-dispose')).toBeLessThan(log.indexOf('detach:res'));
@@ -382,55 +339,50 @@ describe('island', () => {
 
     test('rebuilds the context on param change, disposing the previous one first', async () => {
         const log: string[] = [];
-        const sources = new Map<string, TestSource<{ id: string }>>();
+        const sources = new Map<string, ControllableSource<{ id: string }>>();
         const sourceFor = (id: string) => {
             let source = sources.get(id);
             if (!source) {
-                source = testSource<{ id: string }>(log, id);
+                source = controllableSource<{ id: string }>({
+                    onDetach: () => log.push(`detach:${id}`),
+                });
                 sources.set(id, source);
             }
             return source;
         };
 
-        const Island = island({
-            scope: scope({ id: input<string>() })
-                .load({ res: ({ id }) => sourceFor(id) })
-                .provide(({ res }) => {
-                    log.push(`context-mount:${res.id}`);
-                    return {
-                        id: res.id,
-                        [Symbol.dispose]() {
-                            log.push(`context-dispose:${res.id}`);
-                        },
-                    };
-                }),
-            component: ({ res }) => <div>ready {res.id}</div>,
-            loading: Loading,
-        });
-
-        const { rerender } = render(<Island id="a1" />);
-        sourceFor('a1').ready({ id: 'a1' });
-        await screen.findByText('ready a1');
+        const handle = await renderIsland(
+            {
+                scope: scope({ id: input<string>() })
+                    .load({ res: ({ id }) => sourceFor(id) })
+                    .provide(({ res }) => {
+                        log.push(`context-mount:${res.id}`);
+                        return {
+                            id: res.id,
+                            [Symbol.dispose]() {
+                                log.push(`context-dispose:${res.id}`);
+                            },
+                        };
+                    }),
+                component: ({ res }) => <div>ready {res.id}</div>,
+                loading: Loading,
+            },
+            { props: { id: 'a1' } },
+        );
+        await act(async () => sourceFor('a1').setReady({ id: 'a1' }));
+        expect(handle.text()).toBe('ready a1');
         expect(log).toContain('context-mount:a1');
 
-        rerender(<Island id="a2" />);
+        await handle.rerender({ id: 'a2' });
         expect(log.indexOf('context-dispose:a1')).toBeLessThan(log.indexOf('detach:a1'));
 
-        sourceFor('a2').ready({ id: 'a2' });
-        await screen.findByText('ready a2');
+        await act(async () => sourceFor('a2').setReady({ id: 'a2' }));
+        expect(handle.text()).toBe('ready a2');
         expect(log).toContain('context-mount:a2');
     });
 
     test('.provide({ provideTo }) also publishes the value into an app-owned context', async () => {
         const AppContext = createContext<{ label: string } | null>(null);
-
-        const Island = island({
-            scope: scope({ id: input<string>() }).provide(({ id }) => ({ label: `#${id}` }), {
-                provideTo: AppContext,
-            }),
-            component: () => <Consumer />,
-            loading: Loading,
-        });
 
         // Reads the value through the app context — no useScope, so an app
         // consumer never has to import the island (which would cycle).
@@ -439,31 +391,39 @@ describe('island', () => {
             return <div>app {ctx?.label}</div>;
         }
 
-        render(<Island id="a1" />);
-        expect(await screen.findByText('app #a1')).toBeTruthy();
+        const handle = await renderIsland(
+            {
+                scope: scope({ id: input<string>() }).provide(({ id }) => ({ label: `#${id}` }), {
+                    provideTo: AppContext,
+                }),
+                component: () => <Consumer />,
+                loading: Loading,
+            },
+            { props: { id: 'a1' } },
+        );
+        expect(handle.text()).toBe('app #a1');
     });
 
     test('useOptionalScope returns the value when a context is provided above', async () => {
         const ctxScope = scope({ id: input<string>() }).provide(({ id }) => ({ label: `#${id}` }));
-        const Island = island({
-            scope: ctxScope,
-            component: () => <Consumer />,
-            loading: Loading,
-        });
 
         function Consumer() {
             const ctx = useOptionalScope(ctxScope);
             return <div>opt {ctx ? ctx.label : 'none'}</div>;
         }
 
-        render(<Island id="a1" />);
-        expect(await screen.findByText('opt #a1')).toBeTruthy();
+        const handle = await renderIsland(
+            { scope: ctxScope, component: () => <Consumer />, loading: Loading },
+            { props: { id: 'a1' } },
+        );
+        expect(handle.text()).toBe('opt #a1');
     });
 
     test('useOptionalScope returns undefined when rendered outside the island', () => {
         const ctxScope = scope({ id: input<string>() }).provide(({ id }) => ({ label: `#${id}` }));
         // Build the island so the scope's channel exists, but render the reader with no
-        // <Island> above it — a present scope with no provider in the tree.
+        // <Island> above it — a present scope with no provider in the tree. Not an island
+        // mount, so renderIsland doesn't apply: a bare RTL render is the honest tool.
         island({ scope: ctxScope, component: () => <div>page</div>, loading: Loading });
 
         function Consumer() {
@@ -477,11 +437,6 @@ describe('island', () => {
 
     test('provide-by-default: useScope returns the resolved props when the scope declares no .provide()', async () => {
         const propsScope = scope({ id: input<string>() });
-        const Island = island({
-            scope: propsScope,
-            component: () => <Consumer />,
-            loading: Loading,
-        });
 
         // No `.provide()`, so the island provides its resolved props to the subtree.
         function Consumer() {
@@ -489,8 +444,11 @@ describe('island', () => {
             return <div>props {props.id}</div>;
         }
 
-        render(<Island id="a1" />);
-        expect(await screen.findByText('props a1')).toBeTruthy();
+        const handle = await renderIsland(
+            { scope: propsScope, component: () => <Consumer />, loading: Loading },
+            { props: { id: 'a1' } },
+        );
+        expect(handle.text()).toBe('props a1');
     });
 
     // StrictMode mounts, tears down, then remounts on the initial commit. Each
@@ -499,25 +457,23 @@ describe('island', () => {
     // from the discarded first run — and that the discarded context is disposed
     // while its own source is still attached.
 
-    // A source that is ready immediately, tagged with a per-build identity so run #1
-    // and run #2 are distinguishable. Logs attach/detach so teardown is observable.
+    // A source ready immediately, tagged with a per-build identity so run #1 and run #2
+    // are distinguishable, logging attach/detach so teardown is observable.
     function readySourceFactory(log: string[]) {
         let seq = 0;
         return () => {
             const id = `src${++seq}`;
-            const state: SourceState<{ id: string }> = { status: 'ready', value: { id } };
-            const source: Source<{ id: string }> = {
-                [SourceSymbol]: true,
-                getSnapshot: () => state,
-                subscribe: () => () => {},
-                attach() {
-                    log.push(`attach:${id}`);
-                    return () => log.push(`detach:${id}`);
-                },
-            };
-            return source;
+            return controllableSource({
+                initial: { id },
+                onAttach: () => log.push(`attach:${id}`),
+                onDetach: () => log.push(`detach:${id}`),
+            });
         };
     }
+
+    // These pin StrictMode's discard-remount specifically, which needs a *synchronous* mount
+    // (renderIsland mounts under an async act, and React skips the remount there — see its
+    // docs). So they stay on a bare RTL render, driving the controllableSource-backed factory.
 
     test('StrictMode: useScope sees the surviving run, discarded context disposed before its source detaches', async () => {
         const log: string[] = [];
@@ -534,11 +490,7 @@ describe('island', () => {
                     },
                 };
             });
-        const Island = island({
-            scope: ctxScope,
-            component: () => <Consumer />,
-            loading: Loading,
-        });
+        const Island = island({ scope: ctxScope, component: () => <Consumer />, loading: Loading });
 
         function Consumer() {
             const ctx = useScope(ctxScope);
@@ -612,8 +564,8 @@ describe('island', () => {
         // The reuse case: two distinct islands built from the *same* scope. They share
         // one value channel (scope identity), but each renders its own Provider subtree,
         // so a by-scope reader under each gets that island's value — nearest wins, no
-        // cross-talk. (Nesting two of the same scope is the only ambiguous case, and
-        // then nearest-wins is the sane default.)
+        // cross-talk. Two islands in one tree isn't a single-island mount, so this stays
+        // on a bare RTL render.
         const sharedScope = scope({ id: input<string>() }).provide(({ id }) => ({ tag: `#${id}` }));
         const First = island({
             scope: sharedScope,

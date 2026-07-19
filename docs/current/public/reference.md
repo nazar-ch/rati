@@ -666,6 +666,8 @@ rati's own suites (and Jnana's) hand-rolled before this entry existed.
 | `deferred<T>()` | `{ promise, resolve, reject }` — a promise you settle by hand, to walk a load through its phases. `T = void` → no-arg `resolve()` |
 | `flush(times?)` | `await` `times` empty `act`-flushed microtask turns (default 1). A Suspense retry after a settle isn't synchronous with the resolving `act`, and a waterfall re-suspending one level deeper needs one flush per level — prefer a fixed count over a poll |
 | `controllableSource<T>(options?)` | a real `Source<T>` you drive by hand, with an attach/detach ledger |
+| `renderIsland(target, options?)` | mount an island (or `{ scope, component, … }` config) and drive it; async, returns a handle. See below |
+| `cleanup()` | unmount every island `renderIsland` mounted — wire up `afterEach(cleanup)` |
 
 `controllableSource` is a genuine source — an island attaches it, subscribes, and
 re-renders on every transition. Its mutators are **raw**: they set state and notify
@@ -686,19 +688,50 @@ Options: `initial` (start `ready` with a value instead of `pending`), `ssr` (the
 still pending, settle `ready` to this value on a microtask — pair with `ssr: true`),
 `onAttach` / `onDetach` (run at the ledger edges, for asserting attach ordering).
 
-```ts
-import { island } from 'rati';
-import { controllableSource, deferred, flush } from 'rati/testing';
+**`renderIsland(target, options?)`** mounts an island and hands back a handle for driving
+it. Pass a `{ scope, component, loading?, error? }` config (the full-featured path) or an
+already-built `island()` component; `options` takes `props` (the island's inputs) and a
+`wrapper` (app-level providers). It renders with `react-dom/client` — no
+`@testing-library/react` dependency — and returns the container, so query it however you
+already do. It is **async**: the mount settles the scope as far as it can, so a self-settling
+load is already `content` while a still-pending one (a `deferred`, an un-driven
+`controllableSource`) reads as `loading`; drive it, then `await flush()`.
 
-// The canonical flow: mount with a pending load, assert loading, resolve, assert content.
-const gate = deferred<string>();
-const feed = controllableSource<string>();          // a live source, driven below
-const scope = scope({ id: input<string>() })
-    .load({ page: () => gate.promise })
-    .load({ feed: () => feed });
-// … mount the island, assert the loading slot …
-gate.resolve('home');
-feed.setReady('live');
-await flush();                                        // let the Suspense retry land
-// … assert the content slot …
+| Handle member | Purpose |
+| --- | --- |
+| `container` | the mounted DOM node (appended to `document.body`) |
+| `slot()` | which slot is on screen — `'loading'` / `'content'` / `'error'`; reads visibility, so a Suspense-hidden stale subtree doesn't count as content. Config mode only |
+| `text()` | the visible slot's trimmed `textContent`. Config mode only |
+| `controls()` | the island's `useScopeControls` (imperative `refresh` + the live `pending` set), from the test side. Config mode only |
+| `rerender(props?)` | re-render with new inputs — the param-change path. Async, like the mount |
+| `unmount()` | unmount and remove the container |
+
+Config mode wraps each slot in a private marker element to read `slot()` — testids never
+enter the island's own API. A pre-built island exposes neither its scope nor its slots, so
+`slot()` / `text()` / `controls()` need the config form. One limit: the async mount skips
+StrictMode's mount/unmount/remount, so a test pinning that discard-the-first-run behavior
+must render synchronously instead.
+
+```ts
+import { renderIsland, deferred, controllableSource, flush, cleanup } from 'rati/testing';
+
+afterEach(cleanup);
+
+test('loading → content', async () => {
+    const gate = deferred<string>();
+    const handle = await renderIsland(
+        {
+            scope: scope({ id: input<string>() }).load({ page: () => gate.promise }),
+            component: ({ page }) => <div>ready {page}</div>,
+            loading: () => <div>loading…</div>,
+        },
+        { props: { id: 'a1' } },
+    );
+
+    expect(handle.slot()).toBe('loading');   // the deferred load is still pending
+    gate.resolve('home');
+    await flush();                            // let the Suspense retry land
+    expect(handle.slot()).toBe('content');
+    expect(handle.text()).toBe('ready home');
+});
 ```

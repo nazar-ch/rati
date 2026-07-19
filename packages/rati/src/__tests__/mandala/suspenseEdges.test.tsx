@@ -1,9 +1,7 @@
 import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
-import { render, screen, cleanup, act } from '@testing-library/react';
-import { useSyncExternalStore, type FC } from 'react';
+import { act, useSyncExternalStore, type FC } from 'react';
 import { scope, hook } from '../../scope/scope';
-import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
-import { island } from '../../island/island';
+import { controllableSource, deferred, flush, renderIsland, cleanup } from '../../testing';
 
 /*
     The Suspense-produced situations React makes possible around a committed island —
@@ -21,80 +19,27 @@ import { island } from '../../island/island';
     not its exact event sequence. Whether the engine keeps a source attached through a
     hide or cycles it is its own business — S4/S8 say so explicitly — so pinning the
     sequence would freeze an implementation nicety into a promise.
+
+    A `controllableSource`'s transitions must drive an **async** act (`act(async () =>
+    source.setReady(v))`) and be awaited: S2's rule for the mount is really about any act
+    that (re-)suspends, and a source transition can be one — here a ready source lets the
+    waterfall reach a level whose hook load `use()`es a promise React has not seen, which
+    suspends. Under a sync act that retry is never delivered and the island sits on the
+    loading slot forever.
 */
 
 const Loading: FC = () => <div>loading...</div>;
 
 afterEach(cleanup);
 
-// The Suspense retry after a settle is not synchronous with the resolving `act`
-// (suspense-situations.md S2) — a *fixed* number of empty flushes, never a
-// poll-until-green.
-async function flush(times = 1): Promise<void> {
-    for (let i = 0; i < times; i++) await act(async () => {});
-}
-
-function deferred<T>() {
-    let resolve!: (value: T) => void;
-    const promise = new Promise<T>((res) => {
-        resolve = res;
-    });
-    return { promise, resolve };
-}
-
-type TestSource<T> = Source<T> & {
-    ready: (value: T) => Promise<void>;
-    pend: () => Promise<void>;
-};
-
 /*
-    As elsewhere, except that the transitions drive an **async** act and must be awaited.
-    S2 states the rule for the mount; it is really about any act that (re-)suspends, and
-    a source transition can be one: here a ready source lets the waterfall reach a level
-    whose hook load `use()`es a promise React has not seen, which suspends. Under a sync
-    `act(() => set(…))` that retry is never delivered and the island sits on the loading
-    slot forever — the mount's failure mode exactly, one transition later.
+    The attach/detach ledger read off the source's own counters, as *bounds* rather than a
+    transcript: `live` is what is attached right now, `peak` the most that was ever attached
+    at once. For a single source, `peak > 1` is a double attach of a live entry (the
+    contract's line), and `live > 0` after teardown is a leak.
 */
-function testSource<T>(log: string[], id: string): TestSource<T> {
-    let state: SourceState<T> = { status: 'pending' };
-    const listeners = new Set<() => void>();
-    const set = (next: SourceState<T>) => {
-        state = next;
-        for (const listener of listeners) listener();
-    };
-    return {
-        [SourceSymbol]: true,
-        getSnapshot: () => state,
-        subscribe(onChange) {
-            listeners.add(onChange);
-            return () => {
-                listeners.delete(onChange);
-            };
-        },
-        attach() {
-            log.push(`attach:${id}`);
-            return () => log.push(`detach:${id}`);
-        },
-        ready: (value) => act(async () => set({ status: 'ready', value })),
-        pend: () => act(async () => set({ status: 'pending' })),
-    };
-}
-
-/*
-    The attach/detach ledger as *bounds* rather than a transcript: `live` is what is
-    attached right now, `peak` the most that was ever attached at once. For a single
-    source, `peak > 1` is a double attach of a live entry (the contract's line), and
-    `live > 0` after teardown is a leak.
-*/
-function ledger(log: string[], id: string) {
-    let live = 0;
-    let peak = 0;
-    for (const event of log) {
-        if (event === `attach:${id}`) live++;
-        else if (event === `detach:${id}`) live--;
-        peak = Math.max(peak, live);
-    }
-    return { live, peak };
+function ledger(source: { attachCount: number; detachCount: number; peakAttached: number }) {
+    return { live: source.attachCount - source.detachCount, peak: source.peakAttached };
 }
 
 // An external store holding the promise a hook load hands back — the test swaps in a
@@ -130,8 +75,7 @@ describe('S4 — re-suspension of committed content', () => {
     // the one the label's initial suspension causes on the way to content — the explicit
     // re-suspension below is the second.)
     test('a hook load re-suspending hides and reveals content without double-attaching or re-running producers', async () => {
-        const log: string[] = [];
-        const feed = testSource<string>(log, 'feed');
+        const feed = controllableSource<string>();
         let itemRuns = 0;
         const store = promiseStore(Promise.resolve('label-1'));
         const testScope = scope()
@@ -146,7 +90,7 @@ describe('S4 — re-suspension of committed content', () => {
                 // Re-runs every render and hands back whatever promise the store holds.
                 label: hook(() => useSyncExternalStore(store.subscribe, store.getSnapshot)),
             });
-        const Island = island({
+        const handle = await renderIsland({
             scope: testScope,
             component: ({
                 feed: f,
@@ -166,23 +110,20 @@ describe('S4 — re-suspension of committed content', () => {
             loading: Loading,
         });
 
-        await act(async () => {
-            render(<Island />);
-        });
-        await feed.ready('live');
+        await act(async () => feed.setReady('live'));
         await flush();
-        expect(screen.getByText('live/item/label-1')).toBeTruthy();
+        expect(handle.text()).toBe('live/item/label-1');
         expect(itemRuns).toBe(1);
-        expect(ledger(log, 'feed')).toEqual({ live: 1, peak: 1 });
+        expect(ledger(feed)).toEqual({ live: 1, peak: 1 });
 
         // The committed Step suspends again on a fresh pending promise.
         const next = deferred<string>();
         await act(async () => {
             store.set(next.promise);
         });
-        expect(screen.getByText('loading...')).toBeTruthy();
+        expect(handle.slot()).toBe('loading');
         // Hidden, not unmounted — but either way nothing may attach twice.
-        expect(ledger(log, 'feed').peak).toBe(1);
+        expect(ledger(feed).peak).toBe(1);
 
         await act(async () => {
             next.resolve('label-2');
@@ -190,13 +131,13 @@ describe('S4 — re-suspension of committed content', () => {
         await flush(2);
 
         // Content is back on the new label, and the source that feeds it is attached.
-        expect(screen.getByText('live/item/label-2')).toBeTruthy();
-        expect(ledger(log, 'feed')).toEqual({ live: 1, peak: 1 });
+        expect(handle.text()).toBe('live/item/label-2');
+        expect(ledger(feed)).toEqual({ live: 1, peak: 1 });
         // Only the hook load re-ran: the data cells are cached, so no re-fetch.
         expect(itemRuns).toBe(1);
 
         cleanup();
-        expect(ledger(log, 'feed')).toEqual({ live: 0, peak: 1 });
+        expect(ledger(feed)).toEqual({ live: 0, peak: 1 });
     });
 });
 
@@ -213,16 +154,16 @@ describe('S5 — unmount while suspended', () => {
     test('a late settle into a discarded tree is inert; a never-attached source is balanced at 0/0', async () => {
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        const log: string[] = [];
         const slow = deferred<string>();
+        // Both cells are built when the level builds, but the resolve loop suspends on
+        // `slow` before it reads `feed` — so the Step never commits and `feed`, though
+        // created, is never attached.
+        const feed = controllableSource<string>();
         const testScope = scope().load({
-            // Both cells are built when the level builds, but the resolve loop suspends
-            // on `slow` before it reads `feed` — so the Step never commits and `feed`,
-            // though created, is never attached.
             slow: () => slow.promise,
-            feed: () => testSource<string>(log, 'feed'),
+            feed: () => feed,
         });
-        const Island = island({
+        const handle = await renderIsland({
             scope: testScope,
             component: ({ slow: s, feed: f }: { slow: string; feed: string }) => (
                 <div>
@@ -231,24 +172,17 @@ describe('S5 — unmount while suspended', () => {
             ),
             loading: Loading,
         });
+        expect(handle.slot()).toBe('loading');
+        expect(feed.attachCount).toBe(0);
 
-        let unmount!: () => void;
-        await act(async () => {
-            ({ unmount } = render(<Island />));
-        });
-        expect(screen.getByText('loading...')).toBeTruthy();
-        expect(log).toEqual([]);
-
-        await act(async () => {
-            unmount();
-        });
+        handle.unmount();
         // The load settles after the tree is gone.
         await act(async () => {
             slow.resolve('too late');
         });
         await flush();
 
-        expect(ledger(log, 'feed')).toEqual({ live: 0, peak: 0 });
+        expect(ledger(feed)).toEqual({ live: 0, peak: 0 });
         expect(errorSpy).not.toHaveBeenCalled();
         expect(warnSpy).not.toHaveBeenCalled();
         errorSpy.mockRestore();
@@ -268,9 +202,8 @@ describe('S8 — a mid-tree source dropping to pending', () => {
     // (!equals(cell.lastValue, state.value))` → `if (true)` → the recovery blip is
     // called a change, cascades, and `derived` re-runs.
     test('recovering onto the same value re-renders the levels below with no producer re-runs', async () => {
-        const log: string[] = [];
-        const feed = testSource<string>(log, 'feed');
-        const deep = testSource<string>(log, 'deep');
+        const feed = controllableSource<string>();
+        const deep = controllableSource<string>();
         let derivedRuns = 0;
         const testScope = scope()
             .load({ feed: () => feed })
@@ -281,7 +214,7 @@ describe('S8 — a mid-tree source dropping to pending', () => {
                 },
                 deep: () => deep,
             });
-        const Island = island({
+        const handle = await renderIsland({
             scope: testScope,
             component: ({ derived, deep: d }: { derived: string; deep: string }) => (
                 <div>
@@ -293,31 +226,28 @@ describe('S8 — a mid-tree source dropping to pending', () => {
             loading: Loading,
         });
 
-        await act(async () => {
-            render(<Island />);
-        });
-        await feed.ready('v1');
-        await deep.ready('deep-1');
-        expect(screen.getByText('d(v1)/deep-1')).toBeTruthy();
+        await act(async () => feed.setReady('v1'));
+        await act(async () => deep.setReady('deep-1'));
+        expect(handle.text()).toBe('d(v1)/deep-1');
         expect(derivedRuns).toBe(1);
-        expect(ledger(log, 'deep')).toEqual({ live: 1, peak: 1 });
+        expect(ledger(deep)).toEqual({ live: 1, peak: 1 });
 
         // The mid-tree source blips: the levels below go away for real.
-        await feed.pend();
-        expect(screen.getByText('loading...')).toBeTruthy();
-        expect(ledger(log, 'deep').peak).toBe(1);
+        await act(async () => feed.setPending());
+        expect(handle.slot()).toBe('loading');
+        expect(ledger(deep).peak).toBe(1);
 
         // …and recovers onto the value it already had.
-        await feed.ready('v1');
+        await act(async () => feed.setReady('v1'));
 
-        expect(screen.getByText('d(v1)/deep-1')).toBeTruthy();
+        expect(handle.text()).toBe('d(v1)/deep-1');
         // The cached cell rendered again; the producer never ran a second time.
         expect(derivedRuns).toBe(1);
-        expect(ledger(log, 'deep').peak).toBe(1);
+        expect(ledger(deep).peak).toBe(1);
 
         cleanup();
-        expect(ledger(log, 'deep')).toEqual({ live: 0, peak: 1 });
-        expect(ledger(log, 'feed')).toEqual({ live: 0, peak: 1 });
+        expect(ledger(deep)).toEqual({ live: 0, peak: 1 });
+        expect(ledger(feed)).toEqual({ live: 0, peak: 1 });
     });
 
     // The mandala's unmount sweep, tested where it is the only thing that can work — the
@@ -336,16 +266,15 @@ describe('S8 — a mid-tree source dropping to pending', () => {
     // Kill: mandala.tsx, the unmount effect's cleanup — drop
     // `sweepDetach(cacheRef.current?.buckets)` → `deep` is never detached: live 1.
     test('unmounting during the pending window releases what the torn-down levels kept', async () => {
-        const log: string[] = [];
-        const feed = testSource<string>(log, 'feed');
-        const deep = testSource<string>(log, 'deep');
+        const feed = controllableSource<string>();
+        const deep = controllableSource<string>();
         const testScope = scope()
             .load({ feed: () => feed })
             .load({
                 derived: ({ feed: f }: { feed: string }) => `d(${f})`,
                 deep: () => deep,
             });
-        const Island = island({
+        const handle = await renderIsland({
             scope: testScope,
             component: ({ derived, deep: d }: { derived: string; deep: string }) => (
                 <div>
@@ -357,21 +286,18 @@ describe('S8 — a mid-tree source dropping to pending', () => {
             loading: Loading,
         });
 
-        await act(async () => {
-            render(<Island />);
-        });
-        await feed.ready('v1');
-        await deep.ready('deep-1');
-        expect(screen.getByText('d(v1)/deep-1')).toBeTruthy();
+        await act(async () => feed.setReady('v1'));
+        await act(async () => deep.setReady('deep-1'));
+        expect(handle.text()).toBe('d(v1)/deep-1');
 
         // The blip tears the level below down; its source stays attached, deferred.
-        await feed.pend();
-        expect(screen.getByText('loading...')).toBeTruthy();
-        expect(ledger(log, 'deep')).toEqual({ live: 1, peak: 1 });
+        await act(async () => feed.setPending());
+        expect(handle.slot()).toBe('loading');
+        expect(ledger(deep)).toEqual({ live: 1, peak: 1 });
 
         // The island goes away with the window still open.
         cleanup();
-        expect(ledger(log, 'deep')).toEqual({ live: 0, peak: 1 });
-        expect(ledger(log, 'feed')).toEqual({ live: 0, peak: 1 });
+        expect(ledger(deep)).toEqual({ live: 0, peak: 1 });
+        expect(ledger(feed)).toEqual({ live: 0, peak: 1 });
     });
 });

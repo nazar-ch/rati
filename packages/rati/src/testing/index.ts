@@ -17,3 +17,4 @@ export {
     type ControllableSource,
     type ControllableSourceOptions,
 } from './controllableSource';
+export { renderIsland, cleanup, type IslandHandle, type RenderIslandOptions } from './renderIsland';

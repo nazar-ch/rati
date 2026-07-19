@@ -83,6 +83,53 @@ Batching, dependencies, grading: [plan.md](./plan.md).
 output besides the code — anywhere the utilities force a workaround is the signal a future
 item needs.)
 
+### 2026-07-19 — DX-01 (entry + API style pinned)
+
+The B1 style decisions, for every later item to copy:
+
+- **Entry** `src/testing/`, one file per primitive + an additive barrel; wired into the
+  exports map and the lib build like `./ssr`. Byte-identical builds for every pre-existing
+  entry (the entry is side-effect-free and unreferenced from `main.ts`).
+- **`controllableSource` mutators are raw** (no auto-`act`). A source is driven both from
+  the test top level *and* from inside engine flow (a `queueMicrotask` in a load, a fuzz
+  command already inside `act`); an auto-`act` breaks the latter. The test wraps a top-level
+  drive (`act(async () => src.setReady(v))`) or follows it with `await flush()`.
+- **Naming reconciliation** (research doc said `setReady`/`setError`/`reset`): `reset` was
+  too weak — the copies pend/re-ready repeatedly and one needs identity-stable recovery. Final
+  surface: `setReady` / `setPending` / `setError` (a bare string → the `code`) / `emit()`
+  (re-emit the last value, stable identity — the S8/pin-12 recovery case). Ledger:
+  `attachCount` / `detachCount` / `attached` / `peakAttached`. Options: `initial`, `ssr`
+  (marker passthrough), `loads` (the `ssr: true` loader shape), `onAttach` / `onDetach`.
+- **`@testing-library/react` is not a dependency** — decided absent. `flush` imports `act`
+  from `react`; the render harness (DX-02) uses `react-dom/client`.
+- **Docs** live in `reference.md` under a `## rati/testing` section (last entry, test-only).
+
+### 2026-07-19 — DX-02 (renderIsland) friction, for DX-05 to expect
+
+- **The async mount can't pin StrictMode's discard-remount.** `renderIsland` mounts under an
+  async `act` so a pending promise/source settles; React skips StrictMode's
+  mount/unmount/remount double-invoke under an async act (verified: a single `attach`, no
+  remount). A plain sync `act(() => root.render())` triggers the remount but then can't settle
+  a *later*-resolved promise (the un-awaited sync act with pending Suspense leaves the boundary
+  stuck). No single mount does both — the original suite already used async-wrapped mounts for
+  async tests and plain sync `render` for the StrictMode cases. So `island.test.tsx`'s three
+  StrictMode-remount tests **stay on a bare RTL `render`** (driving the promoted
+  `controllableSource` factory); everything else moved to `renderIsland`.
+- **`renderIsland` is single-island.** Two mounts in `island.test.tsx` aren't (a bare reader
+  with no island above; two sibling islands sharing a scope) — they stay on RTL. `renderIsland`
+  covers one island + its slots/controls; a bare-component or multi-island render is out of
+  scope by design. DX-05 should not force those onto it.
+- **Slot detection via private markers, not testids.** Config mode wraps each slot in a
+  `data-rati-testing-slot` element (visibility-aware, for the Suspense-hidden-stale case) — so
+  `slot()`/`text()` work without any testid entering the island's own API. A pre-built island
+  exposes neither scope nor slots, so `slot()`/`text()`/`controls()` need the config form.
+- Converted with assertions preserved: `island.test.tsx` (23 tests) and `suspenseEdges.test.tsx`
+  (4) — the latter's `ledger(log,id)` became the source's own `attachCount`/`peakAttached`.
+- **Follow-up (SI-03 not landed):** `ScopeControls` is still `{ refresh, pending }` — no
+  `phase`/`isStale`. So `handle.controls()` surfaces exactly those two; when SI-03 lands and
+  widens `ScopeControls`, the handle gets `phase`/`isStale` for free (it returns the whole
+  `useScopeControls` value), no harness change needed.
+
 ## Per-item conventions
 
 Atomic commits on the current branch; subjects prefixed `DX-NN:`, a `Closes: DX-NN` trailer

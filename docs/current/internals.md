@@ -466,15 +466,18 @@ deterministic pin list, the fuzz harness design — is
 `packages/rati/src/__tests__/suspense-situations.md`.
 
 The utilities the suites lean on ship as the public **`rati/testing`** entry (`src/testing/`
-— `deferred`, `flush`, `controllableSource`), so both a consumer and rati's own suites use
-one implementation. It is *promotion*: the generic cores were extracted out of the ~8
-hand-rolled `testSource`/`loaderSource` copies and the `deferred`/`flush` idioms. The
-`fuzz/` harnesses keep their own **model-wired** drivers — `scopeHarness.tsx`'s
+— `deferred`, `flush`, `controllableSource`, `renderIsland`), so both a consumer and rati's
+own suites use one implementation. It is *promotion*: the generic cores were extracted out of
+the ~8 hand-rolled `testSource`/`loaderSource` copies, the `deferred`/`flush` idioms, and the
+island mount + slot-reader hand-inlined across the mandala suites (now `renderIsland` +
+`slot()`, which wraps each slot in a private marker so testids stay out of the island API).
+The `fuzz/` harnesses keep their own **model-wired** drivers — `scopeHarness.tsx`'s
 `controllableSource` carries a ledger tied to the reference model (depth/`maxConcurrent`), a
-`recompute` closure, and testid-tagged slot readers — none of which belong in the generic
-core; that reconciliation (and deleting the remaining deterministic-suite duplicates behind
-the entry) is the [testing-and-dx effort](../planned/testing-and-dx/README.md)'s later
-dogfood sweep. Effort record for the entry: [planned/testing-and-dx/](../planned/testing-and-dx/README.md).
+`recompute` closure, and its own testid slot readers, and its mount is instrumented for the
+command model — none of which belong in the generic core; that reconciliation (and deleting
+the remaining deterministic-suite duplicates behind the entry) is the
+[testing-and-dx effort](../planned/testing-and-dx/README.md)'s later dogfood sweep. Effort
+record for the entry: [planned/testing-and-dx/](../planned/testing-and-dx/README.md).
 
 `fuzz/` holds two targets sharing one budget convention (`fuzz(n)`, `FUZZ_RUNS`,
 `FUZZ_LEVEL`, `FUZZ_SEED` — documented in `fuzz/arbitraries.ts`): the mandala's scope
