@@ -1,5 +1,11 @@
 # Scope & island directions — resolution, loading states, sharing
 
+> **Parts 1 and 2 are being executed** — cut 2026-07-19 as the
+> [scope-and-island effort](../planned/scope-and-island/README.md) (all six directions,
+> including the two below marked wait-for-need — the cut's decisions are recorded there,
+> and where a record and this doc disagree, the record wins). Part 3 (`ResourceContainer`)
+> stays open research.
+
 Forward-looking options for scope resolution and the island's loading/error presentation.
 **None of these are implemented** — each waits for a real (Jnana- or consumer-driven) need so
 the shape is pinned by a concrete use case. Distilled from the July 2026 design review

@@ -17,7 +17,8 @@ regrouped by topic into the files below.
 - [scope-and-island-directions.md](./scope-and-island-directions.md) — abort signals for data
   loads; advanced island loading states (`loadingDelayMs`, `keepStale` + status hook, retry
   policy, per-island `ssr: false`, SSR-error dehydration options); `ResourceContainer` migrating
-  into core for shared resource lifetimes.
+  into core for shared resource lifetimes. **Parts 1–2 in execution:**
+  [../planned/scope-and-island/](../planned/scope-and-island/README.md) (cut 2026-07-19).
 - [router-extensions.md](./router-extensions.md) — `group`/`include` composition, nested wrapper
   stacks, layout-level scope, namespaced names, typed path converters, route guards, regex paths;
   plus typed search params and navigation status/blocking.
@@ -30,7 +31,8 @@ regrouped by topic into the files below.
 - [ssg-and-rsc.md](./ssg-and-rsc.md) — SSG (a build script over the shipped `renderApp`) and RSC
   as a compatibility constraint; direction only.
 - [dx-and-tooling.md](./dx-and-tooling.md) — test utilities (`rati/testing`), a `dataTrace`
-  sibling to `navTrace`, DevTools naming for `Step` components.
+  sibling to `navTrace`, DevTools naming for `Step` components. **In execution:**
+  [../planned/testing-and-dx/](../planned/testing-and-dx/README.md) (cut 2026-07-19).
 
 ## Parked (left as-is — not part of this sort)
 
