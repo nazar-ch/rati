@@ -5,6 +5,7 @@ import { RegionContext } from './appContext';
 import { fetchProduct, fetchProfile, fetchReviews } from './data';
 import { About } from './components/About';
 import { Counter } from './components/Counter';
+import { DeferredPage } from './components/Deferred';
 import { Fallback, FallbackWrapper } from './components/Fallback';
 import { Flaky } from './components/Flaky';
 import { Home } from './components/Home';
@@ -67,6 +68,9 @@ export const routes = [
     }),
     route('/profile/:userId', 'profile', ProfilePage, { scope: profileScope }),
     route('/counter', 'counter', Counter),
+    // Two islands, one page: the second sets `ssr: false`, so its loading slot is what
+    // the server ships and the browser does the load after hydration.
+    route('/deferred', 'deferred', DeferredPage),
     route('/live', 'live', Live),
     route('/flaky', 'flaky', Flaky),
     // Throws during the server render from its `wrapper` — which the Router renders

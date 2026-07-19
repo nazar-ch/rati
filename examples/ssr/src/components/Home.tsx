@@ -28,6 +28,12 @@ const FEATURES = [
         blurb: 'The scope instantiates a MobX store and hands the component the instance; mutate it after hydration.',
     },
     {
+        to: { name: 'deferred' },
+        title: 'Opting out of SSR',
+        tags: ['ssr: false', 'island'],
+        blurb: 'Two islands, one option apart: one gates the response, the other ships its spinner in the HTML and resolves in the browser.',
+    },
+    {
         to: { name: 'live' },
         title: 'Sources · the SSR boundary',
         tags: ['Source', 'attach / detach'],
