@@ -1,62 +1,32 @@
 import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
 import { render, screen, cleanup, act } from '@testing-library/react';
-import { prerender } from 'react-dom/static';
 import { hydrateRoot } from 'react-dom/client';
 import type { FC, ReactElement } from 'react';
 import { scope, data, input } from '../../scope/scope';
-import { SourceSymbol, type Source, type SourceError, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
 import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
 import { useScopeControls, type ScopeControls } from '../../mandala/controls';
+import {
+    controllableSource,
+    deferred,
+    flush,
+    prerenderToString,
+    type ControllableSource,
+} from '../../testing';
 
 const Loading: FC = () => <div>loading...</div>;
 
 afterEach(cleanup);
 
-// The Suspense retry after a settle is not synchronous with the resolving `act`
-// (suspense-situations.md S2), and a cascade settles one level per flush. Every wait
-// here is a *fixed* number of empty flushes — never a poll-until-green.
-async function flush(times = 1): Promise<void> {
-    for (let i = 0; i < times; i++) await act(async () => {});
-}
-
-// A promise the test resolves by hand, so in-flight refreshes can be observed.
-function deferred<T>() {
-    let resolve!: (value: T) => void;
-    let reject!: (reason: unknown) => void;
-    const promise = new Promise<T>((res, rej) => {
-        resolve = res;
-        reject = rej;
+// A hand-driven source keyed into a shared attach/detach log, so a cascade's source swap is
+// observable per generation (attach:s1 / detach:s1 / attach:s2). Built on the entry's
+// controllableSource — the id-keyed log is the test-specific part, wired through its
+// lifecycle hooks; drive it with `act(() => src.setReady(v))` / `act(() => src.setError(e))`.
+function testSource<T>(log: string[], id: string): ControllableSource<T> {
+    return controllableSource<T>({
+        onAttach: () => log.push(`attach:${id}`),
+        onDetach: () => log.push(`detach:${id}`),
     });
-    return { promise, resolve, reject };
-}
-
-// A hand-rolled source the test drives, logging attach/detach so lifetime is observable.
-type TestSource<T> = Source<T> & { ready: (value: T) => void; fail: (error: SourceError) => void };
-
-function testSource<T>(log: string[], id: string): TestSource<T> {
-    let state: SourceState<T> = { status: 'pending' };
-    const listeners = new Set<() => void>();
-    const set = (next: SourceState<T>) => {
-        state = next;
-        for (const listener of listeners) listener();
-    };
-    return {
-        [SourceSymbol]: true,
-        getSnapshot: () => state,
-        subscribe(onChange) {
-            listeners.add(onChange);
-            return () => {
-                listeners.delete(onChange);
-            };
-        },
-        attach() {
-            log.push(`attach:${id}`);
-            return () => log.push(`detach:${id}`);
-        },
-        ready: (value) => act(() => set({ status: 'ready', value })),
-        fail: (error) => act(() => set({ status: 'error', error })),
-    };
 }
 
 // Renders inside the island's subtree and hands the test the current controls value.
@@ -375,7 +345,7 @@ describe('useScopeControls — selective refresh', () => {
         await act(async () => {
             render(<Island />);
         });
-        live.ready('on');
+        act(() => live.setReady('on'));
         expect(screen.getByText('feed on')).toBeTruthy();
 
         await act(async () => {
@@ -391,7 +361,7 @@ describe('useScopeControls — selective refresh', () => {
     test('a cascade re-creates a downstream source: old detaches, stale content bridges the swap', async () => {
         const log: string[] = [];
         let version = 1;
-        const created: TestSource<string>[] = [];
+        const created: ControllableSource<string>[] = [];
         const testScope = scope()
             .load({
                 v: async () => version,
@@ -418,7 +388,7 @@ describe('useScopeControls — selective refresh', () => {
         await act(async () => {
             render(<Island />);
         });
-        created[0]!.ready('one');
+        act(() => created[0]!.setReady('one'));
         expect(screen.getByText('live one')).toBeTruthy();
         expect(log).toContain('attach:s1');
 
@@ -436,7 +406,7 @@ describe('useScopeControls — selective refresh', () => {
         expect(screen.getByText('live one')).toBeTruthy();
         expect(screen.queryByText('loading...')).toBeNull();
 
-        created[1]!.ready('two');
+        act(() => created[1]!.setReady('two'));
         expect(screen.getByText('live two')).toBeTruthy();
     });
 
@@ -703,7 +673,7 @@ describe('selective refresh — races', () => {
     test('a swapped source that errors settles the swap: the error slot reads an empty pending', async () => {
         const log: string[] = [];
         let version = 1;
-        const created: TestSource<string>[] = [];
+        const created: ControllableSource<string>[] = [];
         const testScope = scope()
             .load({ v: async () => version })
             .load({
@@ -734,7 +704,7 @@ describe('selective refresh — races', () => {
         await act(async () => {
             render(<Island />);
         });
-        created[0]!.ready('one');
+        act(() => created[0]!.setReady('one'));
         expect(screen.getByText('live one')).toBeTruthy();
 
         version = 2;
@@ -748,7 +718,7 @@ describe('selective refresh — races', () => {
         expect([...captured.current!.pending]).toEqual(['live']);
         expect(screen.getByText('live one')).toBeTruthy();
 
-        created[1]!.fail({ code: 'failed', message: 'boom' });
+        act(() => created[1]!.setError({ code: 'failed', message: 'boom' }));
         await flush();
         expect(screen.getByText('failed')).toBeTruthy();
         expect(captured.current!.pending.size).toBe(0);
@@ -983,20 +953,6 @@ describe('selective refresh — cascade semantics', () => {
         expect(screen.getByText('doc e0/2')).toBeTruthy();
     });
 });
-
-// Drive react-dom/static `prerender` to a string — the server half of pin 5's setup.
-async function prerenderToString(element: ReactElement): Promise<string> {
-    const { prelude } = await prerender(element);
-    const reader = prelude.getReader();
-    const decoder = new TextDecoder();
-    let html = '';
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        html += decoder.decode(value, { stream: true });
-    }
-    return html;
-}
 
 describe('selective refresh — hydrated cells', () => {
     // Pin 5. A hydrated cell short-circuits to its server value, so its producer never
