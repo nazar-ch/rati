@@ -14,6 +14,7 @@ import {
     isHookLoad,
     InputSymbol,
     type HookLoad,
+    type LoadContext,
     type Scope,
     type ScopeProvideDef,
 } from '../scope/scope';
@@ -30,6 +31,7 @@ import {
     type DataTrace,
 } from '../util/dataTrace';
 import {
+    bucketSignal,
     makeProducedCell,
     makeStaticCell,
     trackReads,
@@ -138,8 +140,15 @@ function namedStep(keys: string[]): typeof Step {
 
 // Classify a *data entry* (the value written in the scope definition) into a cell.
 // Function/class producers run against a read-tracking proxy of the prior levels'
-// values — the recorded read-set is what a selective refresh cascades along.
-function classifyEntry(entry: unknown, prev: Record<string, unknown>, key: string): Cell {
+// values — the recorded read-set is what a selective refresh cascades along. A function
+// load additionally gets the level's `LoadContext` (its abort signal); a class load
+// doesn't — it constructs a value, and what it starts it owns.
+function classifyEntry(
+    entry: unknown,
+    prev: Record<string, unknown>,
+    key: string,
+    context: LoadContext,
+): Cell {
     if (is.object(entry) && InputSymbol in entry) {
         return makeStaticCell({ kind: 'value', value: prev[key] });
     }
@@ -159,7 +168,7 @@ function classifyEntry(entry: unknown, prev: Record<string, unknown>, key: strin
             : undefined;
         const { proxy, reads } = trackReads(prev);
         return makeProducedCell(
-            classifyResult((entry as (p: unknown) => unknown)(proxy)),
+            classifyResult((entry as (p: unknown, c: LoadContext) => unknown)(proxy, context)),
             reads,
             equals,
         );
@@ -219,6 +228,7 @@ function buildCell(
     key: string,
     prev: Record<string, unknown>,
     shared: Shared,
+    context: LoadContext,
 ): Cell {
     // A value dehydrated from the server short-circuits the entry: skip the load (no
     // re-fetch) and `use()` (no re-suspend), so hydration renders the server HTML
@@ -242,7 +252,7 @@ function buildCell(
         };
     }
 
-    const cell = classifyEntry(level[key], prev, key);
+    const cell = classifyEntry(level[key], prev, key, context);
 
     // A live-source seed: feed the server value to the freshly created source before
     // anything reads or attaches it, so its first snapshot is already ready — no
@@ -321,7 +331,9 @@ function processDirtyCells(
         if (!cell.rerunnable) continue;
 
         traceCellRefresh(trace, index, key);
-        const next = classifyEntry(level[key], prev, key);
+        // The re-run gets the same bucket signal the first run did: a selective refresh
+        // replaces a load *within* the run, it doesn't discard the run.
+        const next = classifyEntry(level[key], prev, key, { signal: bucketSignal(bucket) });
         traceCell(trace, index, key, next);
         cell.reads = next.reads;
 
@@ -414,8 +426,12 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
     const trace = shared.trace;
     if (!bucket.built) {
         traceLevelStart(trace, index, keys);
+        // What this level's function loads receive as their second argument — one bag
+        // for the level, carrying the *bucket's* signal: cancellation lives with the run,
+        // not with the individual load (see bucketSignal).
+        const context: LoadContext = { signal: bucketSignal(bucket) };
         for (const key of dataKeys) {
-            const cell = buildCell(level, key, prev, shared);
+            const cell = buildCell(level, key, prev, shared, context);
             if (trace) {
                 const entry = level[key];
                 // Inputs arrive with the run — they are not loads, so they get no settle

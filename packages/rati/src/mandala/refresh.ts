@@ -104,8 +104,26 @@ export type SourceEntry = { source: Source<unknown>; detach: (() => void) | null
 // which would otherwise re-build the cell — re-running its load and re-suspending on a
 // brand-new promise forever. Built per level here; the load side effect runs once.
 // `sources` is replaced (new array identity) when a cascade swaps a source, so the
-// Step's attach/detach effects and uSES subscription re-key.
-export type Bucket = { cells: Map<string, Cell>; sources: SourceEntry[]; built: boolean };
+// Step's attach/detach effects and uSES subscription re-key. `abort` is the level's
+// cancellation handle — see `bucketSignal` / `discardRun`.
+export type Bucket = {
+    cells: Map<string, Cell>;
+    sources: SourceEntry[];
+    built: boolean;
+    abort: AbortController | null;
+};
+
+/**
+ * The `AbortSignal` this level's loads receive (the `signal` of their `LoadContext`) —
+ * one controller per bucket, i.e. per level per run, created with the level's cells. The
+ * bucket is exactly the right lifetime: it is built once per inner-tree generation and
+ * discarded wholesale when that generation is (`discardRun`), so the signal fires when —
+ * and only when — the loads it covers have lost their reader.
+ */
+export function bucketSignal(bucket: Bucket): AbortSignal {
+    bucket.abort ??= new AbortController();
+    return bucket.abort.signal;
+}
 
 /**
  * Record which keys of `prev` a producer reads while it runs. Destructuring — the
@@ -129,6 +147,42 @@ export function trackReads(prev: Record<string, unknown>): {
         },
     });
     return { proxy, reads };
+}
+
+/**
+ * Let a torn-down generation go: abort the loads it still has in flight, then detach the
+ * sources it still has attached. Called wherever a run is discarded — the buckets a new
+ * generation replaced (an inputs change, a retry, `refresh()`) and the mandala's unmount
+ * — never on a plain re-render, where the run is still the live one.
+ *
+ * Effect-time on purpose, like the detach half it wraps: a *discarded render* must not
+ * cancel the loads of a run that is still current.
+ */
+export function discardRun(buckets: readonly Bucket[] | null | undefined): void {
+    if (!buckets) return;
+    for (const bucket of buckets) abortLoads(bucket);
+    sweepDetach(buckets);
+}
+
+// Fire one bucket's controller. A load that took the signal rejects as a result, and
+// that rejection has no reader left — the Step that `use()`d the promise is gone, and a
+// refresh settle is dropped by token — so it would surface as an unhandled rejection.
+// Each producer-backed promise therefore gets a no-op rejection handler *before* the
+// abort, which is what keeps the runtime quiet (attaching one afterwards is already too
+// late). Static promise entries are left alone: they never received the signal, so this
+// can't be what rejects them, and marking a shared module-level promise as handled
+// forever is not ours to do.
+function abortLoads(bucket: Bucket): void {
+    const controller = bucket.abort;
+    if (!controller || controller.signal.aborted) return;
+    for (const cell of bucket.cells.values()) {
+        if (cell.kind === 'promise' && cell.rerunnable) {
+            void cell.promise.then(undefined, () => {});
+        }
+    }
+    // No reason argument: `signal.reason` stays the standard AbortError DOMException, so
+    // the `error.name === 'AbortError'` check every fetch wrapper already has holds.
+    controller.abort();
 }
 
 /** Detach every still-attached source in the given buckets (the mandala's unmount
@@ -304,10 +358,17 @@ export class RefreshController {
     }
 
     private refreshFailed(levelIndex: number, key: string, error: unknown, token: number): void {
-        const cell = this.wiring?.buckets[levelIndex]?.cells.get(key);
+        const bucket = this.wiring?.buckets[levelIndex];
+        const cell = bucket?.cells.get(key);
         if (!cell || cell.refreshing?.token !== token) return;
         cell.refreshing = null;
-        console.error(`[rati] refresh('${key}') failed — keeping the previous value.`, error);
+        // A cancelled re-fetch is not a failed one: the run this re-run belonged to was
+        // discarded (unmount, mostly — a remount re-wires the controller onto the new
+        // buckets, so the old cell isn't even found) and took the load with it. Nothing
+        // to report; the bookkeeping below still settles so an awaited `refresh()` resolves.
+        if (!bucket?.abort?.signal.aborted) {
+            console.error(`[rati] refresh('${key}') failed — keeping the previous value.`, error);
+        }
         this.removePending(key);
         this.settleWaiters(key);
     }

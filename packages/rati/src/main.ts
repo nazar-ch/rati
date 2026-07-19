@@ -66,6 +66,7 @@ export {
     data,
     type DataLoad,
     type DataLoadOptions,
+    type LoadContext,
     type ScopeLoadKeys,
     type ScopeProvideDef,
     InputSymbol,

@@ -28,6 +28,31 @@ export const HookSymbol = Symbol();
  */
 export type HookLoad<T = unknown> = ((resolved: any) => T) & { readonly [HookSymbol]: true };
 
+/**
+ * The second argument a function load receives — the run it belongs to, seen from
+ * inside the load. Today it carries one thing: an `AbortSignal` that fires when that
+ * run is discarded (an input change, a retry, `refresh()`, unmount), so a load can hand
+ * it to `fetch` and have the request cancelled instead of finishing for a tree that is
+ * already gone.
+ *
+ * A bag rather than a bare signal so later additions don't reshuffle parameters. Taking
+ * it is opt-in: a load declaring only its props argument behaves exactly as before.
+ *
+ *     scope({ spaceId: input<string>() }).load({
+ *         members: ({ spaceId }, { signal }) => api.members.list(spaceId, { signal }),
+ *     });
+ *
+ * `hook()` loads don't get one (a hook owns its own lifecycle), and neither do sources —
+ * `detach()` is already their cancellation.
+ */
+export type LoadContext = {
+    /**
+     * Aborted when this load's run is discarded. Pass it to `fetch` or any signal-aware
+     * client; ignoring it leaves the load running to completion, as it always did.
+     */
+    readonly signal: AbortSignal;
+};
+
 // One entry of a scope's merged definition: an `input()` marker (head only), a `hook()`
 // load, or a data load (function / promise / source / class / value). They're kept
 // apart at the builder surface — `scope({…})` takes inputs, `.load({…})` takes hooks
@@ -143,9 +168,16 @@ type InputsDefinition = Record<string, Input<any>>;
 // error. A `hook()` load satisfies the function member (a `HookLoad` is a function),
 // so it's accepted without a dedicated union member — which would otherwise widen the
 // contextual argument type of plain function loads to `any`.
+//
+// The second parameter is the load's {@link LoadContext}. Declaring it is optional —
+// a function of lower arity stays assignable — so `({ id }) => …` is unchanged and
+// `({ id }, { signal }) => …` gets `signal` contextually typed.
 type LoadDefinition<PrevDefs extends GenericScopeDefinition> = {
     [key: string]:
-        | ((resolved: Simplify<ResolveScopeDefinition<PrevDefs>>) => any | Promise<any>)
+        | ((
+              resolved: Simplify<ResolveScopeDefinition<PrevDefs>>,
+              context: LoadContext,
+          ) => any | Promise<any>)
         | Promise<any>
         | Source<any>
         | { new (resolved: Simplify<ResolveScopeDefinition<PrevDefs>>): any }
@@ -278,7 +310,7 @@ export type DataLoadOptions<T = unknown> = {
  * A data load carrying per-load options — a plain function load plus configuration the
  * resolver reads (today: the `equals` refresh gate). Create one with {@link data}.
  */
-export type DataLoad<T = unknown> = ((resolved: any) => T) & {
+export type DataLoad<T = unknown> = ((resolved: any, context: LoadContext) => T) & {
     readonly [DataSymbol]: true;
     readonly dataOptions: DataLoadOptions;
 };
@@ -296,7 +328,7 @@ export type DataLoad<T = unknown> = ((resolved: any) => T) & {
  *     });
  */
 export function data<T>(
-    fn: (resolved: any) => T,
+    fn: (resolved: any, context: LoadContext) => T,
     options: DataLoadOptions<Awaited<UnwrapSource<Awaited<T>>>> = {},
 ): DataLoad<T> {
     const marked = fn as typeof fn & { [DataSymbol]?: true; dataOptions?: DataLoadOptions };

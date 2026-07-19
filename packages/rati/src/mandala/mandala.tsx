@@ -7,7 +7,7 @@ import { startDataTrace, type DataTrace, type DataTraceCause } from '../util/dat
 import { buildTree, flattenLevels, type Bucket, type Shared } from './resolver';
 import { registerScopeChannel, setScopeLabel } from './channel';
 import { registerScopeControlsChannel } from './controls';
-import { RefreshController, sweepDetach } from './refresh';
+import { discardRun, RefreshController } from './refresh';
 import { MandalaErrorBoundary } from './boundary';
 import { HydrationContext } from './hydration';
 
@@ -163,7 +163,12 @@ export function createMandala<S extends Scope<any>>(
             if (previous) orphanedRef.current.push(previous.buckets);
             cacheRef.current = {
                 key: treeKey,
-                buckets: levels.map(() => ({ cells: new Map(), sources: [], built: false })),
+                buckets: levels.map(() => ({
+                    cells: new Map(),
+                    sources: [],
+                    built: false,
+                    abort: null,
+                })),
                 // A generation is a data-trace run: fresh timeline, and a cause to open it
                 // with. Undefined unless `globalThis.__DEBUG__.data` is on.
                 trace: startDataTrace(displayName, generationCause(previous?.key, retry)),
@@ -195,15 +200,16 @@ export function createMandala<S extends Scope<any>>(
 
         // A committed remount (inputs change / retry) tears the old cells down —
         // outstanding refresh bookkeeping settles wholesale, and the generation it replaced
-        // releases whatever its Steps left attached. Off the render path on purpose: a
-        // discarded render must not detach. Idempotent both ways — the ordinary remount
-        // path has already detached through the Steps' own cleanups (by then the live
-        // buckets are the new ones), so this finds only what those deferred.
+        // is discarded: its in-flight loads abort, and it releases whatever its Steps left
+        // attached. Off the render path on purpose: a discarded render must not cancel or
+        // detach anything. Idempotent both ways — the ordinary remount path has already
+        // detached through the Steps' own cleanups (by then the live buckets are the new
+        // ones), so this finds only what those deferred.
         useEffect(() => {
             controller.treeCommitted(treeKey);
             const orphaned = orphanedRef.current;
             orphanedRef.current = [];
-            for (const buckets of orphaned) sweepDetach(buckets);
+            for (const buckets of orphaned) discardRun(buckets);
         }, [controller, treeKey]);
 
         // Drop the cache on unmount so a StrictMode remount (mount → cleanup → mount)
@@ -215,14 +221,16 @@ export function createMandala<S extends Scope<any>>(
         // The sweep is the sources' unmount backstop: Step cleanups keep entries their
         // live bucket still holds (they can't tell a source swap from an unmount), so the
         // final detach of everything still attached happens here — after the leaf's
-        // layout-phase dispose, preserving the dispose-before-detach order.
+        // layout-phase dispose, preserving the dispose-before-detach order. The loads the
+        // run still has in flight are aborted in the same pass (`discardRun`): an island
+        // that is gone has no reader for them.
         useEffect(() => {
             if (cacheRef.current === null) forceRebuild();
             return () => {
-                sweepDetach(cacheRef.current?.buckets);
+                discardRun(cacheRef.current?.buckets);
                 // An unmount racing a generation change can leave a bucket queued but
                 // unswept (the effect above never ran for it).
-                for (const buckets of orphanedRef.current) sweepDetach(buckets);
+                for (const buckets of orphanedRef.current) discardRun(buckets);
                 orphanedRef.current = [];
                 cacheRef.current = null;
             };
