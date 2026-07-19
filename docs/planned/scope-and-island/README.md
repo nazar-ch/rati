@@ -104,6 +104,42 @@ Two commits: the engine + type change, then the pins. `yarn ci` green; 65 files 
   server/client behavior; a signal that never fires server-side has nothing to show there,
   and the guide's `fetch` example is the whole story on the client.
 
+### 2026-07-20 — SI-04 (`ssr: false`) shipped + decisions
+
+Two commits: the engine + threading + pins, then the gallery page; docs alongside.
+`yarn ci` green; 66 files / 589 tests.
+
+- **The gate is `getServerSnapshot`, not the collector.** The record framed the condition
+  as "`false` and a collector is present (server render)" — the collector being the
+  mandala's only way to know where it is. `useSyncExternalStore`'s third argument is a
+  better one: React reads it on the server *and* through the client's hydration pass, which
+  is exactly the pair of renders that must show the slot. The consequence is a small
+  widening — the option now means the same thing under a bare `prerender` with no
+  `HydrationProvider` — which reads as the more honest behavior for an option named `ssr`.
+- **What the hook really buys is the hydration pass, not the server render.** Rendering the
+  slot server-side is the easy half; the trap is the client. Let the island resolve
+  normally on its first client render and it suspends *inside* a boundary React is
+  hydrating — React discards the server markup and client-renders it, which surfaces as a
+  recoverable error (`ssrRender().hydrate()` throws on exactly this, and its message
+  already named the cause: "a load that re-ran and re-suspended on its loading slot").
+  Deferring to the post-hydration re-render is what makes the round trip silent — verified
+  in a real browser too, not just jsdom: zero console output on `/deferred`.
+- **`foldInputs` had to learn the option.** A `group` re-folds a child's mandala whenever it
+  supplies a `loading`/`error` slot the child lacks — and a re-fold that didn't carry `ssr`
+  would silently turn SSR back on for exactly the routes a group is most likely to wrap.
+  Pinned in `router/group.test.tsx`.
+- **No `ssr` default on `GroupDefaults`.** A group defaults *presentation* (wrapper, slots);
+  "does this page gate TTFB" is a per-route judgment, and a group-wide opt-out would be a
+  foot-gun that reads like a layout choice. Not cut, and not missed — say so if a consumer
+  asks.
+- **The fuzz suite never moved**, which is the tripwire working: the harness sets no `ssr`
+  option, and `ssrEnabled` is a build-time constant, so the default path renders the exact
+  element tree it did before.
+- **A finding for SI-02, free:** the loading slot is threaded from a single place
+  (`mandala.tsx`'s `Loading`) into all three sites that can show it — the Suspense fallback,
+  a pending source in `Step`, and `ProvideLeaf`'s build frame. `loadingDelayMs` gates that
+  one binding, so the delay does not need to be taught about the three sites separately.
+
 ## Per-item conventions
 
 Atomic commits on the current branch (rati `CLAUDE.md`); subjects prefixed `SI-NN:`, a

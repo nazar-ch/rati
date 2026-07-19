@@ -18,6 +18,7 @@ src/
     hydration.tsx   SSR dehydration (values + live-source seeds + error recording)
     hydrationDiagnostics.ts  the client-side unclaimed-payload watchdog
     ssrSource.ts    firstSettle — the server-side promise face of SSR-marked sources
+    afterHydration.tsx  the ssr: false gate (server + hydration pass render the slot)
   island/    island.ts — public island() wrapper + Island* / Hydration* aliases
   head/      store.ts (HeadStore/createHeadStore), HeadProvider, Title/useTitle/Meta,
              useHeadTag (shared registration), domSync (client title/meta reconciler),
@@ -284,6 +285,18 @@ registry, keyed `mandalaId (useId) → scopeKey → value`, in two wire sections
   collector's `errors` carries
   `{ mandalaId, key, error: SourceError }` — the server's status input (`not-available` →
   404). `asSourceError` (scope/source.ts) is the shared normalization with the boundary.
+- **The per-island opt-out** (`mandala/afterHydration.tsx`): `ssr: false` wraps the Step
+  tree in `AfterHydration`, whose gate is `useSyncExternalStore`'s `getServerSnapshot` —
+  which React reads on the server *and* through the client's hydration pass. So the server
+  renders the loading slot (no Step renders → no cell is built, no load starts, the
+  collector never hears from this island), the hydration pass renders the same slot
+  byte-identically, and only the post-hydration re-render resolves. Suspending *during*
+  hydration is what this buys off: React would throw the boundary away and client-render
+  it, which surfaces as a recoverable error. A client-only mount reads `getSnapshot` on its
+  first render, so the option costs nothing there. Note this is a render-phase test of
+  "am I the server", not a collector check — the option means the same thing under a bare
+  `prerender`. The option is the island's, so it sits *above* the source markers above: an
+  `ssr: true` source inside an opted-out island never reaches `buildCell`'s promotion.
 - **Claim watchdog** (`hydrationDiagnostics.ts`): on a rehydrating client, `buildCell`
   claims each consumed `data`/`seeds` slice; slices still unclaimed a grace period after
   the last claim get one console.warn — the loud version of "the trees drifted, the useId

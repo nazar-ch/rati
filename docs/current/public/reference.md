@@ -139,6 +139,7 @@ island({
     component,    // required: ComponentType<ScopeProps<S>>
     loading,      // optional: ComponentType<{ inputs: ScopeInputs<S> }>
     error,        // optional: ComponentType<{ inputs: ScopeInputs<S>; error: SourceError; retry: () => void }>
+    ssr,          // optional: boolean, default true — resolve during a server render?
 });
 ```
 
@@ -146,6 +147,30 @@ island({
 - Without `error`, a failure throws to the nearest ErrorBoundary.
 - `retry` re-mounts the island's inner tree: fresh promises, fresh sources.
 - Types: `IslandComponent<S>`, `IslandConfig<S>`.
+
+### `ssr: false` — sitting out the server render
+
+A server render is all-or-nothing: every promise load on the page is awaited before the
+first byte goes out. `ssr: false` takes one island out of that — the server renders its
+`loading` slot into the HTML and starts none of its loads; the client renders that same
+slot through hydration, then resolves normally.
+
+```ts
+island({ scope: feedScope, component: Feed, loading: FeedSkeleton, ssr: false });
+```
+
+- **The whole island opts out**, loads and sources alike. A source marked
+  [`ssr: true`](#ssr-capable-sources--the-ssr-marker) inside an `ssr: false` island stays
+  pending on the server: the island-level decision wins, and there is no per-load opt-out
+  (resolution is all-or-nothing by design).
+- **Nothing reaches the payload**, so nothing reaches the server's error signal either —
+  an opted-out island can't produce the 404/5xx a server-side load failure would (see
+  [response statuses](./ssr.md#response-statuses-and-load-failures)).
+- **Client-only apps are unaffected** — with no server in the picture the option does
+  nothing, and the island resolves on its first render as always.
+
+See the guide's [server rendering](./guide.md#server-rendering) section for when to reach
+for it.
 
 ### `useScope(scope)` / `useOptionalScope(scope)`
 
@@ -296,6 +321,7 @@ route('/station/:stationId', 'station', Board, {
     loading: Skeleton,     // optional: same contract as island's
     error: BoardError,     // optional: same contract as island's
     wrapper: AppLayout,    // optional: layout rendered around the component
+    ssr: false,            // optional: same contract as island's (needs `scope`)
 });
 ```
 
@@ -334,7 +360,8 @@ declare module 'rati' {
 
 Applies shared `wrapper` / `loading` / `error` to a list of routes (a child's own option
 wins). Returns the routes unchanged at the type level — spread the result into the routes
-tuple; paths stay absolute.
+tuple; paths stay absolute. A child's own `ssr: false` survives the group's rebuild; the
+group has no `ssr` default of its own.
 
 ### `RouterStore`
 

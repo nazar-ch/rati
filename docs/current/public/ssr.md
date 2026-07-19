@@ -16,6 +16,11 @@ load. You write no server: the [Vite plugin](#the-vite-plugin) serves the app in
 builds both sides of it, and the [production handler](#the-production-handler) is a fetch
 function your host already knows how to call.
 
+The render is all-or-nothing — no streaming, so the response waits for every load on the
+page. An island that shouldn't be part of that bargain sets
+[`ssr: false`](./reference.md#ssr-false--sitting-out-the-server-render): its loading slot
+ships in the HTML and the browser resolves it after hydration.
+
 ## The server entry
 
 `renderApp` runs the whole per-request loop — memory history → a fresh app →
@@ -447,6 +452,11 @@ transient server hiccup heals itself, with no hydration mismatch; a persistent f
 reaches the error slot through the normal client path. Every failure is recorded in
 `result.errors` (`{ mandalaId, key, error }` with the normalized `SourceError`), so a
 different status policy than the table above is a few lines over that array.
+
+An island that opted out with [`ssr: false`](./reference.md#ssr-false--sitting-out-the-server-render)
+runs no load server-side, so it contributes nothing to `result.errors` and nothing to the
+status: a page whose data lives entirely in opted-out islands is always a 200, and its
+failures surface on the client through the error slot.
 
 An error *outside* every island — a render bug in the app shell, a route `wrapper` that
 throws — rejects `renderApp` itself. `createRequestHandler` answers that with the

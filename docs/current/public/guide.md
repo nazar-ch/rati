@@ -610,6 +610,36 @@ shapes:
 
 A live source that can't seed simply stays unmarked and keeps the default behavior.
 
+### When an island shouldn't hold the page up
+
+`prerender` is all-or-nothing: the response waits for *every* load on the page. rati does
+not stream — a half-sent document is a lot of machinery for a narrow win, and it makes
+resolution stop being all-or-nothing, which is the model the whole framework is built on.
+The pressure valve is per-island instead. Set `ssr: false` and that island sits the server
+render out:
+
+```tsx
+island({ scope: feedScope, component: Feed, loading: FeedSkeleton, ssr: false });
+
+route('/dashboard', 'dashboard', Dashboard, { scope: metricsScope, ssr: false });
+```
+
+The server renders the island's `loading` slot into the HTML and starts none of its
+loads; the browser resolves it after hydration. Reach for it when an island is below the
+fold, expensive, or personalized — anything whose data the first paint doesn't need. What
+you're trading is real: that island's content is no longer in the HTML, so it isn't there
+for a crawler and it costs a spinner on screen. Slow-but-important data still belongs in
+the blocking path.
+
+Two details follow from the island being the unit:
+
+- The opt-out **wins over anything inside the scope** — a source marked `ssr: true` in an
+  `ssr: false` island stays pending on the server like any unmarked one.
+- An opted-out island **can't fail server-side**, so it never contributes to the response
+  status: no load of its can produce a 404 or a 5xx.
+
+On a client-only app the option does nothing at all.
+
 ## App setup
 
 Minimal setup is a router and the `Router` component:
