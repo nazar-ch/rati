@@ -125,7 +125,8 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
 - `server/` — the `rati/server` entry: `createRequestHandler` (fetch-shaped, the result
   kinds → HTTP + the CSR fallback) and `serve` (the `node:http` adapter, static files +
   the MIME table). Production only — dev is the plugin's.
-- `debug/index.ts` — the `rati/debug` entry: `navTrace` and friends (from `util/navTrace.ts`).
+- `debug/index.ts` — the `rati/debug` entry: the two opt-in console tracers — `navTrace`
+  (from `util/navTrace.ts`) and `dataTrace` (from `util/dataTrace.ts`, island resolution).
 - `stores/` — `RootStore`, `GlobalStore`. `types/` — `generic.ts`. `util/` — `utils.ts`.
 
 ## Key patterns

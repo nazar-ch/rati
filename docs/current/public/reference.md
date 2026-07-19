@@ -10,7 +10,7 @@ the [guide](./guide.md).
 | `rati/vite` | The Vite plugin: `vite dev` serves an SSR app, no server of your own. |
 | `rati/server` | Production serving: a fetch request handler, plus a Node listener. |
 | `rati/mobx` | Optional MobX bindings (`observableSource`) and the legacy data layer. |
-| `rati/debug` | Opt-in debug tooling (`navTrace`). |
+| `rati/debug` | Opt-in debug tooling (`navTrace`, `dataTrace`). |
 | `rati/testing` | Test utilities: `deferred`/`flush`/`controllableSource`, island/router/stores render harnesses, an SSR round-trip kit (test-env only). |
 
 > **Status:** first public iteration. The stores container surface (§Stores) is being
@@ -647,9 +647,45 @@ directly as `<form action={store.save}>`.
 
 ## `rati/debug`
 
+Two console tracers for the two halves of a page appearing: getting *there* and getting the
+*data*. Both are off by default and cost one flag read when off, so their marks live
+permanently on those paths; toggle either live from the console.
+
 | Export | Purpose |
 | --- | --- |
 | `navTrace`, `navTraceStart`, `navTraceEnabled` | navigation-timeline tracing; toggled live via `globalThis.__DEBUG__.nav`, near-zero cost when off |
+| `dataTrace`, `dataTraceEnabled` | data-resolution tracing per island; toggled live via `globalThis.__DEBUG__.data`, near-zero cost when off |
+
+### `dataTrace`
+
+`window.__DEBUG__ = { data: true }` and every island logs its resolution: one line per level
+start, one per cell settle (`ready` / `error` / back to `pending`), one per `refresh`, and
+one when the component finally renders.
+
+```
+[data] Route(Prefs) +0.0ms level 0 start (initial) [userId]
+[data] Route(Prefs) +0.2ms level 1 start [user,prefs]
+[data] Route(Prefs) +0.3ms (Δ0.1ms) level 1 prefs ready
+[data] Route(Prefs) +12.4ms (Δ12.2ms) level 1 user ready
+[data] Route(Prefs) +12.6ms level 2 start [tree]
+[data] Route(Prefs) +41.0ms (Δ28.4ms) level 2 tree error not-available — gone
+[data] Route(Prefs) +41.2ms (Δ41.2ms) resolved — component renders
+```
+
+- The line's prefix is the island's own name (`Island(…)` / `Route(…)`) — several resolve
+  concurrently into one console.
+- `+` is since **this island's run** started; `Δ` is since **that cell's** own mark. So `+`
+  on the last line is what the waterfall cost end to end, and `Δ` on a settle is what that
+  one load cost.
+- A run is one resolution generation, and its first line says why it exists: `(initial)`,
+  `(inputs)` — an input changed — or `(retry)`.
+- Level 0 is the scope's inputs head; the `.load()` levels follow. Inputs arrive with the
+  run, so they get no settle line; a value the server resolved is marked `(hydrated)`.
+- A cell is logged when it *transitions*, not when it is read — a live source that keeps
+  producing values stays quiet until it drops back to `pending` or errors.
+
+`dataTrace(label)` adds your own line to the same log (inside a load, say); `dataTraceEnabled()`
+guards work you only want to do while tracing.
 
 ---
 

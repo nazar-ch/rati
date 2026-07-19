@@ -45,8 +45,11 @@ src/
              controllableSource, the island/router/stores render harnesses, and
              the SSR round-trip kit) — the generic cores promoted out of the
              suites' hand-rolls. Test-environment only; shipped for consumers
+  debug/     index.ts — the rati/debug entry: the two opt-in console tracers
   stores/    RootStore, GlobalStore (store roots)
-  util/      utils.ts
+  util/      utils.ts, navTrace.ts (the navigation timeline), dataTrace.ts (island
+             resolution: level starts, cell settles, refreshes) — both gated on a
+             flag off globalThis.__DEBUG__, both re-exported by debug/
   types/     generic.ts
   main.ts    the public barrel
 ```
@@ -91,6 +94,14 @@ to its subtree, and owns the data lifecycle. That shared abstraction is the **ma
 - **Live values = `useSyncExternalStore`.** Each Step subscribes to its level's sources
   through one `useSyncExternalStore`, re-keyed when a cascade swaps a source (the level's
   `sources` array is replaced). (Hook sources own their own subscription.)
+- **Levels are named.** `compileLevel` (memoized on the level object, alongside the
+  hook/data key split) gives each level a bound copy of `Step` whose `displayName` is its
+  keys — DevTools shows `Island(Prefs) → Step(user,prefs) → Step(tree)` instead of
+  anonymous Steps. A bound copy adds no fiber, and the identity is stable per level, so
+  reconciliation is unchanged. The same `compileLevel` keys feed `dataTrace`'s level lines
+  (`util/dataTrace.ts`, the `rati/debug` entry): the resolver hooks a run's timeline at
+  level build, cell classification, dirty re-runs, the source snapshot read, and the leaf —
+  all no-ops on the `undefined` trace a non-traced run carries.
 
 ### The bucket cache lives on the mandala's committed ref
 

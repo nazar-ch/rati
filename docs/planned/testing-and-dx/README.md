@@ -334,6 +334,46 @@ across lifecycle events**, wired through `onAttach`/`onDetach` (and, for the see
 - `flushScrollRestoration` (`router/scrollRestoration`, `router/webRouterHashAnchor`) is a
   scroll-rAF drain, not the act-microtask `flush` — unrelated to the entry, untouched.
 
+### 2026-07-19 — DX-07 (observability) shipped + decisions
+
+Two commits, both independent of the entry work: the `Step` naming, then `dataTrace`.
+
+- **`dataTrace` is per island *run*, not one global timeline.** navTrace's model (a single
+  timeline reset at the click) doesn't transfer: islands resolve concurrently, so the
+  meaningful clock is the generation's own. Each run carries a `DataTrace` (undefined when
+  off) alongside its bucket cache, created where the generation is — so the cause
+  (`initial` / `inputs` / `retry`) falls straight out of `treeKey` and no bookkeeping is
+  needed to know when a run ended. The format keeps navTrace's two numbers, re-based: `+`
+  since the run started, `Δ` since the cell's own mark. The island label leads the line
+  (navTrace's numbers lead) because the log is multi-source — the label is what you scan by.
+- **Transitions, not reads.** A source's snapshot is read every render and a hook load's
+  value is produced every render; logging those would drown the log. The trace holds a
+  per-cell last-status and logs only on a change, which is also what makes a live source's
+  drop back to `pending` visible. Consequence worth knowing: a source that keeps producing
+  *new values* while staying `ready` logs nothing — a value-level trace is a different tool
+  (and belongs to `rati/data`, out of scope here).
+- **Promise settles are timed by their own handlers**, attached where the load ran (cell
+  build / refresh re-run / hook classification), not at `use()`'s return — `use()` returns
+  when React resumes, which is later and lumps the scheduling delay into the load. Guarded
+  by a module WeakSet, the same guard (and reason) as the SSR rejection recording.
+- **Inputs get no settle line and level 0 keeps its index.** Level 0 is the scope's inputs
+  head — it opens the run (carrying the cause) but its cells aren't loads. Renumbering the
+  `.load()` levels to start at 0 was rejected: the resolver, `navTrace`'s source-attach
+  marks, and internals all number levels with the head as 0.
+- **The `Step` name is a bound copy, not a wrapper.** A wrapper component would add a fiber
+  per level to every app forever, for a debug affordance; `Step.bind(null)` memoized on the
+  frozen level object gives DevTools a name with no tree change and a stable per-level
+  identity (a fresh type per render would remount the level and detach its sources — pinned
+  in `mandala/stepNaming.test.tsx`). The island's label is the parent in the tree, so the
+  Step name doesn't repeat it — and *can't*, since a level object is shared by every mandala
+  built from the same scope.
+- **Both features are pinned by tests that read what the tools produce**: the console lines
+  with durations normalized (`__tests__/debug/dataTrace.test.tsx`), and the live fiber tree
+  walked the way DevTools names it (`type.displayName || type.name`). The demo was driven
+  in a browser for the manual check the item asks for: `Route(ComplexTestWithScope) →
+  Step(productName) → Step(name) → Step(first) → Step(xStore) → Leaf`, and that route's
+  four-level waterfall traced end to end.
+
 ## Per-item conventions
 
 Atomic commits on the current branch; subjects prefixed `DX-NN:`, a `Closes: DX-NN` trailer
