@@ -1,9 +1,9 @@
 import * as fc from 'fast-check';
 import { useSyncExternalStore, type FC } from 'react';
 import { scope, input, type Scope } from '../../scope/scope';
-import { SourceSymbol, type Source, type SourceState } from '../../scope/source';
 import { island } from '../../island/island';
 import { useScopeControls, type ScopeControls } from '../../mandala/controls';
+import { controllableSource, type ControllableSource } from '../../testing';
 import { byLevel } from './arbitraries';
 import {
     formatValue,
@@ -109,8 +109,6 @@ export type LedgerEntry = {
     current: boolean;
 };
 
-type SourceLedger = Omit<LedgerEntry, 'attached' | 'current'> & { depth: number };
-
 /**
  * One `.provide()` value's lifecycle. The contract it exists to pin: the value disposes
  * *before* the sources it was built over detach, so a value holding a grabbed resource is
@@ -139,10 +137,14 @@ type HeldEntry = {
     fail: () => void;
 };
 
-type Controllable = Source<HarnessValue> & {
+// The entry's `controllableSource` (its state machine + attach/detach ledger — attachCount /
+// detachCount / peakAttached / attached) with the harness's model driver layered on: `ready`
+// recomputes the formula value on every emit (a `sourceBump` moves the epoch between emits),
+// `restore` re-emits the last value with stable identity (S8's no-op recovery, pin #12), and
+// `id` / `key` identify the instance for the ledger's per-instance bounds.
+type Controllable = ControllableSource<HarnessValue> & {
     id: string;
     key: string;
-    attached: () => boolean;
     /** Emit the value the formula says this source holds *now* — its first ready, and every
      * later one after a `sourceBump` moves its epoch. */
     ready: () => void;
@@ -237,7 +239,9 @@ export function buildHarness(
     const heldEntries: HeldEntry[] = [];
     const liveSources = new Map<string, Controllable>();
     const identities = new Map<string, HarnessValue>();
-    const ledgers = new Map<string, SourceLedger>();
+    // Every source instance ever built (never pruned), so `ledger()` can report the
+    // teardown bounds off each one's own attach/detach counters.
+    const createdSources: Controllable[] = [];
     const provideRecords: Array<{ id: string; detachedAtDispose: readonly string[] | null }> = [];
     let sourceInstances = 0;
     let provideInstances = 0;
@@ -251,56 +255,23 @@ export function buildHarness(
         for (const entry of heldEntries) if (entry.key === key) entry.superseded = true;
     };
 
-    const controllableSource = (key: string, recompute: () => HarnessValue): Controllable => {
+    const makeControllable = (key: string, recompute: () => HarnessValue): Controllable => {
         const id = `${key}#${sourceInstances++}`;
-        const ledger: SourceLedger = {
+        const source = controllableSource<HarnessValue>();
+        const controllable = Object.assign(source, {
             id,
             key,
-            attaches: 0,
-            detaches: 0,
-            maxConcurrent: 0,
-            depth: 0,
-        };
-        ledgers.set(id, ledger);
-        let state: SourceState<HarnessValue> = { status: 'pending' };
-        let lastReady: HarnessValue | null = null;
-        const listeners = new Set<() => void>();
-        const set = (next: SourceState<HarnessValue>) => {
-            state = next;
-            for (const listener of listeners) listener();
-        };
-        return {
-            [SourceSymbol]: true,
-            id,
-            key,
-            attached: () => ledger.depth > 0,
-            getSnapshot: () => state,
-            subscribe(onChange) {
-                listeners.add(onChange);
-                return () => {
-                    listeners.delete(onChange);
-                };
-            },
-            attach() {
-                ledger.attaches++;
-                ledger.depth++;
-                ledger.maxConcurrent = Math.max(ledger.maxConcurrent, ledger.depth);
-                return () => {
-                    ledger.detaches++;
-                    ledger.depth--;
-                };
-            },
-            ready() {
-                lastReady = recompute();
-                set({ status: 'ready', value: lastReady });
-            },
-            pend: () => set({ status: 'pending' }),
-            // S8 recovery returns the *same* value on purpose: pin #12's contract is
+            ready: () => source.setReady(recompute()),
+            pend: () => source.setPending(),
+            // S8 recovery re-emits the *same* value on purpose: pin #12's contract is
             // "recovery without producer re-runs", and an unchanged snapshot must move
-            // nothing. A live source emitting a genuinely new value is `sourceBump`.
-            restore: () => set({ status: 'ready', value: lastReady! }),
-            fail: () => set({ status: 'error', error: { code: 'failed', message: id } }),
-        };
+            // nothing (its identity clears the equals gate's === fast path). A live source
+            // emitting a genuinely new value is `sourceBump` (→ `ready`).
+            restore: () => source.emit(),
+            fail: () => source.setError({ code: 'failed', message: id }),
+        });
+        createdSources.push(controllable);
+        return controllable;
     };
 
     const makeProducer = (keySpec: KeySpec) => (bag: Record<string, unknown>) => {
@@ -339,7 +310,7 @@ export function buildHarness(
                 // the source must then emit the new value without its producer re-running.
                 // Safe for the first ready too — only a *committed* source can be bumped, so
                 // the epoch cannot move between this run and that first settle.
-                const source = controllableSource(keySpec.key, () =>
+                const source = makeControllable(keySpec.key, () =>
                     formatValue(keySpec.key, declared.epochOf(keySpec.key), readValues),
                 );
                 liveSources.set(keySpec.key, source);
@@ -375,9 +346,7 @@ export function buildHarness(
             seen,
             [Symbol.dispose]() {
                 record.detachedAtDispose = builtOver
-                    .filter(
-                        (source) => liveSources.get(source.key) === source && !source.attached(),
-                    )
+                    .filter((source) => liveSources.get(source.key) === source && !source.attached)
                     .map((source) => source.id);
             },
         };
@@ -493,10 +462,14 @@ export function buildHarness(
         runCounts: () => runCounts,
         totalRuns: () => [...runCounts.values()].reduce((total, count) => total + count, 0),
         ledger: () =>
-            [...ledgers.values()].map(({ depth, ...entry }) => ({
-                ...entry,
-                attached: depth > 0,
-                current: liveSources.get(entry.key)?.id === entry.id,
+            createdSources.map((source) => ({
+                id: source.id,
+                key: source.key,
+                attaches: source.attachCount,
+                detaches: source.detachCount,
+                maxConcurrent: source.peakAttached,
+                attached: source.attached,
+                current: liveSources.get(source.key)?.id === source.id,
             })),
         provideLog: () => provideRecords,
         identityOf: (key) => identities.get(key),
