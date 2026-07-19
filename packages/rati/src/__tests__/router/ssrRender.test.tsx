@@ -1,7 +1,5 @@
 import { describe, test, expect } from 'vite-plus/test';
 import { renderToString } from 'react-dom/server';
-import { prerender } from 'react-dom/static';
-import type { ReactElement } from 'react';
 import { RouterStore } from '../../router/store';
 import { route, type GenericRouteType } from '../../router/route';
 import { RootStore, RootStoreProvider } from '../../stores/RootStore';
@@ -9,21 +7,10 @@ import { Router } from '../../router/Router';
 import { createMemoryHistory } from '../../router/history';
 import { prepareRoute } from '../../router/prepareRoute';
 import { scope, type ScopeComponent } from '../../scope/scope';
-
-// react-dom/static `prerender` awaits Suspense before producing HTML, so an island
-// route's promise-backed scope resolves server-side (renderToString does not).
-async function prerenderToString(element: ReactElement): Promise<string> {
-    const { prelude } = await prerender(element);
-    const reader = prelude.getReader();
-    const decoder = new TextDecoder();
-    let html = '';
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        html += decoder.decode(value, { stream: true });
-    }
-    return html;
-}
+// The island route below resolves its scope through `react-dom/static` `prerender`
+// (renderToString, which the contrast tests use, does not await Suspense) — the drain loop
+// is now rati/testing's `prerenderToString`.
+import { prerenderToString } from '../../testing';
 
 function Home() {
     return <div data-testid="home">welcome home</div>;

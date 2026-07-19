@@ -5,6 +5,7 @@ import { byLevel } from './arbitraries';
 import { assertLedgerBounds } from './ledger';
 import { allKeys, type DeclaredState, type ReferenceModel, type ScopeSpec } from './model';
 import { readContent, readSlot, type BuiltHarness } from './scopeHarness';
+import { flush } from '../../testing';
 
 /*
     The MF-02 command alphabet: the events an island actually meets, driven against the real
@@ -41,8 +42,6 @@ export type Real = {
     container: HTMLElement;
     spec: ScopeSpec;
 };
-
-const flush = () => act(async () => {});
 
 /** The invariants that must hold after *every* command. */
 async function assertContract(model: Model, real: Real, label: string): Promise<void> {

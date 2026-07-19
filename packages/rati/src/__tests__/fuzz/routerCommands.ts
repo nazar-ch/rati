@@ -12,6 +12,7 @@ import {
     UNMATCHED_PATH,
     type Harness,
 } from './routerHarness';
+import { flush } from '../../testing';
 
 /*
     The RF-03 command alphabet: the navigations an app actually makes — pushes and replaces
@@ -40,8 +41,6 @@ import {
 
 export type Model = RouterModel;
 export type Real = { harness: Harness; table: RouteTable; log: ErrorLog };
-
-const flush = () => act(async () => {});
 
 /*
     Non-vacuity, accumulated across the whole run set (jnana's rule, carried from the mandala

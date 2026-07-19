@@ -1,16 +1,7 @@
 import { describe, test, expect, vi } from 'vite-plus/test';
 import { collection } from '../../data/collection';
 import { mutation } from '../../data/mutation';
-
-function deferred<T>() {
-    let resolve!: (value: T) => void;
-    let reject!: (reason?: unknown) => void;
-    const promise = new Promise<T>((res, rej) => {
-        resolve = res;
-        reject = rej;
-    });
-    return { promise, resolve, reject };
-}
+import { deferred } from '../../testing';
 
 describe('mutation state', () => {
     test('isPending spans the call; the result comes back; error stays null', async () => {
