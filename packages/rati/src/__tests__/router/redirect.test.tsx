@@ -1,12 +1,10 @@
 import { describe, test, expect, vi, afterEach } from 'vite-plus/test';
-import { cleanup, render } from '@testing-library/react';
 import { route } from '../../router/route';
 import { RouterStore } from '../../router/store';
 import { createMemoryHistory } from '../../router/history';
 import { prepareRoute } from '../../router/prepareRoute';
-import { Router } from '../../router/Router';
-import { RootStore, RootStoreProvider } from '../../stores/RootStore';
 import type { GenericRouteType } from '../../router/route';
+import { createTestRouter, cleanup } from '../../testing';
 
 afterEach(cleanup);
 
@@ -98,7 +96,7 @@ describe('route-level redirects', () => {
         router.dispose();
     });
 
-    test('hydrating onto a redirect route replays it as-is — no follow', () => {
+    test('hydrating onto a redirect route replays it as-is — no follow', async () => {
         // Reachable only from a server that ignored `renderApp`'s redirect result and
         // built a snapshot naming the redirect route itself (the normal flow names the
         // *target*, per prepareRoute). Pinning the choice rather than the accident:
@@ -106,8 +104,8 @@ describe('route-level redirects', () => {
         // following the hop here would move the URL out from under the server's HTML
         // and guarantee a mismatch. So the route renders as written, which for a
         // redirect route means its (empty) component. The server is the thing at fault.
-        const router = new RouterStore({}, makeRoutes(), {
-            history: createMemoryHistory({ url: '/settings' }),
+        const tr = await createTestRouter(makeRoutes(), {
+            url: '/settings',
             hydratedState: {
                 path: '/settings',
                 search: '',
@@ -116,25 +114,16 @@ describe('route-level redirects', () => {
                 routeParams: {},
             },
         });
-        const root = new RootStore({ router }, { isReady: true });
 
-        const view = render(
-            <RootStoreProvider rootStore={root}>
-                <Router />
-            </RootStoreProvider>,
-        );
-
-        expect(router.activeRoute?.name).toBe('settings');
-        expect(router.path).toBe('/settings');
-        expect(router.redirectHops).toEqual([]);
+        expect(tr.router.activeRoute?.name).toBe('settings');
+        expect(tr.router.path).toBe('/settings');
+        expect(tr.router.redirectHops).toEqual([]);
         // The declaration rides along on the active route — nothing acts on it.
-        expect(router.activeRoute?.redirect).toBeDefined();
-        expect(view.container.innerHTML).toBe('');
-
-        router.dispose();
+        expect(tr.router.activeRoute?.redirect).toBeDefined();
+        expect(tr.container.innerHTML).toBe('');
     });
 
-    test('a redirect cycle stops at the depth guard and renders instead', () => {
+    test('a redirect cycle stops at the depth guard and renders instead', async () => {
         const error = vi.spyOn(console, 'error').mockImplementation(() => {});
         const A = () => <div>a</div>;
         const B = () => <div>b</div>;
@@ -143,20 +132,12 @@ describe('route-level redirects', () => {
             route('/b', 'b', B, { redirect: { to: '/a' } }),
             route('*', 'notFound', NotFound),
         ] as const satisfies GenericRouteType[];
-        const router = new RouterStore({}, routes, {
-            history: createMemoryHistory({ url: '/a' }),
-        });
-        const root = new RootStore({ router }, { isReady: true });
-        const view = render(
-            <RootStoreProvider rootStore={root}>
-                <Router />
-            </RootStoreProvider>,
-        );
+        const tr = await createTestRouter(routes, { url: '/a' });
 
         // Following stopped: one of the cycle's routes is active, rendered as-is.
         // *Which* one is the parity of the cap and deliberately not pinned — the fuzz
         // property makes the same call (see routerAsserts' capped-cycle oneOf).
-        expect(['a', 'b']).toContain(router.activeRoute?.name);
+        expect(['a', 'b']).toContain(tr.router.activeRoute?.name);
         // The half the store-level name cannot show: the route's own component is what
         // reaches the DOM — not the catch-all, and not a blank screen. Two kills, both
         // executed red — returning from the loop-report branch instead of falling
@@ -164,11 +145,11 @@ describe('route-level redirects', () => {
         // one that needs this line: a Router declining to render a route still carrying
         // a `redirect` declaration, which leaves the store's answer right and the screen
         // empty.
-        expect(['a', 'b']).toContain(view.container.textContent);
+        expect(['a', 'b']).toContain(tr.container.textContent);
         // The cap, stated where it is observable: one hop per level the guard allowed
         // and no eleventh. Kill: move MAX_REDIRECT_DEPTH — the trail's length follows it.
-        expect(router.redirectHops).toHaveLength(10);
-        expect(router.redirectHops[0]).toEqual({ from: '/a', to: '/b', permanent: false });
+        expect(tr.router.redirectHops).toHaveLength(10);
+        expect(tr.router.redirectHops[0]).toEqual({ from: '/a', to: '/b', permanent: false });
         expect(error).toHaveBeenCalledOnce();
         expect(error.mock.calls[0]![0]).toContain('redirect loop');
         // The trail rides along in the report, and is the only thing naming which routes
@@ -176,7 +157,6 @@ describe('route-level redirects', () => {
         // written down. Kill: drop the hops join from the message. Executed once, red.
         expect(error.mock.calls[0]![0]).toContain('/a → /b → /a');
         error.mockRestore();
-        router.dispose();
     });
 
     test('a route redirecting to itself is a cycle of length one', () => {

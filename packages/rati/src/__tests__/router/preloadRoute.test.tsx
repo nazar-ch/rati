@@ -1,11 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
 import { type FC } from 'react';
-import { act, render, fireEvent, cleanup } from '@testing-library/react';
+import { act, fireEvent } from '@testing-library/react';
 import { RouterStore } from '../../router/store';
 import { route } from '../../router/route';
 import { lazy } from '../../router/lazy';
 import { Link } from '../../router/Link';
-import { GenericStoresContext } from '../../stores/RootStore';
+import { createTestRouter, cleanup } from '../../testing';
 
 const NoopComponent: FC = () => null;
 
@@ -75,27 +75,26 @@ describe('RouterStore.preloadRoute', () => {
 });
 
 describe('<Link prefetch>', () => {
+    // A real test router mounted around the bare <Link> (its `ui`) — the prefetch handlers
+    // read the router from the store, no GenericStoresContext hand-wiring. cleanup() disposes.
     function renderLink(opts: {
         routes: ReturnType<typeof route>[];
         prefetch: boolean;
         href: string;
     }) {
-        const router = new RouterStore({}, opts.routes);
-        const stores = { router };
-        const utils = render(
-            <GenericStoresContext.Provider value={stores}>
+        return createTestRouter(opts.routes, {
+            ui: (
                 <Link href={opts.href} prefetch={opts.prefetch}>
                     go
                 </Link>
-            </GenericStoresContext.Provider>,
-        );
-        return { router, ...utils };
+            ),
+        });
     }
 
     test('prefetch=true triggers preload on mouse enter', async () => {
         const factory = vi.fn(async () => ({ default: NoopComponent }));
         const Page = lazy(factory);
-        const { container, router } = renderLink({
+        const { container } = await renderLink({
             routes: [route('/page', 'page', Page)],
             prefetch: true,
             href: '/page',
@@ -105,13 +104,12 @@ describe('<Link prefetch>', () => {
             fireEvent.mouseEnter(container.querySelector('a')!);
         });
         expect(factory).toHaveBeenCalledOnce();
-        router.dispose();
     });
 
     test('prefetch=true triggers preload on touch start', async () => {
         const factory = vi.fn(async () => ({ default: NoopComponent }));
         const Page = lazy(factory);
-        const { container, router } = renderLink({
+        const { container } = await renderLink({
             routes: [route('/page', 'page', Page)],
             prefetch: true,
             href: '/page',
@@ -121,13 +119,12 @@ describe('<Link prefetch>', () => {
             fireEvent.touchStart(container.querySelector('a')!);
         });
         expect(factory).toHaveBeenCalledOnce();
-        router.dispose();
     });
 
     test('prefetch defaults to off — hover does NOT trigger import', async () => {
         const factory = vi.fn(async () => ({ default: NoopComponent }));
         const Page = lazy(factory);
-        const { container, router } = renderLink({
+        const { container } = await renderLink({
             routes: [route('/page', 'page', Page)],
             prefetch: false,
             href: '/page',
@@ -137,6 +134,5 @@ describe('<Link prefetch>', () => {
             fireEvent.mouseEnter(container.querySelector('a')!);
         });
         expect(factory).not.toHaveBeenCalled();
-        router.dispose();
     });
 });
