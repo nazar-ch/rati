@@ -38,6 +38,25 @@ export function fuzz(numRuns: number): Parameters<unknown> {
     };
 }
 
+/**
+ * The deep fuzz budget: the `numRuns` floor the `fuzz` stage always runs (`FUZZ_RUNS=500`,
+ * scripts/ci.ts) and the mandala-fuzz effort's deep-run bar. Below it a rare, multi-step
+ * shape can honestly go ungenerated in a given run.
+ */
+const DEEP_FUZZ_RUNS = 500;
+
+/**
+ * Whether this run is at (or above) the deep fuzz budget — reads the same `FUZZ_RUNS` env
+ * `fuzz()` reads. A coverage-guard meta-check that asserts every listed shape was generated
+ * gates on this: at the tiny default per-property budget a shape needing a multi-step
+ * conspiracy can go unreached honestly, so asserting there cries wolf — the inverse of the
+ * guard's purpose. The `fuzz` stage always clears the bar, so nothing is lost at the gate
+ * (RF-09).
+ */
+export function atDeepFuzzBudget(): boolean {
+    return (envInt('FUZZ_RUNS') ?? 0) >= DEEP_FUZZ_RUNS;
+}
+
 /** Size a shape knob by complexity level: `base` at FUZZ_LEVEL=0, `+perLevel` per level. */
 export function byLevel(base: number, perLevel: number): number {
     return base + (envInt('FUZZ_LEVEL') ?? 0) * perLevel;

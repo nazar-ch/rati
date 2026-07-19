@@ -1,7 +1,7 @@
 import * as fc from 'fast-check';
 import { describe, test, expect, afterEach, beforeEach, vi } from 'vite-plus/test';
 import { cleanup, act } from '@testing-library/react';
-import { fuzz, fuzzTimeout } from './arbitraries';
+import { atDeepFuzzBudget, fuzz, fuzzTimeout } from './arbitraries';
 import { RouterModel } from './routerModel';
 import {
     assertMounts,
@@ -114,29 +114,36 @@ describe('router fuzz — commands (navigation interleavings over generated rout
                 fuzz(25),
             );
 
-            // Every one of these is reachable at the default budget. If one reads zero, the
-            // alphabet stopped generating a shape the property claims to cover — a harness
-            // failure wearing a green run's clothes, so it fails here rather than going
-            // unnoticed. The first three are RF-03.3's by name.
-            for (const what of [
-                'a traversal ran',
-                'a traversal landed on a stale shallow entry',
-                'a redirect cycle hit the depth guard',
-                'a traversal had nowhere to go',
-                'a traversal stepped between two same-URL entries differing in state',
-                'a traversal landed on a redirect and followed it',
-                'a shallow navigation kept the mounted route',
-                'a shallow entry carried per-entry state',
-                'a same-URL navigation with an equal state resolved nothing',
-                'a same-URL navigation with a different state re-resolved',
-                'a navigation resolved nothing (no remount)',
-                'a navigation went through getPath',
-                'a redirect was followed',
-                'a redirect resolved back to its own route',
-                'setSearchParams pushed an entry',
-                'setSearchParams replaced an entry',
-            ]) {
-                expect(exercised[what] ?? 0, `never exercised: ${what}`).toBeGreaterThan(0);
+            // The counters accumulate at every budget (routerCommands.ts `note`), but this
+            // sixteen-shape guard only *asserts* at the deep budget the `fuzz` stage always
+            // runs (FUZZ_RUNS=500) — the one place every shape is reliably reached. Two of
+            // them need a multi-step conspiracy (a shallow entry armed, navigated away from,
+            // then traversed back onto) that the default `fuzz(25)` budget reaches only
+            // ~86% of runs, so asserting there cried wolf ~14% of the time — the failure
+            // mode this guard exists to prevent, inverted (RF-09). At the deep budget it
+            // still bites: a harness that stopped generating a shape fails here, loudly, on
+            // every gate run. The first three are RF-03.3's by name.
+            if (atDeepFuzzBudget()) {
+                for (const what of [
+                    'a traversal ran',
+                    'a traversal landed on a stale shallow entry',
+                    'a redirect cycle hit the depth guard',
+                    'a traversal had nowhere to go',
+                    'a traversal stepped between two same-URL entries differing in state',
+                    'a traversal landed on a redirect and followed it',
+                    'a shallow navigation kept the mounted route',
+                    'a shallow entry carried per-entry state',
+                    'a same-URL navigation with an equal state resolved nothing',
+                    'a same-URL navigation with a different state re-resolved',
+                    'a navigation resolved nothing (no remount)',
+                    'a navigation went through getPath',
+                    'a redirect was followed',
+                    'a redirect resolved back to its own route',
+                    'setSearchParams pushed an entry',
+                    'setSearchParams replaced an entry',
+                ]) {
+                    expect(exercised[what] ?? 0, `never exercised: ${what}`).toBeGreaterThan(0);
+                }
             }
         },
         fuzzTimeout(),

@@ -603,6 +603,12 @@ by hand) and re-opened the `.`/`..` topic; the decisions are above, the findings
   (issues/RF-09-coverage-guard-flake.md, plan.md B6) with the options weighed there; it
   re-fired once more during the 2026-07-17 review round, again on a tree touching no
   traversal code.
+- **Resolved (RF-09):** the recommended option landed — the sixteen-shape assertion now
+  fires only at the deep budget (`atDeepFuzzBudget()` in `arbitraries.ts`, the same
+  `FUZZ_RUNS` env `fuzz()` reads), which the `fuzz` stage always runs at 500 and where
+  every shape is reliably reached; the counters still accumulate at every budget, so a
+  deep run still fails loudly on a starved shape. The default `test` stage counts but no
+  longer asserts, so it stops crying wolf, and the `:117` comment now states a true claim.
 
 ### 2026-07-17 (post-close review round) — RF-07's guard admitted authority-carrying spellings
 
