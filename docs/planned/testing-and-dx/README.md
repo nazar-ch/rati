@@ -374,6 +374,49 @@ Two commits, both independent of the entry work: the `Step` naming, then `dataTr
   Step(productName) → Step(name) → Step(first) → Step(xStore) → Leaf`, and that route's
   four-level waterfall traced end to end.
 
+### 2026-07-19 — DX-08 (SSR error channel) shipped + decisions
+
+Three commits: the rejection ledger, the data trace's twin of it, the settle budget.
+`yarn ci` green; 64 files / 569 tests.
+
+- **Per *run*, not per collector.** The item suggested `WeakMap<collector, WeakSet<promise>>`;
+  what shipped is a WeakSet created with the generation's bucket cache (beside its data
+  trace) and handed to the resolver on `Shared`. Three reasons the collector is the wrong
+  key: the `collectError` the resolver sees is a mandala-bound closure rebuilt every render,
+  so it can't key anything; the *underlying* collector would dedup across islands, but
+  `errors` entries are `{ mandalaId, key, error }` — two islands sharing one rejected promise
+  are two honest records, not a duplicate; and a run renders under exactly one collector, so
+  run-keying strictly implies collector-keying while staying finer. Per-*cell* was rejected
+  for the opposite failure: a hook load handing back a stable promise builds a fresh cell
+  object every render, so a cell-level flag would stack handlers all over again.
+- **Nothing was "retained for the no-collector path"** (the item's parenthetical): the whole
+  recording block is gated on `collectError`, so there is no client-side recording to keep a
+  global for. The module-level WeakSet is simply gone.
+- **The same hole existed in `dataTrace`**, whose comment already paired itself with this
+  guard — fixed in the same effort rather than left to contradict its own cross-reference.
+  Worth knowing for its pin: within a run the *visible* log is deduped by `traceCellStatus`'s
+  status map, so the module-global guard cost only the **second run's** settle line (a cell
+  that reads as stuck at pending in the log while the island rendered fine). Removing the
+  guard outright therefore breaks nothing visible — the pin is two mounts over one promise.
+- **`settleTimeout` runs over `prerender`'s own `signal`, not a `Promise.race`.** Pinned by
+  experiment: aborting a prerender *resolves* it (never rejects), closes the stream, and
+  calls `onError` once per still-pending task with the abort reason **and that task's
+  `componentStack`**. So the abort is the release valve *and* the census — the message names
+  the budget, the boundary count, and where they were. A race would have left the render
+  running and reported nothing but the elapsed milliseconds. `postponed !== null` (React's
+  own "did not complete" flag) gates the throw, so a budget expiring during the drain of an
+  already-finished render can't fail a good test.
+- **Off by default**, per the item's escape hatch, and the reasoning is the recommendation:
+  any value rati picked sits either above the host runner's own timeout (never fires) or
+  below a legitimately slow load (false failure), and a fake-timers suite would make it
+  fire on `advanceTimersByTime`. Discoverability is the docs' job — reference.md carries a
+  "when a server render hangs" paragraph under the kit.
+- **The component stack names `Step`, not `Step(live)`.** React's server-side stack frames
+  come from the function's own name and source position, so DX-07's per-level `displayName`
+  doesn't reach them; the *count* of `Step` frames still gives the level depth, and the
+  frames around it place the island. Good enough for the item's "or at least the elapsed
+  budget and the likely cause" floor, and better than it.
+
 ## Per-item conventions
 
 Atomic commits on the current branch; subjects prefixed `DX-NN:`, a `Closes: DX-NN` trailer
