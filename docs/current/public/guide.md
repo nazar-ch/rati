@@ -369,6 +369,136 @@ see the [reference](./reference.md#sources). `readySource`, `promiseSource`, and
 `toSource` cover the common cases. A source that should resolve on the server too can opt
 in with its `ssr` marker — see [Server rendering](#server-rendering).
 
+## Stores and living data: `rati/data`
+
+> **Experimental.** `rati/data` is an optional entry — it needs the `mobx` peer dependency,
+> and its surface may still move. The [reference](./reference.md#ratidata) is the API
+> station; this section teaches the model and *when to reach for which primitive*.
+
+Everything so far loads data *per screen*: the island resolves a scope, the component gets
+clean props, a re-mount re-resolves. That's the right shape for read-once screen data. But
+some data outlives one screen and keeps changing under you — a list you edit in place, a row
+a websocket updates, a draft you stage before saving. For that, rati has a small set of
+**instance-owned primitives** you keep in your store graph:
+
+| Reach for | When |
+| --- | --- |
+| `query` | one value that refreshes (a detail, a count) |
+| `collection` | a keyed list whose rows keep their identity across refreshes |
+| `pagedCollection` | that list, loaded in pages |
+| `mutation` | a write, with the optimistic-patch-then-refresh dance owned for you |
+| `form` + `field` | edits staged locally before a save |
+
+One division of labor runs through all of them: **the first load comes through the island;
+live updates come through MobX; a refresh comes through the store; forms never touch the
+island at all.**
+
+**A collection in a store.** A `collection` fetches a list once and reconciles every later
+refresh against it — a changed row updates its *existing* instance in place, so only the rows
+that actually moved re-render (selection, drag state, and refs survive). A `mutation` sits
+next to it, declaring what it patches optimistically and what it refreshes afterwards:
+
+```ts
+import { collection, mutation } from 'rati/data';
+
+class StationsStore {
+    stations = collection({
+        fetch: (signal) => api.stations.list(signal),
+        key: (station) => station.id,
+    });
+
+    rename = mutation((id: string, name: string) => api.stations.rename(id, name), {
+        optimistic: (id, name) => this.stations.patchItem(id, (s) => void (s.name = name)),
+        refreshes: () => [this.stations],
+    });
+}
+```
+
+**Bridged into a scope through `source()`.** A read-side primitive exposes `source()` — the
+same `Source` from the last section — so a scope's `.load()` awaits its *first* readiness and
+the island's loading/error slots cover that first load:
+
+```ts
+export const stationsScope = scope()
+    .load({ stores: hook(() => useStores()) })
+    .load({ stations: ({ stores }) => stores.stations.source() });
+```
+
+The resolved `stations` prop is **the collection instance itself**, not a snapshot of its
+rows. Once it's ready it stays ready with that same reference — later refreshes, and even
+refresh *failures*, are the instance's own observable state and never re-trip the island.
+
+**The component observes it directly.** Because the prop is a live MobX object, the component
+reads its fields through `observer` (the standard MobX–React binding) and re-renders on the
+fine-grained changes — no island re-resolution. This is the one place a rati app reaches for
+`observer`; the core scope/island reads elsewhere don't need it.
+
+```tsx
+import { observer } from 'mobx-react-lite';
+import type { ScopeProps } from 'rati';
+
+const StationList = observer(({ stations }: ScopeProps<typeof stationsScope>) => (
+    <List
+        items={stations.items}
+        dimmed={stations.query.phase === 'refreshing'} // stale-while-refetch, for free
+    />
+));
+```
+
+**A mutation propagates optimistically.** Calling `store.rename(id, name)` patches the row
+synchronously — every observer of the collection sees the new name at once — then fires the
+request and refreshes the collection to reconcile server truth. If the request fails, that
+same refresh rolls the optimistic edit back. You write the call site; the try/patch/recover
+choreography is owned:
+
+```tsx
+function RenameButton({ store, id, name }: { store: StationsStore; id: string; name: string }) {
+    return <button onClick={() => store.rename(id, name)}>Rename</button>;
+}
+```
+
+**A form stages a draft from an item.** Richer edits — a dialog with validation — belong in a
+`form`, seeded from data the island already resolved. The form *is* the draft: `field(...)`
+captures the baseline, `isDirty` compares against it, `reset()` cancels, and `submit()` calls
+the mutation. It's synchronous local state, so it never touches the island:
+
+```tsx
+import { form, field, required } from 'rati/data';
+
+class RenameDialog {
+    readonly form;
+    readonly save;
+    constructor(store: StationsStore, station: Station) {
+        this.form = form({ name: field(station.name, { validate: required() }) });
+        // submit() validates, runs the handler, commits the baseline on success,
+        // and distributes a thrown FormError onto the fields. It never rejects…
+        this.save = this.form.submit(async ({ name }) => {
+            await store.rename(station.id, name);
+        });
+    }
+}
+
+const RenameForm = observer(({ dialog }: { dialog: RenameDialog }) => (
+    <form action={dialog.save}>                       {/* …so it drops straight into action= */}
+        <TextField {...dialog.form.fields.name.props} label="Name" />
+        <button type="submit" disabled={dialog.form.isSubmitting}>Save</button>
+    </form>
+));
+```
+
+`fields.name.props` is React Aria Components-shaped (`value` / `onChange` / `isInvalid` /
+`errorMessage`), so binding an input is a spread.
+
+**Two notes on the edges.** A `query`/`collection` can re-fetch when a store observable it
+reads changes (`reactive: true`) — the type-ahead case; the [reference](./reference.md#ratidata)
+covers it and its one sharp edge (only reads *before the producer's first `await`* are
+tracked). And under **SSR the primitives stay pending**: a `Source` attaches from an effect,
+and the server runs none — so a `rati/data`-backed screen ships its loading slot in the HTML
+and comes alive on hydration. That's usually right for live, interactive data, but it means
+`rati/data` is not the tool for server-rendered *content*; for that, a plain async load is
+simpler and dehydrates. Reach for `rati/data` when the data is long-lived, edited in place,
+or live — otherwise a `scope().load()` over your API client is the smaller thing.
+
 ## `hook()` — context, and other data libraries
 
 Some values can only come from React: context, or libraries that only expose hooks.
