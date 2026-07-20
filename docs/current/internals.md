@@ -19,12 +19,13 @@ src/
     hydrationDiagnostics.ts  the client-side unclaimed-payload watchdog
     ssrSource.ts    firstSettle — the server-side promise face of SSR-marked sources
     afterHydration.tsx  the ssr: false gate (server + hydration pass render the slot)
+    loadingDelay.ts the loadingDelayMs gate (one window per island, client-only)
   island/    island.ts — public island() wrapper + Island* / Hydration* aliases
   head/      store.ts (HeadStore/createHeadStore), HeadProvider, Title/useTitle/Meta,
              useHeadTag (shared registration), domSync (client title/meta reconciler),
              context
   router/    route.tsx (route() + route/param/redirect types), store.ts (RouterStore),
-             Router (keys the page per navigation — by route name for keepStale), Link,
+             Router (keys the page per navigation — by route name for a kept run), Link,
              Navigate, useRouteContext, prepareRoute, history, scrollRestoration, lazy
   scope/     scope.ts (scope/input/load/provide/hook/data + scope types), source.ts
   ssr/       index.ts (the rati/ssr entry) + renderApp, renderToHtml, payload
@@ -152,7 +153,7 @@ An inputs change (by value) bumps `treeKey`, remounting the inner tree under a `
 key>`: React tears the old run down (children-first) and resolves the new inputs from scratch;
 same-inputs source transitions re-render in place, keeping promise/source identity.
 
-### The kept run (`keepStale`)
+### The kept run (`keepStale`, `loadingDelayMs`)
 
 `keepStale` keeps the **run**, not a copy of its props. The mandala holds a `keptRef`
 alongside `cacheRef`, and on a `treeKey` change retires the outgoing run into it instead of
@@ -169,9 +170,12 @@ stopped being *owned*. Everything else follows from that:
   `Shared.retainProvided`, handing its dispose to the mandala rather than running it — which
   is what lets the value channel keep publishing a live `.provide()` value through the
   window. (A props-only snapshot would have had nothing of the right type to publish.)
-- **`Shared.staleContent`** is one element rendered wherever the loading slot would be: the
-  Suspense fallback, `Step`'s pending-source return, and `ProvideLeaf`'s build frame — the
-  single `Loading` binding all three already shared.
+- **`Shared.slot`** is one element rendered at all three sites that can show something
+  other than content: the Suspense fallback, `Step`'s pending-source return, and
+  `ProvideLeaf`'s build frame. The mandala decides once per render what it *is* — the kept
+  run, the loading slot, or nothing while the delay holds it back — so those three sites
+  carry no slot logic at all, and the element's stable identity keeps the component from
+  remounting as the tree moves between them.
 - **The swap is passive, and it is the leaf's.** `Shared.swap` releases the kept run from
   the leaf's *passive* effect: every layout effect of that commit has run by then, so a
   source both runs hold is never detached and re-attached across the window. It cannot be
@@ -180,16 +184,39 @@ stopped being *owned*. Everything else follows from that:
   `disposeProvided` then `discardRun`, preserving dispose-before-detach.
 - **The Router keys these routes by name.** `Router` normally keys a route's element by a
   per-navigation counter, remounting the component on every navigation — fatal for a kept
-  run, which lives on the island instance. `createMandala` hangs `keepStale` on the
+  run, which lives on the island instance. `createMandala` hangs `keepsRun` on the
   component (like `preload` / `moduleId`) and `Router` reads it. Opt-in: every other route
   keeps the counter.
+
+### The delay window (`loadingDelayMs`)
+
+`LoadingDelay` (mandala/loadingDelay.ts) is one uSES store per island instance, read by
+`LoadingSlot` (render nothing) and by the mandala (keep the previous run on screen). It
+engages the kept-run machinery above — `keepsRun` is `keepStale || loadingDelayMs > 0` —
+and the only difference between the two options is when the kept run stops being shown:
+never, until the successor commits (`keepStale`), or at the deadline, after which a
+mandala effect runs the same `releaseKept` the swap does.
+
+- **The window is a stretch without content, not a resolution.** `begin` (render, where the
+  generation is built) opens one; `settled` (the leaf's commit) closes it and re-arms the
+  next; `expire` (the timer, or the slot rendering itself) ends it and *latches* — so a
+  superseding re-resolve neither restarts the deadline nor blanks a slot already up.
+- **Opening and arming are split** because the render half runs on the server too. `begin`
+  starts no timer: a server render must not leave a `setTimeout` holding the process open.
+  `arm` runs from a mandala effect, which the server never reaches.
+- **Inert off the client.** Both uSES reads pass `false` as `getServerSnapshot`, which React
+  uses for the server render *and* the hydration pass — so a slot that belongs in the HTML
+  (`ssr: false`, a source pending server-side, a rejected load) is rendered there whatever
+  the deadline says. The slot then calls `expire` from its own render, so the first render
+  that consults the *client* snapshot cannot take back what the server shipped.
 
 ## The island's phase (`reportPhase`)
 
 `useScopeControls` reports `phase` / `isStale` off a second uSES store on the
 `RefreshController`, written by **whatever renders**: `Leaf` and `ProvideLeaf` (`'ready'`),
-`KeptContent` (`'ready'`, stale), `LoadingSlot` and the two in-resolver slot returns
-(`'loading'`), and `MandalaErrorBoundary` (`'error'`). Which slot is on screen is the only
+`KeptContent` (`'ready'`, stale), `LoadingSlot` (`'loading'` — including while the delay
+holds it back: nothing on screen is what loading is), and `MandalaErrorBoundary`
+(`'error'`). Which slot is on screen is the only
 honest definition of an aggregate phase — no single piece of bookkeeping knows it, since a
 level can be suspended on a promise, pending on a source, or thrown to the boundary without
 the mandala re-rendering at all.

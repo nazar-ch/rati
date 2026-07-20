@@ -201,6 +201,69 @@ Three commits: the engine + pins, the Router fix + gallery, then docs. 70 files 
   suites pass, so default behavior is unmoved — the harness never sets `keepStale`, and both
   the option and the Router's keying are opt-in.
 
+### 2026-07-20 — SI-02 (`loadingDelayMs`) shipped + decisions
+
+Three commits: a `rati/testing` fix the pins needed, the engine + pins, then docs.
+72 files / 628 tests; `yarn ci` green end to end here (including the fuzz stage that SI-03
+found flaky on this machine), and the randomized suites hold at `FUZZ_RUNS=1500`.
+
+- **The window measures a stretch without content, not a resolution.** The item's semantics
+  are per-resolution ("render nothing until the delay elapses"), and taken literally that
+  gives two flickers the option exists to prevent: a re-resolve superseding another
+  restarts the deadline (so the user waits 2× staring at the same stale content), and one
+  arriving while the slot is *already up* blanks it. So the gate latches — `expire` is
+  sticky until content commits — and `begin` is a no-op on an open-and-paid window. Both
+  edges are pinned. Reading it as "how long has this island been away from fresh content"
+  makes every case fall out; reading it as "how long has this load been running" does not.
+- **`keepStale` and `loadingDelayMs` are one mechanism with two release points.** The record
+  said the delay needs SI-03's kept bucket; what it needs is the *whole* thing —
+  `keepsRun = keepStale || delayed` engages capture, `bucketRetained`, `retainProvided` and
+  the swap identically, and the only difference is that a bare delay releases the run at the
+  deadline (via `releaseKept` from a mandala effect) instead of at the successor's commit.
+  So the composed contract isn't a third behavior to implement, it is what happens when the
+  release point never arrives.
+- **The delay is one deadline because the slot became one element.** SI-04's parting finding
+  (the loading slot is threaded from a single `Loading` binding into three sites) was half
+  right: the *binding* was shared, but each of the three sites rebuilt the element and
+  re-decided the stale substitution, so a per-mount timer would have restarted every time
+  the slot moved between them. `Shared.slot` is now the built element — the mandala decides
+  once what it is (kept run / slot / nothing) and `Step` and `ProvideLeaf` just return it.
+  That deleted more code than the option added.
+- **Split render/effect halves, because the server renders too.** `begin` runs where the
+  generation is built (render) so the first client render is *already* holding — a gate
+  opened from an effect would flash the slot before hiding it. But it starts no timer:
+  arming in render would leave a `setTimeout` per island per request holding Node's event
+  loop open. `arm` is the effect half, which the server never runs.
+- **The hydration trap is SI-04's, mirrored.** An island whose loading slot legitimately
+  belongs in the HTML (`ssr: false`, a source that stays pending server-side, a rejected
+  load) would have it blanked by the delay on the first render that consults the *client*
+  snapshot — not a mismatch, just a flash, which is exactly what the option is for. Two
+  lines fix it: `false` as `getServerSnapshot` (inert on the server and through hydration,
+  the `AfterHydration` trick again) plus the slot calling `expire` from its own render, so
+  having shown it the delay can't take it back.
+- **A route with only `loadingDelayMs` needed the Router change too**, so the flag
+  `createMandala` hangs on the component is now `keepsRun` rather than `keepStale` — same
+  keying, same opt-in, honest about covering both. Without it a delayed *route* would
+  degrade to the first-load half on a param change (the Router remounts, and a remounted
+  island has nothing to keep) while a delayed *island* kept content — the kind of split
+  nobody would guess from the docs.
+- **A `rati/testing` bug, fixed in passing (again).** `TestRouter.text()`,
+  `renderWithStores`'s and `.hydrate()`'s all read `container.textContent`, which includes
+  the previous children React keeps at `display: none` beside a Suspense fallback — so they
+  returned the page twice. SI-03 fixed the same class of bug in `renderIsland`'s per-slot
+  read; this is the container-wide twin, now one `visibleText` helper. It matters here
+  because the delay's failure mode *is* a blank, and a hidden copy of the very slot under
+  assertion hid it: the pin passed against a deliberately broken engine until this landed.
+- **No gallery page, on purpose.** The gallery foregrounds server/client behavior and the
+  delay is inert on the server — its whole story is a few hundred milliseconds of client
+  timing, which a static page can only describe, not show. The two existing options it
+  composes with (`/product`'s `keepStale`, `/deferred`'s `ssr: false`) already carry the
+  loading-state story there. Same call as SI-01's.
+- **Fake timers work fine under `act`** (Vitest leaves `queueMicrotask` real, which is what
+  React's act queue and the gate's notify ride on), so the deadline is a step rather than a
+  wait — and `vi.getTimerCount()` around mount/unmount is the timer-leak pin, measured as a
+  delta so React's own timers don't matter.
+
 ## Per-item conventions
 
 Atomic commits on the current branch (rati `CLAUDE.md`); subjects prefixed `SI-NN:`, a

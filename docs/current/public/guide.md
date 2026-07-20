@@ -397,6 +397,49 @@ What to know:
 `isStale` is about the whole view. A per-key `refresh('departures')` also keeps its previous
 value rendered, and that one reports through `pending`.
 
+### `loadingDelayMs` — don't flash on a fast load
+
+The other half of the same problem. A resolution that settles in tens of milliseconds still
+renders its loading slot for a frame or two, and a spinner that appears and vanishes reads
+worse than no spinner at all. `loadingDelayMs` holds the slot back:
+
+```tsx
+island({ scope: stationScope, component: Board, loading: Skeleton, loadingDelayMs: 200 });
+```
+
+Until the deadline the island renders **nothing** on a first load, or keeps the **previous
+content** on a re-resolve — `keepStale`'s mechanism, borrowed for the length of the window.
+A resolution that beats the deadline never shows the slot at all.
+
+What to know:
+
+- **The deadline measures a stretch without content, not one resolution.** A second
+  re-resolve arriving mid-window doesn't push the slot further out, and once the slot is up
+  nothing takes it back until content returns — no blanking what the user is already
+  looking at.
+- **`phase` is `'loading'` while the slot is held back** — nothing is on screen, which is
+  what loading is. The option changes what the island *shows*, not what it is doing. (A
+  re-resolve's window is `phase: 'ready', isStale: true`, like `keepStale`'s, until the
+  deadline.)
+- **It is inert on the server**, which waits for the resolution regardless, and through
+  hydration: a slot that belongs in the HTML (an `ssr: false` island, a source that stays
+  pending server-side) is shipped and stays put.
+- **`0` and absent are the same thing.**
+
+The two options compose, and that is the point of setting both:
+
+```tsx
+route('/stations/:stationId', 'station', Board, {
+    scope: stationScope,
+    keepStale: true,
+    loadingDelayMs: 200,
+});
+```
+
+`loadingDelayMs` handles "don't flash on a fast load", `keepStale` handles "don't blank on a
+re-load" — so with both, the loading slot appears only for a slow **first** load. Every
+later resolution either beats the deadline invisibly or happens under the previous content.
+
 ## Types, end to end
 
 You never write a prop type for loaded data — you read it off the scope:

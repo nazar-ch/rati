@@ -139,8 +139,9 @@ island({
     component,    // required: ComponentType<ScopeProps<S>>
     loading,      // optional: ComponentType<{ inputs: ScopeInputs<S> }>
     error,        // optional: ComponentType<{ inputs: ScopeInputs<S>; error: SourceError; retry: () => void }>
-    ssr,          // optional: boolean, default true — resolve during a server render?
-    keepStale,    // optional: boolean, default false — keep the last content while re-resolving?
+    ssr,            // optional: boolean, default true — resolve during a server render?
+    keepStale,      // optional: boolean, default false — keep the last content while re-resolving?
+    loadingDelayMs, // optional: number, default 0 — hold the loading slot back this long
 });
 ```
 
@@ -199,6 +200,33 @@ island({ scope: stationScope, component: Board, loading: Skeleton, keepStale: tr
 - **On a route**, the Router keys the page by name rather than by navigation, so a param
   change re-renders the same island instead of replacing it. Navigating to a *different*
   route still remounts, so nothing is carried across pages.
+
+### `loadingDelayMs` — holding the loading slot back
+
+A resolution that settles in tens of milliseconds still renders its `loading` slot for a
+frame or two, which reads as a flash. `loadingDelayMs` renders **nothing** until the
+deadline on a first load, or keeps the **previous content** on a re-resolve (`keepStale`'s
+mechanism, borrowed for the length of the window); a resolution that beats the deadline
+never shows the slot.
+
+```ts
+island({ scope: stationScope, component: Board, loading: Skeleton, loadingDelayMs: 200 });
+```
+
+- **`0` and absent are identical** — no window, no timer, nothing kept.
+- **The deadline measures a stretch without content**, not one resolution: a superseding
+  re-resolve doesn't restart it, and once the slot is on screen nothing takes it back until
+  content returns.
+- **`phase` is `'loading'` while the slot is held back** (nothing is on screen, which is
+  what loading is). A re-resolve's window reads `phase: 'ready', isStale: true` like
+  `keepStale`'s, until the deadline.
+- **The kept run is released at the deadline** — dispose, then detach, the same order the
+  swap uses. Set `keepStale` too to hold it for the whole re-resolution, in which case the
+  slot appears only for a slow *first* load.
+- **Under SSR the option is inert** — the server waits for the resolution regardless, and
+  dehydration is unchanged. A slot that belongs in the HTML (an `ssr: false` island, a
+  source that stays pending server-side) is shipped and survives hydration unblanked.
+- **On a route**, the Router keys the page by name for the same reason `keepStale` does.
 
 ### `useScope(scope)` / `useOptionalScope(scope)`
 
@@ -362,6 +390,7 @@ route('/station/:stationId', 'station', Board, {
     wrapper: AppLayout,    // optional: layout rendered around the component
     ssr: false,            // optional: same contract as island's (needs `scope`)
     keepStale: true,       // optional: same contract as island's (needs `scope`)
+    loadingDelayMs: 200,   // optional: same contract as island's (needs `scope`)
 });
 ```
 
@@ -400,7 +429,8 @@ declare module 'rati' {
 
 Applies shared `wrapper` / `loading` / `error` to a list of routes (a child's own option
 wins). Returns the routes unchanged at the type level — spread the result into the routes
-tuple; paths stay absolute. A child's own `ssr` / `keepStale` survives the group's rebuild;
+tuple; paths stay absolute. A child's own `ssr` / `keepStale` / `loadingDelayMs` survives
+the group's rebuild;
 the group has no default of its own for either — both are per-route judgments, not shared
 presentation.
 
@@ -890,7 +920,7 @@ no layout), and `cleanup()` disposes the router — detaching its history.
 | Handle member | Purpose |
 | --- | --- |
 | `router` / `history` | the live `RouterStore` and its memory `History` — navigate, read `path`/`activeRoute`, spy, or `push`/`go` directly |
-| `container` / `text()` | the mounted node and its trimmed text |
+| `container` / `text()` | the mounted node and what it says — `text()` skips React's hidden subtrees, so a boundary's Suspense-hidden previous children don't read as a second copy of the page |
 | `navigate(to)` / `back()` / `forward()` | drive navigation, settled (async) |
 | `rerender(node)` / `unmount()` / `dispose()` | re-render, unmount; `dispose()` also disposes the router |
 
@@ -995,7 +1025,7 @@ through), `onDispose` (runs at unmount — dispose a client router here).
 | `.hydrate()` handle | Purpose |
 | --- | --- |
 | `container` | the hydrated DOM node (appended to `document.body`) |
-| `text()` | its trimmed `textContent` |
+| `text()` | what the hydrated node says (hidden subtrees skipped, as above) |
 | `recovered` | React's recoverable hydration errors — empty on a clean round-trip; populated only under `allowMismatch` |
 | `rerender(node)` / `unmount()` | re-render (a client update) / unmount and remove the container |
 
