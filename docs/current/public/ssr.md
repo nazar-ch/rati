@@ -453,6 +453,11 @@ reaches the error slot through the normal client path. Every failure is recorded
 `result.errors` (`{ mandalaId, key, error }` with the normalized `SourceError`), so a
 different status policy than the table above is a few lines over that array.
 
+An island's [`retry`](./reference.md#retry--trying-again-automatically) policy changes
+nothing here: the server takes its one attempt per request, records the failure, and lets
+the status be what it is — a page that eventually recovers on the client should not have
+held the response open to find out. The policy runs on the client's own resolution.
+
 An island that opted out with [`ssr: false`](./reference.md#ssr-false--sitting-out-the-server-render)
 runs no load server-side, so it contributes nothing to `result.errors` and nothing to the
 status: a page whose data lives entirely in opted-out islands is always a 200, and its

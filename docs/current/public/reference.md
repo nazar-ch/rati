@@ -142,6 +142,7 @@ island({
     ssr,            // optional: boolean, default true — resolve during a server render?
     keepStale,      // optional: boolean, default false — keep the last content while re-resolving?
     loadingDelayMs, // optional: number, default 0 — hold the loading slot back this long
+    retry,          // optional: { count, backoffMs } — re-resolve automatically on a failure
 });
 ```
 
@@ -228,6 +229,42 @@ island({ scope: stationScope, component: Board, loading: Skeleton, loadingDelayM
   source that stays pending server-side) is shipped and survives hydration unblanked.
 - **On a route**, the Router keys the page by name for the same reason `keepStale` does.
 
+### `retry` — trying again automatically
+
+A flaky backend makes every consumer write the same retry button. `retry: { count,
+backoffMs }` gives the island up to `count` further attempts of its own, waiting `backoffMs`
+before the first and doubling for each one after — `{ count: 3, backoffMs: 500 }` means
+500ms, then 1s, then 2s.
+
+```ts
+island({
+    scope: stationScope,
+    component: Board,
+    loading: Skeleton,
+    error: BoardError,
+    retry: { count: 2, backoffMs: 500 },
+});
+```
+
+- **A retry in progress is not an error.** The `error` slot is not rendered at all while the
+  policy works — the island shows its `loading` slot (or the kept run, under `keepStale`),
+  exactly as for any other re-resolution. It comes up only once the budget is spent.
+- **`useScopeControls(scope).retrying`** is the attempt in flight (`1`, `2`, …) and `0`
+  whenever none is — including in the error slot, which is a spent budget, not a retry.
+  `phase` is unaffected: an island retrying is an island resolving.
+- **`failed` only.** A `not-available` — or any other `code` a load coins — goes straight to
+  the `error` slot. It is an answer, not a transient fault, and retrying it only delays the
+  404 the user is owed.
+- **The manual `retry` buys a fresh budget**, so the error slot's button (and
+  `useScopeControls().retry`) works after exhaustion and starts the policy over. A human
+  asking again is new information.
+- **The budget is per failure streak.** It is restored when the island commits content, and
+  when its inputs change — which also cancels a countdown belonging to the old ones.
+- **Client-only.** A server render takes its one attempt per request and reports the failure
+  as always (see [response statuses](./ssr.md#response-statuses-and-load-failures)); the
+  client's own resolution then runs the policy.
+- **`count: 0` and absent are identical.** Types: `RetryOptions`.
+
 ### `useScope(scope)` / `useOptionalScope(scope)`
 
 Read what the nearest island built from `scope` provides — the `.provide()` value, or the
@@ -241,13 +278,14 @@ The nearest island's imperative controls, keyed by the scope like `useScope` (th
 outside the island's subtree):
 
 ```ts
-const { refresh, pending, phase, isStale, retry } = useScopeControls(stationScope);
+const { refresh, pending, phase, isStale, retrying, retry } = useScopeControls(stationScope);
 
 refresh(): Promise<void>;                      // whole scope — the retry mechanism
 refresh(key: ScopeLoadKeys<S>): Promise<void>; // one load, surgically
 pending: ReadonlySet<ScopeLoadKeys<S>>;        // keys currently re-fetching
 phase: 'loading' | 'ready' | 'error';          // which slot is on screen
 isStale: boolean;                              // …and is it the previous resolution's?
+retrying: number;                              // the `retry` policy's attempt in flight, else 0
 retry: () => void;                             // the error slot's retry, from anywhere
 ```
 
@@ -391,6 +429,7 @@ route('/station/:stationId', 'station', Board, {
     ssr: false,            // optional: same contract as island's (needs `scope`)
     keepStale: true,       // optional: same contract as island's (needs `scope`)
     loadingDelayMs: 200,   // optional: same contract as island's (needs `scope`)
+    retry: { count: 2, backoffMs: 500 },  // optional: same contract as island's
 });
 ```
 
@@ -429,10 +468,9 @@ declare module 'rati' {
 
 Applies shared `wrapper` / `loading` / `error` to a list of routes (a child's own option
 wins). Returns the routes unchanged at the type level — spread the result into the routes
-tuple; paths stay absolute. A child's own `ssr` / `keepStale` / `loadingDelayMs` survives
-the group's rebuild;
-the group has no default of its own for either — both are per-route judgments, not shared
-presentation.
+tuple; paths stay absolute. A child's own `ssr` / `keepStale` / `loadingDelayMs` / `retry`
+survives the group's rebuild; the group has no default of its own for any of them — they are
+per-route judgments, not shared presentation.
 
 ### `RouterStore`
 

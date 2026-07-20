@@ -20,6 +20,7 @@ src/
     ssrSource.ts    firstSettle — the server-side promise face of SSR-marked sources
     afterHydration.tsx  the ssr: false gate (server + hydration pass render the slot)
     loadingDelay.ts the loadingDelayMs gate (one window per island, client-only)
+    retryPolicy.ts  the retry option's driver (one budget per island, client-only)
   island/    island.ts — public island() wrapper + Island* / Hydration* aliases
   head/      store.ts (HeadStore/createHeadStore), HeadProvider, Title/useTitle/Meta,
              useHeadTag (shared registration), domSync (client title/meta reconciler),
@@ -98,7 +99,8 @@ to its subtree, and owns the data lifecycle. That shared abstraction is the **ma
   the loading slot); a pending *source* sets a pending flag → the loading slot.
 - **Errors = the boundary.** A rejected promise (`use()`) or a thrown source error reaches
   `MandalaErrorBoundary` → the `error` slot (switch on `error.code`), or rethrows to the
-  nearest outer boundary when there's no slot.
+  nearest outer boundary when there's no slot. With a `retry` policy the boundary gets a
+  first refusal on the error — see [the retry policy](#the-retry-policy-retry).
 - **Live values = `useSyncExternalStore`.** Each Step subscribes to its level's sources
   through one `useSyncExternalStore`, re-keyed when a cascade swaps a source (the level's
   `sources` array is replaced). (Hook sources own their own subscription.)
@@ -210,6 +212,35 @@ mandala effect runs the same `releaseKept` the swap does.
   the deadline says. The slot then calls `expire` from its own render, so the first render
   that consults the *client* snapshot cannot take back what the server shipped.
 
+### The retry policy (`retry`)
+
+`RetryPolicy` (mandala/retryPolicy.ts) is one budget per island instance, driving the retry
+counter `bumpRetry` already owned. The boundary asks it before it does anything with a
+caught error: an accepted failure returns the mandala's built `slot` (loading, or the kept
+run under `keepStale`) in place of the error slot, and a timer re-resolves from scratch
+after `backoffMs * 2 ** (attempt - 1)`.
+
+- **`accept` is render-time, `arm` is commit-time** — `LoadingDelay`'s split, for two
+  different reasons. Deciding from an effect would mount the error slot for a commit, and
+  its effects (a log, a toast, a Sentry report) with it. Arming from render would leave a
+  `setTimeout` per island per request holding Node's event loop open — and since only a
+  commit can start a timer, and a server render has no commit phase, "the policy is
+  client-only" needs no enforcement at all: `prerender` takes its one attempt and the
+  collector records the failure exactly as without the option.
+- **`accept` is idempotent per generation**, keyed on the boundary's `resetKey` (the tree
+  key). The boundary re-renders while it holds an error, and a static rejected promise
+  hands the *same* reason object to every generation — the generation is the only identity
+  that distinguishes one failure from the next.
+- **`failed` only.** `not-available` (or any code a load coins) is an answer, not a fault.
+- **The budget is per failure streak**, restored by `reset()` from three places: the leaf's
+  commit (content is on screen — hence `Shared.commit` is now wired for `keepsRun` **or** a
+  retry policy), a manual retry (the mandala wraps `bumpRetry` for the error slot's prop and
+  `fullRefresh`; the policy's own retry is the unwrapped bump), and `committed(version)`
+  from the mandala's per-render effect, which drops a countdown belonging to inputs that
+  have since changed. That last one *compares* the version rather than resetting
+  unconditionally, because it runs after every commit — including the one that armed a
+  synchronous first failure's attempt moments earlier.
+
 ## The island's phase (`reportPhase`)
 
 `useScopeControls` reports `phase` / `isStale` off a second uSES store on the
@@ -227,6 +258,11 @@ is not allowed). The payoff is that a subtree reading the status further down th
 sees the value that pass produced: the kept run reports stale before rendering the component
 under it, so the first stale render is already dimmed rather than flashing undimmed for a
 frame.
+
+`retrying` rides the same store but is written by the retry policy, not by a renderer —
+`reportPhase` carries it through untouched, and `reportRetrying` carries `phase`/`isStale`
+through. An island retrying *is* an island resolving, so there is no fourth phase member:
+`phase` reads `'loading'` throughout (or `'ready'` + `isStale`, under `keepStale`).
 
 ## Selective refresh (`mandala/refresh.ts` + `controls.ts`)
 

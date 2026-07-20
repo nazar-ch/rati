@@ -264,6 +264,70 @@ found flaky on this machine), and the randomized suites hold at `FUZZ_RUNS=1500`
   wait — and `vi.getTimerCount()` around mount/unmount is the timer-leak pin, measured as a
   delta so React's own timers don't matter.
 
+### 2026-07-20 — SI-05 (retry policy) shipped + decisions
+
+Two commits: the engine + pins, then docs. 72 files / 639 tests; `yarn ci` green, and the
+randomized suites hold at `FUZZ_RUNS=1500` (the harness sets no `retry`, so the policy is
+unreachable there — the tripwire never moved).
+
+- **An accepted failure is not an error state, so the decision belongs to the boundary's
+  *render*.** The fork the item turns on. Deciding from an effect (`componentDidCatch`,
+  where a timer would naturally live) is one line shorter and wrong: React renders and
+  *commits* the error slot before any effect could take it back, so the slot's own effects
+  run — the log, the toast, the Sentry report — for a failure the island is about to fix.
+  Pinned by counting error-slot renders, not by reading the DOM. `accept` is therefore
+  render-time and idempotent per generation; `arm` is the commit-time half.
+- **That split is also the whole of "client-only" — no gate needed.** The record asked for
+  SSR to be pinned; it turned out to need no code. Only a commit can start a timer and a
+  server render has no commit phase, so `prerender` takes its one attempt per request and
+  the collector records the failure byte-identically to an island without the option
+  (pinned against a no-policy twin). The `ssr: false` finding's `getServerSnapshot` gate
+  would have worked too and buys nothing here.
+- **Keyed on the generation, not the thrown value.** The obvious idempotency key for "have I
+  already ruled on this error?" is the error's identity — and a static rejected promise
+  (`load({ post: failingPromise })`) hands the *same* reason object to every generation,
+  which would retry forever on a fresh budget each time. `resetKey` (the tree key) is the
+  only identity that separates one failure from the next, and it is already a boundary prop.
+- **The budget is restored from three places, and the third one is the trap.** Content
+  committing and a manual retry are obvious. The param change is not: reset it from render
+  and a *synchronous* first failure loses the attempt it just armed (the mandala's effect
+  runs after `componentDidCatch`), reset it from the tree-key effect and the same thing
+  happens one frame later. `committed(version)` compares the inputs version instead, and
+  starts at `0` because that is the version the policy is constructed under.
+- **`retrying` is a number on the status, not a fourth phase.** SI-03's rule applied twice
+  over: `phase` means "which slot is on screen", and during a retry that is the loading slot
+  (or kept content) — a subtree gating a skeleton on `phase === 'loading'` must keep showing
+  it. The count is the useful part anyway ("Retrying (2)…"), and `0` reads as "not". It
+  clears in the error slot too: a spent budget is not a retry in progress.
+- **`keepStale` composes for free, and `loadingDelayMs` does too.** The boundary renders the
+  mandala's *built* `slot` — the same element SI-02 collapsed the three loading-slot sites
+  into — so kept content stands in front of a retry exactly as it stands in front of any
+  re-resolve, and a delay still holds the slot back during the backoff. Nothing in this item
+  knows about either option.
+- **A component that throws in render is retried like a load that failed.** The boundary
+  catches everything under it and `asSourceError` maps a plain `Error` to `code: 'failed'`,
+  so a render bug gets `count` re-mounts before the error slot. Not worth plumbing a
+  load-vs-render distinction down from the resolver for — the manual `retry` has always
+  re-thrown the same way — but it is the one place the `failed`-only rule is blunter than it
+  reads.
+- **The kept content remounts across the backoff — on top of a remount `keepStale` already
+  does.** The boundary swaps its whole child (`<Suspense>` → the slot element) to show the
+  slot in place of the error, so under `keepStale` the user's component unmounts and
+  remounts around each attempt. Measured, not reasoned: a plain `keepStale` re-resolve
+  already logs `mount page a` on entering the window (the kept run renders in the Suspense
+  *fallback* position, a different fiber slot from the live tree), and each automatic attempt
+  adds an unmount/mount pair on top. Same surgery the error slot has always done, and
+  invisible for a spinner; worth knowing for a heavy kept page. Avoiding it means inverting
+  boundary/Suspense, which a lot of SSR behavior sits on — not this item's call.
+
+**A finding out of scope, for the maintainer.** The measurement above says `keepStale`'s
+stale window **remounts the component**, which nothing in SI-03 or the docs claims — the
+guide says "the component re-renders with the *previous* params' props", and `re-renders` is
+what a reader would bank component state and scroll position on. Visually it is invisible
+(same props, same output), so no pin caught it. Whether that is a bug or the price of
+rendering the kept run from the fallback position is a semantics call on top of the item
+that set the semantics; not touched here.
+
 ## Per-item conventions
 
 Atomic commits on the current branch (rati `CLAUDE.md`); subjects prefixed `SI-NN:`, a

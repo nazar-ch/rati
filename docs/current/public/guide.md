@@ -211,6 +211,19 @@ function BoardError({ inputs, error, retry }: {
 Throw `NotAvailableError` in a load to signal "this doesn't exist" as data, not as a
 crash.
 
+If the failure you expect is a flaky network rather than a real one, let the island try
+again on its own instead of writing that button:
+
+```tsx
+island({ scope: stationScope, component: Board, loading: Skeleton, error: BoardError,
+         retry: { count: 2, backoffMs: 500 } });
+```
+
+Two more attempts, 500ms then 1s apart, and the `error` slot is not rendered at all until
+they are spent — the island shows its loading slot meanwhile, because an island retrying is
+an island loading. `not-available` is never retried: it is an answer, not a fault. See
+[`retry`](./reference.md#retry--trying-again-automatically).
+
 ## Routes
 
 A route is an island bound to a URL — same scope, same slots, plus a path:
@@ -357,7 +370,9 @@ const { phase, isStale, retry } = useScopeControls(stationScope);
 
 `phase` is `'loading'`, `'ready'`, or `'error'` — the island's aggregate phase, not any one
 load's. `retry` is the error slot's retry, reachable from anywhere (the same action as
-`refresh()` with no key). `isStale` belongs to the option below.
+`refresh()` with no key). `isStale` belongs to the option below; `retrying` — the same
+object's fourth read — belongs to [`retry`](./reference.md#retry--trying-again-automatically),
+and is what a loading slot switches on to say *why* it is still up.
 
 ### `keepStale` — don't blank on a re-load
 
