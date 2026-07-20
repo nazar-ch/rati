@@ -417,6 +417,99 @@ Three commits: the rejection ledger, the data trace's twin of it, the settle bud
   frames around it place the island. Good enough for the item's "or at least the elapsed
   budget and the likely cause" floor, and better than it.
 
+### 2026-07-20 — DX-06 (the Jnana adoption leg landed)
+
+Ran against **published `rati@0.6.1`** — the entry ships in the release Jnana already
+depends on, so no `rati-dev` alias and no local rati source in the loop. Jnana PR:
+[nazar-ch/jnana#825](https://github.com/nazar-ch/jnana/pull/825), four commits (one per leg,
+plus the docs). Both Jnana gates green after each leg and unchanged in size: `frontend-unit`
+132 files / **1213 → 1214** tests (the one new test is below), `frontend-browser` 27 files /
+**247** tests. The §Verify grep gate is clean — no `as unknown as GlobalStores`, no
+`vi.mock('rati'`, and no `GenericStoresContext` at all in `frontend/test/`.
+
+**By the numbers, over the ten files: 986 → 970 lines (−16).** The concepts the survey named:
+`GenericStoresContext` mentions 32 → **0**; the container cast `as unknown as GlobalStores`
+10 → **0**; `vi.mock('rati', …)` 2 → **0**; all `as unknown as` 30 → **16**; `vi.fn()`
+15 → **9** (what's left is authClient spies and one router partial).
+
+**The line count is the honest disappointment: flat.** Per leg — stores 609 → 607, router
+230 → **213**, Link 147 → 150. The stores leg is where the utilities were supposed to pay and
+it broke even, because `storesWrapper<S>({…})` + `render(ui, { wrapper })` costs about what
+the provider JSX cost, while each file *gained* a `SessionContainer` type import and a line of
+comment explaining the surviving nested cast (~7 lines of that across the six). Strip those and
+the mechanical delta is ≈ −9. Lines only really fall where a *fake* died rather than moved:
+the two guard files lost 17 by replacing spy bookkeeping with `router.path` reads. The Link leg
+grew by 3 because it gained a test.
+
+So: **honester, unambiguously; shorter, only where a hand-rolled surface disappeared.** Which
+is the right read of the disposition, not a failure of the utilities — the ten files' problem
+was never length, it was that they asserted against an imitation.
+
+**Per-file judgment calls** (§Scope asks for the record):
+
+- `storesWrapper` + the file's existing renderer, no cast: `connectivityDot.browser`,
+  `anonymousShell.browser` (the two `.browser` files, as the item requires),
+  `twoFactorSettingsPage`, `spaceNodeCreateGating`, `DocRejectedDot`, `UpgradeGate`.
+- `createTestRouter` with a minimal local table (3–4 routes): `authLayout` (5 tests),
+  `guards` (8), `loginPage` (3), `twoFactorPage` (6). All four *care* about routing —
+  redirect targets or a `<Link>`. Local tables, per the pre-DX-05 intel: importing Jnana's
+  `routes.tsx` drags ~40 page + scope modules into a unit test.
+- **`renderWithStores` had no taker.** Every one of the ten files already had a renderer
+  worth keeping (RTL, or `vitest-browser-react`), so the DX-03 recalibration that split
+  `storesWrapper` out of it is what made the leg possible — 6 of 6, not 8 of 10.
+- `test/boot/fakes.ts`'s `fakeRouter` untouched, per this record's own 2026-07-19 correction.
+
+**The one friction that wants a rati-side answer: a real `RouterStore` cannot go in a
+`PartialStores` slot.** Jnana types its container's `router` as `RouterStore<typeof routes>`
+(the app's exact 32-route tuple), so `Partial<RouterStore<typeof routes>>` demands `routes`
+be that tuple, and a store built over a *local* table is rejected:
+
+```
+Type 'RouterStore<{…'/home/'…}[]>' is not assignable to type 'Partial<RouterStore<readonly [
+  {…'/'…}, … 30 more …, {…}]>>'. Types of property 'routes' are incompatible.
+  Target requires 32 element(s) but source may have fewer.
+```
+
+This inverts the item's expectation. A `{ navigate: vi.fn(), path, search, searchParams }`
+fake needs **no** cast (none of those fields is route-table-typed) — it is the *honest* value
+that can't be expressed. So "give the file a real test router" is reachable only through
+`createTestRouter`, which sidesteps the check by building the container itself
+(`{ ...options.stores, router } as S`). Fine wherever routing matters; the gap is the file
+that needs a router-shaped presence under a renderer it must keep —
+`anonymousShell.browser`, which therefore keeps its typed partial as a **survivor**. Shape of
+a fix, if it's worth one: let the `router` slot accept a `RouterStore<any>` (or exclude
+`routes` from the partial), so a bare `new RouterStore({}, localTable, { history })` can be
+injected without a cast.
+
+**Second friction, consumer-side, no rati change:** a `rati/*` entry that's new to a
+Vitest **browser** project must be added to `optimizeDeps.include`. The first two-file run
+after the migration failed three tests inside React's `useState` — the un-prebundled entry
+triggered a mid-run re-optimization, which reads as a component crash, not a bundling event.
+Worth a line in the entry's docs for consumers with browser-mode suites.
+
+**Survivors, one line each (§Verify).**
+
+- Five non-render files fake a container as a **constructor argument** (`workspaceStores`,
+  `UIStore.hostStatus`, `UIStore.syncPaused`, `resolveReadonlyReason`, `readonlyWorkspace`) —
+  untouched, out of any render utility's reach, exactly as pre-justified.
+- One in-file ctor cast survives in `UpgradeGate` (`new UIStore(… as GlobalStoresContainer)`).
+- **Per-field casts on nested models** — `authStore.user` (5 files), `authStore.workspaceStores`
+  (2). `PartialStores` is one level deep by design; this is the predicted, correct cost, and
+  Jnana's new docs section says so explicitly so nobody reads them as unfinished work.
+- `anonymousShell.browser`'s router partial — the friction above.
+
+**What the utilities got right, unprompted:** `storesWrapper`'s partial-of-partials caught two
+mistyped slices during the migration that the old `as unknown as` container would have carried
+to a runtime failure; `createTestRouter`'s memory history made the open-redirect pin
+(`//evil.example` as a `returnTo`) an actual "the router did not move" assertion; and the
+act-flag scoping held — Jnana's `unitSetup.ts` still sets no global
+`IS_REACT_ACT_ENVIRONMENT` and not one migrated file warned.
+
+**Jnana-side extras**, for the record: `.claude/frontend-testing.md` gained the section the
+survey found missing (the ten-file pattern was entirely undocumented), and Jnana's commit
+subjects read `rati DX-06:` — a bare `DX-06:` collides with Jnana's own `DX` prefix
+(its external-interactions effort), which its issue-tracking gate flagged.
+
 ## Per-item conventions
 
 Atomic commits on the current branch; subjects prefixed `DX-NN:`, a `Closes: DX-NN` trailer
