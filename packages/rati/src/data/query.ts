@@ -15,6 +15,9 @@ import { toSourceError, type Source, type SourceError } from '../scope/source';
         error. Mutations and user gestures call it.
       - The race guard is an invariant, not an option: a superseded request's
         settle is ignored and its `AbortSignal` fires, so producers can cancel.
+      - `set()`/`patch()` are the single-value write seam (`upsert`/`patchItem`'s
+        siblings): local truth now, server truth on the next refresh. They swap
+        the `data` reference (the notification) and touch no fetch and no error.
       - `load()`/`refresh()` resolve when the fetch settles either way — failure is
         state (`phase`/`error`), not a rejection.
       - `reactive: true` re-fetches when the producer's *synchronous prefix* reads
@@ -58,6 +61,20 @@ export interface Query<T> {
     load(): Promise<void>;
     /** Explicit re-fetch; `data` stays visible; dedupes in flight. */
     refresh(): Promise<void>;
+    /**
+     * Replace the value locally (the server-push seam — `upsert`'s single-value
+     * sibling). Doesn't touch `error` or any fetch; last-write-wins against an
+     * in-flight refresh.
+     */
+    set(next: T): void;
+    /**
+     * Optimistic edit (`patchItem`'s single-value sibling): must return the next
+     * value — `data` is a ref, so the reference swap *is* the notification.
+     * No-ops before the first value. No dirty-mark is needed: a refresh
+     * overwrites wholesale, so `onError: 'refresh'` recovery works by
+     * construction.
+     */
+    patch(producer: (current: T) => T): void;
     /** Back to idle; drops data and error, aborts anything in flight. */
     reset(): void;
     /**
@@ -72,7 +89,11 @@ export interface Query<T> {
 
 /** Package-internal hooks — the seam `collection` builds on. Not public API. */
 export interface QueryInternalOptions<T> extends QueryOptions {
-    /** Runs inside the settling action of a *current* (non-superseded) fetch. */
+    /**
+     * Runs inside the settling action of a *current* (non-superseded) fetch, and
+     * inside `set`/`patch`'s action — every way a value lands. `collection`
+     * reconciles here, so a local write keeps the item map coherent.
+     */
     onSuccess?: (value: T) => void;
     /** Runs inside `reset()`'s action, after the query's own state cleared. */
     onReset?: () => void;
@@ -243,6 +264,23 @@ export function createQuery<T>(
         else void startFetch();
     }
 
+    function set(next: T): void {
+        runInAction(() => {
+            state.data = next;
+            state.hasData = true;
+            options.onSuccess?.(next);
+        });
+    }
+
+    function patch(producer: (current: T) => T): void {
+        if (!state.hasData) return; // nothing to patch yet
+        runInAction(() => {
+            const next = producer(state.data as T);
+            state.data = next;
+            options.onSuccess?.(next);
+        });
+    }
+
     function reset(): void {
         requestId += 1; // anything in flight settles into the void
         controller?.abort();
@@ -282,6 +320,8 @@ export function createQuery<T>(
         },
         load,
         refresh,
+        set,
+        patch,
         reset,
         source() {
             memoizedSource ??= instanceSource(

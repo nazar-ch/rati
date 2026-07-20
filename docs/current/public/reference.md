@@ -777,7 +777,7 @@ topology:
 
 | Export | Purpose |
 | --- | --- |
-| `query(producer, { debounce?, reactive? }?)` | read one value: one async producer (`(signal: AbortSignal) => Promise<T>`), honest phases (`idle → loading → ready / refreshing / error`), race-guarded |
+| `query(producer, { debounce?, reactive? }?)` | read one value: one async producer (`(signal: AbortSignal) => Promise<T>`), honest phases (`idle → loading → ready / refreshing / error`), race-guarded; `set`/`patch` write it locally |
 | `collection({ fetch, key, equals?, into?, debounce?, reactive? })` | read a keyed set: identity-stable reconciliation, `patchItem`/`upsert`/`insert`/`remove` |
 | `pagedCollection({ fetchPage, key, equals?, into?, reactive? })` | read in pages: pages *are* queries (per-page phase/error/retry), structural `hasMore`, cursor re-anchoring `refresh()` |
 | `mutation(perform, { optimistic?, refreshes?, onError? }?)` | write: callable with observable `isPending`/`error`, optimistic patch + refresh choreography |
@@ -823,6 +823,16 @@ phases for pagination rows, `isSubmitting` for buttons. `query.load()` is idempo
 `refresh()` is the only re-fetch and keeps stale data visible, even through a refresh
 failure. Under SSR the primitives stay pending (a `Source` attaches in effects) — this
 entry is for the interactive app, not the SSR path.
+
+**Single-value writes.** `query` mirrors the collection's write seam for its one value:
+`set(next)` replaces it locally (the server-push case, `upsert`'s sibling) and
+`patch((current) => next)` is the optimistic edit (`patchItem`'s sibling — a
+`mutation`'s `optimistic:` callback writes through it). Both swap the `data`
+reference (**return a new object** — an in-place edit of a plain payload is invisible),
+touch no fetch and no standing error, and lose to any later settle: a refresh
+overwrites wholesale, which is exactly what makes `onError: 'refresh'` recovery work
+with no dirty-mark. `patch` no-ops before the first value; on a `collection`'s
+underlying query, a local write reconciles the item map like a fetch would.
 
 **Reactive params** (`reactive: true`, opt-in). A `query` marked `reactive` re-fetches when
 the observables its producer reads **synchronously** change — the type-ahead / filter case,

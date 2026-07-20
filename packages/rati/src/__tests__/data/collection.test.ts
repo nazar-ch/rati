@@ -180,6 +180,22 @@ describe('optimistic edits and server truth', () => {
         expect(c.items.map((row) => row.id)).toEqual(['a', 'b']);
     });
 
+    test('a set on the underlying query reconciles the item map (stays coherent)', async () => {
+        const { c } = rowsCollection([{ id: 'a', title: 'Alpha' }]);
+        await c.query.load();
+        const item = c.items[0]!;
+
+        // A whole-list local write lands through onSuccess like a fetch would —
+        // items and query.data never diverge.
+        c.query.set([
+            { id: 'a', title: 'Alpha v2' },
+            { id: 'b', title: 'Beta' },
+        ]);
+        expect(c.items[0]).toBe(item); // reconciled, not replaced
+        expect(item.title).toBe('Alpha v2');
+        expect(c.items.map((row) => row.id)).toEqual(['a', 'b']);
+    });
+
     test('insert places locally, remove drops locally', async () => {
         const { c } = rowsCollection([
             { id: 'a', title: 'Alpha' },

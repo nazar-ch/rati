@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
-import { observable, runInAction } from 'mobx';
+import { autorun, observable, runInAction } from 'mobx';
 import { query } from '../../data/query';
 // A deferred fake walks a query through every phase without module mocking — the
 // "testability by construction" ground rule (data-package.md), now `rati/testing`'s.
@@ -110,6 +110,89 @@ describe('refresh()', () => {
         expect(q.phase).toBe('ready');
         expect(q.data).toBe(3);
         expect(q.error).toBeNull();
+    });
+});
+
+describe('set() and patch() — the single-value write seam', () => {
+    test('patch swaps the reference and notifies an observer', async () => {
+        const q = query(() => Promise.resolve({ retention: 30, role: 'admin' }));
+        await q.load();
+
+        const seen: number[] = [];
+        const dispose = autorun(() => seen.push(q.data!.retention));
+        q.patch((current) => ({ ...current, retention: 7 }));
+        dispose();
+
+        expect(q.data).toEqual({ retention: 7, role: 'admin' });
+        expect(seen).toEqual([30, 7]); // the ref swap is the notification
+        expect(q.phase).toBe('ready'); // no fetch started, no phase change
+    });
+
+    test('patch before the first value no-ops', () => {
+        const q = query(() => Promise.resolve(1));
+        q.patch((current) => current + 1);
+        expect(q.data).toBeUndefined();
+        expect(q.phase).toBe('idle');
+    });
+
+    test('set lands a value from idle; source() becomes ready (the server-push seam)', () => {
+        const q = query(() => Promise.resolve(1));
+        const source = q.source();
+        expect(source.getSnapshot()).toEqual({ status: 'pending' });
+
+        q.set(42);
+        expect(q.data).toBe(42);
+        expect(q.phase).toBe('ready');
+        expect(source.getSnapshot()).toEqual({ status: 'ready', value: q });
+    });
+
+    test('set does not touch a standing error (a local write is no evidence of recovery)', async () => {
+        const gates = [deferred<number>(), deferred<number>()];
+        let call = 0;
+        const q = query(() => gates[call++]!.promise);
+        const first = q.load();
+        gates[0]!.resolve(1);
+        await first;
+        const failing = q.refresh();
+        gates[1]!.reject(new Error('offline'));
+        await failing;
+
+        q.set(2);
+        expect(q.data).toBe(2);
+        expect(q.error).toMatchObject({ code: 'failed' }); // only a settle clears it
+    });
+
+    test('a refresh overwrites the patched value wholesale — the recovery path', async () => {
+        const gates = [deferred<number>(), deferred<number>()];
+        let call = 0;
+        const q = query(() => gates[call++]!.promise);
+        const first = q.load();
+        gates[0]!.resolve(10);
+        await first;
+
+        q.patch(() => 99); // optimistic hop
+        expect(q.data).toBe(99);
+
+        const refreshing = q.refresh(); // e.g. mutation onError: 'refresh'
+        gates[1]!.resolve(10); // server truth unchanged
+        await refreshing;
+        expect(q.data).toBe(10); // no dirty-mark needed: refresh replaces the ref
+    });
+
+    test('a patch during an in-flight refresh loses to the settle (last-write-wins)', async () => {
+        const gates = [deferred<number>(), deferred<number>()];
+        let call = 0;
+        const q = query(() => gates[call++]!.promise);
+        const first = q.load();
+        gates[0]!.resolve(1);
+        await first;
+
+        const refreshing = q.refresh();
+        q.patch(() => 5); // visible immediately…
+        expect(q.data).toBe(5);
+        gates[1]!.resolve(2);
+        await refreshing;
+        expect(q.data).toBe(2); // …until the settle brings server truth
     });
 });
 
