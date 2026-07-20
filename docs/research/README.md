@@ -14,6 +14,11 @@ regrouped by topic into the files below.
 
 ## Topics
 
+- [field-gap-analysis.md](./field-gap-analysis.md) — the IMP-01 comparison against
+  react-query/SWR, TanStack Router, React Router 8 and Next 16 (versions cited at
+  2026-07-20): every daily-driver field feature classified through rati's stance, plus
+  three net-new proposals — intent-based data prefetch, commit-aware scroll restoration,
+  a devtools panel over the tracers.
 - [scope-and-island-directions.md](./scope-and-island-directions.md) — abort signals for data
   loads; advanced island loading states (`loadingDelayMs`, `keepStale` + status hook, retry
   policy, per-island `ssr: false`, SSR-error dehydration options); `ResourceContainer` migrating
