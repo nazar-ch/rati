@@ -155,6 +155,12 @@ export type RouteOptions<TScope extends Scope<any> | undefined, Path extends str
      */
     keepStale?: TScope extends Scope<any> ? boolean : undefined;
     /**
+     * Hold the `loading` slot back for this many milliseconds, so a fast resolution never
+     * flashes it — the mandala's `loadingDelayMs` (see `island`). Only meaningful alongside
+     * `scope`.
+     */
+    loadingDelayMs?: TScope extends Scope<any> ? number : undefined;
+    /**
      * Declare this route a redirect — see {@link RouteRedirect}. The component never
      * renders on the happy path (pass `() => null`); it shows only if a redirect loop
      * is detected and following stops.
@@ -205,6 +211,7 @@ export function buildRouteComponent(
         error?: ComponentType<any> | undefined;
         ssr?: boolean | undefined;
         keepStale?: boolean | undefined;
+        loadingDelayMs?: number | undefined;
     },
 ): ComponentType<any> {
     return createMandala(
@@ -215,6 +222,7 @@ export function buildRouteComponent(
             ...(fold.error ? { error: fold.error } : {}),
             ...(fold.ssr !== undefined ? { ssr: fold.ssr } : {}),
             ...(fold.keepStale !== undefined ? { keepStale: fold.keepStale } : {}),
+            ...(fold.loadingDelayMs !== undefined ? { loadingDelayMs: fold.loadingDelayMs } : {}),
         },
         'Route',
     );
@@ -234,6 +242,7 @@ export type RouteFoldInputs = {
     // options (an opt-out turned back on, a stale window that stops keeping).
     ssr?: boolean | undefined;
     keepStale?: boolean | undefined;
+    loadingDelayMs?: number | undefined;
 };
 
 /**
@@ -284,6 +293,7 @@ export function route<
                   error: options.error as ComponentType<any> | undefined,
                   ssr: options.ssr as boolean | undefined,
                   keepStale: options.keepStale as boolean | undefined,
+                  loadingDelayMs: options.loadingDelayMs as number | undefined,
               })
             : component;
 
@@ -307,6 +317,7 @@ export function route<
                       error: options.error as ComponentType<any> | undefined,
                       ssr: options.ssr as boolean | undefined,
                       keepStale: options.keepStale as boolean | undefined,
+                      loadingDelayMs: options.loadingDelayMs as number | undefined,
                   } satisfies RouteFoldInputs,
               }
             : {}),

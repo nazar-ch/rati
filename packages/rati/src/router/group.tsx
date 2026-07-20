@@ -57,6 +57,7 @@ export function group<const T extends readonly GenericRouteType[]>(
                     // Not group defaults — the route's own, carried through the rebuild.
                     ssr: fold.ssr,
                     keepStale: fold.keepStale,
+                    loadingDelayMs: fold.loadingDelayMs,
                 });
             }
         }

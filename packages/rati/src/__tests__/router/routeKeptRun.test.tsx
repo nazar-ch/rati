@@ -1,5 +1,5 @@
-import { describe, test, expect, afterEach } from 'vite-plus/test';
-import type { FC } from 'react';
+import { describe, test, expect, afterEach, beforeEach, vi } from 'vite-plus/test';
+import { act, type FC } from 'react';
 import { route } from '../../router/route';
 import { scope, input, type ScopeComponent } from '../../scope/scope';
 import { createTestRouter, deferred, flush, cleanup } from '../../testing';
@@ -7,22 +7,25 @@ import { createTestRouter, deferred, flush, cleanup } from '../../testing';
 afterEach(cleanup);
 
 /*
-    `keepStale` on a route — the case the option exists for, and the one that needs the
-    Router's help.
+    A route that keeps its previous run across a navigation — `keepStale`, or
+    `loadingDelayMs` for the length of its window. The case those options exist for, and the
+    one that needs the Router's help.
 
     The Router keys a route's element by a per-navigation counter, so every navigation
-    remounts the component. For a `keepStale` island that is fatal: what it keeps lives on
-    the island instance, and a remounted island has no previous run to keep. So the mandala
-    carries the flag and the Router keys those by route name instead — which still remounts
-    across routes, and lets a same-route param change reach the mandala's own param-change
-    path. These pins hold both halves of that.
+    remounts the component. For an island that keeps a run that is fatal: what it keeps lives
+    on the island instance, and a remounted island has no previous run to keep. So the
+    mandala carries the flag (`keepsRun`) and the Router keys those by route name instead —
+    which still remounts across routes, and lets a same-route param change reach the
+    mandala's own param-change path. These pins hold both halves of that, for both options.
 */
+
+const DELAY = 200;
 
 const Home: FC = () => <div>home</div>;
 
 function productRoutes(
     gates: Map<string, ReturnType<typeof deferred<string>>>,
-    keepStale: boolean,
+    options: { keepStale?: boolean; loadingDelayMs?: number },
 ) {
     const productScope = scope({ productId: input<string>() }).load({
         label: ({ productId }) => {
@@ -40,7 +43,7 @@ function productRoutes(
         route('/products/:productId', 'product', Product, {
             scope: productScope,
             loading: () => <div>loading slot</div>,
-            ...(keepStale ? { keepStale: true } : {}),
+            ...options,
         }),
         route('*', 'home', Home),
     ] as const;
@@ -49,7 +52,9 @@ function productRoutes(
 describe('route keepStale', () => {
     test('a param change keeps the previous page rendered while the new one resolves', async () => {
         const gates = new Map<string, ReturnType<typeof deferred<string>>>();
-        const router = await createTestRouter(productRoutes(gates, true), { url: '/products/1' });
+        const router = await createTestRouter(productRoutes(gates, { keepStale: true }), {
+            url: '/products/1',
+        });
 
         gates.get('1')!.resolve('AeroPress');
         await flush();
@@ -68,7 +73,7 @@ describe('route keepStale', () => {
 
     test('without the option the same navigation blanks to the loading slot', async () => {
         const gates = new Map<string, ReturnType<typeof deferred<string>>>();
-        const router = await createTestRouter(productRoutes(gates, false), { url: '/products/1' });
+        const router = await createTestRouter(productRoutes(gates, {}), { url: '/products/1' });
 
         gates.get('1')!.resolve('AeroPress');
         await flush();
@@ -80,7 +85,9 @@ describe('route keepStale', () => {
 
     test('leaving for a different route still remounts — the keying is per route, not global', async () => {
         const gates = new Map<string, ReturnType<typeof deferred<string>>>();
-        const router = await createTestRouter(productRoutes(gates, true), { url: '/products/1' });
+        const router = await createTestRouter(productRoutes(gates, { keepStale: true }), {
+            url: '/products/1',
+        });
 
         gates.get('1')!.resolve('AeroPress');
         await flush();
@@ -95,7 +102,9 @@ describe('route keepStale', () => {
 
     test('back() through the entry stack keeps content the same way forward navigation does', async () => {
         const gates = new Map<string, ReturnType<typeof deferred<string>>>();
-        const router = await createTestRouter(productRoutes(gates, true), { url: '/products/1' });
+        const router = await createTestRouter(productRoutes(gates, { keepStale: true }), {
+            url: '/products/1',
+        });
 
         gates.get('1')!.resolve('AeroPress');
         await flush();
@@ -113,5 +122,41 @@ describe('route keepStale', () => {
         gates.get('1')!.resolve('AeroPress again');
         await flush();
         expect(router.text()).toBe('product 1: AeroPress again');
+    });
+});
+
+describe('route loadingDelayMs', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+    afterEach(() => {
+        cleanup();
+        vi.useRealTimers();
+    });
+
+    test('a param change keeps the previous page until the deadline, then shows the slot', async () => {
+        const gates = new Map<string, ReturnType<typeof deferred<string>>>();
+        const router = await createTestRouter(productRoutes(gates, { loadingDelayMs: DELAY }), {
+            url: '/products/1',
+        });
+
+        gates.get('1')!.resolve('AeroPress');
+        await flush();
+
+        await router.navigate('/products/3');
+
+        // Same Router keying, borrowed for the window: without it the navigation would
+        // remount the island, and a remounted island has nothing to keep.
+        expect(router.text()).toBe('product 1: AeroPress');
+
+        await act(async () => {
+            vi.advanceTimersByTime(DELAY + 1);
+        });
+        await flush();
+        expect(router.text()).toBe('loading slot');
+
+        gates.get('3')!.resolve('Stagg');
+        await flush();
+        expect(router.text()).toBe('product 3: Stagg');
     });
 });

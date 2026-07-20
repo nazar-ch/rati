@@ -190,8 +190,13 @@ export type Shared = {
     scope: Scope;
     component: ComponentType<any>;
     channel: Context<unknown>;
-    loading: ComponentType<{ inputs: unknown }>;
-    inputs: unknown;
+    // What the island shows while it has no fresh content, built once by the mandala so all
+    // three sites that can show it (the Suspense fallback, a Step pending on a source,
+    // `ProvideLeaf`'s build frame) render one element — and one identity, so nothing
+    // remounts as the tree moves between them. It is the loading slot, the kept run standing
+    // in for it (`keepStale`), or nothing at all while `loadingDelayMs` holds the slot back;
+    // whichever it is reports its own phase.
+    slot: ReactNode;
     // Per-level data-cell caches, held on the mandala's committed ref (see Bucket).
     buckets: Bucket[];
     // Does the mandala still own this bucket? True for the run being rendered and for the
@@ -220,9 +225,10 @@ export type Shared = {
     hydration: Record<string, unknown> | undefined;
     // Client only: server-dehydrated live-source seeds (scope key -> hydrate() input).
     seeds: Record<string, unknown> | undefined;
-    // `keepStale` only (undefined otherwise). The leaf reports what it committed, which
-    // becomes the baseline the next re-resolve keeps on screen — and the report is the
-    // swap: recording the new output is what releases the run it replaces.
+    // Kept-run options only, i.e. `keepStale` / `loadingDelayMs` (undefined otherwise). The
+    // leaf reports what it committed, which becomes the baseline the next re-resolve keeps
+    // on screen — and the report is the swap: recording the new output is what releases the
+    // run it replaces.
     commit:
         | ((
               buckets: Bucket[],
@@ -230,15 +236,12 @@ export type Shared = {
               provided: { value: unknown } | null,
           ) => void)
         | undefined;
-    // `keepStale` only. Called from the leaf's passive effect once its run is on screen —
-    // the moment the run it replaced can be let go (see the mandala's swapRun).
+    // Same. Called from the leaf's passive effect once its run is on screen — the moment the
+    // run it replaced can be let go (see the mandala's swapRun).
     swap: ((buckets: Bucket[]) => void) | undefined;
-    // `keepStale` only. A retiring `ProvideLeaf` offers its dispose here; taken (true) when
-    // its run is the kept one, so the value stays alive while it is still being published.
+    // Same. A retiring `ProvideLeaf` offers its dispose here; taken (true) when its run is
+    // the kept one, so the value stays alive while it is still being published.
     retainProvided: ((buckets: Bucket[], dispose: () => void) => boolean) | undefined;
-    // The kept run's content, rendered wherever the loading slot would be while a stale
-    // window is open. Undefined the rest of the time — which is always, without `keepStale`.
-    staleContent: ReactNode | undefined;
 };
 
 // Build one cell — the hydration short-circuit, the live-source seeding, and the
@@ -644,14 +647,10 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
 
     if (pending) {
         if (navTraceEnabled()) navTrace(`level ${index} render loading slot (pending)`);
-        // Under `keepStale`, the previous run stands in for the slot — the same substitution
-        // the mandala makes for its Suspense fallback, so a level pending on a source and a
-        // level suspended on a promise look the same from outside. (The kept run reports its
-        // own phase as it renders; this branch only owns the bare slot.)
-        if (shared.staleContent !== undefined) return shared.staleContent;
-        shared.controller?.reportPhase('loading', false);
-        const Loading = shared.loading;
-        return <Loading inputs={shared.inputs} />;
+        // The mandala's one slot element — so a level pending on a source and a level
+        // suspended on a promise look the same from outside, kept content and delayed slot
+        // included. Whatever it turns out to be reports its own phase.
+        return shared.slot;
     }
     return children(resolved);
 }
@@ -699,9 +698,7 @@ function Leaf({ resolved, shared }: LeafProps) {
             resolved={resolved}
             component={Component}
             channel={channel}
-            loading={shared.loading}
-            staleContent={shared.staleContent}
-            inputs={shared.inputs}
+            slot={shared.slot}
             cacheToken={shared.buckets}
             controller={shared.controller}
             commit={commit}
@@ -716,9 +713,7 @@ type ProvideLeafProps = {
     resolved: Record<string, unknown>;
     component: ComponentType<any>;
     channel: Context<unknown>;
-    loading: ComponentType<{ inputs: unknown }>;
-    staleContent: ReactNode | undefined;
-    inputs: unknown;
+    slot: ReactNode;
     commit: Shared['commit'];
     swap: Shared['swap'];
     retainProvided: Shared['retainProvided'];
@@ -735,9 +730,7 @@ function ProvideLeaf({
     resolved,
     component: Component,
     channel,
-    loading: Loading,
-    staleContent,
-    inputs,
+    slot,
     cacheToken,
     controller,
     commit,
@@ -800,13 +793,9 @@ function ProvideLeaf({
         if (built) swap?.(cacheToken as Bucket[]);
     });
 
-    // The build frame: one render with the value not yet made. Under `keepStale` the
-    // previous run covers it, like every other not-ready instant.
-    if (!built) {
-        if (staleContent !== undefined) return staleContent;
-        controller?.reportPhase('loading', false);
-        return <Loading inputs={inputs} />;
-    }
+    // The build frame: one render with the value not yet made — the island's third
+    // not-ready instant, and it shows the same slot as the other two.
+    if (!built) return slot;
     controller?.reportPhase('ready', false);
 
     let content: ReactNode = (

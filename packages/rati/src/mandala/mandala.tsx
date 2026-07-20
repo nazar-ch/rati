@@ -1,5 +1,14 @@
-import { Fragment, Suspense, useContext, useEffect, useId, useReducer, useRef } from 'react';
-import type { ComponentType, Context, FC, ReactNode } from 'react';
+import {
+    Fragment,
+    Suspense,
+    useContext,
+    useEffect,
+    useId,
+    useReducer,
+    useRef,
+    useSyncExternalStore,
+} from 'react';
+import type { ComponentType, Context, FC } from 'react';
 import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope';
 import type { SourceError } from '../scope/source';
 import { deepEqual } from '../util/utils';
@@ -8,6 +17,7 @@ import { buildTree, flattenLevels, type Bucket, type Shared } from './resolver';
 import { registerScopeChannel, setScopeLabel } from './channel';
 import { registerScopeControlsChannel } from './controls';
 import { discardRun, RefreshController } from './refresh';
+import { LoadingDelay, noDelaySubscribe, notHeld } from './loadingDelay';
 import { MandalaErrorBoundary } from './boundary';
 import { HydrationContext } from './hydration';
 import { AfterHydration } from './afterHydration';
@@ -78,6 +88,24 @@ export type MandalaConfig<S extends Scope<any>> = {
      * is how a component knows to say so (dim it, badge it).
      */
     keepStale?: boolean;
+
+    /**
+     * Hold the `loading` slot back for this many milliseconds. Default `0` (no delay) —
+     * `0` and absent are the same thing.
+     *
+     * A resolution that settles in tens of milliseconds still renders its loading slot for
+     * a frame or two, which reads as a flash. With a delay the island renders **nothing**
+     * until the deadline (first load) or keeps the **previous content** (a re-resolve —
+     * `keepStale`'s mechanism, borrowed for the length of the window), and a resolution
+     * that beats the deadline never shows the slot at all.
+     *
+     * The deadline measures a stretch without content, not one resolution: a second
+     * re-resolve arriving mid-window doesn't push the slot further out, and once the slot
+     * is up nothing takes it back until content returns. It composes with `keepStale` —
+     * with both set the slot appears only for a slow *first* load. Inert on the server,
+     * which waits for the resolution regardless.
+     */
+    loadingDelayMs?: number;
 };
 
 export type MandalaComponent<S extends Scope<any>> = FC<ScopeInputs<S>> & {
@@ -91,14 +119,15 @@ export type MandalaComponent<S extends Scope<any>> = FC<ScopeInputs<S>> & {
     /** Forwarded from the same `lazy()` component, for the same reason — see {@link lazy}. */
     moduleId?: string;
     /**
-     * Set when the mandala was built with `keepStale`, so the `Router` can tell. It keys a
-     * route's element by a per-navigation counter, which remounts the component on every
-     * navigation — and a remounted island has no previous run left to keep. For these the
-     * Router keys by route name instead, so a param change on the same route re-renders
-     * this instance (the mandala's own param-change path) rather than replacing it.
-     * Absent otherwise, and the default keying is untouched.
+     * Set when the mandala keeps its previous run across a re-resolve — `keepStale`, or
+     * `loadingDelayMs` (which keeps it for the length of the window) — so the `Router` can
+     * tell. It keys a route's element by a per-navigation counter, which remounts the
+     * component on every navigation — and a remounted island has no previous run left to
+     * keep. For these the Router keys by route name instead, so a param change on the same
+     * route re-renders this instance (the mandala's own param-change path) rather than
+     * replacing it. Absent otherwise, and the default keying is untouched.
      */
-    keepStale?: boolean;
+    keepsRun?: boolean;
 };
 
 const DefaultLoading: FC<{ inputs: unknown }> = () => null;
@@ -136,19 +165,38 @@ function releaseKept(keptRef: { current: KeptRun | null }, successor: Bucket[] |
 }
 
 /**
- * The loading slot, reporting itself. A wrapper rather than a call in the mandala's render
- * because React is what decides to show a Suspense fallback — by the time this renders, the
- * mandala's own render has long since returned.
+ * The loading slot, reporting itself and honouring `loadingDelayMs`. A wrapper rather than a
+ * call in the mandala's render because React is what decides to show a Suspense fallback —
+ * by the time this renders, the mandala's own render has long since returned.
+ *
+ * Phase is `'loading'` either way: while the delay holds the slot back nothing is on screen,
+ * which is what loading *is* — the option changes what the island shows, not what it is doing.
  */
 function LoadingSlot({
     controller,
-    children,
+    delay,
+    loading: Loading,
+    inputs,
 }: {
     controller: RefreshController;
-    children: ReactNode;
+    delay: LoadingDelay | null;
+    loading: ComponentType<{ inputs: unknown }>;
+    inputs: unknown;
 }) {
     controller.reportPhase('loading', false);
-    return children;
+    // The third argument is what makes the delay inert off the client: React reads it for
+    // the server render *and* the hydration pass, so a slot that belongs in the HTML
+    // (`ssr: false`, a source that stays pending server-side, a load that rejected) is
+    // rendered there whatever the deadline says.
+    const held = useSyncExternalStore(
+        delay?.subscribe ?? noDelaySubscribe,
+        delay?.getHeld ?? notHeld,
+        notHeld,
+    );
+    // ...and having shown it, the delay must not take it back on the first render that
+    // consults the client snapshot.
+    if (!held) delay?.expire();
+    return held ? null : <Loading inputs={inputs} />;
 }
 
 /**
@@ -212,6 +260,12 @@ export function createMandala<S extends Scope<any>>(
     // Build-time constants, so the element tree below keeps one stable shape per mandala.
     const ssrEnabled = config.ssr !== false;
     const keepStale = config.keepStale === true;
+    const delayMs = config.loadingDelayMs ?? 0;
+    const delayed = delayMs > 0;
+    // Both options ride the same kept-run machinery (SI-03's): `keepStale` holds the
+    // previous run for the whole re-resolution, a bare delay only until its deadline. With
+    // neither, nothing is kept and the engine behaves exactly as it did before either landed.
+    const keepsRun = keepStale || delayed;
     const provideChannel = (config.scope as Scope).provideDef?.channel;
 
     // The public identity of this mandala — the React displayName, the scope's read-error
@@ -291,16 +345,25 @@ export function createMandala<S extends Scope<any>>(
         // `.provide()` value stays alive — the stale content is the run that produced it,
         // frozen, rather than a re-render over torn-down resources.
         const keptRef = useRef<KeptRun | null>(null);
+        // The `loadingDelayMs` gate, one per instance and only when the option is set — see
+        // loadingDelay.ts. Null is the whole default path: no window, no timer, no
+        // subscription that ever fires.
+        const delayRef = useRef<LoadingDelay | null>(null);
+        if (delayed) delayRef.current ??= new LoadingDelay(delayMs);
+        const delay = delayRef.current;
         if (!cacheRef.current || cacheRef.current.key !== treeKey) {
             const previous = cacheRef.current;
             const committed = committedRef.current;
+            // A resolution starts here — the generation being built *is* the resolution —
+            // so this is where the delay's window opens (timer-less; see LoadingDelay).
+            delay?.begin();
             if (previous) {
                 // Only a run that reached the screen is worth keeping — and only if none
                 // already is. A second re-resolve mid-stale-window discards the run that
                 // never committed and keeps showing the original: swapping in a half-built
                 // replacement would blank exactly what `keepStale` exists to preserve.
                 if (
-                    keepStale &&
+                    keepsRun &&
                     !keptRef.current &&
                     committed &&
                     committed.buckets === previous.buckets
@@ -334,6 +397,16 @@ export function createMandala<S extends Scope<any>>(
                 recordedRejections: collectError ? new WeakSet<Promise<unknown>>() : undefined,
             };
         }
+
+        // Is the delay holding the loading slot back right now? Read after the block above,
+        // so a window that just opened is already visible here. Inert (and unsubscribed)
+        // without the option, and `false` on the server / through hydration — same reasoning
+        // as the slot's own read.
+        const held = useSyncExternalStore(
+            delay?.subscribe ?? noDelaySubscribe,
+            delay?.getHeld ?? notHeld,
+            notHeld,
+        );
 
         // A bare re-render trigger (does not change treeKey), used by the effects below
         // and by the refresh controller (dirty cells / swapped values re-render in place).
@@ -390,6 +463,8 @@ export function createMandala<S extends Scope<any>>(
                 // The run `keepStale` was holding on screen: the island is gone, so there
                 // is nothing left to keep it for. Same order as the swap below.
                 releaseKept(keptRef, null);
+                // ...and nothing left to delay: the pending countdown goes with it.
+                delayRef.current?.dispose();
                 cacheRef.current = null;
             };
         }, []);
@@ -403,6 +478,9 @@ export function createMandala<S extends Scope<any>>(
             provided: { value: unknown } | null,
         ) => {
             committedRef.current = { buckets, resolved, provided };
+            // Content is on screen, so the delay has nothing to hold back and the next
+            // stretch without content gets the full deadline again.
+            delay?.settled();
         };
 
         // The swap: the successor is on screen, so the run it replaced can go. Split from
@@ -426,11 +504,15 @@ export function createMandala<S extends Scope<any>>(
             return true;
         };
 
-        // The kept run's content, standing in for the loading slot at every site the slot
-        // can appear. Built here so all three share one element — and one identity, so the
-        // component doesn't remount as the tree moves between them.
+        // What the island shows while it has no fresh content: the loading slot, or — while
+        // a stale window is open — the previous run standing in for it. `keepStale` keeps it
+        // there for the whole re-resolution; a bare `loadingDelayMs` only until the deadline,
+        // after which the slot takes over. Built here so all three sites that can show it
+        // share one element — and one identity, so nothing remounts as the tree moves
+        // between them.
         const kept = keptRef.current;
-        const staleContent = kept ? (
+        const showKept = kept !== null && (keepStale || held);
+        const slot = showKept ? (
             <KeptContent
                 kept={kept}
                 channel={Channel}
@@ -438,14 +520,24 @@ export function createMandala<S extends Scope<any>>(
                 component={config.component as ComponentType<any>}
                 controller={controller}
             />
-        ) : undefined;
+        ) : (
+            <LoadingSlot controller={controller} delay={delay} loading={Loading} inputs={inputs} />
+        );
+
+        // Two things the delay needs, both after the children's effects (so the leaf's
+        // commit has already reported content on screen): start the countdown of an open
+        // window, and — once the deadline has moved the kept run off screen — let that run
+        // go, in the same dispose-then-detach order the swap uses.
+        useEffect(() => {
+            delay?.arm();
+            if (!showKept) releaseKept(keptRef, null);
+        });
 
         const shared: Shared = {
             scope: config.scope as Scope,
             component: config.component as ComponentType<any>,
             channel: Channel,
-            loading: Loading,
-            inputs,
+            slot,
             buckets: cacheRef.current.buckets,
             bucketRetained: (index, bucket) =>
                 cacheRef.current?.buckets[index] === bucket ||
@@ -458,22 +550,13 @@ export function createMandala<S extends Scope<any>>(
             hydration: hydrationSlice,
             seeds: seedsSlice,
             trace: cacheRef.current.trace,
-            // The leaf reports its commit only where something reads it: with `keepStale`
-            // off there is no baseline to keep, and the default path stays untouched.
-            commit: keepStale ? commitRun : undefined,
-            swap: keepStale ? swapRun : undefined,
-            retainProvided: keepStale ? retainProvided : undefined,
-            staleContent,
+            // The leaf reports its commit only where something reads it: with neither option
+            // there is no baseline to keep, and the default path stays untouched.
+            commit: keepsRun ? commitRun : undefined,
+            swap: keepsRun ? swapRun : undefined,
+            retainProvided: keepsRun ? retainProvided : undefined,
         };
 
-        // The one element the loading slot is: the Suspense fallback, and — under
-        // `ssr: false` — what stands in for the whole tree until the client has hydrated.
-        // While a kept run is on screen it stands in for the slot itself (`keepStale`).
-        const loadingSlot = staleContent ?? (
-            <LoadingSlot controller={controller}>
-                <Loading inputs={inputs} />
-            </LoadingSlot>
-        );
         const tree = <Fragment key={treeKey}>{buildTree(levels, 0, inputs, shared)}</Fragment>;
 
         return (
@@ -493,13 +576,13 @@ export function createMandala<S extends Scope<any>>(
                     resetKey={treeKey}
                     controller={controller}
                 >
-                    <Suspense fallback={loadingSlot}>
+                    <Suspense fallback={slot}>
                         {ssrEnabled ? (
                             tree
                         ) : (
                             // Opted out: no Step renders server-side, so no load starts and
                             // the collector stays empty for this island.
-                            <AfterHydration fallback={loadingSlot}>{tree}</AfterHydration>
+                            <AfterHydration fallback={slot}>{tree}</AfterHydration>
                         )}
                     </Suspense>
                 </MandalaErrorBoundary>
@@ -521,8 +604,8 @@ export function createMandala<S extends Scope<any>>(
     if (lazyComponent.moduleId !== undefined) Mandala.moduleId = lazyComponent.moduleId;
 
     // Tell the Router not to remount this one on every navigation — a kept run cannot
-    // survive its own island being replaced. See MandalaComponent.keepStale.
-    if (keepStale) Mandala.keepStale = true;
+    // survive its own island being replaced. See MandalaComponent.keepsRun.
+    if (keepsRun) Mandala.keepsRun = true;
 
     // A readable identifier for this scope's read errors (best-effort: shared scopes keep
     // the last mandala's label).

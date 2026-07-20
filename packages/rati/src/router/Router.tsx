@@ -37,14 +37,15 @@ export const Router: FC<{
     // Remount the route component on every navigation — the per-navigation counter is a
     // key nothing else can collide with, so a route's own state never leaks across one.
     //
-    // A `keepStale` island is the exception, and has to be: what it keeps lives on the
-    // island instance, so remounting it destroys exactly the thing the option exists to
-    // preserve. Those key by route name instead, which still remounts when the route
-    // changes and lets a same-route param change re-render the instance — the mandala's
-    // own param-change path, which is where `keepStale` does its work. Opt-in, so the
-    // default keying above is what every other route still gets.
-    const keepsStale = (activeRoute.component as { keepStale?: boolean }).keepStale === true;
-    const routeKey = keepsStale ? `route:${activeRoute.name}` : activeRoute.pathCounter;
+    // An island that keeps its previous run across a re-resolve (`keepStale`, or
+    // `loadingDelayMs` for the length of its window) is the exception, and has to be: what
+    // it keeps lives on the island instance, so remounting it destroys exactly the thing
+    // those options exist to preserve. Those key by route name instead, which still remounts
+    // when the route changes and lets a same-route param change re-render the instance — the
+    // mandala's own param-change path, which is where the kept run does its work. Opt-in, so
+    // the default keying above is what every other route still gets.
+    const keepsRun = (activeRoute.component as { keepsRun?: boolean }).keepsRun === true;
+    const routeKey = keepsRun ? `route:${activeRoute.name}` : activeRoute.pathCounter;
 
     // A route's component is either a plain component or an island (built by
     // `route({ scope })` / `island`); both render directly with the route
