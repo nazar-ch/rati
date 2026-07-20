@@ -18,6 +18,7 @@ src/
     hydration.tsx   SSR dehydration (values + live-source seeds + error recording)
     hydrationDiagnostics.ts  the client-side unclaimed-payload watchdog
     ssrSource.ts    firstSettle — the server-side promise face of SSR-marked sources
+    ssrErrors.ts    the ssrErrors: 'dehydrate' guard (server-side, one per run)
     afterHydration.tsx  the ssr: false gate (server + hydration pass render the slot)
     loadingDelay.ts the loadingDelayMs gate (one window per island, client-only)
     retryPolicy.ts  the retry option's driver (one budget per island, client-only)
@@ -368,7 +369,7 @@ mocking.
 ## SSR dehydration (`mandala/hydration.tsx` + `ssrSource.ts`)
 
 Values resolved on the server are carried to the client through a small, framework-owned
-registry, keyed `mandalaId (useId) → scopeKey → value`, in two wire sections:
+registry, keyed `mandalaId (useId) → scopeKey → value`, in three wire sections:
 
 - **`data` — plain values.** Promise loads, plus `ssr: true` **loader sources**: on the
   server the resolver wraps a marked source's first settle into a promise (`firstSettle` —
@@ -379,6 +380,9 @@ registry, keyed `mandalaId (useId) → scopeKey → value`, in two wire sections
   `dehydrate(value)` into `seeds`; the client creates the source as usual and calls
   `hydrate(data)` **before** attach, so its first snapshot is already ready — no pending
   gap, no double fetch, live afterward.
+- **`errors` — dehydrated failures.** Only islands running `ssrErrors: 'dehydrate'` write
+  here (see below); omitted from the payload entirely when empty, so the default app's wire
+  bytes are unchanged and no version bump was needed.
 - Server resolution of marked sources is **gated on the collector being present**: resolving
   without dehydration would hand the client ready HTML over a pending source — a guaranteed
   hydration mismatch. Unmarked sources stay pending under SSR (fallback ships in the HTML).
@@ -397,6 +401,28 @@ registry, keyed `mandalaId (useId) → scopeKey → value`, in two wire sections
   collector's `errors` carries
   `{ mandalaId, key, error: SourceError }` — the server's status input (`not-available` →
   404). `asSourceError` (scope/source.ts) is the shared normalization with the boundary.
+- **Error dehydration** (`mandala/ssrErrors.ts`): `ssrErrors: 'dehydrate'` is the other
+  half of the bullet above — the island that wants its *error slot* in the HTML. The catch
+  has to happen in the resolver because React runs no error boundary server-side, and it
+  cannot be a `try` around `use()` (a pending `use()` throws too). So the Step waits on a
+  **rejection-proof twin**: `promise.then(undefined, reason => new SsrRejection(...))`,
+  which resolves where the original rejects. The twins are keyed by promise in a WeakMap on
+  the run — `use()` needs one identity across a level's resume, and hook loads have no
+  cached cell to hang one on. Recognizing the marker, the Step returns `Shared.ssrErrors
+  .slot(error)` — the island's error slot, built by the mandala from the same `config.error`
+  the boundary uses; `slot: null` (no error slot declared) leaves the throw, i.e. the
+  default degradation. `recordRejection` is untouched: the *original* promise still rejects
+  and still carries the recorder, so one path feeds both the status list and — via
+  `collectError`'s `dehydrate` flag, bound per island in the mandala — the `errors` wire
+  section. `wireError` strips `cause` there (a live `Error` JSON-stringifies to `{}`).
+  Client side, `buildCell` short-circuits a key present in the slice to a **fourth cell
+  kind**, `{ kind: 'error' }` — `SourceState`'s third member in cell clothing — which the
+  resolve pass throws, so a dehydrated failure and a source failure leave by the same door
+  (the boundary, hence SI-05's `retry` policy applies to both). Gated on the collector for
+  the same reason marked sources are; gated on `firstMount` for the same reason `data` is.
+  Pinned in `islandSsrErrorDehydration.test.tsx`; throwing during hydration into a boundary
+  is *not* a recoverable error (measured — React re-creates the subtree and reports
+  nothing), which is what makes the round trip silent.
 - **The per-island opt-out** (`mandala/afterHydration.tsx`): `ssr: false` wraps the Step
   tree in `AfterHydration`, whose gate is `useSyncExternalStore`'s `getServerSnapshot` —
   which React reads on the server *and* through the client's hydration pass. So the server
@@ -410,7 +436,7 @@ registry, keyed `mandalaId (useId) → scopeKey → value`, in two wire sections
   `prerender`. The option is the island's, so it sits *above* the source markers above: an
   `ssr: true` source inside an opted-out island never reaches `buildCell`'s promotion.
 - **Claim watchdog** (`hydrationDiagnostics.ts`): on a rehydrating client, `buildCell`
-  claims each consumed `data`/`seeds` slice; slices still unclaimed a grace period after
+  claims each consumed `data`/`seeds`/`errors` slice; slices still unclaimed a grace period after
   the last claim get one console.warn — the loud version of "the trees drifted, the useId
   keys shifted, SSR silently turned itself off".
 

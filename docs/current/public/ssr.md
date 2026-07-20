@@ -119,7 +119,9 @@ const state = readHydration(); // null → client-only boot, resolve from scratc
 const { App } = createApp({
     history: createBrowserHistory(),
     hydratedState: state?.router,
-    hydration: state ? { data: state.data, seeds: state.seeds } : undefined,
+    hydration: state
+        ? { data: state.data, seeds: state.seeds, errors: state.errors }
+        : undefined,
 });
 
 const root = document.getElementById('root')!;
@@ -445,13 +447,22 @@ on the server.
 no styling. Add a catch-all route to keep your own not-found page; the status is 404
 either way.
 
-**What a failed load renders.** The error slot never renders on the server: React
-abandons the failing Suspense boundary, emits the *loading* slot with a client-retry
+**What a failed load renders.** By default the error slot does not render on the server:
+React abandons the failing Suspense boundary, emits the *loading* slot with a client-retry
 marker, and the promise still resolves. On hydration the client re-runs that load — a
 transient server hiccup heals itself, with no hydration mismatch; a persistent failure
 reaches the error slot through the normal client path. Every failure is recorded in
 `result.errors` (`{ mandalaId, key, error }` with the normalized `SourceError`), so a
 different status policy than the table above is a few lines over that array.
+
+An island can ask for the other trade with
+[`ssrErrors: 'dehydrate'`](./reference.md#ssrerrors--the-error-slot-in-the-servers-html):
+the server renders its **error slot** into the HTML and carries the failure over in the
+payload, so the client hydrates onto that slot instead of re-running the load. Nothing
+about the status changes — the failure is recorded either way, and a 500 with a rendered
+error slot is still a 500. What crosses the wire is `code`, `message` and `retryable`;
+`cause` is dropped, and the `message` is written into the HTML, so a load whose failures
+carry backend text should say something else before rejecting.
 
 An island's [`retry`](./reference.md#retry--trying-again-automatically) policy changes
 nothing here: the server takes its one attempt per request, records the failure, and lets
@@ -514,6 +525,12 @@ themselves.
 - Values must survive JSON. A `Date`, `Map`, class instance, `undefined`, or `NaN`
   resolves fine on the server and arrives *different* on the client — outside
   production, `serializeHydration` warns per offending key.
+- Three sections, keyed the same way (`mandalaId → scope key → …`): `data` (resolved
+  values), `seeds` (live-source seeds), and `errors` — the failures an
+  [`ssrErrors: 'dehydrate'`](./reference.md#ssrerrors--the-error-slot-in-the-servers-html)
+  island asked to carry over. `errors` is omitted entirely when nothing dehydrated into
+  it, so an app that never sets the option ships the payload it always did, and a client
+  that doesn't read the section simply resolves from scratch.
 - The payload carries a format version; a stale cached page meeting a newer client
   logs and falls back to resolving from scratch instead of misreading it.
 - If the server and client render different trees, the registry keys (`useId`) shift

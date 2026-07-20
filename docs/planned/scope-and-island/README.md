@@ -328,6 +328,71 @@ what a reader would bank component state and scroll position on. Visually it is 
 rendering the kept run from the fallback position is a semantics call on top of the item
 that set the semantics; not touched here.
 
+### 2026-07-20 — SI-06 (`ssrErrors: 'dehydrate'`) shipped + decisions
+
+Three commits: the engine + pins, the gallery page, then docs. `yarn ci` green end to end;
+73 files / 656 tests. `islandSsrErrors.test.tsx` is untouched, and the randomized suites hold at `FUZZ_RUNS=1500`
+(the harness sets no `ssrErrors`, and the mode is unreachable off a collected server
+render — the tripwire never moved). **This closes the effort.**
+
+- **The catch cannot be a `try` around `use()`, so the promise has to change instead.** The
+  fork the item turns on. A pending `use()` throws too (React's Suspense signal), so
+  catching at the call site means telling one throw from the other by shape — a bet on
+  React's internals. The Step waits on a *rejection-proof twin* instead
+  (`promise.then(undefined, reason => new SsrRejection(...))`), which resolves where the
+  original rejects, and the resolve pass reads a value where it would have caught. The
+  original promise is untouched, which is what keeps `recordRejection` — and DX-08's
+  hardening of it — the one path that feeds the status list.
+- **The twins are keyed by promise, not held on the cell.** `use()` needs one identity
+  across a level's resume, and the obvious home is the cached cell — except a *hook* load
+  has no cached cell (it re-classifies its result every render), so a per-cell field would
+  have quietly excluded `hook(() => fetchThing())` from the mode. A WeakMap on the run
+  covers both, and sits next to the rejection ledger it is the twin of.
+- **Throwing during hydration is not a recoverable error** — measured before designing
+  around it, because the whole round trip depends on it. React catches it in the boundary,
+  re-creates that subtree from scratch, and reports *nothing* to `onRecoverableError`; the
+  server rendered the same slot, so the swap is invisible. That is what let the client half
+  be a `kind: 'error'` cell that simply throws, rather than a second way to render the
+  error slot — one door, so SI-05's policy sees a dehydrated failure without being told
+  about it. (It does log to the console in dev, as any boundary-caught error does. An
+  island that failed on the server being loud in dev reads as correct; documented.)
+- **The mode is gated on the collector**, like the source-side `ssr` marker and for the
+  same reason: with nothing to carry the failure over, painting the error slot would only
+  mean the client paints something else a moment later. Found by a test rather than by
+  reasoning — the `group` re-fold pin used `prerenderToString` and got the default
+  degradation. Worth contrasting with SI-04's finding, which *widened* `ssr: false` past
+  the collector to `getServerSnapshot`: there the widening made the option more honest,
+  here it would manufacture the mismatch the option exists to avoid.
+- **The wire section is omitted when empty**, so an app that never sets the option ships a
+  byte-identical payload and needed no version bump. A client predating the section ignores
+  it and re-runs the load, which is the default behavior — the graceful direction.
+- **`cause` is the only field dropped, and the `message` is the trade.** A live `Error`
+  JSON-stringifies to `{}`, so shipping it would hand the client a lie shaped like a cause.
+  The message travels because the error slot exists to show it — and it lands in the HTML
+  for anyone to read, which is the one thing an author must know before opting in. Said in
+  the option's doc, the reference, ssr.md and on the gallery page; a load whose failures
+  carry backend text should say something else before rejecting.
+- **The collector grew a second error field, not a flag on the first.** `errors` (the flat
+  list) is the server's status input and never leaves the server; `dehydratedErrors` is the
+  wire section. Deriving one from the other at read time would have put the same filter in
+  `renderApp` and `ssrRender`, and a `dehydrated` flag on the public `HydrationError` would
+  have churned a type for bookkeeping that isn't the reader's business.
+- **The retry policy picks a dehydrated failure up** — the interaction the record asked to
+  rule on, decided as recommended. The policy asks one question (is this a `failed` I have
+  budget for) and where the failure came from is not part of it; the alternative is a hidden
+  rule that an explicitly configured option silently doesn't apply to one error. The
+  consequence is real and pinned: with both set, the error slot the HTML shipped is replaced
+  by the loading slot on the *first* client render (the boundary rules during render, so it
+  never mounts), and the deterministic paint is the server's only.
+- **A `not-available` gets a rendered 404 page.** Falls out for free — the status derivation
+  never sees the mode — and is probably the most useful case: the server already knew the
+  entity was missing, and the HTML can say so instead of spinning.
+- **Nothing was done for a plain source that errors server-side.** Under SSR an unmarked
+  source stays pending, so this needs a synchronously-errored one; it throws and degrades as
+  it always has, in both modes. Consistent with the baseline (`recordRejection` is promise-
+  only, so such a failure reaches neither `errors` nor the status), and noting it here
+  because *that* is the older gap this item declined to widen its scope into.
+
 ## Per-item conventions
 
 Atomic commits on the current branch (rati `CLAUDE.md`); subjects prefixed `SI-NN:`, a

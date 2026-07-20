@@ -143,6 +143,7 @@ island({
     keepStale,      // optional: boolean, default false — keep the last content while re-resolving?
     loadingDelayMs, // optional: number, default 0 — hold the loading slot back this long
     retry,          // optional: { count, backoffMs } — re-resolve automatically on a failure
+    ssrErrors,      // optional: 'retry' (default) | 'dehydrate' — what SSR does with a failure
 });
 ```
 
@@ -264,6 +265,53 @@ island({
   as always (see [response statuses](./ssr.md#response-statuses-and-load-failures)); the
   client's own resolution then runs the policy.
 - **`count: 0` and absent are identical.** Types: `RetryOptions`.
+
+### `ssrErrors` — the error slot in the server's HTML
+
+React runs no error boundary during a server render, so a load that fails there has always
+degraded the same way: React abandons the failing Suspense boundary, the HTML carries the
+`loading` slot with a client-retry marker, and the client re-runs the load on hydration.
+That is `'retry'`, the default — self-healing, and non-deterministic. `'dehydrate'` renders
+the `error` slot into the HTML instead and carries the failure over in the payload, so the
+client hydrates straight onto that slot.
+
+```ts
+island({
+    scope: orderScope,
+    component: OrderCard,
+    loading: Skeleton,
+    error: OrderError,
+    ssrErrors: 'dehydrate',
+});
+```
+
+- **The client does not re-run the load.** It hydrates the failed cell to its error state,
+  which reaches the `error` slot through the same boundary a client-side failure does —
+  with `retry` armed. Pressing it resolves the island again, load and all.
+- **What crosses the wire is `code`, `message` and `retryable`.** `cause` is dropped: a live
+  `Error` doesn't survive JSON, and a server-side cause chain isn't the client's business.
+  The `message` *is* written into the HTML — a load whose failures carry backend text should
+  say something else before rejecting.
+- **The response status is unchanged.** Every failure is recorded in either mode, and
+  `renderApp` derives the status from it — a 500 with a rendered error slot is still a 500
+  (see [response statuses](./ssr.md#response-statuses-and-load-failures)).
+- **Without an `error` slot there is nothing to paint deterministically**, so the throw
+  stands and the server degrades exactly as `'retry'` does. The failure still crosses the
+  wire, so the client surfaces it through the nearest outer ErrorBoundary instead of
+  silently re-running the load.
+- **It needs the payload.** Under a bare `prerender` with no `HydrationProvider` — and on a
+  client-only render — the option does nothing, for the same reason the source-side
+  [`ssr` marker](#ssr-capable-sources--the-ssr-marker) is gated the same way: a first paint
+  that hydration contradicts a moment later is worse than the degradation it replaces.
+- **With [`retry`](#retry--trying-again-automatically) configured, the policy picks a
+  dehydrated failure up** like any other — it asks whether this is a `failed` it still has
+  budget for, and where the failure came from is not part of that question. So the error
+  slot the HTML shipped is replaced by the `loading` slot on the first client render, and
+  the island retries. Set both deliberately: the deterministic paint is then the server's
+  only.
+- **In development React logs the caught error to the console**, as it does for anything an
+  error boundary catches. Nothing is broken; an island that failed on the server is being
+  loud about it.
 
 ### `useScope(scope)` / `useOptionalScope(scope)`
 
@@ -430,6 +478,7 @@ route('/station/:stationId', 'station', Board, {
     keepStale: true,       // optional: same contract as island's (needs `scope`)
     loadingDelayMs: 200,   // optional: same contract as island's (needs `scope`)
     retry: { count: 2, backoffMs: 500 },  // optional: same contract as island's
+    ssrErrors: 'dehydrate', // optional: same contract as island's (needs `scope`)
 });
 ```
 
@@ -468,9 +517,9 @@ declare module 'rati' {
 
 Applies shared `wrapper` / `loading` / `error` to a list of routes (a child's own option
 wins). Returns the routes unchanged at the type level — spread the result into the routes
-tuple; paths stay absolute. A child's own `ssr` / `keepStale` / `loadingDelayMs` / `retry`
-survives the group's rebuild; the group has no default of its own for any of them — they are
-per-route judgments, not shared presentation.
+tuple; paths stay absolute. A child's own `ssr` / `keepStale` / `loadingDelayMs` / `retry` /
+`ssrErrors` survives the group's rebuild; the group has no default of its own for any of
+them — they are per-route judgments, not shared presentation.
 
 ### `RouterStore`
 
@@ -622,15 +671,19 @@ mount the provider on both sides so the trees match.) The full flow with code:
 | `readHydration()` | client: parse the embedded payload; `null` → resolve from scratch |
 | `headTags(store)` | the head store's winners as escaped HTML — call after prerender |
 | `prepareRoute(router)` | drive a memory-history router to its match (preloading a lazy component); returns `{ hydratedState, matchedCatchAll, redirect?, moduleId? }` or `null` when nothing matched |
-| `createHydrationCollector()` | `{ collect, collectError, data, seeds, errors }` — records islands' resolved values, live-source seeds, and failed loads during prerender |
-| `HydrationProvider` | server: `collect`/`collectError`; client: `data`/`seeds` — islands then hydrate without re-running loads |
-| `HydrationState`, `HydrationError`, `Hydration`, `HydrationData`, `PreparedRoute`, `RouterHydratedState`, `HYDRATION_SCRIPT_ID` | the payload/decision types |
+| `createHydrationCollector()` | `{ collect, collectError, data, seeds, errors, dehydratedErrors }` — records islands' resolved values, live-source seeds, and failed loads during prerender |
+| `HydrationProvider` | server: `collect`/`collectError`; client: `data`/`seeds`/`errors` — islands then hydrate without re-running loads |
+| `HydrationState`, `HydrationError`, `Hydration`, `HydrationData`, `HydrationErrors`, `PreparedRoute`, `RouterHydratedState`, `HYDRATION_SCRIPT_ID` | the payload/decision types |
 
 Async load results and `ssr: true` sources dehydrate as values; `ssr: { hydrate }` sources
 dehydrate as seeds; unmarked sources stay pending under SSR and come alive after hydration
 (see [Sources §SSR-capable sources](#ssr-capable-sources--the-ssr-marker)). A load that
 *rejects* is recorded in `errors` — statuses derive from it (`not-available` → 404); the
-HTML degrades to the loading slot and the client retries the load after hydration.
+HTML degrades to the loading slot and the client retries the load after hydration, unless
+the island set [`ssrErrors: 'dehydrate'`](#ssrerrors--the-error-slot-in-the-servers-html),
+in which case the failure also lands in `dehydratedErrors` (the payload's third section)
+and the client hydrates onto the error slot instead. `errors` is the flat list either way —
+it never leaves the server, and it is what the status derives from.
 
 ---
 
@@ -1046,6 +1099,7 @@ plus the dehydrated payload — with a `.hydrate()` for the **client half**.
 | `data` | dehydrated resolved values (promise loads, `ssr: true` loaders): `mandalaId → key → value` |
 | `seeds` | dehydrated live-source seeds (`ssr: { dehydrate, hydrate }`) |
 | `errors` | loads that rejected during the render — the server's 404/5xx signal |
+| `dehydratedErrors` | the payload's `errors` section: the failures [`ssrErrors: 'dehydrate'`](#ssrerrors--the-error-slot-in-the-servers-html) islands carry to the client, which `.hydrate()` feeds back. Empty in the default mode |
 | `hydrate(clientNode?, options?)` | hydrate the HTML on the client, feeding the payload back. See below |
 
 **`.hydrate(clientNode?, options?)`** pre-fills a container with the server HTML, wraps

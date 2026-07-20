@@ -224,6 +224,12 @@ they are spent — the island shows its loading slot meanwhile, because an islan
 an island loading. `not-available` is never retried: it is an answer, not a fault. See
 [`retry`](./reference.md#retry--trying-again-automatically).
 
+Under server rendering a failed load ships the *loading* slot and the client re-runs it —
+React's own degradation, and self-healing. A page that would rather paint the error slot
+straight away sets
+[`ssrErrors: 'dehydrate'`](./reference.md#ssrerrors--the-error-slot-in-the-servers-html),
+and the server renders that slot into the HTML with the failure carried alongside it.
+
 ## Routes
 
 A route is an island bound to a URL — same scope, same slots, plus a path:
@@ -689,7 +695,9 @@ const state = readHydration();
 const { App } = createApp({
     history: createBrowserHistory(),
     hydratedState: state?.router,
-    hydration: state ? { data: state.data, seeds: state.seeds } : undefined,
+    hydration: state
+        ? { data: state.data, seeds: state.seeds, errors: state.errors }
+        : undefined,
 });
 hydrateRoot(container, <App />);
 ```
