@@ -346,6 +346,57 @@ scope().load({
 });
 ```
 
+## Loading states
+
+An island resolves all-or-nothing, so at any moment it is showing exactly one of its three
+slots. `useScopeControls` reports which, from anywhere in the subtree:
+
+```tsx
+const { phase, isStale, retry } = useScopeControls(stationScope);
+```
+
+`phase` is `'loading'`, `'ready'`, or `'error'` — the island's aggregate phase, not any one
+load's. `retry` is the error slot's retry, reachable from anywhere (the same action as
+`refresh()` with no key). `isStale` belongs to the option below.
+
+### `keepStale` — don't blank on a re-load
+
+A param change or `refresh()` re-resolves everything, which normally throws the screen back
+to the loading slot — blanking content the user was in the middle of reading. `keepStale`
+keeps the last resolution on screen until the new one is ready:
+
+```tsx
+route('/stations/:stationId', 'station', Board, { scope: stationScope, keepStale: true });
+
+function Board({ departures }: ScopeProps<typeof stationScope>) {
+    const { isStale } = useScopeControls(stationScope);
+    return <Table rows={departures} className={isStale ? 'opacity-50' : ''} />;
+}
+```
+
+Between the navigation and the new data committing, the island reports
+`phase: 'ready', isStale: true` — content *is* on screen, it just belongs to the previous
+resolution. That is the pairing to gate on: a subtree showing a skeleton on
+`phase === 'loading'` must not flip back to it under content the user is reading.
+
+What to know:
+
+- **The props are the old ones.** The component re-renders with the *previous* params'
+  data, so the subtree can briefly show old data under a new URL. That is the feature;
+  `isStale` is how you say so.
+- **The first load has nothing to keep**, so it shows the loading slot as always.
+- **An error ends the window** — the error slot replaces the stale content rather than
+  leaving it to pass for current.
+- **What is kept is the whole resolution**, not a copy of its props: its sources stay
+  attached and its `.provide()` value stays alive and published, so `useScope` and
+  `useRouteContext` keep working through the window. Both are released when the new
+  resolution commits.
+- **A source dropping back to pending is not a re-resolution** — that is the source's own
+  contract, and it still shows the loading slot.
+
+`isStale` is about the whole view. A per-key `refresh('departures')` also keeps its previous
+value rendered, and that one reports through `pending`.
+
 ## Types, end to end
 
 You never write a prop type for loaded data — you read it off the scope:

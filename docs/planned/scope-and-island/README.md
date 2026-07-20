@@ -140,6 +140,67 @@ Two commits: the engine + threading + pins, then the gallery page; docs alongsid
   a pending source in `Step`, and `ProvideLeaf`'s build frame. `loadingDelayMs` gates that
   one binding, so the delay does not need to be taught about the three sites separately.
 
+### 2026-07-20 — SI-03 (`keepStale` + the status surface) shipped + decisions
+
+Three commits: the engine + pins, the Router fix + gallery, then docs. 70 files / 615 tests.
+**This is the batch's calibration gate — the semantics below are what B3/B4 build on.**
+
+- **What is kept is the *run*, not a snapshot of its props.** The fork the item turns on.
+  A props snapshot is a much smaller change, but the outgoing run is torn down with it —
+  sources detached, `.provide()` value disposed — so the value channel would have had
+  nothing of the right type to publish during the window, and `useScope` /
+  `useRouteContext` would break for exactly the scopes that need this most (jnana's
+  `pageScope` uses `.provide()`, and its param changing is the motivating case). Deferring
+  only the dispose would instead leave a store alive over detached sources — the one
+  ordering the engine repeats everywhere. So the kept run stays *whole*: buckets out of the
+  discard path, sources attached, provided value alive and published, released in order
+  (dispose → detach) when the successor commits. The record's own words point here —
+  "the kept bucket", "the mandala already holds the committed bucket".
+- **The Router keyed the feature out of existence, and no unit test could have caught it.**
+  `Router` keys a route's element by a per-navigation counter, so *every* navigation
+  remounts the component — and a remounted island has no previous run to keep. Every
+  island-level pin passed while the gallery blanked. Fixed the way the mandala already
+  carries `preload` / `moduleId`: `createMandala` hangs `keepStale` on the component and the
+  Router keys those by route name. Opt-in, so every other route keeps its
+  remount-per-navigation. **Worth a maintainer look**: this is a router behavior change,
+  narrow but real, and `back()` through the entry stack now keeps content too (pinned).
+- **The swap is passive, and belongs to the leaf.** Two ordering facts, both learned by
+  failing: releasing from the leaf's *layout* effect detaches the old run's sources before
+  the new run's are attached (layout effects run child-first, and the leaf is the innermost
+  child), and releasing from an effect of the *mandala's* never runs at all — a Suspense
+  retry re-renders the boundary's children, not the mandala.
+- **`phase` is 'ready' during a stale window, with `isStale` beside it.** Not a fourth
+  `'stale'` member, which would make `isStale` pure sugar for `phase === 'stale'` — two
+  names for one bit, the thing the README's plain-naming rule exists to prevent. And
+  'ready' is the honest read: content *is* on screen, and a subtree gating a skeleton on
+  `phase === 'loading'` must not flip back to it under content the user is reading.
+- **`isStale` is the kept-run flag only.** A selective `refresh(key)` also keeps its
+  previous value rendered — but that has `pending`, which says *which* keys. Conflating
+  them would turn `isStale` into "something somewhere is refetching".
+- **Phase is reported by whatever renders**, during render, with the notify deferred
+  (`addPending`'s established shape). No single piece of bookkeeping knows which slot is up:
+  a level can be suspended on a promise, pending on a source, or thrown to the boundary
+  without the mandala re-rendering. Reporting from render (not an effect) is what lets the
+  kept run mark itself stale *before* rendering the component under it — otherwise the
+  first stale frame renders undimmed and flashes.
+- **`retry` is an alias of `refresh()` with no key**, kept because the error slot's prop
+  already carries that name: a subtree offering the same affordance should spell it the same
+  way. Flagging it as the one place this item adds a second name for one action.
+- **A `rati/testing` bug, fixed in passing.** `renderIsland`'s `visibleNode` read only the
+  *first* marker for a slot. A boundary showing its fallback keeps the previous children in
+  the DOM (hidden) beside it, so under `keepStale` the DOM holds `content` twice — dead then
+  live — and the harness reported the island blank. It now scans for the first *visible*
+  match. Shipped in DX-02; nothing before this item could produce the two-marker DOM.
+- **`yarn ci` is not reliably green on this machine, and it predates this effort.** The two
+  mandala fuzz properties time out at 5000ms when the full 69-file suite runs under the
+  contention of a whole `ci` pass; the dedicated `fuzz` stage does 1500 iterations in ~5s
+  and passes. Verified by stashing every change in this item and running the same command:
+  **identical failure on a clean tree**. Not investigated further here — worth its own look
+  (a per-test timeout on the fuzz properties, or running them outside the parallel pool).
+- **The fuzz tripwire held**: at `FUZZ_RUNS=1500` (3× the deep budget) the randomized
+  suites pass, so default behavior is unmoved — the harness never sets `keepStale`, and both
+  the option and the Router's keying are opt-in.
+
 ## Per-item conventions
 
 Atomic commits on the current branch (rati `CLAUDE.md`); subjects prefixed `SI-NN:`, a

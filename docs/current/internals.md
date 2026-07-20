@@ -24,8 +24,8 @@ src/
              useHeadTag (shared registration), domSync (client title/meta reconciler),
              context
   router/    route.tsx (route() + route/param/redirect types), store.ts (RouterStore),
-             Router, Link, Navigate, useRouteContext, prepareRoute, history,
-             scrollRestoration, lazy
+             Router (keys the page per navigation — by route name for keepStale), Link,
+             Navigate, useRouteContext, prepareRoute, history, scrollRestoration, lazy
   scope/     scope.ts (scope/input/load/provide/hook/data + scope types), source.ts
   ssr/       index.ts (the rati/ssr entry) + renderApp, renderToHtml, payload
              (serializeHydration/readHydration), headTags, html (template filling /
@@ -151,6 +151,55 @@ retry counter). The full catalog of Suspense-produced situations this design ans
 An inputs change (by value) bumps `treeKey`, remounting the inner tree under a `<Fragment
 key>`: React tears the old run down (children-first) and resolves the new inputs from scratch;
 same-inputs source transitions re-render in place, keeping promise/source identity.
+
+### The kept run (`keepStale`)
+
+`keepStale` keeps the **run**, not a copy of its props. The mandala holds a `keptRef`
+alongside `cacheRef`, and on a `treeKey` change retires the outgoing run into it instead of
+queueing it for `discardRun` — so the same buckets that stopped being *rendered* have not
+stopped being *owned*. Everything else follows from that:
+
+- **Retire only what committed.** `committedRef` is written by the leaf's layout effect
+  (`Shared.commit`), so the baseline is one that actually reached the screen. A run replaced
+  before committing goes straight to `orphanedRef` — which is what makes a second param
+  change mid-window keep showing the *original* rather than swapping in a half-built one.
+- **Teardown deferral is the existing Step pattern, widened.** `Shared.bucketRetained`
+  answers for the rendering run *and* the kept one, so the retiring Steps' cleanups leave
+  their sources attached. `ProvideLeaf` learns the same test through
+  `Shared.retainProvided`, handing its dispose to the mandala rather than running it — which
+  is what lets the value channel keep publishing a live `.provide()` value through the
+  window. (A props-only snapshot would have had nothing of the right type to publish.)
+- **`Shared.staleContent`** is one element rendered wherever the loading slot would be: the
+  Suspense fallback, `Step`'s pending-source return, and `ProvideLeaf`'s build frame — the
+  single `Loading` binding all three already shared.
+- **The swap is passive, and it is the leaf's.** `Shared.swap` releases the kept run from
+  the leaf's *passive* effect: every layout effect of that commit has run by then, so a
+  source both runs hold is never detached and re-attached across the window. It cannot be
+  the mandala's own effect — a Suspense retry re-renders the boundary's children, not the
+  mandala, so the commit that ends the window would not run one. Release order is
+  `disposeProvided` then `discardRun`, preserving dispose-before-detach.
+- **The Router keys these routes by name.** `Router` normally keys a route's element by a
+  per-navigation counter, remounting the component on every navigation — fatal for a kept
+  run, which lives on the island instance. `createMandala` hangs `keepStale` on the
+  component (like `preload` / `moduleId`) and `Router` reads it. Opt-in: every other route
+  keeps the counter.
+
+## The island's phase (`reportPhase`)
+
+`useScopeControls` reports `phase` / `isStale` off a second uSES store on the
+`RefreshController`, written by **whatever renders**: `Leaf` and `ProvideLeaf` (`'ready'`),
+`KeptContent` (`'ready'`, stale), `LoadingSlot` and the two in-resolver slot returns
+(`'loading'`), and `MandalaErrorBoundary` (`'error'`). Which slot is on screen is the only
+honest definition of an aggregate phase — no single piece of bookkeeping knows it, since a
+level can be suspended on a promise, pending on a source, or thrown to the boundary without
+the mandala re-rendering at all.
+
+The writes happen **during render**, with the notification microtask-deferred — the same
+shape `addPending` established, and for the same reason (a listener setState during render
+is not allowed). The payoff is that a subtree reading the status further down the same pass
+sees the value that pass produced: the kept run reports stale before rendering the component
+under it, so the first stale render is already dimmed rather than flashing undimmed for a
+frame.
 
 ## Selective refresh (`mandala/refresh.ts` + `controls.ts`)
 

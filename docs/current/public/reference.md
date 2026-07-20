@@ -140,6 +140,7 @@ island({
     loading,      // optional: ComponentType<{ inputs: ScopeInputs<S> }>
     error,        // optional: ComponentType<{ inputs: ScopeInputs<S>; error: SourceError; retry: () => void }>
     ssr,          // optional: boolean, default true — resolve during a server render?
+    keepStale,    // optional: boolean, default false — keep the last content while re-resolving?
 });
 ```
 
@@ -172,6 +173,33 @@ island({ scope: feedScope, component: Feed, loading: FeedSkeleton, ssr: false })
 See the guide's [server rendering](./guide.md#server-rendering) section for when to reach
 for it.
 
+### `keepStale` — keeping the previous content
+
+A param change or `refresh()` re-resolves the whole scope, which normally shows the
+`loading` slot again. `keepStale: true` keeps the last committed resolution on screen until
+the new one commits, then swaps — stale-while-revalidate, per island.
+
+```ts
+island({ scope: stationScope, component: Board, loading: Skeleton, keepStale: true });
+```
+
+- **`useScopeControls(scope).isStale`** is true for exactly that window, and `phase` stays
+  `'ready'` — see [useScopeControls](#usescopecontrolsscope).
+- **The component re-renders with the previous params' props**, so the subtree can briefly
+  show old data under a new URL. `isStale` is how it says so.
+- **First load is unchanged** (nothing to keep), and an **error ends the window**: the
+  `error` slot replaces the stale content rather than letting it pass for current.
+- **The whole resolution is kept, not a copy of its props.** Its sources stay attached and
+  its `.provide()` value stays alive and published, so `useScope` / `useRouteContext` keep
+  working across the window; both are released — dispose, then detach — once the new
+  resolution commits.
+- **A source returning to pending is not a re-resolution** and still shows the loading slot.
+- **Under SSR the option is inert** — the server never re-resolves; dehydration is
+  unchanged.
+- **On a route**, the Router keys the page by name rather than by navigation, so a param
+  change re-renders the same island instead of replacing it. Navigating to a *different*
+  route still remounts, so nothing is carried across pages.
+
 ### `useScope(scope)` / `useOptionalScope(scope)`
 
 Read what the nearest island built from `scope` provides — the `.provide()` value, or the
@@ -185,11 +213,14 @@ The nearest island's imperative controls, keyed by the scope like `useScope` (th
 outside the island's subtree):
 
 ```ts
-const { refresh, pending } = useScopeControls(stationScope);
+const { refresh, pending, phase, isStale, retry } = useScopeControls(stationScope);
 
 refresh(): Promise<void>;                      // whole scope — the retry mechanism
 refresh(key: ScopeLoadKeys<S>): Promise<void>; // one load, surgically
 pending: ReadonlySet<ScopeLoadKeys<S>>;        // keys currently re-fetching
+phase: 'loading' | 'ready' | 'error';          // which slot is on screen
+isStale: boolean;                              // …and is it the previous resolution's?
+retry: () => void;                             // the error slot's retry, from anywhere
 ```
 
 `refresh()` with no key re-resolves everything (the loading slot shows again, same as the
@@ -206,7 +237,15 @@ error slot's `retry`). `refresh(key)`:
 - resolves when the key settles (its cascade may still be in flight — watch `pending`);
   a failed re-fetch keeps the previous value, logs, and still resolves.
 
-Type: `ScopeControls<S>`.
+**The status half.** `phase` is the island's *aggregate* phase — resolution is
+all-or-nothing, so there is no per-load phase to read. A [stale](#keepstale--keeping-the-previous-content)
+window reports `'ready'` with `isStale: true`: content is on screen, it just belongs to the
+previous resolution. Gate skeletons on `phase === 'loading'` and dimming on `isStale`, and
+the two compose without fighting. `isStale` is view-wide; a per-key `refresh(key)` reports
+through `pending` instead. `retry` is the same action as `refresh()` with no key, named for
+the error-slot prop it mirrors so a subtree can offer the affordance without being the slot.
+
+Type: `ScopeControls<S>`; the phase union is exported as `IslandPhase`.
 
 ---
 
@@ -322,6 +361,7 @@ route('/station/:stationId', 'station', Board, {
     error: BoardError,     // optional: same contract as island's
     wrapper: AppLayout,    // optional: layout rendered around the component
     ssr: false,            // optional: same contract as island's (needs `scope`)
+    keepStale: true,       // optional: same contract as island's (needs `scope`)
 });
 ```
 
@@ -360,8 +400,9 @@ declare module 'rati' {
 
 Applies shared `wrapper` / `loading` / `error` to a list of routes (a child's own option
 wins). Returns the routes unchanged at the type level — spread the result into the routes
-tuple; paths stay absolute. A child's own `ssr: false` survives the group's rebuild; the
-group has no `ssr` default of its own.
+tuple; paths stay absolute. A child's own `ssr` / `keepStale` survives the group's rebuild;
+the group has no default of its own for either — both are per-route judgments, not shared
+presentation.
 
 ### `RouterStore`
 
