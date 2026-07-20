@@ -6,6 +6,7 @@ import {
     HydrationProvider,
     type HydrationData,
     type HydrationError,
+    type HydrationErrors,
 } from '../mandala/hydration';
 import { hydrateTree, visibleText, type MountedTree } from './dom';
 
@@ -25,7 +26,7 @@ import { hydrateTree, visibleText, type MountedTree } from './dom';
         runner's clock (see startSettleWatchdog).
       - `ssrRender(node, options?)` — a collected server render: wraps `node` in a
         HydrationProvider carrying a fresh collector, drains it, and returns the HTML plus the
-        dehydrated `data` / `seeds` / `errors`. The server half.
+        dehydrated `data` / `seeds` / `errors` / `dehydratedErrors`. The server half.
       - `.hydrate(clientNode?, options?)` — feeds that payload back through a client-side
         HydrationProvider and `hydrateRoot`s the HTML. The client half. By default a
         recoverable hydration error (React client-rendering over markup that didn't match)
@@ -228,6 +229,9 @@ export interface ServerRender {
     readonly seeds: HydrationData;
     /** Loads that rejected during the render — the server's 404/5xx signal. */
     readonly errors: HydrationError[];
+    /** The wire's `errors` section: the failures `ssrErrors: 'dehydrate'` islands carry
+     *  to the client, which `.hydrate()` feeds back. Empty in the default mode. */
+    readonly dehydratedErrors: HydrationErrors;
     /**
      * Hydrate the server HTML on the client, feeding the collected payload back through a
      * HydrationProvider, and return a handle. Pass `clientNode` when the client tree must
@@ -270,10 +274,15 @@ export async function ssrRender(
         data: collector.data,
         seeds: collector.seeds,
         errors: collector.errors,
+        dehydratedErrors: collector.dehydratedErrors,
         async hydrate(clientNode = node, hydrateOptions = {}) {
             const recovered: unknown[] = [];
             const provider = (
-                <HydrationProvider data={collector.data} seeds={collector.seeds}>
+                <HydrationProvider
+                    data={collector.data}
+                    seeds={collector.seeds}
+                    errors={collector.dehydratedErrors}
+                >
                     {clientNode}
                 </HydrationProvider>
             );

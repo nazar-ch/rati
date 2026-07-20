@@ -3,7 +3,7 @@ import type { FC, ReactNode } from 'react';
 import { route } from '../../router/route';
 import { group } from '../../router/group';
 import { scope, input } from '../../scope/scope';
-import { prerenderToString } from '../../testing';
+import { prerenderToString, ssrRender } from '../../testing';
 
 const Page: FC = () => null;
 const ScopedPage: FC<{ id: string }> = () => null;
@@ -83,6 +83,33 @@ describe('group', () => {
         // The rebuild kept the opt-out: the group's slot is what shipped, not the load.
         expect(html).toContain('group loading');
         expect(runs).toBe(0);
+    });
+
+    test("carries a child's ssrErrors: dehydrate through a re-fold", async () => {
+        const failing = scope().load({
+            note: async () => {
+                throw new Error('backend exploded');
+            },
+        });
+        const Note: FC<{ note: string }> = ({ note }) => <div>{note}</div>;
+        const original = route('/p', 'p', Note, {
+            scope: failing,
+            error: () => <div>error slot</div>,
+            ssrErrors: 'dehydrate',
+        });
+
+        // A group loading slot the route lacks — the condition that rebuilds the mandala.
+        const [refolded] = group({ loading: () => <div>group loading</div> }, [original]);
+        expect(refolded.component).not.toBe(original.component);
+
+        // A *collected* render, which is what the mode needs to be honest — see the
+        // dehydration pins. The group's own re-fold is what is under test here.
+        const Refolded = refolded.component as FC;
+        const server = await ssrRender(<Refolded />);
+
+        // The rebuild kept the mode: the error slot is in the HTML, not the group's slot.
+        expect(server.html).toContain('error slot');
+        expect(server.html).not.toContain('group loading');
     });
 
     test('preserves the route tuple type (literal names) for the router type machinery', () => {

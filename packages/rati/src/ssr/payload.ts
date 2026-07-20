@@ -1,4 +1,4 @@
-import type { HydrationData } from '../mandala/hydration';
+import type { HydrationData, HydrationErrors } from '../mandala/hydration';
 import type { RouterHydratedState } from '../router/store';
 import { deepEqual } from '../util/utils';
 
@@ -19,15 +19,24 @@ import { deepEqual } from '../util/utils';
 
 /**
  * Everything a server render dehydrates, in one versioned shape: the routing snapshot
- * plus the island registries (`data` values, live-source `seeds`). `v` guards against
- * a stale cached HTML page meeting a newer client bundle: on a mismatch the client
- * falls back to resolving from scratch rather than misreading the payload.
+ * plus the island registries (`data` values, live-source `seeds`, dehydrated `errors`).
+ * `v` guards against a stale cached HTML page meeting a newer client bundle: on a
+ * mismatch the client falls back to resolving from scratch rather than misreading the
+ * payload.
  */
 export interface HydrationState {
     v: 1;
     router?: RouterHydratedState;
     data: HydrationData;
     seeds: HydrationData;
+    /**
+     * Loads that failed server-side on islands running `ssrErrors: 'dehydrate'`. Omitted
+     * when there are none — which is every page of an app that never sets the option, so
+     * the default payload is byte-identical to one written before this section existed.
+     * A client that predates it ignores the field and falls back to re-running the load,
+     * which is exactly the default behavior: no version bump needed either way.
+     */
+    errors?: HydrationErrors;
 }
 
 export const HYDRATION_SCRIPT_ID = '__rati-hydration';

@@ -149,10 +149,14 @@ export async function renderApp(options: RenderAppOptions): Promise<RenderAppRes
             ...(options.onError ? { onError: options.onError } : {}),
         });
 
+        // The `errors` section only when an island asked for one (`ssrErrors:
+        // 'dehydrate'`), so the payload of an app that never sets the option is unchanged.
+        const dehydratedErrors = collector.dehydratedErrors;
         const state = {
             router: prepared.hydratedState,
             data: collector.data,
             seeds: collector.seeds,
+            ...(Object.keys(dehydratedErrors).length > 0 ? { errors: dehydratedErrors } : {}),
         };
         return {
             kind: 'rendered',

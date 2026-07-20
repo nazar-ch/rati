@@ -19,6 +19,7 @@ import { registerScopeControlsChannel } from './controls';
 import { discardRun, RefreshController } from './refresh';
 import { LoadingDelay, noDelaySubscribe, notHeld } from './loadingDelay';
 import { RetryPolicy, type RetryOptions } from './retryPolicy';
+import { createRejectionGuard } from './ssrErrors';
 import { MandalaErrorBoundary } from './boundary';
 import { HydrationContext } from './hydration';
 import { AfterHydration } from './afterHydration';
@@ -127,6 +128,35 @@ export type MandalaConfig<S extends Scope<any>> = {
      * failure as always.
      */
     retry?: RetryOptions;
+
+    /**
+     * What a server render does with a load that *failed*. Default `'retry'`.
+     *
+     * `'retry'` is React's own degradation, and it is self-healing: the failing Suspense
+     * boundary is abandoned, the HTML carries the `loading` slot with a client-retry
+     * marker, and the client re-runs the load on hydration. A transient hiccup fixes
+     * itself; a real failure reaches the `error` slot one client-side attempt later.
+     *
+     * `'dehydrate'` trades that for a deterministic first paint. The server renders the
+     * island's `error` slot into the HTML, carries the failure over in the payload, and the
+     * client hydrates that cell straight to its error state — no re-run, no spinner. The
+     * slot's `retry` is armed as always and re-runs the load on click.
+     *
+     * Two things to know before opting in. The failure's `message` is written into the
+     * HTML, so a load whose errors carry backend text should say something else instead
+     * (`cause` never travels — see the payload contract). And with an automatic
+     * {@link MandalaConfig.retry} policy configured, the policy picks a dehydrated failure
+     * up like any other: the island retries on the client instead of sitting on the error
+     * slot the HTML shipped.
+     *
+     * Either way the server's own knowledge is unchanged: the failure is recorded, and the
+     * response status derived from it, in both modes. And like the source-side `ssr`
+     * marker, `'dehydrate'` needs the payload to reach the client: under a bare
+     * `prerender` with no `HydrationProvider` — and on a client-only render — it does
+     * nothing, because a first paint that hydration then contradicts is worse than the
+     * default it replaces.
+     */
+    ssrErrors?: 'retry' | 'dehydrate';
 };
 
 export type MandalaComponent<S extends Scope<any>> = FC<ScopeInputs<S>> & {
@@ -277,6 +307,11 @@ export function createMandala<S extends Scope<any>>(
     const Channel = registerScopeChannel(scopeKey);
     const ControlsChannel = registerScopeControlsChannel(scopeKey);
     const Loading = (config.loading ?? DefaultLoading) as ComponentType<{ inputs: unknown }>;
+    // Undefined means "no slot": the boundary rethrows to the nearest outer one, and a
+    // server render has nothing deterministic to paint (see `ssrErrors`).
+    const ErrorSlot = config.error as
+        | ComponentType<{ inputs: unknown; error: SourceError; retry: () => void }>
+        | undefined;
     const levels = flattenLevels(config.scope as Scope);
     // Build-time constants, so the element tree below keeps one stable shape per mandala.
     const ssrEnabled = config.ssr !== false;
@@ -290,6 +325,7 @@ export function createMandala<S extends Scope<any>>(
     // `count: 0` is the absent option spelled out — no policy, no wrapper on the manual
     // retry, nothing to report.
     const retryOptions = config.retry && config.retry.count > 0 ? config.retry : null;
+    const dehydrateErrors = config.ssrErrors === 'dehydrate';
     const provideChannel = (config.scope as Scope).provideDef?.channel;
 
     // The public identity of this mandala — the React displayName, the scope's read-error
@@ -330,6 +366,10 @@ export function createMandala<S extends Scope<any>>(
         const firstMount = retry === 0 && deepEqual(inputs, initialInputsRef.current);
         const hydrationSlice = firstMount ? hydration.data?.[mandalaId] : undefined;
         const seedsSlice = firstMount ? hydration.seeds?.[mandalaId] : undefined;
+        // Same gate, and for the same reason: a retry (manual or the policy's) and an
+        // inputs change both mean "run the load", which is precisely what a dehydrated
+        // failure is the alternative to.
+        const errorsSlice = firstMount ? hydration.errors?.[mandalaId] : undefined;
 
         // Bound to this mandala's id; present only on the server (client has no `collect`),
         // where each Step records its resolved promise for the wire.
@@ -337,11 +377,15 @@ export function createMandala<S extends Scope<any>>(
             ? (key: string, value: unknown, kind: 'value' | 'seed') =>
                   hydration.collect!(mandalaId, key, value, kind)
             : undefined;
+        // The island's `ssrErrors` mode rides along: every failure is recorded for the
+        // status derivation, and this is what decides whether it also crosses the wire.
         const collectError = hydration.collectError
-            ? (key: string, error: SourceError) => hydration.collectError!(mandalaId, key, error)
+            ? (key: string, error: SourceError) =>
+                  hydration.collectError!(mandalaId, key, error, dehydrateErrors)
             : undefined;
         const claim = hydration.claim
-            ? (key: string, section: 'data' | 'seeds') => hydration.claim!(mandalaId, key, section)
+            ? (key: string, section: 'data' | 'seeds' | 'errors') =>
+                  hydration.claim!(mandalaId, key, section)
             : undefined;
 
         // Per-level data-cell caches, rebuilt when the inner tree remounts (treeKey
@@ -352,6 +396,7 @@ export function createMandala<S extends Scope<any>>(
             buckets: Bucket[];
             trace: DataTrace | undefined;
             recordedRejections: WeakSet<Promise<unknown>> | undefined;
+            guardRejection: ((promise: Promise<unknown>) => Promise<unknown>) | undefined;
         } | null>(null);
         // Buckets the line below replaced, awaiting the sweep in the commit effect. A Step
         // torn down while its bucket was still live keeps its sources attached on purpose
@@ -424,6 +469,13 @@ export function createMandala<S extends Scope<any>>(
                 // for the same reason the trace is: a *later* render reusing the same
                 // promise instance is a new report, not a duplicate of this one.
                 recordedRejections: collectError ? new WeakSet<Promise<unknown>>() : undefined,
+                // The rejection-proof twins this generation's Steps wait on under
+                // `ssrErrors: 'dehydrate'` — scoped to the run for the same reason. Gated
+                // on the collector, like the source-side `ssr` marker and for the same
+                // reason: with nothing to carry the failure over, painting the error slot
+                // would only mean the client paints something else a moment later. The
+                // default degradation is what a render without a payload is *for*.
+                guardRejection: collect && dehydrateErrors ? createRejectionGuard() : undefined,
             };
         }
 
@@ -454,6 +506,22 @@ export function createMandala<S extends Scope<any>>(
             };
         }
         const manualRetry = manualRetryRef.current ?? bumpRetry;
+
+        // The resolver's server-side error path, assembled where the pieces are: the run's
+        // guard, plus the error slot the Step renders in place of the throw React would
+        // hand to nobody. Present only on a collected server render of a `'dehydrate'`
+        // island — `guardRejection` already carries both conditions.
+        const guardRejection = cacheRef.current.guardRejection;
+        const ssrErrors = guardRejection
+            ? {
+                  guard: guardRejection,
+                  slot: ErrorSlot
+                      ? (error: SourceError) => (
+                            <ErrorSlot inputs={inputs} error={error} retry={manualRetry} />
+                        )
+                      : null,
+              }
+            : undefined;
 
         // The instance's refresh controller — the value behind `useScopeControls`. Wired
         // every render so it always sees the current run's buckets; created once so the
@@ -601,9 +669,11 @@ export function createMandala<S extends Scope<any>>(
             collect,
             collectError,
             recordedRejections: cacheRef.current.recordedRejections,
+            ssrErrors,
             claim,
             hydration: hydrationSlice,
             seeds: seedsSlice,
+            errors: errorsSlice,
             trace: cacheRef.current.trace,
             // The leaf reports its commit only where something reads it: with none of the
             // three options there is no baseline to keep and no streak to end, and the
@@ -618,15 +688,7 @@ export function createMandala<S extends Scope<any>>(
         return (
             <ControlsChannel.Provider value={controller}>
                 <MandalaErrorBoundary
-                    errorSlot={
-                        config.error as
-                            | ComponentType<{
-                                  inputs: unknown;
-                                  error: SourceError;
-                                  retry: () => void;
-                              }>
-                            | undefined
-                    }
+                    errorSlot={ErrorSlot}
                     inputs={inputs}
                     retry={manualRetry}
                     resetKey={treeKey}

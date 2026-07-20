@@ -6,7 +6,8 @@
 
       - `HydrationProvider` / `createHydrationCollector` — the mandala engine's SSR
         dehydration. Wrap the app at the SSR boundary; the server passes `collect`, the
-        client passes the collected `data` back so it rehydrates without re-running loads.
+        client passes the collected `data` (plus `seeds` / `errors`, when the app uses
+        them) back so it rehydrates without re-running loads.
         (`HydrationProvider` renders on the client too — mount it on both sides so the
         trees stay identical and each mandala's `useId` is stable.)
       - `prepareRoute` — drive a memory-history router to its matched route and snapshot
@@ -22,6 +23,7 @@ export {
     type Hydration,
     type HydrationData,
     type HydrationError,
+    type HydrationErrors,
 } from '../mandala/hydration';
 
 export { prepareRoute, type PreparedRoute } from '../router/prepareRoute';

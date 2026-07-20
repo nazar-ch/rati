@@ -176,7 +176,7 @@ describe('unclaimed-payload watchdog', () => {
 
         const claims = createHydrationClaims();
         // Two slices, so a re-armed countdown would have something left to report.
-        const disarm = claims.arm({ ':stale:': { orphan: 1, sibling: 2 } }, undefined);
+        const disarm = claims.arm({ ':stale:': { orphan: 1, sibling: 2 } }, undefined, undefined);
         vi.advanceTimersByTime(3500);
         expect(warn).toHaveBeenCalledOnce();
 

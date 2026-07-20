@@ -34,6 +34,13 @@ const routes = [
         scope: postScope,
         loading: () => <div>loading post</div>,
     }),
+    // The same scope and the same failures, asking for the error slot in the HTML.
+    route('/dehydrated/:slug', 'dehydrated', PostPage, {
+        scope: postScope,
+        loading: () => <div>loading post</div>,
+        error: ({ error }) => <div>{`error slot: ${error.code}`}</div>,
+        ssrErrors: 'dehydrate',
+    }),
     route('/blog/:slug', 'blog', () => null, {
         redirect: { to: ({ slug }) => ({ name: 'post', slug }), permanent: true },
     }),
@@ -93,6 +100,35 @@ describe('renderApp', () => {
         if (broken.kind === 'rendered') {
             expect(broken.status).toBe(500);
         }
+    });
+
+    test('ssrErrors: dehydrate changes what is painted, not the status', async () => {
+        // No `onError` swallow: this route's failure is caught by the resolver, so React
+        // never sees a throw. What changes is the HTML — and the payload's third section.
+        const broken = await renderApp({ url: '/dehydrated/broken', createApp });
+        expect(broken.kind).toBe('rendered');
+        if (broken.kind !== 'rendered') return;
+        expect(broken.status).toBe(500);
+        expect(broken.html).toContain('error slot: failed');
+        expect(broken.html).not.toContain('loading post');
+        expect(Object.values(broken.hydration.errors ?? {})[0]).toEqual({
+            post: { code: 'failed', message: 'backend exploded' },
+        });
+        expect(broken.stateScript).toContain('backend exploded');
+
+        const missing = await renderApp({ url: '/dehydrated/missing', createApp });
+        if (missing.kind !== 'rendered') return;
+        expect(missing.status).toBe(404);
+        expect(missing.html).toContain('error slot: not-available');
+    });
+
+    test('the errors section is absent from a payload nothing dehydrated into', async () => {
+        // Every page of an app that never sets the option, i.e. the default: the payload
+        // is what it was before the section existed.
+        const result = await renderApp({ url: '/posts/hello', createApp });
+        if (result.kind !== 'rendered') return;
+        expect(result.hydration.errors).toBeUndefined();
+        expect(result.stateScript).not.toContain('"errors"');
     });
 
     test('onError receives the render-level view of a failed load', async () => {

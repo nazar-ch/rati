@@ -169,6 +169,14 @@ export type RouteOptions<TScope extends Scope<any> | undefined, Path extends str
      */
     retry?: TScope extends Scope<any> ? MandalaConfig<TScope>['retry'] : undefined;
     /**
+     * What a server render does with a load that failed: `'retry'` (the default) ships the
+     * `loading` slot and lets the client re-run it, `'dehydrate'` renders the `error` slot
+     * into the HTML and carries the failure over — the mandala's `ssrErrors` (see
+     * `island`). The response status is the same either way. Only meaningful alongside
+     * `scope`.
+     */
+    ssrErrors?: TScope extends Scope<any> ? MandalaConfig<TScope>['ssrErrors'] : undefined;
+    /**
      * Declare this route a redirect — see {@link RouteRedirect}. The component never
      * renders on the happy path (pass `() => null`); it shows only if a redirect loop
      * is detected and following stops.
@@ -221,6 +229,7 @@ export function buildRouteComponent(
         keepStale?: boolean | undefined;
         loadingDelayMs?: number | undefined;
         retry?: RetryOptions | undefined;
+        ssrErrors?: 'retry' | 'dehydrate' | undefined;
     },
 ): ComponentType<any> {
     return createMandala(
@@ -233,6 +242,7 @@ export function buildRouteComponent(
             ...(fold.keepStale !== undefined ? { keepStale: fold.keepStale } : {}),
             ...(fold.loadingDelayMs !== undefined ? { loadingDelayMs: fold.loadingDelayMs } : {}),
             ...(fold.retry !== undefined ? { retry: fold.retry } : {}),
+            ...(fold.ssrErrors !== undefined ? { ssrErrors: fold.ssrErrors } : {}),
         },
         'Route',
     );
@@ -254,6 +264,7 @@ export type RouteFoldInputs = {
     keepStale?: boolean | undefined;
     loadingDelayMs?: number | undefined;
     retry?: RetryOptions | undefined;
+    ssrErrors?: 'retry' | 'dehydrate' | undefined;
 };
 
 /**
@@ -306,6 +317,7 @@ export function route<
                   keepStale: options.keepStale as boolean | undefined,
                   loadingDelayMs: options.loadingDelayMs as number | undefined,
                   retry: options.retry as RetryOptions | undefined,
+                  ssrErrors: options.ssrErrors as 'retry' | 'dehydrate' | undefined,
               })
             : component;
 
@@ -331,6 +343,7 @@ export function route<
                       keepStale: options.keepStale as boolean | undefined,
                       loadingDelayMs: options.loadingDelayMs as number | undefined,
                       retry: options.retry as RetryOptions | undefined,
+                      ssrErrors: options.ssrErrors as 'retry' | 'dehydrate' | undefined,
                   } satisfies RouteFoldInputs,
               }
             : {}),

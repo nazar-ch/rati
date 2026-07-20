@@ -39,9 +39,12 @@ import {
     type Cell,
     type CellBody,
     type EqualsFn,
+    type ProducedBody,
+    type ProducedCell,
     type RefreshController,
 } from './refresh';
 import { firstSettle } from './ssrSource';
+import { SsrRejection } from './ssrErrors';
 
 /*
     The mandala's resolution mechanics: compile a scope's levels into a nested tree of
@@ -59,7 +62,9 @@ import { firstSettle } from './ssrSource';
       - a *promise* entry is unwrapped with `use()` — it suspends while pending (the
         Suspense fallback is the loading slot) and a Suspense-aware server render
         (react-dom/static `prerender`) awaits it. Rejections throw to the mandala's
-        ErrorBoundary → the error slot.
+        ErrorBoundary → the error slot. Server-side there is no such boundary (React runs
+        none), so an island asking for its failures to be dehydrated
+        (`ssrErrors: 'dehydrate'`) has the throw taken here instead — see Shared.ssrErrors.
       - a *source* entry (a reactive `pending | ready | error` state machine) is read
         observably; pending renders the loading slot, error throws to the slot. A ready
         source returning to pending drops back to loading, live. Under SSR an unmarked
@@ -148,7 +153,7 @@ function classifyEntry(
     prev: Record<string, unknown>,
     key: string,
     context: LoadContext,
-): Cell {
+): ProducedCell {
     if (is.object(entry) && InputSymbol in entry) {
         return makeStaticCell({ kind: 'value', value: prev[key] });
     }
@@ -177,7 +182,7 @@ function classifyEntry(
 }
 
 // Classify the *result* of a function/class/hook load (already called).
-function classifyResult(result: unknown): CellBody {
+function classifyResult(result: unknown): ProducedBody {
     if (is.promise(result)) return { kind: 'promise', promise: result };
     if (isSource(result)) return { kind: 'source', source: result };
     return { kind: 'value', value: result };
@@ -218,13 +223,29 @@ export type Shared = {
     // The promises this run has already handed to `collectError` (see recordRejection).
     // Lives on the run, next to the collector it feeds — present exactly when that is.
     recordedRejections: WeakSet<Promise<unknown>> | undefined;
+    // Server + `ssrErrors: 'dehydrate'` only; undefined everywhere else, which is the
+    // whole default path. React runs no error boundary during a server render, so a
+    // rejected load would reach nobody and the HTML would degrade to the loading slot —
+    // this is the resolver's own error path instead. `guard` hands back a promise that
+    // cannot reject (see ssrErrors.ts) and `slot` builds the island's error slot for the
+    // Step to render where it stands; `slot` is null when the island declares none, which
+    // leaves the throw — and the degradation — exactly as it is by default.
+    ssrErrors:
+        | {
+              guard: (promise: Promise<unknown>) => Promise<unknown>;
+              slot: ((error: SourceError) => ReactNode) | null;
+          }
+        | undefined;
     // Client only, diagnostic: notes a hydration/seed slice as consumed, feeding the
     // unclaimed-payload watchdog (hydrationDiagnostics.ts).
-    claim: ((key: string, section: 'data' | 'seeds') => void) | undefined;
+    claim: ((key: string, section: 'data' | 'seeds' | 'errors') => void) | undefined;
     // Client only: server-resolved promise values to rehydrate from (scope key -> value).
     hydration: Record<string, unknown> | undefined;
     // Client only: server-dehydrated live-source seeds (scope key -> hydrate() input).
     seeds: Record<string, unknown> | undefined;
+    // Client only: loads that failed during the server render and were carried over
+    // (scope key -> SourceError) — the `ssrErrors` field above, seen from the other side.
+    errors: Record<string, SourceError> | undefined;
     // Kept-run options only, i.e. `keepStale` / `loadingDelayMs` (undefined otherwise). The
     // leaf reports what it committed, which becomes the baseline the next re-resolve keeps
     // on screen — and the report is the swap: recording the new output is what releases the
@@ -273,6 +294,16 @@ function buildCell(
             lastValue: undefined,
             hasValue: false,
         };
+    }
+
+    // ...and a failure dehydrated from the server (`ssrErrors: 'dehydrate'`) short-circuits
+    // it the same way, to the other outcome: the cell lands in its error state, the resolve
+    // pass throws it to the boundary, and the error slot the server already rendered stays
+    // — with `retry` armed, and without the load running here at all. Read after the values
+    // above only because a key cannot be in both sections.
+    if (shared.errors && key in shared.errors) {
+        shared.claim?.(key, 'errors');
+        return makeStaticCell({ kind: 'error', error: shared.errors[key]! });
     }
 
     const cell = classifyEntry(level[key], prev, key, context);
@@ -331,6 +362,9 @@ function traceCell(
     if (!trace) return;
     if (cell.kind === 'promise') traceCellPromise(trace, index, key, cell.promise);
     else if (cell.kind === 'value') traceCellStatus(trace, index, key, 'ready', detail);
+    else if (cell.kind === 'error') {
+        traceCellStatus(trace, index, key, 'error', errorLabel(cell.error));
+    }
 }
 
 // Render-time halves of a selective refresh: re-run dirty cells against the current
@@ -575,7 +609,21 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
             resolved[key] = cell.value;
         } else if (cell.kind === 'promise') {
             recordRejection(shared, key, cell.promise);
-            const value = use(cell.promise);
+            // Server + `ssrErrors: 'dehydrate'`: wait on the rejection-proof twin instead,
+            // so a failed load comes back as a value this pass can act on rather than a
+            // throw with no boundary to catch it. The original still rejects, and the line
+            // above is still what records it.
+            const ssrErrors = shared.ssrErrors;
+            const value = use(ssrErrors ? ssrErrors.guard(cell.promise) : cell.promise);
+            if (ssrErrors && value instanceof SsrRejection) {
+                // Render the island's error slot from here — the deterministic first paint
+                // this mode exists for. With no slot to render there is nothing to be
+                // deterministic about, so the throw takes the default path: React degrades
+                // the boundary to the loading slot, and the client (which still receives
+                // the dehydrated failure) surfaces it through the app's own boundary.
+                if (!ssrErrors.slot) throw value.error;
+                return ssrErrors.slot(value.error);
+            }
             // Render-time write, but only on the server (client has no `collect`) and
             // idempotent per key — the established SSR data-collection pattern. A
             // live-source cell ships `dehydrate(value)` as a seed instead of the value.
@@ -588,6 +636,11 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
                 );
             }
             resolved[key] = value;
+        } else if (cell.kind === 'error') {
+            // A failure the server already had (`ssrErrors: 'dehydrate'`), hydrating into
+            // the state a source that failed would be in — so it leaves the same way: to
+            // the boundary, and the error slot the HTML is already showing.
+            throw cell.error;
         } else {
             const state = cell.source.getSnapshot();
             traceCellStatus(

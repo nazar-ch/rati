@@ -1,5 +1,5 @@
 import { isHookLoad, type Scope } from '../scope/scope';
-import type { Source } from '../scope/source';
+import type { Source, SourceError } from '../scope/source';
 import { deepEqual } from '../util/utils';
 
 /*
@@ -55,19 +55,33 @@ type CellBase = {
 // is unwrapped with `use()`; a source is read observably. A refreshed promise cell
 // becomes a value cell when the re-fetch settles (the settled value renders
 // synchronously — no `use()`, no Suspense re-entry, no loading-slot flash).
+//
+// `error` is the fourth outcome, and the only one a load never *produces*: it is a
+// failure the server already had, dehydrated across the wire (`ssrErrors: 'dehydrate'`).
+// The cell lands in it — `SourceState`'s third member, in cell clothing — and the resolve
+// pass throws it to the boundary without the load having run here at all.
 export type Cell = CellBase &
     (
         | { kind: 'value'; value: unknown }
         | { kind: 'promise'; promise: Promise<unknown> }
         | { kind: 'source'; source: Source<unknown> }
+        | { kind: 'error'; error: SourceError }
     );
 
 export type CellBody =
     | { kind: 'value'; value: unknown }
     | { kind: 'promise'; promise: Promise<unknown> }
-    | { kind: 'source'; source: Source<unknown> };
+    | { kind: 'source'; source: Source<unknown> }
+    | { kind: 'error'; error: SourceError };
 
-export function makeStaticCell(body: CellBody): Cell {
+/** What a load can *produce* — everything but `error`, which is never classified from an
+ *  entry: it only ever arrives dehydrated from a server render. */
+export type ProducedBody = Exclude<CellBody, { kind: 'error' }>;
+export type ProducedCell = CellBase & ProducedBody;
+
+// Generic in the body so a caller that knows which kind it built keeps that knowledge —
+// the classifier's "never an error cell" above is the one that matters.
+export function makeStaticCell<Body extends CellBody>(body: Body): CellBase & Body {
     return {
         ...body,
         reads: null,
@@ -80,11 +94,11 @@ export function makeStaticCell(body: CellBody): Cell {
     };
 }
 
-export function makeProducedCell(
-    body: CellBody,
+export function makeProducedCell<Body extends CellBody>(
+    body: Body,
     reads: Set<string>,
     equals: EqualsFn | undefined,
-): Cell {
+): CellBase & Body {
     return {
         ...body,
         reads,
@@ -338,6 +352,17 @@ export class RefreshController {
             console.warn(
                 `[rati] refresh('${key}'): the key resolves a source — sources are live and ` +
                     `refresh themselves; ignoring.`,
+            );
+            return Promise.resolve();
+        }
+        if (cell.kind === 'error') {
+            // A dehydrated server-side failure (`ssrErrors: 'dehydrate'`). The island is
+            // showing its error slot, so nothing under it renders and a per-key re-run
+            // would never get the chance to happen — resolving the island again is the
+            // way back, which is what the slot's own `retry` does.
+            console.warn(
+                `[rati] refresh('${key}'): the load failed during the server render and the ` +
+                    `island is showing its error slot — use retry() to resolve it again; ignoring.`,
             );
             return Promise.resolve();
         }
