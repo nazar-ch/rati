@@ -82,6 +82,32 @@ unconstrained redesign pass.
 the session found that belongs to another effort — a bug found mid-exploration files to
 production-review's README, not here.)
 
+### 2026-07-20 — IMP-01 (field gap analysis)
+
+Output: [docs/research/field-gap-analysis.md](../../research/field-gap-analysis.md) —
+the full comparison (react-query v5 / SWR 2, TanStack Router 1.170 + Start RC,
+React Router 8.2, Next 16.2; every claim cited at session time), every field feature
+classified (a) covered / (b) rejected / (c) recorded / (d) net-new, three proposals, and
+four notes filed to the data effort (environment revalidation triggers, offline posture,
+`pagedCollection` page cap, mutation serialization evidence).
+
+**Top-3:** D1 — intent-based *data* prefetch (`<Link prefetch>` today preloads only the
+chunk; all four neighbors preload data, and the declarative scope makes the prefetchable
+prefix statically computable); D2 — scroll restoration deferred to the island's commit
+(the restore currently clamps against the loading slot; shares its mandala→router signal
+with the recorded navigation-status direction); the §2 back/forward note (every neighbor
+makes back navigation instant, rati re-resolves — not proposed, but the adopter question
+the recorded directions should be weighed against together).
+
+Session notes: the existing records held up well against the field — most expected axes
+(mutations, invalidation, stale UX, guards, search params, streaming, RSC) were already
+class (a) or (c); the genuinely unnoticed gaps clustered in *pre-navigation* behavior
+(prefetch, scroll, back/forward), which no prior record covers. Where the field moved
+since a record was written (throwable redirects from data code, Standard Schema search
+validation, view transitions as a stable `Link` prop, TanStack's `'data-only'` SSR mode,
+`pendingMinMs`), the evidence was noted on the record rather than re-proposed. No `src/`
+or `docs/current/` changes; no bugs found to file to production-review.
+
 ## Per-item conventions
 
 Atomic commits on the current branch; subjects prefixed `IMP-NN:`, `Closes: IMP-NN` on the
