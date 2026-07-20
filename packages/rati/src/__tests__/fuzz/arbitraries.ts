@@ -71,9 +71,14 @@ export function byLevel(base: number, perLevel: number): number {
  * "Tests 1 failed", no counterexample, and nothing wrong with the code under test. Costly
  * to diagnose, and it fires on the deep runs that are meant to be the trustworthy ones.
  *
+ * The floor is well above 5s for the same reason at the *default* budget: under a full
+ * `yarn ci` pass the whole suite runs in parallel, and the contention alone pushed the
+ * mandala properties past 5s on an otherwise clean tree (the scope-and-island effort's
+ * 2026-07-20 finding — a flaky `ci` with nothing wrong under test).
+ *
  * Generous on purpose: this is a hang-catcher, not a performance gate. The budgets that
  * keep the suite fast are `fuzz(n)` and `byLevel`.
  */
 export function fuzzTimeout(): number {
-    return Math.max(5_000, (envInt('FUZZ_RUNS') ?? 0) * 30);
+    return Math.max(30_000, (envInt('FUZZ_RUNS') ?? 0) * 30);
 }

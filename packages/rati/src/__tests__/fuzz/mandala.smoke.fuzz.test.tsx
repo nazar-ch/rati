@@ -2,7 +2,7 @@ import * as fc from 'fast-check';
 import { StrictMode } from 'react';
 import { describe, test, expect, afterEach } from 'vite-plus/test';
 import { render, cleanup, act } from '@testing-library/react';
-import { fuzz } from './arbitraries';
+import { fuzz, fuzzTimeout } from './arbitraries';
 import { assertLedgerBalanced, assertLedgerBounds } from './ledger';
 import { allKeys, createDeclaredState, createModel, type ScopeSpec } from './model';
 import { buildHarness, readContent, readSlot, scopeSpecArb } from './scopeHarness';
@@ -112,11 +112,19 @@ function smokeProperty(strict: boolean) {
 }
 
 describe('mandala fuzz — smoke (initial resolution over generated scopes)', () => {
-    test('a generated scope resolves to convergence, in any settle order', async () => {
-        await fc.assert(smokeProperty(false), fuzz(25));
-    });
+    test(
+        'a generated scope resolves to convergence, in any settle order',
+        async () => {
+            await fc.assert(smokeProperty(false), fuzz(25));
+        },
+        fuzzTimeout(),
+    );
 
-    test('the same holds under StrictMode, and the ledger balances through the double-mount', async () => {
-        await fc.assert(smokeProperty(true), fuzz(25));
-    });
+    test(
+        'the same holds under StrictMode, and the ledger balances through the double-mount',
+        async () => {
+            await fc.assert(smokeProperty(true), fuzz(25));
+        },
+        fuzzTimeout(),
+    );
 });

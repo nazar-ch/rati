@@ -1,7 +1,7 @@
 import * as fc from 'fast-check';
 import { describe, test, expect, afterEach, beforeEach, vi } from 'vite-plus/test';
 import { render, cleanup, act } from '@testing-library/react';
-import { fuzz } from './arbitraries';
+import { fuzz, fuzzTimeout } from './arbitraries';
 import { assertLedgerBalanced } from './ledger';
 import { createDeclaredState, createModel } from './model';
 import { buildHarness, readContent, readSlot, scopeSpecArb } from './scopeHarness';
@@ -121,67 +121,75 @@ async function quiesce(model: Model, real: Real): Promise<void> {
 }
 
 describe('mandala fuzz — commands (event interleavings over generated scopes)', () => {
-    test('a generated scope survives any event sequence and converges', async () => {
-        await fc.assert(
-            fc.asyncProperty(
-                // A real waterfall: cascades are what this property searches for.
-                scopeSpecArb({ minLevels: 2 }),
-                commandsArb(),
-                fc.boolean(),
-                fc.boolean(),
-                fc.boolean(),
-                async (spec, cmds, warmStart, skipQuiesce, withProvide) => {
-                    const declared = createDeclaredState();
-                    const harness = buildHarness(spec, declared, { provide: withProvide });
-                    const model = createModel(spec, declared);
-                    // Async act at the mount — see suspense-situations.md S2.
-                    let view!: ReturnType<typeof render>;
-                    await act(async () => {
-                        view = render(<harness.Host />);
-                    });
-                    const real: Real = {
-                        harness,
-                        declared,
-                        container: view.container,
-                        spec,
-                    };
-                    try {
-                        if (warmStart) await warmUp(model, real);
-                        await fc.asyncModelRun(() => ({ model, real }), cmds);
-                        if (!skipQuiesce) await quiesce(model, real);
-                    } finally {
-                        exercised.refreshWithChange += model.stats.refreshWithChange;
-                        exercised.cascades += model.stats.cascades;
-                        exercised.supersededRuns += model.stats.supersededRuns;
-                        exercised.sourceValueChanges += model.stats.sourceValueChanges;
-
-                        view.unmount();
-                        // S5 — late settles into a discarded tree: no throw, no state write,
-                        // no log. `skipQuiesce` runs make this the common case.
+    test(
+        'a generated scope survives any event sequence and converges',
+        async () => {
+            await fc.assert(
+                fc.asyncProperty(
+                    // A real waterfall: cascades are what this property searches for.
+                    scopeSpecArb({ minLevels: 2 }),
+                    commandsArb(),
+                    fc.boolean(),
+                    fc.boolean(),
+                    fc.boolean(),
+                    async (spec, cmds, warmStart, skipQuiesce, withProvide) => {
+                        const declared = createDeclaredState();
+                        const harness = buildHarness(spec, declared, { provide: withProvide });
+                        const model = createModel(spec, declared);
+                        // Async act at the mount — see suspense-situations.md S2.
+                        let view!: ReturnType<typeof render>;
                         await act(async () => {
-                            let remaining = harness.held();
-                            while (remaining.length) {
-                                harness.settle(remaining[0]!);
-                                remaining = harness.held();
-                            }
+                            view = render(<harness.Host />);
                         });
+                        const real: Real = {
+                            harness,
+                            declared,
+                            container: view.container,
+                            spec,
+                        };
+                        try {
+                            if (warmStart) await warmUp(model, real);
+                            await fc.asyncModelRun(() => ({ model, real }), cmds);
+                            if (!skipQuiesce) await quiesce(model, real);
+                        } finally {
+                            exercised.refreshWithChange += model.stats.refreshWithChange;
+                            exercised.cascades += model.stats.cascades;
+                            exercised.supersededRuns += model.stats.supersededRuns;
+                            exercised.sourceValueChanges += model.stats.sourceValueChanges;
 
-                        // 6 — the lifecycle ledger at final unmount: every attach matched
-                        // by a detach, every `.provide()` value disposed (and disposed
-                        // while its sources were still attached). A leak fails the run
-                        // even though every mid-run assert passed.
-                        assertLedgerBalanced(harness, 'teardown');
-                    }
-                },
-            ),
-            fuzz(100),
-        );
+                            view.unmount();
+                            // S5 — late settles into a discarded tree: no throw, no state write,
+                            // no log. `skipQuiesce` runs make this the common case.
+                            await act(async () => {
+                                let remaining = harness.held();
+                                while (remaining.length) {
+                                    harness.settle(remaining[0]!);
+                                    remaining = harness.held();
+                                }
+                            });
 
-        // The harness must have actually reached the machinery it claims to cover.
-        expect(exercised.refreshWithChange, 'no refresh ever changed a value').toBeGreaterThan(0);
-        expect(exercised.cascades, 'no cascade ever fired').toBeGreaterThan(0);
-        expect(exercised.supersededRuns, 'no producer run was ever superseded').toBeGreaterThan(0);
-        expect(exercised.sourceValueChanges, 'no live source ever moved').toBeGreaterThan(0);
-        expect(observed.provideRebuilds, 'no .provide() value ever rebuilt').toBeGreaterThan(0);
-    });
+                            // 6 — the lifecycle ledger at final unmount: every attach matched
+                            // by a detach, every `.provide()` value disposed (and disposed
+                            // while its sources were still attached). A leak fails the run
+                            // even though every mid-run assert passed.
+                            assertLedgerBalanced(harness, 'teardown');
+                        }
+                    },
+                ),
+                fuzz(100),
+            );
+
+            // The harness must have actually reached the machinery it claims to cover.
+            expect(exercised.refreshWithChange, 'no refresh ever changed a value').toBeGreaterThan(
+                0,
+            );
+            expect(exercised.cascades, 'no cascade ever fired').toBeGreaterThan(0);
+            expect(exercised.supersededRuns, 'no producer run was ever superseded').toBeGreaterThan(
+                0,
+            );
+            expect(exercised.sourceValueChanges, 'no live source ever moved').toBeGreaterThan(0);
+            expect(observed.provideRebuilds, 'no .provide() value ever rebuilt').toBeGreaterThan(0);
+        },
+        fuzzTimeout(),
+    );
 });
