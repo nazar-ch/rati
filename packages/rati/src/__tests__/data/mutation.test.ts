@@ -1,6 +1,7 @@
 import { describe, test, expect, vi } from 'vite-plus/test';
 import { collection } from '../../data/collection';
 import { mutation } from '../../data/mutation';
+import { query } from '../../data/query';
 import { deferred } from '../../testing';
 
 describe('mutation state', () => {
@@ -104,6 +105,55 @@ describe('optimistic choreography', () => {
         await expect(rename('a', 'Beta')).rejects.toThrow('denied');
         await spaces.query.refresh(); // join the recovery refresh
         expect(spaces.getByKey('a')!.title).toBe('Alpha'); // patch undone by truth
+    });
+
+    test('refreshes sees the call arguments — only the keyed dependent re-fetches', async () => {
+        // The keyed shape from the jnana migration: one query per space, the
+        // mutation selecting its dependent by the call's own spaceId.
+        const fetches: string[] = [];
+        const membersFor = new Map(
+            ['a', 'b'].map((spaceId) => [
+                spaceId,
+                query(() => {
+                    fetches.push(spaceId);
+                    return Promise.resolve({ spaceId });
+                }),
+            ]),
+        );
+        await membersFor.get('a')!.load();
+        await membersFor.get('b')!.load();
+        fetches.length = 0;
+
+        const touch = mutation((_spaceId: string) => Promise.resolve(), {
+            refreshes: (spaceId) => [membersFor.get(spaceId)!],
+        });
+
+        await touch('b');
+        await membersFor.get('b')!.refresh(); // join the fired refresh
+        expect(fetches).toEqual(['b']); // 'a' was never re-fetched
+    });
+
+    test('a keyed optimistic patch is recovered through the keyed refresh on failure', async () => {
+        // DATA-05 + DATA-06 together — the FND-106 choreography: patch the one
+        // query the call names, and let onError: 'refresh' restore its truth.
+        const members = query(() => Promise.resolve({ retention: 30 }));
+        await members.load();
+        const membersFor = (_spaceId: string) => members;
+
+        const setRetention = mutation(
+            (_spaceId: string, _days: number) => Promise.reject(new Error('denied')),
+            {
+                optimistic: (spaceId, days) =>
+                    membersFor(spaceId).patch((current) => ({ ...current, retention: days })),
+                refreshes: (spaceId) => [membersFor(spaceId)],
+            },
+        );
+
+        const call = setRetention('a', 7);
+        expect(members.data).toEqual({ retention: 7 }); // expected truth, instantly
+        await expect(call).rejects.toThrow('denied');
+        await members.refresh(); // join the recovery refresh
+        expect(members.data).toEqual({ retention: 30 }); // actual truth restored
     });
 
     test('an onError callback replaces the refresh for local rollback', async () => {

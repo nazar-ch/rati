@@ -30,8 +30,12 @@ export interface Mutation<Args extends unknown[], R> {
 export interface MutationOptions<Args extends unknown[]> {
     /** Applied synchronously (in an action) before the request. */
     optimistic?: (...args: Args) => void;
-    /** Read-side dependents to re-fetch — typically collections/queries. */
-    refreshes?: () => ReadonlyArray<{ refresh(): Promise<void> }>;
+    /**
+     * Read-side dependents to re-fetch — typically collections/queries. Receives
+     * the call's arguments, so a keyed dependent can be declared:
+     * `refreshes: (spaceId) => [this.membersFor(spaceId)]`.
+     */
+    refreshes?: (...args: Args) => ReadonlyArray<{ refresh(): Promise<void> }>;
     /**
      * `'refresh'` (default): re-fetch truth from the `refreshes` list. A callback
      * is the escape hatch for offline-ish flows that must roll back locally —
@@ -50,8 +54,8 @@ export function mutation<Args extends unknown[], R>(
         { deep: false },
     );
 
-    const refreshAll = (): void => {
-        const dependents = options.refreshes?.() ?? [];
+    const refreshAll = (...args: Args): void => {
+        const dependents = options.refreshes?.(...args) ?? [];
         for (const dependent of dependents) void dependent.refresh();
     };
 
@@ -66,7 +70,7 @@ export function mutation<Args extends unknown[], R>(
             runInAction(() => {
                 state.pendingCount -= 1;
             });
-            refreshAll();
+            refreshAll(...args);
             return result;
         } catch (thrown) {
             runInAction(() => {
@@ -74,7 +78,7 @@ export function mutation<Args extends unknown[], R>(
                 state.error = toSourceError(thrown);
             });
             const onError = options.onError ?? 'refresh';
-            if (onError === 'refresh') refreshAll();
+            if (onError === 'refresh') refreshAll(...args);
             else runInAction(() => onError(...args));
             throw thrown;
         }

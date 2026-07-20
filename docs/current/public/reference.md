@@ -816,6 +816,10 @@ const SpacesPage = observer(({ spaces }: ScopeProps<typeof spacesScope>) => (
 ));
 ```
 
+`optimistic` and `refreshes` both receive the call's own arguments, so a dependent
+keyed by the call is declarable — `refreshes: (spaceId) => [this.membersFor(spaceId)]`
+— and the `onError: 'refresh'` recovery reaches it too.
+
 Division of labor: the island covers loading/error for the **first** resolution; the
 primitives' phases drive everything after — `refreshing` for stale display, per-page
 phases for pagination rows, `isSubmitting` for buttons. `query.load()` is idempotent
