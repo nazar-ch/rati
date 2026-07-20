@@ -18,6 +18,7 @@ import { registerScopeChannel, setScopeLabel } from './channel';
 import { registerScopeControlsChannel } from './controls';
 import { discardRun, RefreshController } from './refresh';
 import { LoadingDelay, noDelaySubscribe, notHeld } from './loadingDelay';
+import { RetryPolicy, type RetryOptions } from './retryPolicy';
 import { MandalaErrorBoundary } from './boundary';
 import { HydrationContext } from './hydration';
 import { AfterHydration } from './afterHydration';
@@ -106,6 +107,26 @@ export type MandalaConfig<S extends Scope<any>> = {
      * which waits for the resolution regardless.
      */
     loadingDelayMs?: number;
+
+    /**
+     * Re-resolve automatically when the resolution fails? Absent (the default) means no
+     * automatic retry: a failure shows the `error` slot at once, as it always has.
+     *
+     * `{ count, backoffMs }` — up to `count` further attempts, waiting `backoffMs` before
+     * the first and doubling for each one after (`{ count: 3, backoffMs: 500 }` → 500ms,
+     * 1s, 2s). While the policy is working the island is *not* in its error state: it shows
+     * the `loading` slot (or the kept run, under `keepStale`) and
+     * `useScopeControls().retrying` says which attempt is in flight. Only once the budget
+     * is spent does the `error` slot come up — with its manual `retry`, which buys a fresh
+     * budget.
+     *
+     * **`failed` only.** A `not-available` — or any other code a load coins — is an answer,
+     * not a transient fault; retrying it just delays the 404 the user is owed.
+     *
+     * Client-only: a server render takes its one attempt per request and reports the
+     * failure as always.
+     */
+    retry?: RetryOptions;
 };
 
 export type MandalaComponent<S extends Scope<any>> = FC<ScopeInputs<S>> & {
@@ -266,6 +287,9 @@ export function createMandala<S extends Scope<any>>(
     // previous run for the whole re-resolution, a bare delay only until its deadline. With
     // neither, nothing is kept and the engine behaves exactly as it did before either landed.
     const keepsRun = keepStale || delayed;
+    // `count: 0` is the absent option spelled out — no policy, no wrapper on the manual
+    // retry, nothing to report.
+    const retryOptions = config.retry && config.retry.count > 0 ? config.retry : null;
     const provideChannel = (config.scope as Scope).provideDef?.channel;
 
     // The public identity of this mandala — the React displayName, the scope's read-error
@@ -351,6 +375,11 @@ export function createMandala<S extends Scope<any>>(
         const delayRef = useRef<LoadingDelay | null>(null);
         if (delayed) delayRef.current ??= new LoadingDelay(delayMs);
         const delay = delayRef.current;
+        // The `retry` policy, same shape: one per instance, only when the option is set —
+        // without it nothing below this line does anything at all.
+        const policyRef = useRef<RetryPolicy | null>(null);
+        if (retryOptions) policyRef.current ??= new RetryPolicy(retryOptions);
+        const policy = policyRef.current;
         if (!cacheRef.current || cacheRef.current.key !== treeKey) {
             const previous = cacheRef.current;
             const committed = committedRef.current;
@@ -412,6 +441,20 @@ export function createMandala<S extends Scope<any>>(
         // and by the refresh controller (dirty cells / swapped values re-render in place).
         const [, forceRebuild] = useReducer((count: number) => count + 1, 0);
 
+        // The retry a *human* asked for — the error slot's prop, `useScopeControls().retry`,
+        // and `refresh()` with no key. It resets the automatic budget: a click is new
+        // information, not a continuation of the streak the policy just gave up on. Held on
+        // a ref so the error slot's `retry` prop keeps the stable identity `bumpRetry` had;
+        // without the option it *is* `bumpRetry`, and nothing here is in the way.
+        const manualRetryRef = useRef<(() => void) | null>(null);
+        if (retryOptions) {
+            manualRetryRef.current ??= () => {
+                policyRef.current?.reset();
+                bumpRetry();
+            };
+        }
+        const manualRetry = manualRetryRef.current ?? bumpRetry;
+
         // The instance's refresh controller — the value behind `useScopeControls`. Wired
         // every render so it always sees the current run's buckets; created once so the
         // channel value (and the hook's verbs) stay referentially stable.
@@ -423,8 +466,11 @@ export function createMandala<S extends Scope<any>>(
             buckets: cacheRef.current.buckets,
             treeKey,
             notify: forceRebuild,
-            fullRefresh: bumpRetry,
+            fullRefresh: manualRetry,
         });
+        // The policy's verbs, wired the same way: its own retry is the *unwrapped* bump —
+        // an automatic attempt continues the streak rather than restarting it.
+        policy?.wire({ retry: bumpRetry, report: controller.reportRetrying });
 
         // A committed remount (inputs change / retry) tears the old cells down —
         // outstanding refresh bookkeeping settles wholesale, and the generation it replaced
@@ -463,8 +509,9 @@ export function createMandala<S extends Scope<any>>(
                 // The run `keepStale` was holding on screen: the island is gone, so there
                 // is nothing left to keep it for. Same order as the swap below.
                 releaseKept(keptRef, null);
-                // ...and nothing left to delay: the pending countdown goes with it.
+                // ...and nothing left to delay or retry: the pending countdowns go with it.
                 delayRef.current?.dispose();
+                policyRef.current?.dispose();
                 cacheRef.current = null;
             };
         }, []);
@@ -479,8 +526,11 @@ export function createMandala<S extends Scope<any>>(
         ) => {
             committedRef.current = { buckets, resolved, provided };
             // Content is on screen, so the delay has nothing to hold back and the next
-            // stretch without content gets the full deadline again.
+            // stretch without content gets the full deadline again...
             delay?.settled();
+            // ...and whatever failure the retry policy was working through is over, however
+            // many attempts it took: the budget is per failure streak, not per island.
+            policy?.reset();
         };
 
         // The swap: the successor is on screen, so the run it replaced can go. Split from
@@ -531,6 +581,11 @@ export function createMandala<S extends Scope<any>>(
         useEffect(() => {
             delay?.arm();
             if (!showKept) releaseKept(keptRef, null);
+            // Which inputs the island is now resolving — the retry policy drops a countdown
+            // left over from the previous ones here (see RetryPolicy.committed). Effect-time
+            // and compared rather than reset, so the commit that *armed* an attempt can't
+            // cancel it on the way out.
+            policy?.committed(versionRef.current);
         });
 
         const shared: Shared = {
@@ -550,9 +605,10 @@ export function createMandala<S extends Scope<any>>(
             hydration: hydrationSlice,
             seeds: seedsSlice,
             trace: cacheRef.current.trace,
-            // The leaf reports its commit only where something reads it: with neither option
-            // there is no baseline to keep, and the default path stays untouched.
-            commit: keepsRun ? commitRun : undefined,
+            // The leaf reports its commit only where something reads it: with none of the
+            // three options there is no baseline to keep and no streak to end, and the
+            // default path stays untouched.
+            commit: keepsRun || retryOptions ? commitRun : undefined,
             swap: keepsRun ? swapRun : undefined,
             retainProvided: keepsRun ? retainProvided : undefined,
         };
@@ -572,9 +628,11 @@ export function createMandala<S extends Scope<any>>(
                             | undefined
                     }
                     inputs={inputs}
-                    retry={bumpRetry}
+                    retry={manualRetry}
                     resetKey={treeKey}
                     controller={controller}
+                    policy={policy}
+                    slot={slot}
                 >
                     <Suspense fallback={slot}>
                         {ssrEnabled ? (

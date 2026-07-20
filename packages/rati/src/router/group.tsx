@@ -58,6 +58,7 @@ export function group<const T extends readonly GenericRouteType[]>(
                     ssr: fold.ssr,
                     keepStale: fold.keepStale,
                     loadingDelayMs: fold.loadingDelayMs,
+                    retry: fold.retry,
                 });
             }
         }

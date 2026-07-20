@@ -213,9 +213,9 @@ export function sweepDetach(buckets: readonly Bucket[] | null | undefined): void
 export type IslandPhase = 'loading' | 'ready' | 'error';
 
 /** The island's status, as `useScopeControls` reports it. */
-export type IslandStatus = { phase: IslandPhase; isStale: boolean };
+export type IslandStatus = { phase: IslandPhase; isStale: boolean; retrying: number };
 
-const initialStatus: IslandStatus = { phase: 'loading', isStale: false };
+const initialStatus: IslandStatus = { phase: 'loading', isStale: false, retrying: 0 };
 
 type ControllerWiring = {
     levels: Scope['definition'][];
@@ -269,7 +269,25 @@ export class RefreshController {
      */
     reportPhase(phase: IslandPhase, isStale: boolean): void {
         if (this.status.phase === phase && this.status.isStale === isStale) return;
-        this.status = { phase, isStale };
+        // `retrying` is carried, not replaced: it belongs to the automatic retry policy,
+        // which reports on its own clock (see reportRetrying) and is orthogonal to which
+        // slot happens to be up.
+        this.status = { phase, isStale, retrying: this.status.retrying };
+        this.statusChanged();
+    }
+
+    /**
+     * The automatic retry policy's half of the status: which attempt is in flight, 0 when
+     * none is. Called from the boundary's render (accepting a failure) and from the
+     * policy's own settles — the same render-time-with-deferred-notify shape as above.
+     */
+    reportRetrying = (attempt: number): void => {
+        if (this.status.retrying === attempt) return;
+        this.status = { ...this.status, retrying: attempt };
+        this.statusChanged();
+    };
+
+    private statusChanged(): void {
         if (this.statusNotifyScheduled) return;
         this.statusNotifyScheduled = true;
         queueMicrotask(() => {

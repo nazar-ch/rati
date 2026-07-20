@@ -54,9 +54,20 @@ export type ScopeControls<S extends Scope<any>> = {
      */
     isStale: boolean;
     /**
+     * Which automatic attempt the island's `retry` policy has in flight — `1` for the first
+     * one, and `0` whenever none is, the error slot included (a spent budget is not a retry
+     * in progress). Always `0` on an island with no policy.
+     *
+     * Not a phase of its own: an island retrying is an island resolving, so `phase` reads
+     * `'loading'` (or `'ready'` + `isStale` under `keepStale`) throughout. This is what a
+     * loading slot switches on to say *why* it is still up.
+     */
+    retrying: number;
+    /**
      * Re-resolve from scratch — the error slot's `retry`, as a verb the whole subtree can
      * reach, so a component can offer the affordance without being the error slot. The same
-     * action as `refresh()` with no key.
+     * action as `refresh()` with no key. On an island with a `retry` policy this also resets
+     * the automatic budget: a human asking again is new information.
      */
     retry: () => void;
 };
@@ -64,7 +75,7 @@ export type ScopeControls<S extends Scope<any>> = {
 const emptyPending: ReadonlySet<string> = new Set();
 const noopSubscribe = () => () => {};
 const emptySnapshot = () => emptyPending;
-const inertStatus: IslandStatus = { phase: 'loading', isStale: false };
+const inertStatus: IslandStatus = { phase: 'loading', isStale: false, retrying: 0 };
 const inertStatusSnapshot = () => inertStatus;
 
 /**
@@ -108,6 +119,7 @@ export function useScopeControls<S extends Scope<any>>(scope: S): ScopeControls<
         pending: pending as ReadonlySet<ScopeLoadKeys<S>>,
         phase: status.phase,
         isStale: status.isStale,
+        retrying: status.retrying,
         retry: controller.retry,
     };
 }

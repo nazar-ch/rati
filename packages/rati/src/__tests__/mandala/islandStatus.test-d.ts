@@ -16,6 +16,8 @@ describe('useScopeControls — the status surface stays inferred off the scope',
         expectTypeOf(controls.phase).toEqualTypeOf<'loading' | 'ready' | 'error'>();
         expectTypeOf(controls.isStale).toEqualTypeOf<boolean>();
         expectTypeOf(controls.retry).toEqualTypeOf<() => void>();
+        // The automatic retry's attempt counter — a number, not a fourth phase member.
+        expectTypeOf(controls.retrying).toEqualTypeOf<number>();
     });
 
     test('the widened surface did not loosen refresh or pending', () => {
