@@ -393,6 +393,50 @@ render — the tripwire never moved). **This closes the effort.**
   only, so such a failure reaches neither `errors` nor the status), and noting it here
   because *that* is the older gap this item declined to widen its scope into.
 
+### 2026-07-20 — post-effort review (the flagged findings, addressed)
+
+A grounded re-read of everything the items shipped (engine, Router, boundary, policy,
+delay, tests), plus measurement where an item had only reasoned. What came of each open
+flag:
+
+- **The stale-window remount (SI-05's out-of-scope finding) is confirmed by measurement,
+  and is one instance bigger than described.** Counting mount/unmount effects: entering the
+  window mounts a *second* instance of the component (the kept content, in the Suspense
+  fallback position) while React keeps the outgoing committed tree hidden beside it; both
+  unmount when the successor commits, which mounts a third. And a site move mid-window — the
+  not-ready position shifting from the fallback to a later level's pending source — is
+  another unmount/mount pair, which disproves the SI-02/SI-03 line that the shared slot
+  element's identity keeps the component from remounting "as the tree moves between them":
+  one element only stabilizes re-renders at a single site; the sites are different fiber
+  positions. **Decision:** the semantics stand (the motivating case wants visual
+  continuity; the kept *resources* — sources, the `.provide()` value — are what must
+  survive, and do), and the docs now say so instead of "re-renders": guide + reference
+  (`keepStale`, plus a clause on `retry`'s per-attempt remount), the `keepStale` and
+  `isStale` jsdoc, internals §The kept run, and the two code comments that carried the
+  disproven claim. True instance continuity is recorded as an open direction
+  (`docs/research/scope-and-island-directions.md`, "in-place stale window") — a resolver
+  restructuring or React `<Activity>`-class rendering, not a patch; wait for a consumer who
+  actually loses state.
+- **The Router keying change (SI-03's "worth a maintainer look"): reviewed, endorsed, no
+  change.** Opt-in via `keepsRun`, keyed `route:<name>` (unique by construction), still
+  remounts across routes, `back()` through the entry stack pinned in
+  `routeKeptRun.test.tsx`. The behavior change is exactly the one the option asks for.
+- **The fuzz flakiness (SI-03) had a one-line root cause.** `fuzzTimeout()` already existed
+  for this class of false failure (the mandala-fuzz effort's) but was applied only to the
+  *router* properties — the two mandala properties sat on vitest's default 5s, which
+  full-`ci` contention alone exceeds — and its floor was the same blind 5s. Applied to the
+  mandala properties, floor raised to 30s (it is a hang-catcher, not a performance gate).
+- **A small status-surface doc bug found in review:** the `isStale` jsdoc claimed the flag
+  is `keepStale`-only, but a bare `loadingDelayMs` island's window also reports it (the
+  kept run reports for itself, whichever option keeps it — reference and guide already said
+  so). Fixed at the jsdoc.
+- **SI-01's two deliberately-open seams** (per-key cancellation for the superseded
+  `refresh(key)`, the SSR request-abort seam through `renderApp`) graduated from
+  findings-prose to recorded research directions in the same doc, so they are findable
+  where directions are looked for.
+- **No new planned items cut.** Everything decision-free was fixed in-review; the three
+  open directions are wait-for-need by the research tree's discipline.
+
 ## Per-item conventions
 
 Atomic commits on the current branch (rati `CLAUDE.md`); subjects prefixed `SI-NN:`, a

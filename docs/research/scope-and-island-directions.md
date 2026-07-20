@@ -1,10 +1,11 @@
 # Scope & island directions — resolution, loading states, sharing
 
-> **Parts 1 and 2 are being executed** — cut 2026-07-19 as the
+> **Parts 1 and 2 shipped** — cut 2026-07-19 and executed as the
 > [scope-and-island effort](../planned/scope-and-island/README.md) (all six directions,
-> including the two below marked wait-for-need — the cut's decisions are recorded there,
-> and where a record and this doc disagree, the record wins). Part 3 (`ResourceContainer`)
-> stays open research.
+> including the two below marked wait-for-need — the decisions and findings are recorded
+> there, and where a record and this doc disagree, the record wins). Part 3
+> (`ResourceContainer`) stays open research, and execution left three new open directions,
+> marked **(open, post-execution)** below.
 
 Forward-looking options for scope resolution and the island's loading/error presentation.
 **None of these are implemented** — each waits for a real (Jnana- or consumer-driven) need so
@@ -40,6 +41,23 @@ bucket), backwards compatible (loads that ignore the second argument behave as t
 Sources don't need it: `detach()` is already their cancellation. (The `rati/data` `query`
 already threads an `AbortSignal` through its producer; this is the core-scope analogue, still
 missing.)
+
+**Shipped as SI-01** (`LoadContext`, one controller per bucket). Two seams it deliberately
+left open, both wait-for-need (SI-01's findings in the
+[effort README](../planned/scope-and-island/README.md#findings)):
+
+- **Per-key cancellation (open, post-execution).** The signal belongs to the bucket, so a
+  `refresh(key)` that supersedes its *own* in-flight re-fetch (the double-click) leaves the
+  predecessor running — latest-wins by token, but the wasted request is never aborted.
+  Fixing it means a controller per cell and the teardown discipline that implies; worth its
+  own item if a consumer hits it.
+- **The SSR request-abort seam (open, post-execution).** React's half exists — `prerender`
+  takes a `signal`, and `rati/testing`'s settle watchdog drives it — but nothing connects an
+  aborted *request* to the per-bucket controllers, so a client disconnect leaves the loads
+  running. The shape: `renderApp` (which today takes no request signal at all) accepts one,
+  threads it as a run-level parent signal on `Shared`, and each bucket composes its
+  controller with it. A server-side item; lands with the first consumer that terminates
+  requests.
 
 ## 2. Islands / mandala — advanced loading states
 
@@ -100,6 +118,23 @@ handles "don't blank on re-loads". They compose — with both set the loading sl
 only for a slow **first** load. `useScopeControls` (shipped) does not yet expose
 `phase`/`isStale`; that half arrives with this batch, and the error-slot `retry` could fold
 in too.
+
+**Shipped as SI-03 (Option A) + SI-02**, with one structural limitation found after the
+fact (verified 2026-07-20, documented in the guide/reference and internals):
+
+- **In-place stale window (open, post-execution).** The shipped mechanism renders the kept
+  run in whatever not-ready position is current — usually the Suspense fallback — which is
+  a different fiber position from the live leaf. So the continuity is visual, not
+  instance-level: entering the window mounts a second instance of the component, a site
+  move mid-window is another unmount/mount pair, and the swap mounts the successor fresh.
+  Component-local state (form drafts, focus, inner scroll) does not survive; the kept
+  *resources* (sources, the `.provide()` value) do, which is why store-held state is the
+  documented answer. True instance continuity would need the component hoisted to a stable
+  fiber position outside the keyed inner tree — a resolver restructuring with SSR
+  consequences (`prerender` needs the component's HTML inside the boundary) — or
+  React `<Activity>`-class hidden rendering for the resolving tree. Either is a real
+  redesign of the window, not a patch on it; wait for a consumer who actually loses state
+  they needed (the motivating jnana case wants visual continuity only).
 
 ### Retry policy (brief)
 

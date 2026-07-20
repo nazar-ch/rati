@@ -17,8 +17,10 @@ regrouped by topic into the files below.
 - [scope-and-island-directions.md](./scope-and-island-directions.md) — abort signals for data
   loads; advanced island loading states (`loadingDelayMs`, `keepStale` + status hook, retry
   policy, per-island `ssr: false`, SSR-error dehydration options); `ResourceContainer` migrating
-  into core for shared resource lifetimes. **Parts 1–2 in execution:**
-  [../planned/scope-and-island/](../planned/scope-and-island/README.md) (cut 2026-07-19).
+  into core for shared resource lifetimes. **Parts 1–2 shipped** (the
+  [scope-and-island effort](../planned/scope-and-island/README.md), closed 2026-07-20); still
+  open there: part 3 plus three post-execution directions (in-place stale window, per-key
+  cancellation, the SSR request-abort seam).
 - [router-extensions.md](./router-extensions.md) — `group`/`include` composition, nested wrapper
   stacks, layout-level scope, namespaced names, typed path converters, route guards, regex paths;
   plus typed search params and navigation status/blocking.
