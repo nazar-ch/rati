@@ -512,6 +512,35 @@ survey found missing (the ten-file pattern was entirely undocumented), and Jnana
 subjects read `rati DX-06:` — a bare `DX-06:` collides with Jnana's own `DX` prefix
 (its external-interactions effort), which its issue-tracking gate flagged.
 
+### 2026-07-20 — DX-09 (the DX-06 frictions addressed)
+
+Cut and shipped the same day the adoption note landed; both DX-06 frictions closed.
+
+- **The router slot takes the honest value now.** `PartialStores` gained a union arm: a
+  slot whose declared type is a RouterStore also accepts bare `RouterStore` (any table).
+  Grounded before fixing: the friction reproduced verbatim in rati's own test tree
+  (`Types of property 'routes' are incompatible … Target requires 3 element(s)`), and
+  `routes: T` proved to be the *only* invariantly-checked member —
+  `navigate`/`replace`/`getPath` are method-syntax, so bivariance already admits a
+  `RouterStore<localTable>` into bare `RouterStore`. That made the fix type-level only (no
+  runtime change; the sanctioned widening was always inside the helpers). The arm keys on
+  the slot's **value type**, not the `router` key name, so a differently-named slot behaves
+  the same; partial fakes still check against the app's own store type, and the test-d
+  cases pin all three sides (honest store, surviving partial, mistyped-slice error).
+- **The browser-mode prebundle note is in the reference** — the entry's intro carries the
+  `optimizeDeps.include` warning (a mid-run re-optimization reads as a component crash),
+  and the `storesWrapper` section documents the one-level partial + the router-slot rule.
+- **For Jnana, next release:** `anonymousShell.browser`'s router partial — the one
+  survivor DX-06 kept *because* of this friction — can become a real store over a local
+  table once a rati carrying DX-09 ships. Optional; the partial it keeps today is legal
+  and honest about what the component reads.
+- **Open, not an item: the cross-repo "fix is on the other side" convention.** Jnana's
+  DX-06 feedback record (`docs/feedback/2026-07-20-lima-dx-06-rati-adoption.md`) asks for
+  a stated rule — "rati fixes land + release first, jnana follows" vs "the jnana PR sits
+  on a `rati-dev` alias, merge-blocked until the release". DX-09 is precisely such a fix
+  (landed here, unreleased, with a jnana leg waiting), so the next release is the natural
+  moment to state one. Maintainer's call; recorded here so it doesn't evaporate.
+
 ## Per-item conventions
 
 Atomic commits on the current branch; subjects prefixed `DX-NN:`, a `Closes: DX-NN` trailer

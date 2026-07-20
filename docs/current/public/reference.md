@@ -913,6 +913,11 @@ environment: `@testing-library/react` sets one up on import, or set
 `globalThis.IS_REACT_ACT_ENVIRONMENT = true`. These are the primitives rati's own suites
 (and Jnana's) hand-rolled before this entry existed.
 
+Using a `rati/*` entry for the first time in a Vitest **browser**-mode project? Add it to
+that config's `optimizeDeps.include`. An un-prebundled entry triggers a mid-run
+re-optimization ("new dependencies optimized … reloading"), which surfaces as failing tests
+deep inside React — a component crash in the report, a bundling event in reality.
+
 | Export | Purpose |
 | --- | --- |
 | `deferred<T>()` | `{ promise, resolve, reject }` — a promise you settle by hand, to walk a load through its phases. `T = void` → no-arg `resolve()` |
@@ -1056,6 +1061,15 @@ entry's own mount.
 const wrapper = storesWrapper<AppStores>({ foo, bar: { count: 3 } });
 render(<TwoStoreReader />, { wrapper });   // RTL stays the renderer
 ```
+
+The partial is one level deep: a nested model hanging off a store (a `user`, say) is taken
+whole — faking just a field of it needs a per-field cast, by design. And a slot declared as
+a `RouterStore` additionally accepts a **real `RouterStore` over any route table**: an app
+container typically types its router against the app's exact tuple
+(`RouterStore<typeof routes>`), which a plain partial would demand verbatim — rejecting the
+honest test value, a store built over a minimal local table. Build one with
+`createMemoryHistory` and hand it in; when the test *drives* navigation, prefer
+`createTestRouter`, which wires and disposes it for you.
 
 ### The SSR round-trip kit
 
