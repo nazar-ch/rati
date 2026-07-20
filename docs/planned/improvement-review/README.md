@@ -108,6 +108,43 @@ validation, view transitions as a stable `Link` prop, TanStack's `'data-only'` S
 `pendingMinMs`), the evidence was noted on the record rather than re-proposed. No `src/`
 or `docs/current/` changes; no bugs found to file to production-review.
 
+### 2026-07-20 — IMP-02 (model-native capabilities)
+
+Output: [docs/research/scope-model-capabilities.md](../../research/scope-model-capabilities.md) —
+the end-to-end walk of what "the spec is data" buys, grounded in the source (scope.ts,
+resolver.tsx, mandala.tsx, channel.ts) rather than the docs. The record's spine: the model
+holds **two graphs** no hook-based peer has — the *declared shape* (levels, keys, kinds:
+free at module load via `flattenLevels` + the classifiers) and the *observed dependency
+graph* (per-cell read-sets from `trackReads`, refreshed by every run) — and each proposal
+is one of the two graphs cashed in. Four proposals (M1 shape read, M2 prefix executor,
+M3 placement advisor, M4 test doubles), the direction-5 defense, and the scope-identity
+composition note.
+
+**Top-3:** M2 — run the plain-data prefix of a scope outside React (the field guesses
+what is safe to prefetch, rati reads it off the declaration; explicitly the first
+implementation slice of IMP-01's D1, sharing its handoff/carrier design rather than
+competing); M4 — declaration-level test doubles (`substituteLoads` in `rati/testing`:
+per-key, typed, impossible at a hook call site; shares its one hard design question —
+substituting hook keys — with M2); the all-or-nothing defense — level-granular commits
+stay out (type honesty, the phase model), because **nested islands already are
+level-granular commits spelled as composition** (parent's resolved props feed the child
+island's inputs, today, no new API) — a documentation move for the guide, not a feature.
+
+Session notes: the two directions the cut expected to be large mostly *reduced* onto
+IMP-01's record — prefetch inference became M2's sharpening of D1, and runtime
+introspection became M1 (the minimal seam D3's panel needs, answering the cut's
+"without freezing internals" constraint — the walk is half-public today: `prevScope` and
+`InputSymbol` are exported, the classifiers are not). The honest limits that shaped
+everything: what a function load *returns* and what it *reads* are runtime facts, so the
+statically-known prefix is provisional (a load may hand back a `Source`) and the advisor
+is a heuristic (read-sets under-report conditional reads). The composition direction
+yielded a fact rather than a feature — scope identity keys the channels, so factories
+work but mint identities, and `.extend()`'s recorded identity question is that fact
+surfacing. No `src/` or `docs/current/` changes; no bugs found to file to
+production-review; one convergence for the reconciliation session: IMP-01 (D1) and
+IMP-02 (M2) arrived at the same machinery from opposite directions, which the effort
+README calls signal.
+
 ## Per-item conventions
 
 Atomic commits on the current branch; subjects prefixed `IMP-NN:`, `Closes: IMP-NN` on the
