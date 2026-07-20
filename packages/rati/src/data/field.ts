@@ -31,7 +31,12 @@ export interface FieldProps<T> {
     value: T;
     onChange: (value: T) => void;
     isInvalid: boolean;
-    errorMessage: string | undefined;
+    /**
+     * Absent (not `undefined`) when the field is clean, so the spread satisfies
+     * a consumer prop declared `errorMessage?: string` under
+     * `exactOptionalPropertyTypes`.
+     */
+    errorMessage?: string;
 }
 
 export interface Field<T> {
@@ -123,11 +128,12 @@ export function field<T>(initial: T, options: FieldOptions<NoInfer<T>> = {}): Fi
             });
         },
         get props(): FieldProps<T> {
+            const [firstError] = state.errors;
             return {
                 value: state.value,
                 onChange: setValue,
                 isInvalid: state.errors.length > 0,
-                errorMessage: state.errors[0],
+                ...(firstError !== undefined && { errorMessage: firstError }),
             };
         },
         [FieldExternalErrors](messages) {

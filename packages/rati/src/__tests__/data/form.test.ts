@@ -43,6 +43,19 @@ describe('field', () => {
         expect(count.props.isInvalid).toBe(false);
     });
 
+    test('props omits errorMessage while clean — a spread fits an `errorMessage?:` prop', () => {
+        // Present-but-undefined would reject under exactOptionalPropertyTypes on
+        // the consumer's side (the jnana migration had to widen its TextField).
+        const title = field('', { validate: required() });
+        expect('errorMessage' in title.props).toBe(false);
+
+        title.validate();
+        expect(title.props.errorMessage).toBe('Required');
+
+        const target: { errorMessage?: string } = { ...title.props };
+        expect(target.errorMessage).toBe('Required');
+    });
+
     test('the validator kit composes; non-required validators skip empty values', () => {
         const nickname = field('', {
             validate: [minLength(3), maxLength(5), pattern(/^[a-z]+$/)],
