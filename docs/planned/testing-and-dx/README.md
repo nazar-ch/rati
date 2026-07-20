@@ -75,6 +75,8 @@ whenever.
 - [DX-06 — Jnana adoption leg (the success test)](./issues/DX-06-jnana-adoption.md)
 - [DX-07 — `dataTrace` + `Step` displayName](./issues/DX-07-observability.md)
 - [DX-08 — SSR error-channel hardening: per-collector rejection dedup + a prerender settle budget](./issues/DX-08-ssr-error-channel.md)
+- [DX-09 — a real RouterStore fits a `PartialStores` slot](./issues/DX-09-router-in-partial-stores.md)
+  (cut 2026-07-20 from the DX-06 frictions)
 
 Batching, dependencies, grading: [plan.md](./plan.md).
 
