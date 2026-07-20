@@ -177,8 +177,18 @@ stopped being *owned*. Everything else follows from that:
   other than content: the Suspense fallback, `Step`'s pending-source return, and
   `ProvideLeaf`'s build frame. The mandala decides once per render what it *is* — the kept
   run, the loading slot, or nothing while the delay holds it back — so those three sites
-  carry no slot logic at all, and the element's stable identity keeps the component from
-  remounting as the tree moves between them.
+  carry no slot logic at all, and re-renders at any one site reconcile against the same
+  element.
+- **The kept content is a remount, not the old tree.** The three sites are different fiber
+  positions, so the shared element's identity does not carry the component *across* them
+  (only within one). Entering the window mounts a fresh instance of the component at the
+  not-ready site — usually the Suspense fallback, with React keeping the outgoing run's
+  committed tree hidden beside it until the boundary un-suspends — a site move mid-window
+  (fallback → a later level's pending source) is another unmount/mount pair, and the swap
+  mounts the successor fresh. Component-local state therefore does not survive a stale
+  window (measured 2026-07-20; the guide and reference say so). What the machinery keeps
+  alive is the run's *resources* — attached sources, the published `.provide()` value —
+  never the component instance.
 - **The swap is passive, and it is the leaf's.** `Shared.swap` releases the kept run from
   the leaf's *passive* effect: every layout effect of that commit has run by then, so a
   source both runs hold is never detached and re-attached across the window. It cannot be

@@ -188,8 +188,11 @@ island({ scope: stationScope, component: Board, loading: Skeleton, keepStale: tr
 
 - **`useScopeControls(scope).isStale`** is true for exactly that window, and `phase` stays
   `'ready'` — see [useScopeControls](#usescopecontrolsscope).
-- **The component re-renders with the previous params' props**, so the subtree can briefly
-  show old data under a new URL. `isStale` is how it says so.
+- **The kept content renders the previous params' props**, so the subtree can briefly
+  show old data under a new URL. `isStale` is how it says so. The continuity is visual, not
+  instance-level: the kept content is a fresh mount of the component and the swap mounts
+  another, so component-local state does not survive the window — a store (`.provide()`)
+  does.
 - **First load is unchanged** (nothing to keep), and an **error ends the window**: the
   `error` slot replaces the stale content rather than letting it pass for current.
 - **The whole resolution is kept, not a copy of its props.** Its sources stay attached and
@@ -249,7 +252,9 @@ island({
 
 - **A retry in progress is not an error.** The `error` slot is not rendered at all while the
   policy works — the island shows its `loading` slot (or the kept run, under `keepStale`),
-  exactly as for any other re-resolution. It comes up only once the budget is spent.
+  exactly as for any other re-resolution. It comes up only once the budget is spent. (Under
+  `keepStale` each attempt remounts the kept content — invisible for identical output, but
+  see that option's note on instance continuity.)
 - **`useScopeControls(scope).retrying`** is the attempt in flight (`1`, `2`, …) and `0`
   whenever none is — including in the error slot, which is a spent budget, not a retry.
   `phase` is unaffected: an island retrying is an island resolving.

@@ -87,7 +87,10 @@ export type MandalaConfig<S extends Scope<any>> = {
      *
      * The kept props were resolved for the *previous* inputs, so the subtree can briefly
      * see old data under a new URL — that is the feature, and `useScopeControls().isStale`
-     * is how a component knows to say so (dim it, badge it).
+     * is how a component knows to say so (dim it, badge it). The continuity is visual, not
+     * instance-level: the kept content is a fresh mount of the component (and the swap
+     * mounts another), so component-local state does not survive the window — a store
+     * (`.provide()`, which is kept alive) does.
      */
     keepStale?: boolean;
 
@@ -626,8 +629,9 @@ export function createMandala<S extends Scope<any>>(
         // a stale window is open — the previous run standing in for it. `keepStale` keeps it
         // there for the whole re-resolution; a bare `loadingDelayMs` only until the deadline,
         // after which the slot takes over. Built here so all three sites that can show it
-        // share one element — and one identity, so nothing remounts as the tree moves
-        // between them.
+        // share one element, and re-renders at any one site reconcile against it. (The sites
+        // are different fiber positions, so a move *between* them still remounts — see
+        // internals.md §The kept run.)
         const kept = keptRef.current;
         const showKept = kept !== null && (keepStale || held);
         const slot = showKept ? (

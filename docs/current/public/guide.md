@@ -402,9 +402,14 @@ resolution. That is the pairing to gate on: a subtree showing a skeleton on
 
 What to know:
 
-- **The props are the old ones.** The component re-renders with the *previous* params'
-  data, so the subtree can briefly show old data under a new URL. That is the feature;
-  `isStale` is how you say so.
+- **The props are the old ones.** The kept content shows the *previous* params' data, so
+  the subtree can briefly show old data under a new URL. That is the feature; `isStale` is
+  how you say so.
+- **The continuity is visual, not instance-level.** The kept content is a fresh mount of
+  the component (and the swap mounts another), so component-local state — `useState`,
+  focus, an inner container's scroll position — does not survive the window. State that
+  must survive belongs in a store (`.provide()`, which *is* kept alive) or above the
+  island.
 - **The first load has nothing to keep**, so it shows the loading slot as always.
 - **An error ends the window** — the error slot replaces the stale content rather than
   leaving it to pass for current.

@@ -44,9 +44,10 @@ export type ScopeControls<S extends Scope<any>> = {
      */
     phase: IslandPhase;
     /**
-     * Is the content on screen the *previous* resolution's? True only inside a `keepStale`
-     * island's stale window — between a re-resolve starting and the new run committing.
-     * Dim it, badge it, disable its actions.
+     * Is the content on screen the *previous* resolution's? True only while kept content is
+     * up: a `keepStale` island's stale window — between a re-resolve starting and the new
+     * run committing — or a `loadingDelayMs` island's, until its deadline moves the loading
+     * slot in. Dim it, badge it, disable its actions.
      *
      * Not a per-key flag: a selective `refresh(key)` also keeps its previous value
      * rendered, and that one is `pending` — which says *which* keys, where this says the
