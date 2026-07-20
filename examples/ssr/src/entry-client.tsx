@@ -15,7 +15,7 @@ const state = readHydration();
 const { App } = createApp({
     history: createBrowserHistory(),
     hydratedState: state?.router,
-    hydration: state ? { data: state.data, seeds: state.seeds } : undefined,
+    hydration: state ? { data: state.data, seeds: state.seeds, errors: state.errors } : undefined,
 });
 
 const root = document.getElementById('root')!;

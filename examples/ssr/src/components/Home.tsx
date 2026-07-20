@@ -46,6 +46,12 @@ const FEATURES = [
         blurb: 'A source that fails then recovers; the island routes the failure to an error slot whose retry rebuilds the load.',
     },
     {
+        to: { name: 'broken' },
+        title: 'Dehydrating a server-side failure',
+        tags: ["ssrErrors: 'dehydrate'", 'error'],
+        blurb: 'A load that fails on the server: the error slot ships in the HTML and the failure travels with it, so the browser hydrates onto the same slot instead of quietly re-running the load.',
+    },
+    {
         to: { name: 'split' },
         title: 'Lazy routes · modulepreload',
         tags: ['lazy', 'rati/vite'],

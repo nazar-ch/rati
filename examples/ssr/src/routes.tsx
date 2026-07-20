@@ -3,6 +3,7 @@ import type { GenericRouteType } from 'rati';
 import { fetchProfile } from './data';
 import { productScope } from './scopes';
 import { About } from './components/About';
+import { Broken } from './components/Broken';
 import { Counter } from './components/Counter';
 import { DeferredPage } from './components/Deferred';
 import { Fallback, FallbackWrapper } from './components/Fallback';
@@ -67,6 +68,10 @@ export const routes = [
     route('/deferred', 'deferred', DeferredPage),
     route('/live', 'live', Live),
     route('/flaky', 'flaky', Flaky),
+    // The island inside sets `ssrErrors: 'dehydrate'`, so the failure its load hits on the
+    // server is rendered as the error slot *and* carried to the client — which hydrates
+    // onto that slot instead of re-running the load. Answered with a 500 either way.
+    route('/broken', 'broken', Broken),
     // Throws during the server render from its `wrapper` — which the Router renders
     // outside the route's island, so no boundary catches it and `renderApp` rejects
     // rather than encoding it in a status. rati/server answers that with the CSR shell
