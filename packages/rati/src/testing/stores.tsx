@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
 import { RootStore, RootStoreProvider, type GlobalStores } from '../stores/RootStore';
-import { mountTree, type MountedTree } from './dom';
+import { mountTree, visibleText, type MountedTree } from './dom';
 
 /*
     The stores-injection seam — the shape ten Jnana component tests build by hand and inject
@@ -57,7 +57,7 @@ export interface RenderWithStoresOptions<S extends GlobalStores> {
 
 /** The handle {@link renderWithStores} returns. */
 export interface StoresHandle extends MountedTree {
-    /** The container's trimmed `textContent`. */
+    /** What the container says — see {@link visibleText}. */
     text(): string | null;
 }
 
@@ -77,6 +77,6 @@ export async function renderWithStores<S extends GlobalStores = GlobalStores>(
         ...mount,
         // Re-wrap so a re-render keeps the stores provider (the bare mount.rerender would drop it).
         rerender: (next) => mount.rerender(<Wrapper>{next}</Wrapper>),
-        text: () => mount.container.textContent?.trim() ?? null,
+        text: () => visibleText(mount.container),
     };
 }

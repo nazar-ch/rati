@@ -35,6 +35,22 @@ async function settleRender(root: Root, node: ReactNode): Promise<void> {
     );
 }
 
+/**
+ * What a container *says* — its trimmed `textContent` with React's hidden subtrees left out.
+ *
+ * A Suspense boundary that re-suspends after having shown content keeps the old children in
+ * the DOM at `display: none` beside its fallback, so a plain `textContent` reads the page
+ * twice: once dead, once live. Every `text()` in this entry reads through here, which is the
+ * container-wide twin of the per-slot rule `renderIsland` already follows.
+ */
+export function visibleText(container: HTMLElement): string | null {
+    const clone = container.cloneNode(true) as HTMLElement;
+    for (const node of clone.querySelectorAll<HTMLElement>('*')) {
+        if (node.style.display === 'none') node.remove();
+    }
+    return clone.textContent?.trim() ?? null;
+}
+
 /** A mounted React tree: its container, a re-render, and teardown. */
 export interface MountedTree {
     readonly container: HTMLElement;

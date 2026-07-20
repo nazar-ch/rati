@@ -4,7 +4,7 @@ import { RouterStore, type RouterHydratedState } from '../router/store';
 import { Router } from '../router/Router';
 import { RootStore, RootStoreProvider, type GlobalStores } from '../stores/RootStore';
 import type { GenericRouteType } from '../router/route';
-import { mountTree, type MountedTree } from './dom';
+import { mountTree, visibleText, type MountedTree } from './dom';
 import type { PartialStores } from './stores';
 
 /*
@@ -48,7 +48,7 @@ export interface TestRouter extends MountedTree {
     readonly router: RouterStore<readonly GenericRouteType[]>;
     /** Its memory history — push/replace/go directly, or seed more entries. */
     readonly history: History;
-    /** The container's trimmed `textContent`. */
+    /** What the router's container says — see {@link visibleText}. */
     text(): string | null;
     /** `router.navigate(to)`, settled. */
     navigate(to: string): Promise<void>;
@@ -88,7 +88,7 @@ export async function createTestRouter<S extends GlobalStores = GlobalStores>(
         ...mount,
         router,
         history,
-        text: () => mount.container.textContent?.trim() ?? null,
+        text: () => visibleText(mount.container),
         navigate: (to) => act(async () => router.navigate(to)),
         back: () => act(async () => history.back()),
         forward: () => act(async () => history.forward()),

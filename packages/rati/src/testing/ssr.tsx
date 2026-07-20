@@ -7,7 +7,7 @@ import {
     type HydrationData,
     type HydrationError,
 } from '../mandala/hydration';
-import { hydrateTree, type MountedTree } from './dom';
+import { hydrateTree, visibleText, type MountedTree } from './dom';
 
 /*
     The SSR round-trip kit — the drain-loop + collector/provider + hydrateRoot dance
@@ -209,7 +209,7 @@ export interface HydrateOptions {
 
 /** The client half of an SSR round-trip: the hydrated container and what React reported. */
 export interface HydratedTree extends MountedTree {
-    /** The hydrated container's trimmed `textContent`. */
+    /** What the hydrated container says — see {@link visibleText}. */
     text(): string | null;
     /**
      * The recoverable errors React reported while hydrating. Empty on a clean round-trip;
@@ -289,7 +289,7 @@ export async function ssrRender(
             }
             return {
                 ...mount,
-                text: () => mount.container.textContent?.trim() ?? null,
+                text: () => visibleText(mount.container),
                 recovered,
             };
         },
