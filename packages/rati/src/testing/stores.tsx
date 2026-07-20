@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
+import type { RouterStore } from '../router/store';
 import { RootStore, RootStoreProvider, type GlobalStores } from '../stores/RootStore';
 import { mountTree, visibleText, type MountedTree } from './dom';
 
@@ -26,8 +27,17 @@ import { mountTree, visibleText, type MountedTree } from './dom';
  * a component actually reads (`{ authStore: { isExpired: true } }`), typed against the real
  * store so a misspelled or mistyped field is still an error. One level deep: a nested object
  * on a store (say, a `user` model) is taken whole.
+ *
+ * A slot typed as a RouterStore additionally accepts a *real* RouterStore over any route
+ * table. An app container types its router against the app's exact tuple
+ * (`RouterStore<typeof routes>`), which `Partial` would demand verbatim — rejecting the
+ * honest test value, a store built over a minimal local table, while a `vi.fn()` partial
+ * sails through (the DX-06 finding). The extra arm admits the real store; partial fakes
+ * still check against the app's own type.
  */
-export type PartialStores<S extends GlobalStores> = { [K in keyof S]?: Partial<S[K]> };
+export type PartialStores<S extends GlobalStores> = {
+    [K in keyof S]?: Partial<S[K]> | (NonNullable<S[K]> extends RouterStore ? RouterStore : never);
+};
 
 /**
  * Build a provider component carrying a stores container made from `stores` — the

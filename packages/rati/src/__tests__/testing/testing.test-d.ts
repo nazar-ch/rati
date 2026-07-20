@@ -1,9 +1,14 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
 import type { Source, SourceState } from '../../scope/source';
 import { scope, input } from '../../scope/scope';
+import { createMemoryHistory } from '../../router/history';
+import { route } from '../../router/route';
+import { RouterStore } from '../../router/store';
+import type { GlobalStores } from '../../stores/RootStore';
 import { controllableSource, type ControllableSource } from '../../testing/controllableSource';
 import { deferred } from '../../testing/deferred';
 import { renderIsland } from '../../testing/renderIsland';
+import { storesWrapper, type PartialStores } from '../../testing/stores';
 
 describe('deferred<T> infers T through resolve', () => {
     test('resolve takes T, promise yields T', () => {
@@ -51,6 +56,44 @@ describe('controllableSource<T> infers T through its drivers', () => {
         });
         // @ts-expect-error hydrate must return T
         controllableSource<{ n: number }>({ seed: { hydrate: (data) => String(data) } });
+    });
+});
+
+describe('PartialStores lets a real router stand in for an app-typed one (DX-09)', () => {
+    // The Jnana shape: the app's container types `router` against its exact route tuple.
+    const appRoutes = [
+        route('/', 'home', () => null),
+        route('/about', 'about', () => null),
+        route('/settings/account', 'settings-account', () => null),
+    ] as const;
+    interface AppStores extends GlobalStores {
+        router: RouterStore<typeof appRoutes>;
+        authStore: { isExpired: boolean; token: string | null };
+    }
+
+    test('a RouterStore over a local table fits the router slot — no cast', () => {
+        const localRoutes = [route('/x', 'x', () => null)];
+        const router = new RouterStore({}, localRoutes, {
+            history: createMemoryHistory({ url: '/x' }),
+            scrollRestoration: false,
+        });
+        const stores: PartialStores<AppStores> = { router };
+        storesWrapper<AppStores>(stores);
+        router.dispose();
+    });
+
+    test('a router-shaped partial still fits (the anonymousShell survivor)', () => {
+        const stores: PartialStores<AppStores> = {
+            router: { path: '/a', search: '', searchParams: new URLSearchParams() },
+        };
+        storesWrapper<AppStores>(stores);
+    });
+
+    test('non-router slots stay strictly typed — a mistyped slice is an error', () => {
+        // @ts-expect-error isExpired is a boolean on the real store
+        storesWrapper<AppStores>({ authStore: { isExpired: 'nope' } });
+        // @ts-expect-error a store the container doesn't declare is an error
+        storesWrapper<AppStores>({ ghostStore: {} });
     });
 });
 
