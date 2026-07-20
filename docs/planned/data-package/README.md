@@ -52,21 +52,25 @@ session deliberately left.
   the verdict and findings below. (`Closes: DATA-03`.)
 - [DATA-04 — extraction & entry-layout decision](./issues/DATA-04-extraction-decision.md)
   — companion package vs entry, `rati/mobx` absorption, forms subpath.
-- [DATA-05 — a single-value write seam for `query`](./issues/DATA-05-query-write-seam.md)
-  — `set`/`patch`; the migration's one lost behavior (jnana ◊FND-106).
-- [DATA-06 — `refreshes` sees the mutation call's arguments](./issues/DATA-06-refreshes-args.md)
-  — keyed dependents are refreshed by hand inside `perform` today.
-- [DATA-07 — `field.props` under `exactOptionalPropertyTypes`](./issues/DATA-07-field-props-exact-optional.md)
-  — omit `errorMessage` when clean instead of carrying `undefined` into consumer spreads.
+- ✅ [DATA-05 — a single-value write seam for `query`](./issues/DATA-05-query-write-seam.md)
+  — **done 2026-07-20**: `set`/`patch` (through `onSuccess`, so a collection's map stays
+  coherent), tests, reference.md. (`Closes: DATA-05`.)
+- ✅ [DATA-06 — `refreshes` sees the mutation call's arguments](./issues/DATA-06-refreshes-args.md)
+  — **done 2026-07-20**: the declaration receives the call's args at both fire sites;
+  keyed tests pin the FND-106 choreography with DATA-05. (`Closes: DATA-06`.)
+- ✅ [DATA-07 — `field.props` under `exactOptionalPropertyTypes`](./issues/DATA-07-field-props-exact-optional.md)
+  — **done 2026-07-20**: `errorMessage` is absent while clean, genuinely `?:`.
+  (`Closes: DATA-07`.)
 - [DATA-08 — the fetch-boilerplate helper decision](./issues/DATA-08-fetch-helper-decision.md)
   — where the ok-check + `json()` + error mapping lives; **maintainer call**, blocked on it.
 - [DATA-09 — pin the unpinned data branches](./issues/DATA-09-unpinned-branches.md)
   — test-only: the branches the 2026-07-20 coverage map found bare.
 
-DATA-01..03 are done. DATA-05 and DATA-06 are coupled through jnana's ◊FND-106: restoring
-the optimistic retention hop needs the seam (05) *and* the on-error recovery refresh of a
-keyed query (06). DATA-04 stays last — it should extract the surface *after* the
-migration-demanded API answers (05–08) land, not before.
+DATA-01..03 and 05..07 are done. DATA-05 and DATA-06 were coupled through jnana's
+◊FND-106: restoring the optimistic retention hop needs the seam (05) *and* the on-error
+recovery refresh of a keyed query (06) — jnana can unskip HI-03 after the next rati
+release. DATA-04 stays last — it should extract the surface *after* DATA-08's answer
+lands, not before.
 
 ## DATA-03 findings — the jnana migration (recorded 2026-07-20)
 
