@@ -16,7 +16,7 @@ import { HYDRATION_SCRIPT_ID, readHydration, serializeHydration } from '../../ss
 import { renderToHtml } from '../../ssr/renderToHtml';
 
 /*
-    The whole-document pattern end to end — the one docs/public/ssr.md describes but no
+    The whole-document pattern end to end — the one docs/current/public/ssr.md describes but no
     suite walked: React renders `<html>` itself, `headTags` and the payload script splice
     into the rendered string *outside* the React tree, and the client hydrates `document`.
     The seam being pinned is that last part: React must neither reconcile nor duplicate
@@ -238,7 +238,7 @@ describe('the CSR fallback', () => {
         expect(document.title).toBe('Torcal · Site');
         // The entry that is running this render survived the mount that it started.
         expect(document.querySelector('script[src="/assets/entry-a1b2.js"]')).not.toBeNull();
-        // The point of the client entry's branch (docs/public/ssr.md §The client entry):
+        // The point of the client entry's branch (docs/current/public/ssr.md §The client entry):
         // hydrating this document instead would reach the same page *through* recovery,
         // and tell the reader's console about it on every fallback.
         expect(recovered).not.toHaveBeenCalled();
@@ -261,7 +261,7 @@ describe('the CSR fallback', () => {
     same working page, at the cost of a reported error (`onRecoverableError` →
     `reportGlobalError`, an uncaught error in the console) on every fallback. See
     docs/archive/directions-2026-07/ssr-server-kit.md §The fallback for whole-document
-    apps, and docs/public/ssr.md §When a render throws.
+    apps, and docs/current/public/ssr.md §When a render throws.
 */
 describe('createRoot(document) — the React contract the fallback rests on', () => {
     test('renders a synthesized minimal document into a working page', async () => {

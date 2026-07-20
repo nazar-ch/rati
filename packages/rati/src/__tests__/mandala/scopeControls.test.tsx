@@ -457,7 +457,7 @@ describe('useScopeControls — selective refresh', () => {
     The deterministic pins for the refresh machinery (MF-05; the list they implement is
     docs/archive/mandala-testing.md §"Deterministic pins"). Each carries a *kill note* —
     the one-line source mutation that must make it fail, executed once at authoring and
-    reverted. They guard the contract stated in docs/public/reference.md
+    reverted. They guard the contract stated in docs/current/public/reference.md
     §useScopeControls, never the mechanism (§"The altitude rule").
 */
 

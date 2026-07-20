@@ -21,7 +21,7 @@
     ```
 
     Dev is not here at all — `vite dev` is the whole dev story (see `rati/vite`), so
-    this is production-only code and there is no branch in it. See docs/public/ssr.md.
+    this is production-only code and there is no branch in it. See docs/current/public/ssr.md.
 */
 export { createRequestHandler, type RequestHandlerOptions } from './requestHandler';
 export { serve, type ServeOptions } from './node';

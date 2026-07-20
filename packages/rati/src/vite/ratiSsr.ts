@@ -292,7 +292,7 @@ async function reply(
 
     return {
         // Already the baseline policy — catch-all → 404, a not-available load → 404, a
-        // failed load → 500. See docs/public/ssr.md §Response statuses.
+        // failed load → 500. See docs/current/public/ssr.md §Response statuses.
         status: result.status,
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
         body: await assemble(server, options, result, url, originalUrl),
@@ -368,7 +368,7 @@ async function loadRender(server: ViteDevServer, entry: string): Promise<RenderF
     if (typeof render !== 'function') {
         throw new Error(
             `rati:ssr — ${entry} does not export \`render\`. A rati server entry exports ` +
-                `\`render(url)\` returning renderApp(…)'s result; see docs/public/ssr.md. ` +
+                `\`render(url)\` returning renderApp(…)'s result; see docs/current/public/ssr.md. ` +
                 `Point elsewhere with ratiSsr({ entry }).`,
         );
     }

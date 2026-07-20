@@ -13,17 +13,17 @@ Yarn-workspaces monorepo: `packages/rati` (the published `rati` package) plus
 They are the source of truth and are kept current. Keep them in sync when you change
 behavior they describe.
 
-- `docs/public/` — the **guide** + **reference**: the public API + mental model (scope /
-  input / load / provide / hook / data / source / island / route / useScope /
+- `docs/current/public/` — the **guide** + **reference**: the public API + mental model
+  (scope / input / load / provide / hook / data / source / island / route / useScope /
   useScopeControls), app setup, routing, SSR. The website renders these — they are the
   main station for anything user-facing; new public surface documents here, nowhere else.
-- `docs/internals.md` — contributor internals only: source layout, the `mandala` engine,
-  the resolver/refresh machinery, lifecycle/teardown, channels, SSR dehydration, testing
-  pointers, toolchain.
+- `docs/current/internals.md` — contributor internals only: source layout, the `mandala`
+  engine, the resolver/refresh machinery, lifecycle/teardown, channels, SSR dehydration,
+  testing pointers, toolchain.
 - `docs/research/` — deferred features, design directions, testing strategy.
 - `docs/planned/` — committed efforts (jnana-style records; status derives from git —
   `<ID>:` commit subjects, `Closes:` trailers).
-- `docs/RELEASING.md` — release process; `docs/website-plan.md` — the public site.
+- `docs/current/RELEASING.md` — release process; `docs/website-plan.md` — the public site.
 
 ## Mental model
 
@@ -66,7 +66,8 @@ internal — callers only ever see `island`/`route`).
 
 - **Don't publish.** `scripts/release.sh` (the `release` script) bumps the version, tags,
   and runs `yarn npm publish`. Never run it — releasing is the maintainer's call (see
-  `docs/RELEASING.md`). `--dry-run` is the only safe form, and still: leave it to the user.
+  `docs/current/RELEASING.md`). `--dry-run` is the only safe form, and still: leave it to
+  the user.
 - **Don't run `vp lint --fix` blindly.** oxlint's `no-unnecessary-type-assertion` autofix
   disagrees with tsgo (it ignores `noUncheckedIndexedAccess` and strips load-bearing
   generic casts), so it can break the typecheck — that rule is off in the config for this
@@ -98,7 +99,7 @@ staged files) on every commit.
 ## Source layout (`packages/rati/src`)
 
 Public barrel: `main.ts` (the only entry; the published surface). Internals — see
-`docs/internals.md §Source layout`:
+`docs/current/internals.md §Source layout`:
 
 - `scope/` — `scope.ts` (the declarative spec builder) and `source.ts` (the Source state
   machine: pending → ready/error).

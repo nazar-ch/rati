@@ -26,6 +26,6 @@
 
     The one thing it needs from the app is the Layer-1 contract: a server entry
     exporting `render(url): Promise<RenderAppResult>`. Types for the generated module
-    come from `rati/vite/client`. See docs/public/ssr.md.
+    come from `rati/vite/client`. See docs/current/public/ssr.md.
 */
 export { ratiSsr, type RatiSsrOptions } from './ratiSsr';

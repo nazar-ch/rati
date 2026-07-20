@@ -1,6 +1,6 @@
 /*
     HTML assembly: a `rendered` result and a shell in, a page out — the two patterns
-    docs/public/ssr.md describes, and nothing else.
+    docs/current/public/ssr.md describes, and nothing else.
 
     It sits here, next to the render loop, because both things that assemble compose it:
     `rati/vite`'s dev middleware and `rati/server`'s request handler. Neither owns it,

@@ -343,7 +343,7 @@ export class RouterStore<
         // escape from that (URLs read it as a dot for precisely this reason — it is what
         // stops percent-encoding from smuggling a traversal past a path check). No URL
         // carries such a value, so getPath refuses it instead of building one that
-        // resolves somewhere else — see docs/public/reference.md §Routing.
+        // resolves somewhere else — see docs/current/public/reference.md §Routing.
         const path = matched.path.replace(PARAM_RE, (token, key: string, tail: string) => {
             const value = (params as Record<string, string | undefined>)[key];
             // Types require every param, so a missing one means a caller reaching past
