@@ -90,6 +90,15 @@ export type MandalaComponent<S extends Scope<any>> = FC<ScopeInputs<S>> & {
     preload?: () => Promise<unknown>;
     /** Forwarded from the same `lazy()` component, for the same reason — see {@link lazy}. */
     moduleId?: string;
+    /**
+     * Set when the mandala was built with `keepStale`, so the `Router` can tell. It keys a
+     * route's element by a per-navigation counter, which remounts the component on every
+     * navigation — and a remounted island has no previous run left to keep. For these the
+     * Router keys by route name instead, so a param change on the same route re-renders
+     * this instance (the mandala's own param-change path) rather than replacing it.
+     * Absent otherwise, and the default keying is untouched.
+     */
+    keepStale?: boolean;
 };
 
 const DefaultLoading: FC<{ inputs: unknown }> = () => null;
@@ -510,6 +519,10 @@ export function createMandala<S extends Scope<any>>(
     };
     if (typeof lazyComponent.preload === 'function') Mandala.preload = lazyComponent.preload;
     if (lazyComponent.moduleId !== undefined) Mandala.moduleId = lazyComponent.moduleId;
+
+    // Tell the Router not to remount this one on every navigation — a kept run cannot
+    // survive its own island being replaced. See MandalaComponent.keepStale.
+    if (keepStale) Mandala.keepStale = true;
 
     // A readable identifier for this scope's read errors (best-effort: shared scopes keep
     // the last mandala's label).

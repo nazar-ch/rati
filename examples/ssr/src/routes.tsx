@@ -1,8 +1,7 @@
-import { useContext } from 'react';
-import { hook, input, lazy, route, scope } from 'rati';
+import { input, lazy, route, scope } from 'rati';
 import type { GenericRouteType } from 'rati';
-import { RegionContext } from './appContext';
-import { fetchProduct, fetchProfile, fetchReviews } from './data';
+import { fetchProfile } from './data';
+import { productScope } from './scopes';
 import { About } from './components/About';
 import { Counter } from './components/Counter';
 import { DeferredPage } from './components/Deferred';
@@ -39,14 +38,6 @@ const aboutScope = scope().load({
     },
 });
 
-// A waterfall: the `productId` input, a `hook()` load that injects the region from
-// React context (the DI seam — no `env` to thread), then a dependent `product`
-// load, then `reviews` keyed off the resolved product. The promise levels dehydrate.
-const productScope = scope({ productId: input<string>() })
-    .load({ region: hook(() => useContext(RegionContext)) })
-    .load({ product: ({ productId, region }) => fetchProduct(productId, region) })
-    .load({ reviews: ({ product }) => fetchReviews(product.id) });
-
 const profileScope = scope({ userId: input<string>() }).load({
     profile: ({ userId }) => fetchProfile(userId),
 });
@@ -62,9 +53,12 @@ const Split = lazy(() => import('./components/Split'));
 export const routes = [
     route('/', 'home', Home),
     route('/about', 'about', About, { scope: aboutScope }),
+    // `keepStale`: switching products keeps the current page rendered (dimmed, via the
+    // island's own `isStale`) until the new waterfall resolves, instead of blanking.
     route('/products/:productId', 'product', ProductPage, {
         scope: productScope,
         error: ProductError,
+        keepStale: true,
     }),
     route('/profile/:userId', 'profile', ProfilePage, { scope: profileScope }),
     route('/counter', 'counter', Counter),

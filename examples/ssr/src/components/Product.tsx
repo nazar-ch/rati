@@ -1,5 +1,6 @@
-import { Link, Meta, Title, type SourceError } from 'rati';
+import { Link, Meta, Title, useScopeControls, type SourceError } from 'rati';
 import type { Product, Review } from '../data';
+import { productScope } from '../scopes';
 
 // Matches the resolved shape of `productScope` (routes.tsx): the `productId` input,
 // the `region` from the hook load, then the dependent `product` and `reviews`
@@ -16,8 +17,14 @@ const price = (cents: number, region: string) =>
     `${region === 'EU' ? '€' : '$'}${(cents / 100).toFixed(2)}`;
 
 export function ProductPage({ productId, region, product, reviews }: ProductPageProps) {
+    // The island's own status, read by the component the island renders. Keyed by the
+    // scope, so this file imports a data module — never the route that mounts it.
+    // `isStale` is true only inside a `keepStale` window: between a param change and the
+    // new waterfall committing, when everything below belongs to the *previous* product.
+    const { phase, isStale } = useScopeControls(productScope);
+
     return (
-        <article className="page">
+        <article className={isStale ? 'page stale' : 'page'}>
             {/* Declared from resolved data: the deepest Title wins over the store's
                 default, the server reads it after prerender (headTags), the client
                 keeps document.title in sync across navigations. */}
@@ -32,7 +39,9 @@ export function ProductPage({ productId, region, product, reviews }: ProductPage
             </p>
 
             <div className="kv">
-                <span className="badge server">resolved</span>
+                <span className={isStale ? 'badge client' : 'badge server'}>
+                    {isStale ? `stale · ${phase}` : `current · ${phase}`}
+                </span>
                 <span>Price</span>
                 <code className="mono">{price(product.priceCents, region)}</code>
                 <span>Region (via hook)</span>
@@ -68,6 +77,16 @@ export function ProductPage({ productId, region, product, reviews }: ProductPage
                 <code>NotAvailableError</code> — the error slot below on the client, an HTTP 404 on
                 the server. <code>/store/2</code> is a route-level redirect: the server answers 301
                 before rendering; the client hops with a history replace.
+            </div>
+
+            <div className="note">
+                <span className="badge client">keepStale</span> Switch products and watch: this page
+                dims instead of blanking. The route sets <code>keepStale</code>, so the island keeps
+                its last committed content on screen — a whole live run, sources and all — until the
+                new waterfall commits, and <code>useScopeControls(productScope).isStale</code> is
+                what the dimming above reads. The badge says <code>stale</code> while the ids and
+                prices you are looking at still belong to the previous product. Note the failure
+                case too: #9 goes to the error slot rather than leaving stale content up.
             </div>
         </article>
     );

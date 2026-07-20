@@ -91,6 +91,15 @@ a:hover {
 .content {
     padding-top: 28px;
 }
+/* What `useScopeControls().isStale` drives on a keepStale island: the content the user
+   was reading stays put and readable, marked as no longer current. Transitioned in, not
+   out, so the swap to fresh data is instant. */
+.stale {
+    opacity: 0.45;
+    filter: saturate(0.6);
+    transition: opacity 140ms ease-in;
+    cursor: progress;
+}
 .foot {
     margin-top: 48px;
     padding-top: 18px;

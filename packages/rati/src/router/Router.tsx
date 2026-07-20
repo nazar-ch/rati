@@ -34,6 +34,18 @@ export const Router: FC<{
 
     const Wrapper = activeRoute.wrapperComponent ?? DefaultWrapper;
 
+    // Remount the route component on every navigation — the per-navigation counter is a
+    // key nothing else can collide with, so a route's own state never leaks across one.
+    //
+    // A `keepStale` island is the exception, and has to be: what it keeps lives on the
+    // island instance, so remounting it destroys exactly the thing the option exists to
+    // preserve. Those key by route name instead, which still remounts when the route
+    // changes and lets a same-route param change re-render the instance — the mandala's
+    // own param-change path, which is where `keepStale` does its work. Opt-in, so the
+    // default keying above is what every other route still gets.
+    const keepsStale = (activeRoute.component as { keepStale?: boolean }).keepStale === true;
+    const routeKey = keepsStale ? `route:${activeRoute.name}` : activeRoute.pathCounter;
+
     // A route's component is either a plain component or an island (built by
     // `route({ scope })` / `island`); both render directly with the route
     // params. An island owns its own loading/error slots and data resolution; the
@@ -42,11 +54,7 @@ export const Router: FC<{
     return (
         <Wrapper>
             <Suspense fallback={<Loading />}>
-                <activeRoute.component
-                    {...activeRoute.routeParams}
-                    // Rerender when the route changes
-                    key={activeRoute.pathCounter}
-                />
+                <activeRoute.component {...activeRoute.routeParams} key={routeKey} />
             </Suspense>
         </Wrapper>
     );
