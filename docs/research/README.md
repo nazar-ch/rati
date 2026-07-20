@@ -19,6 +19,11 @@ regrouped by topic into the files below.
   2026-07-20): every daily-driver field feature classified through rati's stance, plus
   three net-new proposals — intent-based data prefetch, commit-aware scroll restoration,
   a devtools panel over the tracers.
+- [scope-model-capabilities.md](./scope-model-capabilities.md) — the IMP-02 walk of what
+  "the spec is data" uniquely enables: a supported scope-shape read, running the hook-free
+  prefix outside React (the prefetch/D1 slice), a level-placement advisor on the data
+  trace, declaration-level test doubles, and the written defense of all-or-nothing
+  (nested islands as the sanctioned partial shape).
 - [scope-and-island-directions.md](./scope-and-island-directions.md) — abort signals for data
   loads; advanced island loading states (`loadingDelayMs`, `keepStale` + status hook, retry
   policy, per-island `ssr: false`, SSR-error dehydration options); `ResourceContainer` migrating
