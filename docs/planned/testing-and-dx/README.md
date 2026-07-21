@@ -3,7 +3,7 @@
 Status: planned 2026-07-19. Per-item status derives from rati git (`git log --grep 'DX-'`,
 `Closes:` trailers) — never from this file; conventions below.
 
-Executes [dx-and-tooling.md](../../research/dx-and-tooling.md), checked against what rati's
+Executes [dx-and-tooling.md](docs/research/dx-and-tooling.md), checked against what rati's
 own suites and Jnana's frontend tests actually hand-roll (survey below) and built as
 **public API** — the utilities ship for consumers, not just for rati's test tree. The
 research doc's three bullets survive contact with the survey intact, and gain one member it
@@ -67,18 +67,18 @@ additively. DX-05 dogfoods everything in rati's own suites (the duplicates die);
 the Jnana migration and files friction back as findings. DX-07 is independent and can run
 whenever.
 
-- [DX-01 — the `rati/testing` entry: `deferred`, `flush`, `controllableSource`](./issues/DX-01-testing-entry-foundation.md)
-- [DX-02 — `renderIsland` harness + slot readers](./issues/DX-02-island-harness.md)
-- [DX-03 — `createTestRouter` + the stores-injection seam](./issues/DX-03-router-and-stores-harness.md)
-- [DX-04 — SSR round-trip kit](./issues/DX-04-ssr-roundtrip-kit.md)
-- [DX-05 — dogfood: rati's suites adopt the entry](./issues/DX-05-dogfood-migration.md)
-- [DX-06 — Jnana adoption leg (the success test)](./issues/DX-06-jnana-adoption.md)
-- [DX-07 — `dataTrace` + `Step` displayName](./issues/DX-07-observability.md)
-- [DX-08 — SSR error-channel hardening: per-collector rejection dedup + a prerender settle budget](./issues/DX-08-ssr-error-channel.md)
-- [DX-09 — a real RouterStore fits a `PartialStores` slot](./issues/DX-09-router-in-partial-stores.md)
+- [DX-01 — the `rati/testing` entry: `deferred`, `flush`, `controllableSource`](issues/DX-01-testing-entry-foundation.md)
+- [DX-02 — `renderIsland` harness + slot readers](issues/DX-02-island-harness.md)
+- [DX-03 — `createTestRouter` + the stores-injection seam](issues/DX-03-router-and-stores-harness.md)
+- [DX-04 — SSR round-trip kit](issues/DX-04-ssr-roundtrip-kit.md)
+- [DX-05 — dogfood: rati's suites adopt the entry](issues/DX-05-dogfood-migration.md)
+- [DX-06 — Jnana adoption leg (the success test)](issues/DX-06-jnana-adoption.md)
+- [DX-07 — `dataTrace` + `Step` displayName](issues/DX-07-observability.md)
+- [DX-08 — SSR error-channel hardening: per-collector rejection dedup + a prerender settle budget](issues/DX-08-ssr-error-channel.md)
+- [DX-09 — a real RouterStore fits a `PartialStores` slot](issues/DX-09-router-in-partial-stores.md)
   (cut 2026-07-20 from the DX-06 frictions)
 
-Batching, dependencies, grading: [plan.md](./plan.md).
+Batching, dependencies, grading: [plan.md](plan.md).
 
 ## Findings
 

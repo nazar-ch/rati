@@ -1,6 +1,6 @@
 # scope-and-island — implementation plan
 
-Items live in [issues/](./issues/); status derives from rati git (`git log --grep 'SI-'`,
+Items live in [issues/](issues/); status derives from rati git (`git log --grep 'SI-'`,
 `Closes:` trailers). No status here.
 
 ## Batches

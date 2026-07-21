@@ -2,7 +2,7 @@
 
 Status: designed 2026-07-14 (maintainer-confirmed direction: "a good foundation to build
 on top of; everything goes to `rati/*`, slicing is for later"). Implementation is the
-ssr-baseline-remains effort ([docs/planned/ssr-baseline-remains/](../../planned/ssr-baseline-remains/)),
+ssr-baseline-remains effort ([docs/archive/efforts/ssr-baseline-remains/](docs/archive/efforts/ssr-baseline-remains/)),
 items SSR-01…03.
 
 ## Why a kit at all
@@ -227,7 +227,7 @@ this file is the design of record.
 - Fetch `Request`/`Response` is the only server interface — no Express/Koa/framework
   adapters beyond the Node listener.
 - No streaming SSR (`prerender` stays all-or-nothing; the per-island `ssr: false`
-  option in [scope-and-island-directions.md §2](../../research/scope-and-island-directions.md) is the pressure valve).
+  option in [scope-and-island-directions.md §2](docs/research/scope-and-island-directions.md) is the pressure valve).
 - Fetch-shaped means edge runtimes *probably* work; untested is unsupported — no
   promises.
 - No basename/i18n/proxy/caching features in the kit; escape hatches at every seam.

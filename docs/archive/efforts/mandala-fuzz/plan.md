@@ -1,6 +1,6 @@
 # mandala-fuzz — implementation plan
 
-Items live in [issues/](./issues/); status derives from rati git (`git log --grep 'MF-'`,
+Items live in [issues/](issues/); status derives from rati git (`git log --grep 'MF-'`,
 `Closes:` trailers). No status here.
 
 ## Batches
@@ -11,7 +11,7 @@ Items live in [issues/](./issues/); status derives from rati git (`git log --gre
 - **Entry:** this cut reviewed by the user.
 - **Exit / checkpoint:** the harness + smoke property land; the **user reviews the invariant
   altitude** (the lock-in balance from
-  [mandala-testing.md](../../archive/mandala-testing.md) §"The altitude rule") before B2 —
+  [mandala-testing.md](docs/archive/mandala-testing.md) §"The altitude rule") before B2 —
   every later item encodes invariants against this bar, so the review is a calibration gate in
   judgment, not just a merge dependency. The session that implemented refresh/SSR-sources may run
   this inline; the record is written for a cold agent regardless.

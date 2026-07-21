@@ -1,6 +1,6 @@
 # testing-and-dx — implementation plan
 
-Items live in [issues/](./issues/); status derives from rati git (`git log --grep 'DX-'`,
+Items live in [issues/](issues/); status derives from rati git (`git log --grep 'DX-'`,
 `Closes:` trailers). No status here.
 
 ## Batches

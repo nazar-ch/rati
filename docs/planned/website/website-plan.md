@@ -1,14 +1,14 @@
 # rati website — plan (first iteration)
 
 The public site: showcases what makes rati different through interactive examples, hosts
-the docs ([guide](./public/guide.md), [reference](./public/reference.md)), and is itself
+the docs ([guide](docs/current/public/guide.md), [reference](docs/current/public/reference.md)), and is itself
 built with rati — every page a rati route, every demo a rati island, SSR'd by the
 mechanism it demonstrates. Concept chosen: **the Departures Board** (one continuous
 transit app as the running example) **plus a network-conditions panel** on every
 interactive demo. Public release is not expected from this iteration; the site evolves
 with the docs.
 
-Implementation tasks live in [public-prep-tasks.md](./public-prep-tasks.md) (SITE-*).
+Implementation tasks live in [public-prep-tasks.md](public-prep-tasks.md) (SITE-*).
 
 ---
 
@@ -39,7 +39,7 @@ marks, no mascot antics, no superheroes; wit lives in precision, not decoration.
 always real and always typed.
 
 **ASCII props.** Draft ASCII art (parrot marks, wordmarks, boards, trains, concept
-diagrams) lives in [`assets/ascii/`](../assets/ascii/README.md) — raw material for the
+diagrams) lives in [`assets/ascii/`](assets/ascii/README.md) — raw material for the
 404 page, loading placeholders, README, and anywhere a plain-text mark fits the voice.
 
 **Words we use / avoid.**

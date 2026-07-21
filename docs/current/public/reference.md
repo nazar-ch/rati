@@ -1,7 +1,7 @@
 # rati — reference
 
 The complete public API, by entry point. For the concepts and worked examples, start with
-the [guide](./guide.md).
+the [guide](guide.md).
 
 | Entry | Contents |
 | --- | --- |
@@ -169,11 +169,11 @@ island({ scope: feedScope, component: Feed, loading: FeedSkeleton, ssr: false })
   (resolution is all-or-nothing by design).
 - **Nothing reaches the payload**, so nothing reaches the server's error signal either —
   an opted-out island can't produce the 404/5xx a server-side load failure would (see
-  [response statuses](./ssr.md#response-statuses-and-load-failures)).
+  [response statuses](ssr.md#response-statuses-and-load-failures)).
 - **Client-only apps are unaffected** — with no server in the picture the option does
   nothing, and the island resolves on its first render as always.
 
-See the guide's [server rendering](./guide.md#server-rendering) section for when to reach
+See the guide's [server rendering](guide.md#server-rendering) section for when to reach
 for it.
 
 ### `keepStale` — keeping the previous content
@@ -267,7 +267,7 @@ island({
 - **The budget is per failure streak.** It is restored when the island commits content, and
   when its inputs change — which also cancels a countdown belonging to the old ones.
 - **Client-only.** A server render takes its one attempt per request and reports the failure
-  as always (see [response statuses](./ssr.md#response-statuses-and-load-failures)); the
+  as always (see [response statuses](ssr.md#response-statuses-and-load-failures)); the
   client's own resolution then runs the policy.
 - **`count: 0` and absent are identical.** Types: `RetryOptions`.
 
@@ -299,7 +299,7 @@ island({
   say something else before rejecting.
 - **The response status is unchanged.** Every failure is recorded in either mode, and
   `renderApp` derives the status from it — a 500 with a rendered error slot is still a 500
-  (see [response statuses](./ssr.md#response-statuses-and-load-failures)).
+  (see [response statuses](ssr.md#response-statuses-and-load-failures)).
 - **Without an `error` slot there is nothing to paint deterministically**, so the throw
   stands and the server degrades exactly as `'retry'` does. The failure still crosses the
   wire, so the client surfaces it through the nearest outer ErrorBoundary instead of
@@ -648,7 +648,7 @@ deepest live declaration per slot wins (a page beats a layout default); on the c
 `HeadProvider` syncs `document.title` and the managed `<meta>` tags on hydration and
 every navigation; on the server the winners are read after prerender (`headTags` in
 `rati/ssr`, done for you by `renderApp`). Tags that don't need dedupe use native React
-19 hoisting or the HTML shell — see the [server rendering guide](./ssr.md#titles-and-meta).
+19 hoisting or the HTML shell — see the [server rendering guide](ssr.md#titles-and-meta).
 
 | Export | Purpose |
 | --- | --- |
@@ -665,7 +665,7 @@ every navigation; on the server the winners are read after prerender (`headTags`
 
 The server-facing surface. (`HydrationProvider` and `readHydration` run on the client —
 mount the provider on both sides so the trees match.) The full flow with code:
-[server rendering guide](./ssr.md).
+[server rendering guide](ssr.md).
 
 | Export | Purpose |
 | --- | --- |
@@ -696,7 +696,7 @@ it never leaves the server, and it is what the status derives from.
 
 Optional — requires the `vite` peer dependency. Build-time only: it runs in the Vite
 process and nothing from this entry reaches the browser. Walkthrough:
-[server rendering guide](./ssr.md#the-vite-plugin).
+[server rendering guide](ssr.md#the-vite-plugin).
 
 | Export | Purpose |
 | --- | --- |
@@ -721,7 +721,7 @@ without the plugin.
 ## `rati/server`
 
 Production only — dev is the [plugin](#rativite)'s job, so there is no branch in here.
-Walkthrough: [server rendering guide](./ssr.md#the-production-handler).
+Walkthrough: [server rendering guide](ssr.md#the-production-handler).
 
 Nothing in here imports React — `react` is an optional peer, so a server-only workspace
 can install rati for `createRequestHandler` alone and never add it.

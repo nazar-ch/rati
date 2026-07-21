@@ -5,7 +5,7 @@
 > primitives shipped; `reactive:` was deferred by maintainer choice. Deviations from
 > the sketches below, the remaining items (reactive params, guide coverage, the
 > consumer migrations, the extraction decision) and the still-open questions live in
-> [docs/planned/data-package/](../../planned/data-package/README.md).
+> [docs/planned/data-package/](docs/planned/data-package/README.md).
 
 The successor of the legacy `data/` layer (`remoteData`, `ActiveData`, `apiUtils`, shipped via
 `rati/mobx`) and of Jnana's `FetchStore` family. Second revision: the first pass distilled the two
@@ -46,11 +46,11 @@ layer and the `Chunks.ts` pagination layer — and turns the options into one co
   graph; sharing happens by sharing the instance. No keyed shared cache, no normalized store —
   deliberately out of scope to keep the design iterable. (The ref-counting layer,
   `ResourceContainer`, may move to rati core separately — see
-  [scope-and-island-directions.md §3](../../research/scope-and-island-directions.md).)
+  [scope-and-island-directions.md §3](docs/research/scope-and-island-directions.md).)
 - **Phases are data; presentation is the mandala's.** The package reports honest phases
   (`loading` vs `refreshing`, per-page phases, `isSubmitting`). Pending-indication delay
   (`loadingDelayMs`) and stale-content display live in the island
-  ([scope-and-island-directions.md §2](../../research/scope-and-island-directions.md)) — the package never owns a timer that exists only to
+  ([scope-and-island-directions.md §2](docs/research/scope-and-island-directions.md)) — the package never owns a timer that exists only to
   decide what a user sees.
 - **One error shape.** Everything that fails — query, page, mutation, form submit — normalizes to
   `SourceError` (`toSourceError`), so the same `code` switch works everywhere and the island error
@@ -70,7 +70,7 @@ layer and the `Chunks.ts` pagination layer — and turns the options into one co
   `pagedCollection`, `form`, `field` — words React developers already know from the ecosystem.
 - **Testability by construction.** Every primitive is driven by a producer function, so a deferred
   promise fake can walk any primitive through every phase in tests — no module mocking (pairs with
-  the `rati/testing` direction, [dx-and-tooling.md](../../research/dx-and-tooling.md)).
+  the `rati/testing` direction, [dx-and-tooling.md](docs/research/dx-and-tooling.md)).
 
 ## The shape: five primitives, one lifecycle
 
@@ -124,7 +124,7 @@ Decisions:
   error badge.
 - **Race guard is an invariant, not an option** (the `requestId` pattern all three generations
   carry). The producer receives an `AbortSignal` so superseded requests can actually cancel,
-  mirroring the core abort proposal ([scope-and-island-directions.md §1](../../research/scope-and-island-directions.md)).
+  mirroring the core abort proposal ([scope-and-island-directions.md §1](docs/research/scope-and-island-directions.md)).
 - **Debounce as an option** — `remoteData`'s coalescing of keystroke-driven calls survives as
   `options.debounce: { waitMs, maxWaitMs }`; its pending-indication half does not (mandala's job).
 - **Reactive parameters, opt-in** — `options.reactive: true` tracks the producer's observable
@@ -422,7 +422,7 @@ const SpacesPage = observer(({ spaces }: ScopeProps<typeof spacesScope>) => (
 Division of labor: the island covers `loading`/`error` for the **first** resolution (with
 `loadingDelayMs` for flicker); the primitives' phases drive everything after — `refreshing` for
 stale display (directly, or via the island's `keepStale` once it exists —
-[scope-and-island-directions.md §2](../../research/scope-and-island-directions.md)), per-page phases for pagination rows, `isSubmitting` for
+[scope-and-island-directions.md §2](docs/research/scope-and-island-directions.md)), per-page phases for pagination rows, `isSubmitting` for
 buttons. `not-available` vs `failed` rides on `SourceError.code` end to end. Under SSR the
 primitives stay pending (a `Source` attaches in effects), which is correct — this package is for
 the interactive app, not the SSR path.
@@ -477,7 +477,7 @@ extraction time).
 
 ## DATA-01 — reactive params: design pass (2026-07-19)
 
-Resolving the four cross-checks the [planned item](../../planned/data-package/issues/DATA-01-reactive-query-params.md)
+Resolving the four cross-checks the [planned item](docs/planned/data-package/issues/DATA-01-reactive-query-params.md)
 required before code. `reactive: true` ships on `query`, and threads through `collection`
 and `pagedCollection`; the mechanism is a MobX `Reaction`, one per primitive.
 

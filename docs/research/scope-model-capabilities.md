@@ -1,27 +1,27 @@
 # What the scope model uniquely enables
 
 Status: research record (2026-07-20), the output of the improvement-review effort's
-[IMP-02 session](../planned/improvement-review/issues/IMP-02-model-native-capabilities.md).
+[IMP-02 session](docs/planned/improvement-review/issues/IMP-02-model-native-capabilities.md).
 The premise, taken whole: a scope is a *declarative, typed, inspectable* description of a
 page's data — which props, which levels, which kinds — as a plain value, before anything
 runs. Hook-based peers cannot have this by construction; rati has it and exploits almost
 none of it. This record is the end-to-end walk of what "the spec is data" buys, grounded
-in the source at session time ([scope.ts](../../packages/rati/src/scope/scope.ts),
-[resolver.tsx](../../packages/rati/src/mandala/resolver.tsx),
-[mandala.tsx](../../packages/rati/src/mandala/mandala.tsx),
-[channel.ts](../../packages/rati/src/mandala/channel.ts),
-[store.ts](../../packages/rati/src/router/store.ts)) rather than in the docs' claims.
+in the source at session time ([scope.ts](packages/rati/src/scope/scope.ts),
+[resolver.tsx](packages/rati/src/mandala/resolver.tsx),
+[mandala.tsx](packages/rati/src/mandala/mandala.tsx),
+[channel.ts](packages/rati/src/mandala/channel.ts),
+[store.ts](packages/rati/src/router/store.ts)) rather than in the docs' claims.
 
 Neighbors it engages rather than restates: the
-[field gap analysis](./field-gap-analysis.md) (its D1 prefetch and D3 devtools proposals
-border two sections here), [dependency-graphs.md](./undecided/dependency-graphs.md)
+[field gap analysis](field-gap-analysis.md) (its D1 prefetch and D3 devtools proposals
+border two sections here), [dependency-graphs.md](undecided/dependency-graphs.md)
 (`derive()`, the `PartialProps` note),
-[deferred-scope-features.md](./undecided/deferred-scope-features.md) (`.live()`,
-`.extend()`), [ssg-and-rsc.md](./ssg-and-rsc.md),
-[ssr-streaming.md](./undecided/ssr-streaming.md) (the shell-line idea),
-[router-extensions.md](./router-extensions.md), and the executed
-[testing-and-dx](../planned/testing-and-dx/README.md) /
-[scope-and-island](../planned/scope-and-island/README.md) efforts.
+[deferred-scope-features.md](undecided/deferred-scope-features.md) (`.live()`,
+`.extend()`), [ssg-and-rsc.md](ssg-and-rsc.md),
+[ssr-streaming.md](undecided/ssr-streaming.md) (the shell-line idea),
+[router-extensions.md](router-extensions.md), and the executed
+[testing-and-dx](docs/planned/testing-and-dx/README.md) /
+[scope-and-island](docs/planned/scope-and-island/README.md) efforts.
 
 ## The inventory — what the value actually exposes
 
@@ -49,14 +49,14 @@ What is *not* knowable statically — the two honest limits every idea below mus
   declared: `trackReads` proxies the resolved-so-far bag and records which keys a producer
   actually touched — the read-sets the refresh cascade runs on. They exist only after a
   run (and under-report conditional reads, the caveat
-  [dependency-graphs.md](./undecided/dependency-graphs.md) already records for the same
+  [dependency-graphs.md](undecided/dependency-graphs.md) already records for the same
   trick).
 
 So the model holds *two* graphs no hook-based peer has: the **declared shape** (levels,
 keys, kinds — free at module load) and the **observed dependency graph** (read-sets —
 free after every resolution, kept fresh by the cascade machinery). The field's loaders
 are one opaque async function per route — a router can *run* them ahead of time but
-cannot see inside one (the [field gap analysis §7](./field-gap-analysis.md) cites the
+cannot see inside one (the [field gap analysis §7](field-gap-analysis.md) cites the
 current crop); a TanStack Query spec exists only once a component renders its hook. The
 proposals below are the four cheapest things these two graphs buy, plus the defense the
 fifth direction asked for.
@@ -74,10 +74,10 @@ exporting more symbols.
 
 **Problem.** Four recorded directions each need to read the declared shape, and each
 would otherwise reach into internals: the devtools panel
-([field gap analysis D3](./field-gap-analysis.md)) wants to render the declared waterfall
+([field gap analysis D3](field-gap-analysis.md)) wants to render the declared waterfall
 before lighting it up with trace events; the data-prefetch walker (D1) needs the
 hook-free prefix; a route → data manifest (this effort's cut names it; the SSG walker in
-[ssg-and-rsc.md](./ssg-and-rsc.md) is adjacent); and tests that assert on scope structure.
+[ssg-and-rsc.md](ssg-and-rsc.md) is adjacent); and tests that assert on scope structure.
 The improvement-review boundary is explicit — a proposal must not publicize `mandala`
 internals — and the shape read is exactly the minimal seam that keeps them internal: the
 panel and the walker consume a *description*, not the resolver.
@@ -122,9 +122,9 @@ shaped by what that consumer actually reads.
 ## M2 — run the plain-data prefix of a scope outside React
 
 **Problem.** Resolution is deliberately React-run (Step tree, `use()`, Suspense — see
-[internals.md §The resolver](../current/internals.md)), which means *nothing* can start a
+[internals.md §The resolver](docs/current/internals.md)), which means *nothing* can start a
 scope's loads without mounting its island. The
-[field gap analysis](./field-gap-analysis.md) hit this from the outside — its D1
+[field gap analysis](field-gap-analysis.md) hit this from the outside — its D1
 (intent-based data prefetch, the one axis where all four neighbors are ahead) and its §2
 back/forward note both stall on the same missing piece: some way to run the front of a
 scope's waterfall before/outside the island. This effort's cut names the general form
@@ -176,7 +176,7 @@ scope.
 
 **Precedent.** TanStack Router preloads route loaders on intent, React Router fetches
 data + modules, Next auto-prefetches — all cited with versions in the
-[field gap analysis §7](./field-gap-analysis.md). None of them can *see* how much of the
+[field gap analysis §7](field-gap-analysis.md). None of them can *see* how much of the
 work is startable — a loader is one opaque function — where rati's prefix is read off the
 declaration. The field's hard dynamic problem ("what is safe to run early?") has a static
 answer here; that asymmetry is the model earning its keep.
@@ -203,7 +203,7 @@ inventory's second limit), but the runtime records exactly the needed fact on ev
 resolution: `cell.reads`.
 
 **Sketch.** A dev-only diagnostic riding `dataTrace` (the
-[DX-07](../planned/testing-and-dx/issues/DX-07-observability.md) tracer): when a run
+[DX-07](docs/planned/testing-and-dx/issues/DX-07-observability.md) tracer): when a run
 resolves, for each produced cell compare the levels of the keys it read against the level
 it lives on. If every read key resolves at or above level *L*, the load could be declared
 at level *L*+1; if it sits deeper, say so:
@@ -222,7 +222,7 @@ load ever read (it still reaches the component, so that too is advisory only).
 
 **Precedent.** None in the field — a hook-based peer has no levels to misplace; TanStack
 Query's docs instead teach *hoisting out of components entirely* (the waterfall tension
-the [field gap analysis §1](./field-gap-analysis.md) quotes). The closest relative is
+the [field gap analysis §1](field-gap-analysis.md) quotes). The closest relative is
 rati's own trace, which shows the cost but not the diagnosis.
 
 **Cost.** Small: bookkeeping of key → level during the run (the trace already keys marks
@@ -294,7 +294,7 @@ must stay out is level-granular *commits*. The argument, from the code:
 1. **Type honesty is the product.** `ScopeProps` — every key present, fully resolved —
    is the contract the whole model exists to deliver. A component receiving a
    half-committed bag needs per-key state in its props, which is exactly the
-   `PartialProps` sketch [dependency-graphs.md](./undecided/dependency-graphs.md) records
+   `PartialProps` sketch [dependency-graphs.md](undecided/dependency-graphs.md) records
    and rules out of scope: the moment `{ page: ready(Doc); members: pending }` enters the
    prop types, the framework has re-invented the loading-state juggling it was built to
    delete.
@@ -307,11 +307,11 @@ must stay out is level-granular *commits*. The argument, from the code:
    mode forks all of it.
 3. **The dial already has positions**, each keeping every rendered state complete:
    - *spatial* — the designed `.live()` hands one prop's `Source` through, marked,
-     opt-in ([deferred-scope-features.md](./undecided/deferred-scope-features.md));
+     opt-in ([deferred-scope-features.md](undecided/deferred-scope-features.md));
    - *temporal* — `keepStale`/`loadingDelayMs` trade a complete old state for the
      complete new one (never a mixed one — the scope-and-island effort's records);
    - *SSR* — `ssr: false` and the streaming record's "scope levels as the shell line"
-     ([ssr-streaming.md](./undecided/ssr-streaming.md)) move whole islands or whole
+     ([ssr-streaming.md](undecided/ssr-streaming.md)) move whole islands or whole
      level-prefixes across the server/client line;
    - *structural* — the position this defense adds: **nested islands are level-granular
      commits, spelled as composition.** Split the slow tail into a child island rendered
@@ -330,8 +330,8 @@ So the recommendation is a documentation move, not a feature: the guide should t
 genuinely cannot express (the candidate: a child that must *share* the parent's
 in-flight resolution rather than its resolved props), that case lands on the recorded
 sharing directions — `.extend()`, layout-level scope
-([router-extensions.md](./router-extensions.md)), `ResourceContainer`
-([scope-and-island-directions.md §3](./scope-and-island-directions.md)) — not on a
+([router-extensions.md](router-extensions.md)), `ResourceContainer`
+([scope-and-island-directions.md §3](scope-and-island-directions.md)) — not on a
 partial-commit mode.
 
 ## Scope identity is the composition unit — a note for the `.extend()` design
@@ -339,7 +339,7 @@ partial-commit mode.
 A fact the composition directions should inherit explicitly: **the scope object's
 identity is the keying unit of the runtime.** The value channel, the controls channel,
 and the scope label are all `WeakMap`-keyed by the scope value
-([channel.ts](../../packages/rati/src/mandala/channel.ts), controls.ts); mandalas built
+([channel.ts](packages/rati/src/mandala/channel.ts), controls.ts); mandalas built
 from the same scope share channels ("nearest wins"), and `useScope(scope)` is a lookup by
 that identity. Three consequences:
 
@@ -348,7 +348,7 @@ that identity. Three consequences:
   so consumers must read the *returned* value (`useScope` of the factory result, threaded
   to them), never a shared import. A pattern to document, not a feature to build.
 - **`.extend()`'s open question** ("whether the value channel keys by the composed scope
-  or the base", [deferred-scope-features.md](./undecided/deferred-scope-features.md)) is
+  or the base", [deferred-scope-features.md](undecided/deferred-scope-features.md)) is
   exactly this fact surfacing: extension must decide which identities exist and which
   channels they own before anything else about it is designed.
 - **M4's test doubles** get their own channels by construction — right for the island

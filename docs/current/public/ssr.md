@@ -3,7 +3,7 @@
 How to server-render a rati app: the request loop, the client boot, head management,
 response statuses, redirects, and the payload contract. The data-model side — what a
 scope is, how islands resolve, the `ssr` source marker — is in the
-[guide](./guide.md#server-rendering); this page is the operational half. Everything here
+[guide](guide.md#server-rendering); this page is the operational half. Everything here
 imports from `rati/ssr` unless noted.
 
 ## The model in one paragraph
@@ -18,7 +18,7 @@ function your host already knows how to call.
 
 The render is all-or-nothing — no streaming, so the response waits for every load on the
 page. An island that shouldn't be part of that bargain sets
-[`ssr: false`](./reference.md#ssr-false--sitting-out-the-server-render): its loading slot
+[`ssr: false`](reference.md#ssr-false--sitting-out-the-server-render): its loading slot
 ships in the HTML and the browser resolves it after hydration.
 
 ## The server entry
@@ -372,7 +372,7 @@ regardless (it is coordinating the reveal with its own loads), and a boundary wh
 Streaming is a non-goal rather than a missing flag: committing the status line at shell
 flush and shipping `<head>` before in-Suspense `<Title>`s register is a different contract
 from this one, not a knob on it. What it would take is written up in
-[docs/research/ssr-streaming.md](../research/ssr-streaming.md) for a consumer that ever has
+[docs/research/undecided/ssr-streaming.md](docs/research/undecided/ssr-streaming.md) for a consumer that ever has
 a real time-to-first-byte problem.
 
 ## Titles and meta
@@ -456,7 +456,7 @@ reaches the error slot through the normal client path. Every failure is recorded
 different status policy than the table above is a few lines over that array.
 
 An island can ask for the other trade with
-[`ssrErrors: 'dehydrate'`](./reference.md#ssrerrors--the-error-slot-in-the-servers-html):
+[`ssrErrors: 'dehydrate'`](reference.md#ssrerrors--the-error-slot-in-the-servers-html):
 the server renders its **error slot** into the HTML and carries the failure over in the
 payload, so the client hydrates onto that slot instead of re-running the load. Nothing
 about the status changes — the failure is recorded either way, and a 500 with a rendered
@@ -464,12 +464,12 @@ error slot is still a 500. What crosses the wire is `code`, `message` and `retry
 `cause` is dropped, and the `message` is written into the HTML, so a load whose failures
 carry backend text should say something else before rejecting.
 
-An island's [`retry`](./reference.md#retry--trying-again-automatically) policy changes
+An island's [`retry`](reference.md#retry--trying-again-automatically) policy changes
 nothing here: the server takes its one attempt per request, records the failure, and lets
 the status be what it is — a page that eventually recovers on the client should not have
 held the response open to find out. The policy runs on the client's own resolution.
 
-An island that opted out with [`ssr: false`](./reference.md#ssr-false--sitting-out-the-server-render)
+An island that opted out with [`ssr: false`](reference.md#ssr-false--sitting-out-the-server-render)
 runs no load server-side, so it contributes nothing to `result.errors` and nothing to the
 status: a page whose data lives entirely in opted-out islands is always a 200, and its
 failures surface on the client through the error slot.
@@ -527,7 +527,7 @@ themselves.
   production, `serializeHydration` warns per offending key.
 - Three sections, keyed the same way (`mandalaId → scope key → …`): `data` (resolved
   values), `seeds` (live-source seeds), and `errors` — the failures an
-  [`ssrErrors: 'dehydrate'`](./reference.md#ssrerrors--the-error-slot-in-the-servers-html)
+  [`ssrErrors: 'dehydrate'`](reference.md#ssrerrors--the-error-slot-in-the-servers-html)
   island asked to carry over. `errors` is omitted entirely when nothing dehydrated into
   it, so an app that never sets the option ships the payload it always did, and a client
   that doesn't read the section simply resolves from scratch.

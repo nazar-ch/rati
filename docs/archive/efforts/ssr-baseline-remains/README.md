@@ -6,11 +6,11 @@ The 2026-07 SSR baseline shipped in rati core: head management (`Title`/`Meta`/
 `useTitle`/`HeadProvider` + `headTags`), the versioned hydration payload
 (`serializeHydration`/`readHydration` + integrity diagnostics), collector error
 recording with status derivation, route-level redirects + `matchedCatchAll`, and the
-composed `renderApp` — documented in [docs/public/ssr.md](../../public/ssr.md), with
+composed `renderApp` — documented in [docs/current/public/ssr.md](docs/current/public/ssr.md), with
 per-item deltas stamped into
-[ssr-nazar-patterns.md](../../archive/directions-2026-07/ssr-nazar-patterns.md). This
+[ssr-nazar-patterns.md](docs/archive/directions-2026-07/ssr-nazar-patterns.md). This
 effort finishes what that round deliberately left: the **server kit** (Layers 2/3 —
-design record: [ssr-server-kit.md](../../archive/directions-2026-07/ssr-server-kit.md),
+design record: [ssr-server-kit.md](docs/archive/directions-2026-07/ssr-server-kit.md),
 maintainer-confirmed), the **consumer migrations** (nazar.ch, jnana website), and the
 **coverage tail** the implementing session consciously left thin.
 
@@ -40,8 +40,8 @@ The findings below were task-cut into SSR-07…12 (maintainer-reviewed shape):
 - **SSR-11** (the out-of-order shell): discussed and decided same day — fully-inline
   output becomes the behavior (the current output is a buffered-render artifact, not a
   streaming tradeoff); what a real streaming mode would take is recorded in
-  [docs/research/ssr-streaming.md](../../research/ssr-streaming.md), alongside the RSC
-  support question ([docs/research/rsc-support.md](../../research/rsc-support.md)).
+  [docs/research/undecided/ssr-streaming.md](docs/research/undecided/ssr-streaming.md), alongside the RSC
+  support question ([docs/research/postponed/rsc-support.md](docs/research/postponed/rsc-support.md)).
 - **SSR-12** reframes the whole-document finding: not a nazar migration (the
   maintainer keeps nazar whole-document) but a design item — the CSR fallback should
   be available to whole-document apps too. Design-first; nazar's stale-reason note
@@ -83,7 +83,7 @@ Round-2 corrections (2026-07-16, cut at the review): SSR-14 (hydration-mismatch
 observability, from SSR-12's finding) and SSR-15 (the fallback config-error guard) —
 independent, any order.
 
-Batching, dependencies, grading: [plan.md](./plan.md).
+Batching, dependencies, grading: [plan.md](plan.md).
 
 ## Per-item conventions
 
@@ -266,7 +266,7 @@ The fallback landed as designed. One finding, wider than the item and left unfix
   deliberately, so the fix is a known one-liner per mount, not a design question. Not cut
   as an item: it is test-strength in a suite SSR-12 doesn't own, and it may turn something
   up when the assertion starts working — worth its own session, with room to be surprised.
-  — **Cut 2026-07-16 (round-2 review) as [SSR-14](./issues/SSR-14-hydration-mismatch-observability.md).**
+  — **Cut 2026-07-16 (round-2 review) as [SSR-14](issues/SSR-14-hydration-mismatch-observability.md).**
 
 ### 2026-07-16 — from SSR-13 (the dev malformed escape)
 
@@ -306,10 +306,10 @@ sync. Two findings became items, one was closed in-round:
   and the config-error path threads the gap: the synthesized shell has no `#root` for a
   fragment entry to boot into, where pre-SSR-12 the same misconfiguration answered an
   honest plain-text 500. Verified by tracing the catch path. Cut as
-  [SSR-15](./issues/SSR-15-fallback-config-error.md), which also owns the noted
+  [SSR-15](issues/SSR-15-fallback-config-error.md), which also owns the noted
   script-placement asymmetry between the two fallback shapes.
 - **The standing SSR-12 finding above (console-only hydration asserts) is now cut** as
-  [SSR-14](./issues/SSR-14-hydration-mismatch-observability.md) — the round's reviewer
+  [SSR-14](issues/SSR-14-hydration-mismatch-observability.md) — the round's reviewer
   judged "worth its own session" to mean an item, so it derives status like everything
   else.
 - **SSR-13's pins covered only `%zz`** of the four shapes the item verified by hand

@@ -1,7 +1,7 @@
 # DX & tooling — directions
 
 > **Being executed** — cut 2026-07-19 as the
-> [testing-and-dx effort](../planned/testing-and-dx/README.md), grounded in a survey of
+> [testing-and-dx effort](docs/planned/testing-and-dx/README.md), grounded in a survey of
 > what both repos hand-roll (recorded there) and grown by one member this doc missed (an
 > SSR round-trip test kit). Where a record and this doc disagree, the record wins.
 
@@ -21,7 +21,7 @@ The highest-value DX item. Jnana's tests and rati's own `__tests__` both hand-ro
 
 Pairs with the data package's "testability by construction" ground rule (every primitive is
 producer-driven, so a deferred-promise fake walks it through every phase — see the archived
-[data-package.md](../archive/directions-2026-07/data-package.md)).
+[data-package.md](docs/archive/directions-2026-07/data-package.md)).
 
 ## Resolution tracing (`dataTrace`)
 

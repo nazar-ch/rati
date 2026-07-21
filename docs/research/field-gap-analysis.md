@@ -1,7 +1,7 @@
 # Gap analysis against the field
 
 Status: research record (2026-07-20), the output of the improvement-review effort's
-[IMP-01 session](../planned/improvement-review/issues/IMP-01-field-gap-analysis.md).
+[IMP-01 session](docs/planned/improvement-review/issues/IMP-01-field-gap-analysis.md).
 For each neighboring framework: what its users lean on daily, checked against its current
 docs this session, classified through rati's stance. Unflattering findings are the point —
 this is an internal engineering gap list, not a marketing comparison.
@@ -20,7 +20,7 @@ Versions checked (2026-07-20; each claim below links the doc it was read from):
 
 rati's model *replaces* hook-style loading: components receive resolved props, resolution
 is all-or-nothing, loads are cached per island instance, and there is deliberately no
-global request cache ("What rati is not", [guide.md](../current/public/guide.md)). So a
+global request cache ("What rati is not", [guide.md](docs/current/public/guide.md)). So a
 missing feature is not automatically a gap. Every field feature below is classified:
 
 - **(a) covered differently** — the model answers it; the mapping is written down here
@@ -47,8 +47,8 @@ the effort's boundary; gaps landing there are collected in
 | [Suspense hooks](https://tanstack.com/query/latest/docs/framework/react/guides/suspense) (TQ v5, `useSuspenseQuery`); [SWR `suspense: true`](https://swr.vercel.app/docs/suspense) | the engine *is* Suspense; non-`undefined` data is the default, not the opt-in | (a) |
 | [`AbortSignal` to every `queryFn`](https://tanstack.com/query/latest/docs/framework/react/guides/query-cancellation) (TQ v5) | `LoadContext.signal` (SI-01). Note TQ's cancellation [does not work with its suspense hooks](https://tanstack.com/query/latest/docs/framework/react/guides/suspense); rati's does | (a) |
 | [`select` / derived data](https://tanstack.com/query/latest/docs/framework/react/guides/render-optimizations) (TQ v5) | a dependent load *is* the derivation, typed | (a) |
-| [Deferred data: promises from loaders + `<Await>`](https://tanstack.com/router/latest/docs/framework/react/guide/deferred-data-loading) (TSR 1.170); [RR streaming with Suspense](https://reactrouter.com/how-to/suspense) (RR 8, `defer()` replaced by raw promises) | all-or-nothing by design; the per-prop escape is the designed-but-unbuilt `.live()` | (c) — [undecided/deferred-scope-features.md](./undecided/deferred-scope-features.md) |
-| Free dependency graphs (finer than levels) | depth-layered chain is the typeable normal form; `derive()` sketched | (c) — [undecided/dependency-graphs.md](./undecided/dependency-graphs.md) |
+| [Deferred data: promises from loaders + `<Await>`](https://tanstack.com/router/latest/docs/framework/react/guide/deferred-data-loading) (TSR 1.170); [RR streaming with Suspense](https://reactrouter.com/how-to/suspense) (RR 8, `defer()` replaced by raw promises) | all-or-nothing by design; the per-prop escape is the designed-but-unbuilt `.live()` | (c) — [undecided/deferred-scope-features.md](undecided/deferred-scope-features.md) |
+| Free dependency graphs (finer than levels) | depth-layered chain is the typeable normal form; `derive()` sketched | (c) — [undecided/dependency-graphs.md](undecided/dependency-graphs.md) |
 | [`initialData` / `placeholderData`](https://tanstack.com/query/latest/docs/framework/react/guides/placeholder-query-data) (TQ v5); [SWR `fallbackData`](https://swr.vercel.app/docs/global-configuration) | see prose below | (a)/(b) |
 
 **The waterfall tension, worth saying plainly.** TanStack Query's docs call the `enabled`
@@ -72,9 +72,9 @@ deliberately doesn't offer is *render first, correct later* inside the resolved 
 
 | Field feature | rati today | Class |
 | --- | --- | --- |
-| [Query-key cache, `staleTime`/`gcTime`, dedup across components](https://tanstack.com/query/latest/docs/framework/react/guides/caching) (TQ v5); [SWR dedup](https://swr.vercel.app/docs/api) | none, on purpose: loads cache per island instance; "Not a request cache" ([guide](../current/public/guide.md)) — bring TQ/Apollo through `hook()` if you have one | (b) |
+| [Query-key cache, `staleTime`/`gcTime`, dedup across components](https://tanstack.com/query/latest/docs/framework/react/guides/caching) (TQ v5); [SWR dedup](https://swr.vercel.app/docs/api) | none, on purpose: loads cache per island instance; "Not a request cache" ([guide](docs/current/public/guide.md)) — bring TQ/Apollo through `hook()` if you have one | (b) |
 | [Loader SWR cache: `staleTime`, `gcTime`, `shouldReload`](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading) (TSR 1.170) | no cross-navigation cache — the Router remounts per navigation, every visit re-resolves | (b), with the back/forward consequence below |
-| Shared resolution across islands (two scopes with one head) | dedup happens in the source/store tier today | (c) — `.extend()` ([undecided/deferred-scope-features.md](./undecided/deferred-scope-features.md)), `ResourceContainer` ([scope-and-island-directions.md §3](./scope-and-island-directions.md)), layout-level scope ([router-extensions.md](./router-extensions.md)) |
+| Shared resolution across islands (two scopes with one head) | dedup happens in the source/store tier today | (c) — `.extend()` ([undecided/deferred-scope-features.md](undecided/deferred-scope-features.md)), `ResourceContainer` ([scope-and-island-directions.md §3](scope-and-island-directions.md)), layout-level scope ([router-extensions.md](router-extensions.md)) |
 | [Structural sharing / tracked props](https://tanstack.com/query/latest/docs/framework/react/guides/render-optimizations) (TQ v5) | `collection`'s identity-stable reconcile (data territory); core keeps identity through the `equals` gate on refresh | (a) |
 
 **The back/forward expectation.** Every neighbor makes back navigation instant: TanStack
@@ -87,7 +87,7 @@ stores makes a store-backed page's `source()` ready immediately on return, which
 documented answer and works today. What it doesn't cover is plain-async-load pages, the
 guide's own recommended simple path. This is adjacent to two recorded directions — the
 "in-place stale window" (`<Activity>`-class rendering,
-[scope-and-island-directions.md](./scope-and-island-directions.md)) and the prefetch
+[scope-and-island-directions.md](scope-and-island-directions.md)) and the prefetch
 handoff cache in proposal D1, which a retained-run variant could share machinery with —
 so it is noted there rather than proposed separately. An adopter arriving from any
 neighbor *will* ask.
@@ -111,7 +111,7 @@ All excluded from proposing (data territory); the mapping for the record:
 | [`useMutation` lifecycle](https://tanstack.com/query/latest/docs/framework/react/guides/mutations) (TQ v5); [`useSWRMutation`](https://swr.vercel.app/docs/mutation) (SWR 2) | `mutation()` — callable with observable `isPending`/`error` | (a) |
 | [Optimistic via cache write + rollback](https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates) (TQ v5); [SWR `optimisticData`/`rollbackOnError`](https://swr.vercel.app/docs/mutation) | `optimistic:` patch + `onError: 'refresh'` recovery — refresh-as-rollback, no inverse patches | (a) |
 | [Optimistic via in-flight variables / `useMutationState`](https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates) (TQ v5) | instance-owned state makes the mutation itself observable anywhere | (a) |
-| Action-model mutations ([RR actions + revalidation](https://reactrouter.com/start/framework/actions), RR 8; [Next Server Actions + `useActionState`/`useOptimistic`](https://nextjs.org/docs/app/getting-started/mutating-data), Next 16) | `form().submit()` is action-compatible (`<form action={store.save}>`); the rest of the React 19 action stack deliberately not adopted ([data-package.md §5](../archive/directions-2026-07/data-package.md)); server functions belong to a future RSC adoption ([postponed/rsc-support.md §6](./postponed/rsc-support.md)) | (a)/(c) |
+| Action-model mutations ([RR actions + revalidation](https://reactrouter.com/start/framework/actions), RR 8; [Next Server Actions + `useActionState`/`useOptimistic`](https://nextjs.org/docs/app/getting-started/mutating-data), Next 16) | `form().submit()` is action-compatible (`<form action={store.save}>`); the rest of the React 19 action stack deliberately not adopted ([data-package.md §5](docs/archive/directions-2026-07/data-package.md)); server functions belong to a future RSC adoption ([postponed/rsc-support.md §6](postponed/rsc-support.md)) | (a)/(c) |
 | No-JS progressive enhancement ([RR `<Form>`](https://reactrouter.com/start/framework/navigating), RR 8; [Next forms](https://nextjs.org/docs/app/api-reference/components/form), Next 16) | none. Position, recorded here: rati targets interactive apps; its SSR exists for first paint, not for JS-free operation. PE would arrive, if ever, with RSC/server functions — not as a bolt-on | (b) |
 | [TQ paused-mutation offline queue](https://tanstack.com/query/latest/docs/framework/react/guides/mutations) (v5) | none | data-effort note |
 
@@ -122,7 +122,7 @@ All excluded from proposing (data territory); the mapping for the record:
 | [`pendingComponent` + `pendingMs` (default 1000)](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading) (TSR 1.170) | `loading` slot + `loadingDelayMs` (SI-02) | (a) |
 | [`pendingMinMs` (default 500)](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading) (TSR 1.170) — once shown, pending UI stays up a minimum | no minimum-display window: content swaps in the moment it's ready, so a slot that just appeared can flash away. The complement of `loadingDelayMs`; same gate, one more deadline. Noted, wait for a flicker complaint | (a), delta noted |
 | [`keepPreviousData` → `placeholderData: (prev) => prev`](https://tanstack.com/query/latest/docs/framework/react/guides/placeholder-query-data) (TQ v5); [SWR `keepPreviousData`](https://swr.vercel.app/docs/api) | `keepStale` + `isStale` (SI-03), per island and per route | (a) |
-| [`useNavigation` pending state](https://reactrouter.com/start/framework/pending-ui) (RR 8); [`useLinkStatus`](https://nextjs.org/docs/app/api-reference/functions/use-link-status) (Next 16); [NavLink `isPending`](https://reactrouter.com/start/framework/pending-ui) (RR 8) | none globally — per-island `phase` only | (c) — [router-extensions.md §Navigation status](./router-extensions.md); field evidence is now three-for-three, and proposal D2 below needs the same mandala→router signal |
+| [`useNavigation` pending state](https://reactrouter.com/start/framework/pending-ui) (RR 8); [`useLinkStatus`](https://nextjs.org/docs/app/api-reference/functions/use-link-status) (Next 16); [NavLink `isPending`](https://reactrouter.com/start/framework/pending-ui) (RR 8) | none globally — per-island `phase` only | (c) — [router-extensions.md §Navigation status](router-extensions.md); field evidence is now three-for-three, and proposal D2 below needs the same mandala→router signal |
 | [Retry/backoff on queries](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults) (TQ v5, 3× default); [SWR `onErrorRetry`](https://swr.vercel.app/docs/error-handling) | `retry: { count, backoffMs }` (SI-05), opt-in, `failed`-only | (a) |
 | [Per-route error boundaries + `reset`](https://reactrouter.com/how-to/error-boundary) (RR 8); [`errorComponent`](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading) (TSR 1.170) | `error` slot with `SourceError.code` switch + `retry` | (a) |
 | [`notFound()` with fuzzy bubbling](https://tanstack.com/router/latest/docs/framework/react/guide/not-found-errors) (TSR 1.170); [RR `data(..., { status })`](https://reactrouter.com/how-to/error-boundary) (RR 8) | `NotAvailableError` → `not-available` in the slot, 404 on the server; routing 404 is the `*` route | (a) |
@@ -132,16 +132,16 @@ All excluded from proposing (data territory); the mapping for the record:
 | Field feature | rati today | Class |
 | --- | --- | --- |
 | Typed paths/params/links ([TSR type-safety](https://tanstack.com/router/latest/docs/framework/react/guide/type-safety), 1.170; [RR typegen](https://reactrouter.com/explanation/type-safety), RR 8; [Next `typedRoutes`](https://nextjs.org/docs/app/api-reference/config/typescript#statically-typed-links), 16, opt-in) | the literal tuple + `RatiUserTypes` — same `Register`-style pattern as TSR, no codegen step at all (RR and Next both need a generator) | (a) — rati is at full strength here |
-| [Validated search params (`validateSearch`, Standard Schema), search middleware, `retainSearchParams`](https://tanstack.com/router/latest/docs/framework/react/guide/search-params) (TSR 1.170) | stringly `setSearchParams` | (c) — [router-extensions.md §Typed search params](./router-extensions.md); TSR's Standard Schema support and middleware are new evidence for that record's converter-vocabulary design |
-| Param validation/coercion at match time | permissive `[^/]+`, branded types arrive unvalidated | (c) — [router-extensions.md §Typed path converters](./router-extensions.md) |
-| [Optional params `{-$x}`](https://tanstack.com/router/latest/docs/framework/react/routing/routing-concepts) (TSR 1.170); [RR `:x?` + splats](https://reactrouter.com/start/framework/routing) (RR 8) | no optional segments; `*` catch-all only, un-captured | (c)-adjacent — regex routes are recorded ([router-extensions.md §`re_path()`](./router-extensions.md)); optional segments would ride the same matcher work. Noted on that record, not separately proposed |
-| [Guards: `beforeLoad` + throwable `redirect()`](https://tanstack.com/router/latest/docs/framework/react/guide/authenticated-routes) (TSR 1.170); [RR middleware, stable in v8](https://reactrouter.com/how-to/middleware) | route-level declarative `redirect` only; loads can 404 but not redirect | (c) — [router-extensions.md §Route/group guards](./router-extensions.md). New evidence: both neighbors let *data code* redirect (throw-a-redirect), which that record's guard design should decide on |
+| [Validated search params (`validateSearch`, Standard Schema), search middleware, `retainSearchParams`](https://tanstack.com/router/latest/docs/framework/react/guide/search-params) (TSR 1.170) | stringly `setSearchParams` | (c) — [router-extensions.md §Typed search params](router-extensions.md); TSR's Standard Schema support and middleware are new evidence for that record's converter-vocabulary design |
+| Param validation/coercion at match time | permissive `[^/]+`, branded types arrive unvalidated | (c) — [router-extensions.md §Typed path converters](router-extensions.md) |
+| [Optional params `{-$x}`](https://tanstack.com/router/latest/docs/framework/react/routing/routing-concepts) (TSR 1.170); [RR `:x?` + splats](https://reactrouter.com/start/framework/routing) (RR 8) | no optional segments; `*` catch-all only, un-captured | (c)-adjacent — regex routes are recorded ([router-extensions.md §`re_path()`](router-extensions.md)); optional segments would ride the same matcher work. Noted on that record, not separately proposed |
+| [Guards: `beforeLoad` + throwable `redirect()`](https://tanstack.com/router/latest/docs/framework/react/guide/authenticated-routes) (TSR 1.170); [RR middleware, stable in v8](https://reactrouter.com/how-to/middleware) | route-level declarative `redirect` only; loads can 404 but not redirect | (c) — [router-extensions.md §Route/group guards](router-extensions.md). New evidence: both neighbors let *data code* redirect (throw-a-redirect), which that record's guard design should decide on |
 | [Route masking](https://tanstack.com/router/latest/docs/framework/react/guide/route-masking) (TSR 1.170) | `navigate({ keepCurrentRoute, state })` covers the modal-over-page pattern from the other side (URL changes, view stays) | (a) |
 | [Parallel + intercepting routes](https://nextjs.org/docs/app/api-reference/file-conventions/parallel-routes) (Next 16) | out of the model: the flat literal tuple renders one route; multi-pane UIs are the app's components + `keepCurrentRoute`/`state` | (b) |
-| File-based routing ([TSR, recommended](https://tanstack.com/router/latest/docs/framework/react/routing/file-based-routing), 1.170; [RR fs-routes](https://reactrouter.com/start/framework/routing), 8; Next, only mode) | code-based only. Position, recorded here: the route table is a plain `as const` value — no generator, no virtual modules, types straight from literals. That is a *feature* of the model (the whole type machinery reads the tuple), and jnana-scale apps fit in one readable file. Fragment composition, if tables grow, is the recorded `include()` direction ([router-extensions.md](./router-extensions.md)) — still values, still no codegen | (b) |
-| [Nested layouts / `<Outlet>`](https://reactrouter.com/start/framework/routing) (RR 8); [pathless layouts](https://tanstack.com/router/latest/docs/framework/react/routing/routing-concepts) (TSR 1.170) | one `wrapper` per route, `group()` for shared slots — no stacking yet | (c) — [router-extensions.md §Nested wrapper stacks](./router-extensions.md) (sketched), §Layout-level scope for the shared-data half |
-| [Navigation blocking `useBlocker`](https://tanstack.com/router/latest/docs/framework/react/guide/navigation-blocking) (TSR 1.170, with async blocking); [RR `useBlocker`](https://reactrouter.com/api/hooks/useBlocker) (8) | none | (c) — [router-extensions.md §Navigation status & blocking](./router-extensions.md) |
-| [View transitions](https://reactrouter.com/api/components/Link) (RR 8, stable prop + `useViewTransitionState`); [TSR `defaultViewTransition` + types](https://tanstack.com/router/v1/docs/framework/react/api/router/ViewTransitionOptionsType) (1.170); [Next `<Link transitionTypes>`](https://nextjs.org/blog/next-16-2) (16.2, experimental) | none | (c) — [router-extensions.md](./router-extensions.md) ("one-liner-sized, wait for need"); the field has since made it table stakes at the `Link` level — evidence noted, still wait-for-need |
+| File-based routing ([TSR, recommended](https://tanstack.com/router/latest/docs/framework/react/routing/file-based-routing), 1.170; [RR fs-routes](https://reactrouter.com/start/framework/routing), 8; Next, only mode) | code-based only. Position, recorded here: the route table is a plain `as const` value — no generator, no virtual modules, types straight from literals. That is a *feature* of the model (the whole type machinery reads the tuple), and jnana-scale apps fit in one readable file. Fragment composition, if tables grow, is the recorded `include()` direction ([router-extensions.md](router-extensions.md)) — still values, still no codegen | (b) |
+| [Nested layouts / `<Outlet>`](https://reactrouter.com/start/framework/routing) (RR 8); [pathless layouts](https://tanstack.com/router/latest/docs/framework/react/routing/routing-concepts) (TSR 1.170) | one `wrapper` per route, `group()` for shared slots — no stacking yet | (c) — [router-extensions.md §Nested wrapper stacks](router-extensions.md) (sketched), §Layout-level scope for the shared-data half |
+| [Navigation blocking `useBlocker`](https://tanstack.com/router/latest/docs/framework/react/guide/navigation-blocking) (TSR 1.170, with async blocking); [RR `useBlocker`](https://reactrouter.com/api/hooks/useBlocker) (8) | none | (c) — [router-extensions.md §Navigation status & blocking](router-extensions.md) |
+| [View transitions](https://reactrouter.com/api/components/Link) (RR 8, stable prop + `useViewTransitionState`); [TSR `defaultViewTransition` + types](https://tanstack.com/router/v1/docs/framework/react/api/router/ViewTransitionOptionsType) (1.170); [Next `<Link transitionTypes>`](https://nextjs.org/blog/next-16-2) (16.2, experimental) | none | (c) — [router-extensions.md](router-extensions.md) ("one-liner-sized, wait for need"); the field has since made it table stakes at the `Link` level — evidence noted, still wait-for-need |
 
 ## 7. Navigation: prefetching
 
@@ -159,7 +159,7 @@ of proposal D1.
 
 | Field feature | rati today | Class |
 | --- | --- | --- |
-| [TSR scroll restoration: keyed cache, nested `scrollToTopSelectors`, virtualized-list hook, per-navigation `resetScroll`](https://tanstack.com/router/latest/docs/framework/react/guide/scroll-restoration) (1.170); [RR `<ScrollRestoration>`](https://reactrouter.com/api/hooks/useBlocker) (8); [Next reworked scroll handler](https://nextjs.org/blog/next-16-2) (16.2) | POP/PUSH restoration exists, but restores on a double-rAF — before an async route's island has rendered, so the position clamps against the loading slot ([scrollRestoration.ts](../../packages/rati/src/router/scrollRestoration.ts) documents this as its own caveat) | **(d) → D2** for the async-route half; nested-container keys stay wait-for-need |
+| [TSR scroll restoration: keyed cache, nested `scrollToTopSelectors`, virtualized-list hook, per-navigation `resetScroll`](https://tanstack.com/router/latest/docs/framework/react/guide/scroll-restoration) (1.170); [RR `<ScrollRestoration>`](https://reactrouter.com/api/hooks/useBlocker) (8); [Next reworked scroll handler](https://nextjs.org/blog/next-16-2) (16.2) | POP/PUSH restoration exists, but restores on a double-rAF — before an async route's island has rendered, so the position clamps against the loading slot ([scrollRestoration.ts](packages/rati/src/router/scrollRestoration.ts) documents this as its own caveat) | **(d) → D2** for the async-route half; nested-container keys stay wait-for-need |
 | Redirects: [route-level + throwable from loaders](https://tanstack.com/router/latest/docs/framework/react/guide/authenticated-routes) (TSR 1.170) | declarative route-level `redirect` with loop detection, real 30x on the server | (a) for route-level; the load-level half rides the guards record (§6) |
 | [History state, back/forward semantics](https://reactrouter.com/api/components/Link) | per-entry `state`, `keepCurrentRoute`, memory history with a real entry stack | (a) |
 
@@ -175,10 +175,10 @@ of proposal D1.
 | Field feature | rati today | Class |
 | --- | --- | --- |
 | Full-document SSR + hydration ([Start](https://tanstack.com/start/latest/docs/framework/react/overview), RC; [RR framework mode](https://reactrouter.com/start/framework/rendering), 8; Next) | the server kit: `renderApp` / `rati/vite` / `rati/server`, dehydration incl. source seeds, derived statuses, CSR fallback | (a) |
-| Streaming SSR ([RR promise loaders](https://reactrouter.com/how-to/suspense), 8; [TSR deferred serialization](https://tanstack.com/router/latest/docs/framework/react/guide/deferred-data-loading), 1.170; [Next PPR-by-default under Cache Components](https://nextjs.org/docs/app/getting-started/caching), 16) | deliberate non-goal; `ssr: false` is the pressure valve | (c) — [undecided/ssr-streaming.md](./undecided/ssr-streaming.md) (incl. the scope-levels-as-shell-line idea) |
+| Streaming SSR ([RR promise loaders](https://reactrouter.com/how-to/suspense), 8; [TSR deferred serialization](https://tanstack.com/router/latest/docs/framework/react/guide/deferred-data-loading), 1.170; [Next PPR-by-default under Cache Components](https://nextjs.org/docs/app/getting-started/caching), 16) | deliberate non-goal; `ssr: false` is the pressure valve | (c) — [undecided/ssr-streaming.md](undecided/ssr-streaming.md) (incl. the scope-levels-as-shell-line idea) |
 | [Start selective SSR: `true` / `false` / `'data-only'`, inheritable, functions of params](https://tanstack.com/start/latest/docs/framework/react/guide/selective-ssr) (RC) | `ssr: false` per island (SI-04). `'data-only'` — resolve server-side, render client-side — is a matrix cell rati lacks; noted as evidence on the scope-and-island directions, wait for a consumer | (a), delta noted |
-| SSG / ISR ([RR `prerender`](https://reactrouter.com/how-to/pre-rendering), 8; [Next `generateStaticParams` + ISR](https://nextjs.org/docs/app/guides/incremental-static-regeneration), 16) | a build loop over `renderApp` away | (c) — [ssg-and-rsc.md](./ssg-and-rsc.md) |
-| RSC / server functions ([RR experimental](https://reactrouter.com/how-to/react-server-components), 8; [Next](https://nextjs.org/docs/app/getting-started/fetching-data), 16; [Start `createServerFn`](https://tanstack.com/start/latest/docs/framework/react/guide/server-functions), RC) | none | (c) — [postponed/rsc-support.md](./postponed/rsc-support.md); RR 8 shipping `unstable_reactRouterRSC` over `@vitejs/plugin-rsc` confirms that record's wrap-the-plugin read |
+| SSG / ISR ([RR `prerender`](https://reactrouter.com/how-to/pre-rendering), 8; [Next `generateStaticParams` + ISR](https://nextjs.org/docs/app/guides/incremental-static-regeneration), 16) | a build loop over `renderApp` away | (c) — [ssg-and-rsc.md](ssg-and-rsc.md) |
+| RSC / server functions ([RR experimental](https://reactrouter.com/how-to/react-server-components), 8; [Next](https://nextjs.org/docs/app/getting-started/fetching-data), 16; [Start `createServerFn`](https://tanstack.com/start/latest/docs/framework/react/guide/server-functions), RC) | none | (c) — [postponed/rsc-support.md](postponed/rsc-support.md); RR 8 shipping `unstable_reactRouterRSC` over `@vitejs/plugin-rsc` confirms that record's wrap-the-plugin read |
 | Caching: [`use cache` / `cacheLife` / `revalidateTag`](https://nextjs.org/docs/app/api-reference/directives/use-cache) (Next 16) | out of rati's lane — rati has no server data cache; HTTP caching is the app's/CDN's | (b) |
 | Head/meta ([RR route `meta`/`links`](https://reactrouter.com/start/framework/route-module), 8; [Next Metadata API + streaming metadata](https://nextjs.org/docs/app/api-reference/functions/generate-metadata), 16) | `<Title>`/`<Meta>` with dedupe-by-depth, server read-back, client sync | (a) |
 | [Hydration mismatch diff overlay](https://nextjs.org/blog/next-16-2) (Next 16.2) | mismatch-throws-by-default in `rati/testing`, claim watchdog in dev | (a) |
@@ -268,7 +268,7 @@ back/forward expectation (§2): a retained-run variant could reuse the same hand
 ### D2 — Scroll restoration that waits for the content
 
 **Problem.** Restoration fires on a double-rAF after navigation
-([scrollRestoration.ts](../../packages/rati/src/router/scrollRestoration.ts)); an async
+([scrollRestoration.ts](packages/rati/src/router/scrollRestoration.ts)); an async
 route is still showing its loading slot then, so the restored position clamps against the
 slot's height and the user lands at the top (or mid-nowhere) instead of where they were.
 The file's own header calls tying restoration to data boundaries "a future enhancement" —
@@ -285,7 +285,7 @@ slow load never strands the scroll. PUSH keeps scrolling to top immediately; a
 `keepStale` re-resolve needs nothing (content never left). The plumbing — a
 mandala→router "destination committed" signal — is the *same* signal the recorded
 pending-navigation direction needs
-([router-extensions.md §Navigation status](./router-extensions.md) names it explicitly),
+([router-extensions.md §Navigation status](router-extensions.md) names it explicitly),
 so building either pays for both; this proposal extends that record rather than
 competing with it. Nested-container keys and virtualized-list APIs stay out —
 wait-for-need, and rati's `scrollToTop` override already covers the fixed-header case.
@@ -310,7 +310,7 @@ page lists again. Cheap enough that the trigger bar can be low.
 [an MCP server](https://nextjs.org/docs/app/guides/mcp). rati's observability is two
 console tracers (`navTrace`, `dataTrace`) and named components in React DevTools — DX-07
 delivered exactly that and drew its boundary at "no devtools UI, no structured trace
-export" ([DX-07](../planned/testing-and-dx/issues/DX-07-observability.md)). For the
+export" ([DX-07](docs/planned/testing-and-dx/issues/DX-07-observability.md)). For the
 maintainer that is enough; for a first external adopter, a panel is often the first
 "is this framework real" signal — and rati's model makes an unusually good one possible.
 
@@ -357,7 +357,7 @@ effort inherits the note):
   (v5) to bound retained pages; the pages-as-queries array has no cap today.
 - **Mutation serialization.** TQ's [mutation `scope.id`](https://tanstack.com/query/latest/docs/framework/react/guides/mutations)
   (v5) serializes related mutations — field evidence for the data record's open
-  "mutation coalescing/serialization" question ([data-package.md §Open questions](../archive/directions-2026-07/data-package.md)).
+  "mutation coalescing/serialization" question ([data-package.md §Open questions](docs/archive/directions-2026-07/data-package.md)).
 
 ## Top-3
 

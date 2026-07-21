@@ -3,7 +3,7 @@
 React's Suspense machinery produces more distinct situations than "pending shows a
 fallback", and several of them are exactly where resolver bugs (or test-harness lies) hide.
 This catalog enumerates them for the mandala: what React does, what the engine must
-guarantee (the contract — [docs/archive/mandala-testing.md](../../../../docs/archive/mandala-testing.md)
+guarantee (the contract — [docs/archive/mandala-testing.md](docs/archive/mandala-testing.md)
 §"The altitude rule" binds what tests may assert), and which suite owns the coverage.
 It lives with the tests on purpose: when a suite around here behaves strangely, check this
 list before blaming the engine.

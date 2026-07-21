@@ -2,8 +2,8 @@
 
 Forward-looking, intentionally **not built** — each waits for a real need so the shape is
 pinned by a concrete use case. What ships today: `route()` and `group()` (see
-[`router/group.tsx`](../../packages/rati/src/router/group.tsx) and
-[the public guide](../current/public/guide.md)).
+[`router/group.tsx`](packages/rati/src/router/group.tsx) and
+[the public guide](docs/current/public/guide.md)).
 
 ## The invariant everything here preserves
 
@@ -43,7 +43,7 @@ route." e.g. `AppLayout` needs the resolved space; today each page scope re-reso
 `group({ wrapper, scope }, …)` would build a layout mandala whose value the children read via
 `useRouteContext`. Open questions: caching/identity of the shared resolution across child
 navigations, and how it composes with per-route scopes (the `.extend()` question in
-[undecided/deferred-scope-features.md](./undecided/deferred-scope-features.md)).
+[undecided/deferred-scope-features.md](undecided/deferred-scope-features.md)).
 
 ## Django-inspired directions
 

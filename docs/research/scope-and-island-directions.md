@@ -1,7 +1,7 @@
 # Scope & island directions — resolution, loading states, sharing
 
 > **Parts 1 and 2 shipped** — cut 2026-07-19 and executed as the
-> [scope-and-island effort](../planned/scope-and-island/README.md) (all six directions,
+> [scope-and-island effort](docs/planned/scope-and-island/README.md) (all six directions,
 > including the two below marked wait-for-need — the decisions and findings are recorded
 > there, and where a record and this doc disagree, the record wins). Part 3
 > (`ResourceContainer`) stays open research, and execution left three new open directions,
@@ -12,13 +12,13 @@ Forward-looking options for scope resolution and the island's loading/error pres
 the shape is pinned by a concrete use case. Distilled from the July 2026 design review
 (`improvements.md` §1/§2/§5; the review's shipped items — selective refresh via
 `useScopeControls`, the `data()` marker, SSR-capable sources, the SSR-error baseline — landed
-and are recorded in [../archive/directions-2026-07/](../archive/directions-2026-07/)).
+and are recorded in [docs/archive/directions-2026-07/](docs/archive/directions-2026-07/)).
 
 Already-sketched neighbours that live in their own records: the undecided scope primitives
 `.live()` / `.extend()` and the bare-hook dev guard
-([undecided/deferred-scope-features.md](./undecided/deferred-scope-features.md)), the cross-layer
-`derive()` escape hatch ([undecided/dependency-graphs.md](./undecided/dependency-graphs.md)), and
-the router-side resolution work ([router-extensions.md](./router-extensions.md)).
+([undecided/deferred-scope-features.md](undecided/deferred-scope-features.md)), the cross-layer
+`derive()` escape hatch ([undecided/dependency-graphs.md](undecided/dependency-graphs.md)), and
+the router-side resolution work ([router-extensions.md](router-extensions.md)).
 
 ## 1. Scope & resolution
 
@@ -44,7 +44,7 @@ missing.)
 
 **Shipped as SI-01** (`LoadContext`, one controller per bucket). Two seams it deliberately
 left open, both wait-for-need (SI-01's findings in the
-[effort README](../planned/scope-and-island/README.md#findings)):
+[effort README](docs/planned/scope-and-island/README.md#findings)):
 
 - **Per-key cancellation (open, post-execution).** The signal belongs to the bucket, so a
   `refresh(key)` that supersedes its *own* in-flight re-fetch (the double-click) leaves the
@@ -64,7 +64,7 @@ left open, both wait-for-need (SI-01's findings in the
 The `remoteData` features worth keeping that are **presentation** concerns — pending
 indication delay and stale-data display — belong in the mandala, not the data layer (the
 data layer reports honest phases; the island decides what the user sees — see the archived
-[data-package.md](../archive/directions-2026-07/data-package.md) for the split).
+[data-package.md](docs/archive/directions-2026-07/data-package.md) for the split).
 
 ### Delayed loading slot (`loadingDelayMs`)
 
@@ -183,5 +183,5 @@ domain-free ref-counting with `Disposable` integration, and rati's island teardo
 feature-detects `[Symbol.dispose]` on provided values. If it moves, it lands in core (it has
 no MobX dependency) next to `Source`; `ResourcePool`'s `source()` adapter shows the two
 compose. That would also give `.extend()` / layout-scope work
-([router-extensions.md](./router-extensions.md), the layout-level scope idea) a sanctioned
+([router-extensions.md](router-extensions.md), the layout-level scope idea) a sanctioned
 sharing layer — dedup by ref-count under shared heads instead of scope-level caching.
