@@ -1,9 +1,11 @@
-# DX-06 — Jnana adoption leg (the success test)
-
+---
 area: cross-repo — jnana frontend/test (rati consumed via rati-dev)
 needs: DX-05 (utilities proven at home first)
-disposition: cut 2026-07-19, DATA-03's pattern: if the migrations don't get shorter and
-             honester, the utilities are wrong
+status: done
+disposition: cut 2026-07-19, DATA-03's pattern: if the migrations don't get shorter and honester, the utilities are wrong
+---
+
+# DX-06 — Jnana adoption leg (the success test)
 
 ## Problem
 

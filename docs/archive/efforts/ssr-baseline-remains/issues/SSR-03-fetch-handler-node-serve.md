@@ -1,8 +1,11 @@
-# SSR-03 — rati/server: fetch request handler + Node adapter
-
+---
 area: packages/rati/src/server (new), examples/ssr
 needs: SSR-01, SSR-02
+status: done
 disposition: —
+---
+
+# SSR-03 — rati/server: fetch request handler + Node adapter
 
 ## Problem
 

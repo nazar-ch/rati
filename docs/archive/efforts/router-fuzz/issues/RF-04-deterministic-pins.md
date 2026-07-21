@@ -1,8 +1,11 @@
-# RF-04 — deterministic pins: audit the 21 suites, add what's missing
-
+---
 area: packages/rati/src/__tests__/router
 needs: RF-02
+status: done
 disposition: —
+---
+
+# RF-04 — deterministic pins: audit the 21 suites, add what's missing
 
 ## Problem
 

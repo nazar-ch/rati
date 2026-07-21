@@ -1,8 +1,11 @@
-# MF-05 — deterministic pins: the gaps enumerated in the strategy doc
-
+---
 area: packages/rati/src/__tests__/mandala
 needs: —
+status: done
 disposition: —
+---
+
+# MF-05 — deterministic pins: the gaps enumerated in the strategy doc
 
 ## Problem
 

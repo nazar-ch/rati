@@ -1,8 +1,11 @@
-# SSR-02 — rati/vite plugin: build orchestration, assets module, modulepreload
-
+---
 area: packages/rati/src/vite, examples/ssr
 needs: SSR-01
+status: done
 disposition: —
+---
+
+# SSR-02 — rati/vite plugin: build orchestration, assets module, modulepreload
 
 ## Problem
 

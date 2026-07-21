@@ -1,8 +1,11 @@
-# SSR-09 — rati/server without a react install
-
+---
 area: packages/rati/package.json
 needs: —
+status: done
 disposition: —
+---
+
+# SSR-09 — rati/server without a react install
 
 ## Problem
 

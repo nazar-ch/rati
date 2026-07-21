@@ -1,8 +1,11 @@
-# DATA-02 — guide coverage for the data layer
-
+---
 area: docs/public/guide.md (+ website nav if the guide grows a page)
 needs: — (independent)
+status: done
 disposition: cut 2026-07-18 at the implementation session
+---
+
+# DATA-02 — guide coverage for the data layer
 
 ## Problem
 

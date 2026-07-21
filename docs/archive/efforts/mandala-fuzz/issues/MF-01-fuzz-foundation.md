@@ -1,8 +1,11 @@
-# MF-01 — fuzz foundation: scope harness, reference model, smoke property
-
+---
 area: packages/rati/src/__tests__/fuzz
 needs: —
+status: done
 disposition: —
+---
+
+# MF-01 — fuzz foundation: scope harness, reference model, smoke property
 
 ## Problem
 

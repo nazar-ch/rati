@@ -1,8 +1,11 @@
-# IMP-01 — gap analysis against the field
-
+---
 area: docs/research/ (output); the whole public surface as reading
 needs: — (best after scope-and-island lands)
+status: done
 disposition: cut 2026-07-19; improvement-review direction 1
+---
+
+# IMP-01 — gap analysis against the field
 
 ## Problem
 

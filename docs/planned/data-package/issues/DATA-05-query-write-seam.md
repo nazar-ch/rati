@@ -1,8 +1,11 @@
-# DATA-05 — a single-value write seam for `query`
-
+---
 area: packages/rati/src/data — query.ts (+ reference.md)
 needs: nothing; jnana ◊FND-106 waits on it (with DATA-06) and on the next release
+status: done
 disposition: cut 2026-07-20 from the DATA-03 findings (gap 1)
+---
+
+# DATA-05 — a single-value write seam for `query`
 
 ## Problem
 

@@ -1,8 +1,11 @@
-# SSR-13 — dev and production must agree on a malformed escape
-
+---
 area: packages/rati/src/vite
 needs: —
+status: done
 disposition: —
+---
+
+# SSR-13 — dev and production must agree on a malformed escape
 
 ## Problem
 

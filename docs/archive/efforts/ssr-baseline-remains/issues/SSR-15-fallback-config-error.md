@@ -1,8 +1,11 @@
-# SSR-15 — the CSR fallback must not serve a shell the app cannot boot
-
+---
 area: packages/rati/src/server/requestHandler.ts
 needs: — (independent; SSR-12 landed)
+status: done
 disposition: cut 2026-07-16 (round-2 review), from an agent finding verified by hand
+---
+
+# SSR-15 — the CSR fallback must not serve a shell the app cannot boot
 
 ## Problem
 

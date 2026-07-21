@@ -1,9 +1,11 @@
-# DATA-03 — the load-bearing consumer migrations
-
-area: cross-repo — jnana frontend (rati consumed via rati-dev); omni-admin shapes as
-      the third case
+---
+area: cross-repo — jnana frontend (rati consumed via rati-dev); omni-admin shapes as the third case
 needs: DATA-01 for the JobsListStore leg (reactive params); the other two legs can start
+status: done
 disposition: cut 2026-07-18 at the implementation session, from the design record's §7
+---
+
+# DATA-03 — the load-bearing consumer migrations
 
 ## Problem
 

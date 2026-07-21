@@ -1,9 +1,11 @@
-# RF-08 — getPath refuses a dot-only param value
-
-area: packages/rati/src/router/store.ts (getPath), docs/public/reference.md,
-packages/rati/src/__tests__/fuzz (pool comments)
+---
+area: packages/rati/src/router/store.ts (getPath), docs/public/reference.md, packages/rati/src/__tests__/fuzz (pool comments)
 needs: — (independent)
+status: done
 disposition: cut 2026-07-16 (round-2 review); decision taken — throw
+---
+
+# RF-08 — getPath refuses a dot-only param value
 
 ## Problem
 

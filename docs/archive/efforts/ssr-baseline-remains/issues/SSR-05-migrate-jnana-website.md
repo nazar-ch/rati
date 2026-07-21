@@ -1,8 +1,11 @@
-# SSR-05 — migrate the jnana website onto the released SSR surface
-
+---
 area: ~/Sites/jnana/website (external repo; frontend + server workspaces)
 needs: SSR-03 (kit path; see Boundaries for the baseline-only variant), a rati release
+status: done
 disposition: —
+---
+
+# SSR-05 — migrate the jnana website onto the released SSR surface
 
 ## Problem
 

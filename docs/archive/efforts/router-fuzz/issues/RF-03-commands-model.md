@@ -1,8 +1,11 @@
-# RF-03 — fc.commands model: the navigation alphabet + behavioral invariants
-
+---
 area: packages/rati/src/__tests__/fuzz
 needs: RF-02, RF-06
+status: done
 disposition: —
+---
+
+# RF-03 — fc.commands model: the navigation alphabet + behavioral invariants
 
 ## Problem
 

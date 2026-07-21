@@ -1,8 +1,11 @@
-# SSR-01 — rati/vite plugin: dev serving without a user server
-
+---
 area: packages/rati/src/vite (new), examples/ssr
 needs: —
+status: done
 disposition: —
+---
+
+# SSR-01 — rati/vite plugin: dev serving without a user server
 
 ## Problem
 

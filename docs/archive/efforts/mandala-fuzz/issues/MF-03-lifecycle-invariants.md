@@ -1,8 +1,11 @@
-# MF-03 — lifecycle ledger under fuzz + StrictMode variant
-
+---
 area: packages/rati/src/__tests__/fuzz
 needs: MF-01, MF-02
+status: done
 disposition: —
+---
+
+# MF-03 — lifecycle ledger under fuzz + StrictMode variant
 
 ## Problem
 

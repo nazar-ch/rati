@@ -1,10 +1,11 @@
-# DX-01 — the `rati/testing` entry: `deferred`, `flush`, `controllableSource`
-
-area: packages/rati/src/testing/ (new), packages/rati/package.json (exports map),
-      packages/rati/vite config (build inputs), docs
+---
+area: packages/rati/src/testing/ (new), packages/rati/package.json (exports map), packages/rati/vite config (build inputs), docs
 needs: —
-disposition: cut 2026-07-19 from dx-and-tooling.md §Test utilities + the survey
-             (README §Survey)
+status: done
+disposition: cut 2026-07-19 from dx-and-tooling.md §Test utilities + the survey (README §Survey)
+---
+
+# DX-01 — the `rati/testing` entry: `deferred`, `flush`, `controllableSource`
 
 ## Problem
 

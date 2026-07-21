@@ -1,8 +1,11 @@
-# RF-05 — kill audit: prove the suite is not vacuous
-
+---
 area: packages/rati/src/router, packages/rati/src/__tests__/fuzz
 needs: RF-03, RF-04
+status: done
 disposition: —
+---
+
+# RF-05 — kill audit: prove the suite is not vacuous
 
 ## Problem
 

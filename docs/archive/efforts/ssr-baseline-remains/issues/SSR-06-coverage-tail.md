@@ -1,8 +1,11 @@
-# SSR-06 — SSR baseline coverage tail
-
+---
 area: packages/rati/src/__tests__
 needs: —
+status: done
 disposition: —
+---
+
+# SSR-06 — SSR baseline coverage tail
 
 ## Problem
 

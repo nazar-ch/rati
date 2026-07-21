@@ -1,10 +1,11 @@
-# RF-07 — relative strings: the anchor resolves, the router refuses
-
+---
 area: packages/rati/src/router (Link.tsx, store.ts, Navigate.tsx), docs/public/reference.md
 needs: — (RF-06 landed)
-disposition: cut 2026-07-16 (round-2 review); decision corrected 2026-07-17 — the router
-does not support relative strings; `<Link>` resolves them at the platform surface that
-owns them, the anchor
+status: done
+disposition: cut 2026-07-16 (round-2 review); decision corrected 2026-07-17 — the router does not support relative strings; `<Link>` resolves them at the platform surface that owns them, the anchor
+---
+
+# RF-07 — relative strings: the anchor resolves, the router refuses
 
 ## Problem
 

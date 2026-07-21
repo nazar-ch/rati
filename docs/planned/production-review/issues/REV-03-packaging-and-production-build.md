@@ -1,9 +1,11 @@
-# REV-03 — packaging & production build
-
-area: packages/rati/package.json (exports map, files, peers, sideEffects), the vite lib
-      build + tsgo emit, minified consumer builds, examples as build evidence
+---
+area: packages/rati/package.json (exports map, files, peers, sideEffects), the vite lib build + tsgo emit, minified consumer builds, examples as build evidence
 needs: — (suggested first lens: it gates trusting production builds elsewhere)
+status: open
 disposition: cut 2026-07-19; production-review lens 3. Carries the effort's one known bug.
+---
+
+# REV-03 — packaging & production build
 
 ## Problem
 

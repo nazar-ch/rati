@@ -1,8 +1,11 @@
-# DX-05 — dogfood: rati's suites adopt the entry
-
+---
 area: packages/rati/src/__tests__/ (broad), src/testing/ (fixes it forces)
 needs: DX-02, DX-03, DX-04 merged
+status: done
 disposition: cut 2026-07-19; the survey's duplication counts are the work list
+---
+
+# DX-05 — dogfood: rati's suites adopt the entry
 
 ## Problem
 

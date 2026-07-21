@@ -1,9 +1,11 @@
-# DX-03 — `createTestRouter` + the stores-injection seam
-
+---
 area: packages/rati/src/testing/, docs
-needs: DX-01 (the entry + API style); the stores-container work landed (assumed at cut —
-       reconcile against what shipped)
+needs: DX-01 (the entry + API style); the stores-container work landed (assumed at cut — reconcile against what shipped)
+status: done
 disposition: cut 2026-07-19 from dx-and-tooling.md §Test utilities + the survey
+---
+
+# DX-03 — `createTestRouter` + the stores-injection seam
 
 ## Problem
 

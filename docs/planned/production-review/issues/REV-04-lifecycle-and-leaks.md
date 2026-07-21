@@ -1,10 +1,11 @@
-# REV-04 — lifecycle, teardown & leaks
-
-area: every subscribe/attach/listener/timer/cache across packages/rati/src (excluding
-      data/): mandala buckets + channels, Source attach/detach, router + history +
-      scrollRestoration, stores, vite plugin (HMR), server handles
+---
+area: every subscribe/attach/listener/timer/cache across packages/rati/src (excluding data/): mandala buckets + channels, Source attach/detach, router + history + scrollRestoration, stores, vite plugin (HMR), server handles
 needs: — (best after scope-and-island lands — SI adds timers and kept buckets to audit)
+status: open
 disposition: cut 2026-07-19; production-review lens 4
+---
+
+# REV-04 — lifecycle, teardown & leaks
 
 ## Problem
 

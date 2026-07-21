@@ -1,8 +1,11 @@
-# RF-01 — router hardening: the pre-cut review's four findings
-
+---
 area: packages/rati/src/router
 needs: —
+status: done
 disposition: —
+---
+
+# RF-01 — router hardening: the pre-cut review's four findings
 
 ## Problem
 

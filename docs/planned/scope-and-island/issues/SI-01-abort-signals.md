@@ -1,8 +1,11 @@
-# SI-01 — abort signals for data loads
-
+---
 area: packages/rati/src/mandala/resolver.tsx, src/scope/scope.ts (load types), docs
 needs: —
+status: done
 disposition: cut 2026-07-19 from scope-and-island-directions.md §1
+---
+
+# SI-01 — abort signals for data loads
 
 ## Problem
 

@@ -1,9 +1,11 @@
-# SI-04 — per-island `ssr: false`
-
-area: packages/rati/src/mandala/{resolver.tsx,hydration.tsx}, src/island/island.ts,
-      src/router/route.tsx, examples/ssr, docs
+---
+area: packages/rati/src/mandala/{resolver.tsx,hydration.tsx}, src/island/island.ts, src/router/route.tsx, examples/ssr, docs
 needs: — (B1; if run alongside SI-01, land after it — shared resolver files)
+status: done
 disposition: cut 2026-07-19 from scope-and-island-directions.md §2
+---
+
+# SI-04 — per-island `ssr: false`
 
 ## Problem
 

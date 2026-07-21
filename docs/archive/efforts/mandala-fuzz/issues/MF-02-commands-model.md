@@ -1,8 +1,11 @@
-# MF-02 — fc.commands model: the event alphabet + behavioral invariants
-
+---
 area: packages/rati/src/__tests__/fuzz
 needs: MF-01
+status: done
 disposition: —
+---
+
+# MF-02 — fc.commands model: the event alphabet + behavioral invariants
 
 ## Problem
 

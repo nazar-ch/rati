@@ -1,8 +1,11 @@
-# SSR-07 — head: the first client apply must not clobber the server head
-
+---
 area: packages/rati/src/head
 needs: —
+status: done
 disposition: —
+---
+
+# SSR-07 — head: the first client apply must not clobber the server head
 
 ## Problem
 

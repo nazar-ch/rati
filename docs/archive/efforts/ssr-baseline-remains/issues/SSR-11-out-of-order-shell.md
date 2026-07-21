@@ -1,8 +1,11 @@
-# SSR-11 — the out-of-order shell (large routes ship the loading slot)
-
+---
 area: packages/rati/src/ssr/renderToHtml.ts
 needs: —
+status: done
 disposition: —
+---
+
+# SSR-11 — the out-of-order shell (large routes ship the loading slot)
 
 ## Problem
 

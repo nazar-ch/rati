@@ -1,8 +1,11 @@
-# SSR-08 — a followed redirect wins over no-match
-
+---
 area: packages/rati/src/ssr, packages/rati/src/router/prepareRoute.ts
 needs: —
+status: done
 disposition: —
+---
+
+# SSR-08 — a followed redirect wins over no-match
 
 ## Problem
 

@@ -1,8 +1,11 @@
-# DX-09 — a real RouterStore fits a `PartialStores` slot
-
+---
 area: packages/rati/src/testing/stores.tsx (+ reference docs)
 needs: nothing (cut 2026-07-20 from the DX-06 frictions)
+status: done
 disposition: the honest value must type-check wherever the fake does
+---
+
+# DX-09 — a real RouterStore fits a `PartialStores` slot
 
 ## Problem
 

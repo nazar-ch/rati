@@ -1,8 +1,11 @@
-# RF-02 — fuzz foundation: traversable history, routes arbitrary, reference model, smoke
-
+---
 area: packages/rati/src/router/history.ts, packages/rati/src/__tests__/fuzz
 needs: RF-01
+status: done
 disposition: —
+---
+
+# RF-02 — fuzz foundation: traversable history, routes arbitrary, reference model, smoke
 
 ## Problem
 

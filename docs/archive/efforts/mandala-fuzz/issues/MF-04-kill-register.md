@@ -1,8 +1,11 @@
-# MF-04 — kill register: prove the harness bites, file the recipes
-
+---
 area: packages/rati/src/__tests__/fuzz, docs/archive/mandala-testing.md
 needs: MF-02, MF-03
+status: done
 disposition: —
+---
+
+# MF-04 — kill register: prove the harness bites, file the recipes
 
 ## Problem
 

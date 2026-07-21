@@ -1,11 +1,11 @@
-# SI-05 — automatic retry policy
+---
+area: packages/rati/src/mandala/{boundary.tsx,resolver.tsx}, src/island/island.ts, src/router/route.tsx, docs
+needs: SI-03 (an automatic retry must be visible through the phase surface, not a frozen error slot)
+status: done
+disposition: cut 2026-07-19 from scope-and-island-directions.md §2 (the doc marked it wait-for-need; cut anyway — README §Decisions)
+---
 
-area: packages/rati/src/mandala/{boundary.tsx,resolver.tsx}, src/island/island.ts,
-      src/router/route.tsx, docs
-needs: SI-03 (an automatic retry must be visible through the phase surface, not a frozen
-       error slot)
-disposition: cut 2026-07-19 from scope-and-island-directions.md §2 (the doc marked it
-             wait-for-need; cut anyway — README §Decisions)
+# SI-05 — automatic retry policy
 
 ## Problem
 

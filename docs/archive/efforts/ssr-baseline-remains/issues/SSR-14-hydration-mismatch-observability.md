@@ -1,9 +1,11 @@
-# SSR-14 — hydration mismatches must be observable to the suites that claim them
-
-area: packages/rati/src/__tests__/router/hydration.test.tsx (and any other console-only
-hydration assert)
+---
+area: packages/rati/src/__tests__/router/hydration.test.tsx (and any other console-only hydration assert)
 needs: — (independent)
+status: done
 disposition: cut 2026-07-16 (round-2 review), from SSR-12's finding
+---
+
+# SSR-14 — hydration mismatches must be observable to the suites that claim them
 
 ## Problem
 

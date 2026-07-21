@@ -1,8 +1,11 @@
-# IMP-04 — fresh-eyes ergonomics
-
+---
 area: docs/research/ (output); the whole public API as the subject
 needs: — (best after scope-and-island lands)
+status: open
 disposition: cut 2026-07-19; improvement-review direction 4
+---
+
+# IMP-04 — fresh-eyes ergonomics
 
 ## Problem
 

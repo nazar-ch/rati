@@ -1,8 +1,11 @@
-# SSR-04 — migrate nazar.ch onto the released SSR surface
-
+---
 area: ~/Sites/nazar.ch/site (external repo)
 needs: SSR-03 (kit path; see Boundaries for the baseline-only variant), a rati release
+status: done
 disposition: —
+---
+
+# SSR-04 — migrate nazar.ch onto the released SSR surface
 
 ## Problem
 

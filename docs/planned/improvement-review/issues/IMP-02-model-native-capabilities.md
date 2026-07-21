@@ -1,8 +1,11 @@
-# IMP-02 — what the scope model uniquely enables
-
+---
 area: docs/research/ (output); scope/, mandala/, island/, router/ as reading
 needs: — (best after scope-and-island lands)
+status: done
 disposition: cut 2026-07-19; improvement-review direction 2
+---
+
+# IMP-02 — what the scope model uniquely enables
 
 ## Problem
 

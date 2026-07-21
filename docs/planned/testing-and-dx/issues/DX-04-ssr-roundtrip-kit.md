@@ -1,9 +1,11 @@
-# DX-04 — SSR round-trip kit
-
+---
 area: packages/rati/src/testing/, docs
 needs: DX-01 (the entry + API style)
-disposition: cut 2026-07-19 from the survey (README §Survey) — the research doc missed it;
-             added at cut by maintainer's more-scope call
+status: done
+disposition: cut 2026-07-19 from the survey (README §Survey) — the research doc missed it; added at cut by maintainer's more-scope call
+---
+
+# DX-04 — SSR round-trip kit
 
 ## Problem
 

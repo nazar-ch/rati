@@ -1,8 +1,11 @@
-# SSR-10 — docs tail from the consumer migrations
-
+---
 area: docs/public/ssr.md, docs/internals.md
 needs: —
+status: done
 disposition: —
+---
+
+# SSR-10 — docs tail from the consumer migrations
 
 ## Problem
 

@@ -1,11 +1,11 @@
-# RF-09 — the coverage guard flakes at the budget its comment vouches for
-
-area: packages/rati/src/__tests__/fuzz/router.commands.fuzz.test.tsx (the "never
-exercised" loop), scripts/ci.ts (stage split, context only)
+---
+area: packages/rati/src/__tests__/fuzz/router.commands.fuzz.test.tsx (the "never exercised" loop), scripts/ci.ts (stage split, context only)
 needs: — (independent)
-disposition: filed 2026-07-17 (found by SSR-14/15's gate run, measured then; re-fired
-2026-07-17 during the RF-07 correction round on a tree touching no traversal code).
-Decision pending — recommendation below.
+status: done
+disposition: filed 2026-07-17 (found by SSR-14/15's gate run, measured then; re-fired 2026-07-17 during the RF-07 correction round on a tree touching no traversal code). Decision pending — recommendation below.
+---
+
+# RF-09 — the coverage guard flakes at the budget its comment vouches for
 
 ## Problem
 

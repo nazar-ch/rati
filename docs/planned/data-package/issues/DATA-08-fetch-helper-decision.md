@@ -1,8 +1,11 @@
-# DATA-08 — the fetch-boilerplate helper decision
-
+---
 area: design — rati/data's transport stance (and/or jnana's API layer)
 needs: the maintainer's call; blocked on it
+status: open
 disposition: cut 2026-07-20 from the DATA-03 findings (gap 3)
+---
+
+# DATA-08 — the fetch-boilerplate helper decision
 
 ## Problem
 

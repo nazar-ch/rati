@@ -1,9 +1,11 @@
-# IMP-03 — adoption & interop friction
-
-area: docs/research/ (output); the public surface + examples as the walked path; a scratch
-      consumer app as the instrument
+---
+area: docs/research/ (output); the public surface + examples as the walked path; a scratch consumer app as the instrument
 needs: — (best after scope-and-island lands)
+status: open
 disposition: cut 2026-07-19; improvement-review direction 3
+---
+
+# IMP-03 — adoption & interop friction
 
 ## Problem
 

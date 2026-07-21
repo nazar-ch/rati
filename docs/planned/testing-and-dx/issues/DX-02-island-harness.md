@@ -1,8 +1,11 @@
-# DX-02 — `renderIsland` harness + slot readers
-
+---
 area: packages/rati/src/testing/, docs
 needs: DX-01 (the entry + API style)
+status: done
 disposition: cut 2026-07-19 from dx-and-tooling.md §Test utilities + the survey
+---
+
+# DX-02 — `renderIsland` harness + slot readers
 
 ## Problem
 
