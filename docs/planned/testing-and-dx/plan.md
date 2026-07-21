@@ -1,7 +1,7 @@
 # testing-and-dx — implementation plan
 
-Items live in [issues/](issues/); status derives from rati git (`git log --grep 'DX-'`,
-`Closes:` trailers). No status here.
+Items live in [issues/](issues/); each record's `status:` field is the workflow state.
+No status here.
 
 ## Batches
 

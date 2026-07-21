@@ -1,7 +1,12 @@
 # router-fuzz — randomized testing for the router, plus the hardening it starts from
 
-Cut 2026-07-15. Per-item status derives from rati git (`git log --grep 'RF-'`) — never from
-this file; conventions below.
+> **Archived 2026-07-19** — closed tracker, kept as the historical record. No successor
+> effort and no open items carried: the router's fuzz lanes ship, and the hardening the
+> review produced landed with them. Predecessor:
+> [mandala-fuzz](docs/archive/efforts/mandala-fuzz/README.md).
+
+Status: **done — cut 2026-07-15, closed & archived 2026-07-19.** Per-item status is each
+record's own `status:` field — never from this file; conventions below.
 
 The second fuzz target, unblocked by [mandala-fuzz](docs/archive/efforts/mandala-fuzz/README.md) proving the
 harness pattern: an `fc.commands` model over navigation interleavings (push / replace /
@@ -58,8 +63,9 @@ one-notification-per-call `finally` is deliberate, `useRouter` subscribes throug
   through effects, the redirect trail — never mechanics (`pathCounter` values, listener
   counts, internal marker strings). A test that fails under a legitimate optimization is a
   test bug.
-- **Tracking is manual**, git-derived: `RF-NN:` commit subjects mark in-progress, a
-  `Closes: RF-NN` trailer marks done. No status in these files.
+- **Tracking is manual**, git-derived at cut: `RF-NN:` commit subjects marked in-progress,
+  a `Closes: RF-NN` trailer marked done. **Superseded 2026-07-21** by the tree-wide adoption
+  of jnana's record convention — status is each record's own `status:` field.
 - **SSR stays deterministic.** `prepareRoute` already has pins; no `prerender`-per-case
   fuzzing (same cost call as mandala-fuzz took).
 - **Scroll restoration is fuzzed as bookkeeping, not pixels.** jsdom has no layout; the
@@ -640,6 +646,6 @@ by hand) and re-opened the `.`/`..` topic; the decisions are above, the findings
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with
-the item id (`RF-01: …`), put `Closes: RF-01` in the finishing commit's trailer block, keep
+the item id (`RF-01: …`), flip the record's `status: open` → `done` in the finishing commit, keep
 `yarn ci` green (`scripts/ci.ts` — the whole gate, deep fuzz budget included), and push.
 Findings that are out of an item's scope get a dated note appended here, not a silent fix.

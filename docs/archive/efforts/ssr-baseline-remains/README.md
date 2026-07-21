@@ -1,6 +1,13 @@
 # ssr-baseline-remains — server kit, consumer migrations, coverage tail
 
-Status: planned 2026-07-14, cut at the close of the SSR-baseline round.
+> **Archived 2026-07-19** — closed tracker, kept as the historical record. No successor
+> effort and no open items carried: all fifteen landed. The behavioral reference is
+> [docs/current/public/ssr.md](docs/current/public/ssr.md); the design records it executed
+> live in [directions-2026-07/](docs/archive/directions-2026-07/README.md).
+
+Status: **done — cut 2026-07-14 at the close of the SSR-baseline round, closed & archived
+2026-07-19.** Per-item status is each record's own `status:` field — never from this file;
+conventions below.
 
 The 2026-07 SSR baseline shipped in rati core: head management (`Title`/`Meta`/
 `useTitle`/`HeadProvider` + `headTags`), the versioned hydration payload
@@ -22,9 +29,10 @@ maintainer-confirmed), the **consumer migrations** (nazar.ch, jnana website), an
   binding; in-item design freedom is below that line only.
 - Consumer migrations wait for the kit (migrate once, not twice); if the kit stalls, a
   checkpoint may re-decide and migrate consumers straight onto the baseline.
-- Tracking is manual, jnana-shaped: status derives from rati git — `SSR-NN:` commit
-  subjects, a `Closes: SSR-NN` trailer on the finishing commit. No status written into
-  these files.
+- Tracking is manual, jnana-shaped: at cut, status derived from rati git — `SSR-NN:` commit
+  subjects, a `Closes: SSR-NN` trailer on the finishing commit. **Superseded 2026-07-21** by
+  the tree-wide adoption of jnana's record convention — status is each record's own
+  `status:` field.
 
 ## Decisions taken 2026-07-15 (findings round)
 
@@ -88,8 +96,8 @@ Batching, dependencies, grading: [plan.md](plan.md).
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects
-with the item id (`SSR-01: …`), put `Closes: SSR-01` in the finishing commit's trailer
-block, keep `vp run rati#typecheck` + `vp lint` + `vp run rati#test` green, and keep
+with the item id (`SSR-01: …`), flip the record's `status: open` → `done` in the finishing
+commit, keep `vp run rati#typecheck` + `vp lint` + `vp run rati#test` green, and keep
 `docs/public/ssr.md` + `docs/internals.md` in sync with behavior changes. Findings out
 of an item's scope get a dated note appended here, not a silent fix.
 

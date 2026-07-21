@@ -1,7 +1,7 @@
 # scope-and-island — resolution control and advanced loading states
 
-Status: planned 2026-07-19. Per-item status derives from rati git (`git log --grep 'SI-'`,
-`Closes:` trailers) — never from this file; conventions below.
+Status: planned 2026-07-19. Per-item status is each record's own `status:` field — never
+from this file; conventions below.
 
 Executes parts 1 and 2 of
 [scope-and-island-directions.md](docs/research/scope-and-island-directions.md) — the scope/
@@ -439,8 +439,8 @@ flag:
 
 ## Per-item conventions
 
-Atomic commits on the current branch (rati `CLAUDE.md`); subjects prefixed `SI-NN:`, a
-`Closes: SI-NN` trailer on the finishing commit. `yarn ci` green before handing over
+Atomic commits on the current branch (rati `CLAUDE.md`); subjects prefixed `SI-NN:`, the
+record's `status: open` → `done` in the finishing commit. `yarn ci` green before handing over
 (`scripts/ci.ts` — fmt / lint / typecheck / test / deep fuzz / build). Public surface changes
 document in `docs/current/public/` (guide + reference) in the same item;
 `docs/current/internals.md` when the mandala's machinery changes. Findings out of an item's

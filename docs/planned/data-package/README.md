@@ -42,35 +42,37 @@ session deliberately left.
 
 ## Items
 
-- ✅ [DATA-01 — `reactive` params for query](issues/DATA-01-reactive-query-params.md) —
-  **done 2026-07-19**: the design pass + `reactive` on `query`/`collection`/`pagedCollection`,
-  tests, reference/design-record docs. (`Closes: DATA-01`.)
-- ✅ [DATA-02 — guide coverage for the data layer](issues/DATA-02-guide-coverage.md) —
-  **done 2026-07-19**: `guide.md` now teaches the data-layer model end to end. (`Closes: DATA-02`.)
-- ✅ [DATA-03 — the load-bearing consumer migrations](issues/DATA-03-consumer-migrations.md)
-  — **done 2026-07-20** on jnana (PR nazar-ch/jnana#822, merged): all three legs ran;
-  the verdict and findings below. (`Closes: DATA-03`.)
+The records are the tracker — each carries its own `status:` field
+(`grep -l 'status: open' issues/*.md` is the open list). This map is narrative and
+ordering only:
+
+- [DATA-01 — `reactive` params for query](issues/DATA-01-reactive-query-params.md) —
+  the design pass + `reactive` on `query`/`collection`/`pagedCollection`, tests,
+  reference/design-record docs (2026-07-19).
+- [DATA-02 — guide coverage for the data layer](issues/DATA-02-guide-coverage.md) —
+  `guide.md` teaches the data-layer model end to end (2026-07-19).
+- [DATA-03 — the load-bearing consumer migrations](issues/DATA-03-consumer-migrations.md)
+  — all three legs ran on jnana (PR nazar-ch/jnana#822, merged, 2026-07-20); the verdict
+  and findings below.
 - [DATA-04 — extraction & entry-layout decision](issues/DATA-04-extraction-decision.md)
   — companion package vs entry, `rati/mobx` absorption, forms subpath.
-- ✅ [DATA-05 — a single-value write seam for `query`](issues/DATA-05-query-write-seam.md)
-  — **done 2026-07-20**: `set`/`patch` (through `onSuccess`, so a collection's map stays
-  coherent), tests, reference.md. (`Closes: DATA-05`.)
-- ✅ [DATA-06 — `refreshes` sees the mutation call's arguments](issues/DATA-06-refreshes-args.md)
-  — **done 2026-07-20**: the declaration receives the call's args at both fire sites;
-  keyed tests pin the FND-106 choreography with DATA-05. (`Closes: DATA-06`.)
-- ✅ [DATA-07 — `field.props` under `exactOptionalPropertyTypes`](issues/DATA-07-field-props-exact-optional.md)
-  — **done 2026-07-20**: `errorMessage` is absent while clean, genuinely `?:`.
-  (`Closes: DATA-07`.)
+- [DATA-05 — a single-value write seam for `query`](issues/DATA-05-query-write-seam.md)
+  — `set`/`patch` (through `onSuccess`, so a collection's map stays coherent), tests,
+  reference.md (2026-07-20).
+- [DATA-06 — `refreshes` sees the mutation call's arguments](issues/DATA-06-refreshes-args.md)
+  — the declaration receives the call's args at both fire sites; keyed tests pin the
+  FND-106 choreography with DATA-05 (2026-07-20).
+- [DATA-07 — `field.props` under `exactOptionalPropertyTypes`](issues/DATA-07-field-props-exact-optional.md)
+  — `errorMessage` is absent while clean, genuinely `?:` (2026-07-20).
 - [DATA-08 — the fetch-boilerplate helper decision](issues/DATA-08-fetch-helper-decision.md)
   — where the ok-check + `json()` + error mapping lives; **maintainer call**, blocked on it.
 - [DATA-09 — pin the unpinned data branches](issues/DATA-09-unpinned-branches.md)
   — test-only: the branches the 2026-07-20 coverage map found bare.
 
-DATA-01..03 and 05..07 are done. DATA-05 and DATA-06 were coupled through jnana's
-◊FND-106: restoring the optimistic retention hop needs the seam (05) *and* the on-error
-recovery refresh of a keyed query (06) — jnana can unskip HI-03 after the next rati
-release. DATA-04 stays last — it should extract the surface *after* DATA-08's answer
-lands, not before.
+DATA-05 and DATA-06 were coupled through jnana's ◊FND-106: restoring the optimistic
+retention hop needs the seam (05) *and* the on-error recovery refresh of a keyed query
+(06) — jnana can unskip HI-03 after the next rati release. DATA-04 stays last — it should
+extract the surface *after* DATA-08's answer lands, not before.
 
 ## DATA-03 findings — the jnana migration (recorded 2026-07-20)
 
@@ -143,7 +145,7 @@ Separately, a 2026-07-20 coverage map of rati's own data tests found unpinned br
 ## Per-item conventions
 
 As in the sibling records: atomic commits on the current branch, subjects prefixed
-`DATA-NN:`, a `Closes: DATA-NN` trailer on the finishing commit, `vp run
+`DATA-NN:`, the record's `status: open` → `done` in the finishing commit, `vp run
 rati#typecheck` + `vp lint` + `vp run rati#test` green, reference.md/internals.md in
 sync. Findings out of an item's scope get a dated note appended here.
 

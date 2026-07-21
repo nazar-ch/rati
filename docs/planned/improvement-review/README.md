@@ -1,7 +1,7 @@
 # improvement-review — multi-direction improvement proposals
 
-Status: planned 2026-07-19. Per-item status derives from rati git (`git log --grep 'IMP-'`,
-`Closes:` trailers — the finishing commit is the one landing the session's proposal docs).
+Status: planned 2026-07-19. Per-item status is each record's own `status:` field, flipped
+by the commit landing that session's proposal docs — never from this file.
 
 Four generative review directions over rati, each run as its **own session** (maintainer-
 launched, deliberately not orchestrated): where the framework should go next, what adopters
@@ -147,8 +147,8 @@ README calls signal.
 
 ## Per-item conventions
 
-Atomic commits on the current branch; subjects prefixed `IMP-NN:`, `Closes: IMP-NN` on the
-finishing commit. Sessions touch `docs/research/` and this README only — no `src/` changes,
+Atomic commits on the current branch; subjects prefixed `IMP-NN:`, the record's
+`status: open` → `done` in the finishing commit. Sessions touch `docs/research/` and this README only — no `src/` changes,
 no `docs/current/` changes (a proposal is not yet behavior). `bash`-run doc checks: none
 beyond `vp check` being unaffected (markdown is excluded from oxfmt — edit by hand,
 match the tree's style).

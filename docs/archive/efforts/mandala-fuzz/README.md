@@ -1,7 +1,12 @@
 # mandala-fuzz — randomized testing foundation for the mandala engine
 
-Cut 2026-07-12. Per-item status derives from rati git (`git log --grep 'MF-'`) — never from
-this file; see Decisions below.
+> **Archived 2026-07-19** — closed tracker, kept as the historical record. Successor:
+> [router-fuzz](docs/archive/efforts/router-fuzz/README.md), the second fuzz target this
+> one unblocked. No open items carried; the strategy record it executes is
+> [mandala-testing.md](docs/archive/mandala-testing.md).
+
+Status: **done — cut 2026-07-12, closed & archived 2026-07-19.** Per-item status is each
+record's own `status:` field — never from this file; see Decisions below.
 
 The first slice of the "paranoid coverage for the whole rati surface" direction: a fast-check
 model-based fuzz suite over the mandala (generated scopes × event interleavings), plus the
@@ -21,10 +26,11 @@ planning pass once the mandala foundation proves the harness pattern.
   the lifecycle ledger — never mechanics. A test that would fail under a legitimate engine
   optimization is a test bug, not a regression. This is the effort's acceptance bar; MF-01's
   review calibrates it.
-- **Tracking is manual.** This effort borrows jnana's shapes (records, plan, batches, derived
-  status) but none of its tooling: status derives from rati git — `MF-NN:` commit subjects mark
-  in-progress, a `Closes: MF-NN` trailer on the finishing commit marks done
-  (`git log --grep 'MF-'` is the view). No status is ever written into these files.
+- **Tracking is manual.** This effort borrows jnana's shapes (records, plan, batches) but none
+  of its tooling. *At cut:* status derived from rati git — `MF-NN:` commit subjects marked
+  in-progress, a `Closes: MF-NN` trailer on the finishing commit marked done. **Superseded
+  2026-07-21**, when the tree adopted jnana's record convention wholesale: status is each
+  record's own `status:` field, and the trailers stay only in this effort's history.
 - **SSR paths stay deterministic** (pins in MF-05); `prerender`-per-case fuzzing is rejected for
   cost until evidence demands it.
 
@@ -247,6 +253,6 @@ revisit condition.
 ## Per-item conventions
 
 rati works in atomic commits on the current branch (its `CLAUDE.md`); prefix subjects with the
-item id (`MF-01: …`), put `Closes: MF-01` in the finishing commit's trailer block, keep
+item id (`MF-01: …`), flip the record's `status: open` → `done` in the finishing commit, keep
 `vp run rati#typecheck` + `vp lint` + `vp run rati#test` green, and push. Findings that are out
 of an item's scope get a dated note appended here, not a silent fix.

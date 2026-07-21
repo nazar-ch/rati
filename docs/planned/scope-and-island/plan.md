@@ -1,7 +1,7 @@
 # scope-and-island — implementation plan
 
-Items live in [issues/](issues/); status derives from rati git (`git log --grep 'SI-'`,
-`Closes:` trailers). No status here.
+Items live in [issues/](issues/); each record's `status:` field is the workflow state.
+No status here.
 
 ## Batches
 

@@ -1,7 +1,7 @@
 # production-review — multi-lens review before public/production usage
 
-Status: planned 2026-07-19. Per-item status derives from rati git (`git log --grep 'REV-'`,
-`Closes:` trailers) — a lens whose findings and fixes are committed with its id is done.
+Status: planned 2026-07-19. Per-item status is each record's own `status:` field — a lens
+flips its record to `done` in the commit landing its findings and fixes.
 
 Seven independent review lenses over the rati package, each run as its **own session** (the
 maintainer launches them individually — deliberately not an orchestrated pass). Every lens
@@ -71,6 +71,6 @@ repro, fixed-in-session vs filed, severity for filed items.)
 ## Per-item conventions
 
 Atomic commits on the current branch; in-session fixes and their pins prefixed `REV-NN:`,
-a `Closes: REV-NN` trailer on the lens's finishing commit (which may be the findings-note
-commit if nothing was fixed). `yarn ci` green after any fix. Fixes keep docs in sync
+the record's `status: open` → `done` in the lens's finishing commit (which may be the
+findings-note commit if nothing was fixed). `yarn ci` green after any fix. Fixes keep docs in sync
 (standing rule); findings do not pre-edit docs for changes not yet made.

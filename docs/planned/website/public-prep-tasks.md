@@ -1,5 +1,10 @@
 # Public-prep — task batches (July 2026)
 
+> **Legacy format**, kept readable in place. This file predates the work-item record
+> convention (`issues/<ID>-<slug>.md` with a `status:` field — CLAUDE.md §Work items): its
+> tasks are bullets in one file and its "Done" banners are hand-kept. Read them as
+> historical; anything cut out of here from now on becomes a record.
+
 The next batch of work preparing rati to share, sequenced for delegation. Prefixes:
 **CORE** (the rati package), **DOC** (documentation), **SITE** (the website workspace),
 **EXT** (other repos). Tasks are sized for one agent each; unless a dependency says

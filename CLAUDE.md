@@ -21,8 +21,9 @@ behavior they describe.
   engine, the resolver/refresh machinery, lifecycle/teardown, channels, SSR dehydration,
   testing pointers, toolchain.
 - `docs/research/` — deferred features, design directions, testing strategy.
-- `docs/planned/` — committed efforts (jnana-style records; status derives from git —
-  `<ID>:` commit subjects, `Closes:` trailers).
+- `docs/planned/` — committed efforts: an effort `README.md` (framing, decisions,
+  narrative item map), an optional `plan.md` (batches + grading), and one **work-item
+  record** per item under `issues/<ID>-<slug>.md`. Conventions below.
 - `docs/current/RELEASING.md` — release process; `docs/website-plan.md` — the public site.
 
 ## Mental model
@@ -66,6 +67,33 @@ internal — callers only ever see `island`/`route`).
   side. Within-directory relative links are fine (they move with their folder). Cross-repo refs
   use a scheme (`jnana:///docs/README.md`); backticked paths are deliberate non-links. Same
   convention as jnana's docs/README.md "Doc links" (gated there by check-doc-links.ts).
+
+## Work items
+
+Tasks and issues are one primitive — a **work item**: one file per item,
+`docs/planned/<effort>/issues/<ID>-<slug>.md` (jnana's convention; kept deliberately
+compatible with it, minus the `tools/issues.ts` tooling rati doesn't have).
+
+- **Anatomy** — a leading `---` frontmatter block, then the title `# <ID> — <imperative
+  summary>`. The block holds `area:`, `needs:` (ids this depends on), `status:`
+  (`open`/`done`), `disposition:` — simple `key: value` raw-string lines, one line each
+  (not full YAML: no quoting, no nesting, no wrapped continuations). It sits *above* the
+  title so a Markdown formatter treats it as opaque. Then the body: problem, why it
+  matters, links — written for a future session with none of your context.
+- **Assignable = the executable sections are present**: `## Scope` (numbered steps),
+  `## Boundaries` (what not to touch), `## Verify` (the recipe proving it done). Without
+  them a record is filed analysis awaiting planning.
+- **Status is the record's own `status:` field**, read from whatever branch you are on —
+  never derived from git log, never a table in a README. Born `open`; the finishing commit
+  flips it to `done`, and **that edit is the whole close ceremony** (no `Closes:` trailer,
+  no "(done)" title, no ✅). A commit closing several items flips each. Reopen = flip back.
+  Partial progress goes in the record's **text**, not a third state.
+- **Decisions stay separate**, in `disposition:`, with a dated line in the body saying why.
+  A disposition leading with `accepted` / `adopted` / `deferred` / `dissolved` / `retracted`
+  / `watch` / `wontfix` **holds** the item out of default views; any other leading word
+  (rati's records mostly lead with `cut …`) reads as a note and leaves the record live.
+- **Prefix commit subjects with the id**: `SI-03: <what>`. Never hand-maintain a list or
+  status table of items in any doc — effort READMEs carry narrative and ordering only.
 
 ## Restricted actions
 

@@ -1,7 +1,7 @@
 # testing-and-dx — the `rati/testing` entry, grounded in what both repos hand-roll
 
-Status: planned 2026-07-19. Per-item status derives from rati git (`git log --grep 'DX-'`,
-`Closes:` trailers) — never from this file; conventions below.
+Status: planned 2026-07-19. Per-item status is each record's own `status:` field — never
+from this file; conventions below.
 
 Executes [dx-and-tooling.md](docs/research/dx-and-tooling.md), checked against what rati's
 own suites and Jnana's frontend tests actually hand-roll (survey below) and built as
@@ -543,8 +543,8 @@ Cut and shipped the same day the adoption note landed; both DX-06 frictions clos
 
 ## Per-item conventions
 
-Atomic commits on the current branch; subjects prefixed `DX-NN:`, a `Closes: DX-NN` trailer
-on the finishing commit. `yarn ci` green before handing over. The entry is public surface:
+Atomic commits on the current branch; subjects prefixed `DX-NN:`, the record's
+`status: open` → `done` in the finishing commit. `yarn ci` green before handing over. The entry is public surface:
 each item documents what it ships in `docs/current/public/reference.md` (a `rati/testing`
 section) in the same item; internals notes where the promoted cores leave the fuzz harness.
 Jnana-side commits (DX-06) follow Jnana's conventions; this record tracks only findings and
