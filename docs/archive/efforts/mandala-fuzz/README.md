@@ -7,7 +7,7 @@ The first slice of the "paranoid coverage for the whole rati surface" direction:
 model-based fuzz suite over the mandala (generated scopes × event interleavings), plus the
 deterministic pins the selective-refresh / SSR-sources work left open. The strategy record — the
 altitude rule, the pin list, the harness/model/invariant design — is
-[docs/archive/mandala-testing.md](../../archive/mandala-testing.md); this effort executes it.
+[docs/archive/mandala-testing.md](docs/archive/mandala-testing.md); this effort executes it.
 The playbook is jnana's fuzz conventions (`~/Sites/jnana/.claude/fuzz-testing.md`): `fc.commands`
 models, kill-tested harnesses, `fuzz(n)` budgets with `FUZZ_RUNS` / `FUZZ_LEVEL` / `FUZZ_SEED`.
 
@@ -39,7 +39,7 @@ StrictMode variant — same harness files as MF-02, so they run as one lane. MF-
 of the harness: the nine deterministic pins from the strategy doc, each with its kill note.
 MF-04 closes: execute the six planned harness kills, file the recipes, prove non-vacuity.
 
-Batching, dependencies, grading: [plan.md](./plan.md).
+Batching, dependencies, grading: [plan.md](plan.md).
 
 ## Findings
 
@@ -149,7 +149,7 @@ and both kills below went red on the code as shipped. What it did turn up:
 ### 2026-07-15 (MF-04) — six kills executed, no engine bug, no suite change
 
 All six went red on the code as shipped and were reverted; the executed recipes are in
-[mandala-testing.md](../../archive/mandala-testing.md) §"Kill register". No kill survived, so no
+[mandala-testing.md](docs/archive/mandala-testing.md) §"Kill register". No kill survived, so no
 invariant needed re-encoding and the suite is untouched. What the audit turned up:
 
 - **The recipes pin `FUZZ_SEED`, and that is the honest answer, not a workaround.** MF-02 left
@@ -241,7 +241,7 @@ The same review closed MF-03's open question: the command model **stays single-m
 a decision now, not a deferral. Promoting it would buy only run-budget precision under the
 double-mount, at the cost of the model counting reached levels per generation, and the
 smoke property's StrictMode variant already carries the lifecycle ledger there. Recorded in
-[mandala-testing.md](../../archive/mandala-testing.md) §"Explicitly later", with the
+[mandala-testing.md](docs/archive/mandala-testing.md) §"Explicitly later", with the
 revisit condition.
 
 ## Per-item conventions

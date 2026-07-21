@@ -58,10 +58,10 @@ compares against *other frameworks' features*, IMP-03 walks *the adoption path* 
 existing app. IMP-02 looks inward at the model's unexploited structure; IMP-04 is the
 unconstrained redesign pass.
 
-- [IMP-01 — gap analysis against the field](./issues/IMP-01-field-gap-analysis.md)
-- [IMP-02 — what the scope model uniquely enables](./issues/IMP-02-model-native-capabilities.md)
-- [IMP-03 — adoption & interop friction](./issues/IMP-03-adoption-and-interop.md)
-- [IMP-04 — fresh-eyes ergonomics](./issues/IMP-04-fresh-eyes-ergonomics.md)
+- [IMP-01 — gap analysis against the field](issues/IMP-01-field-gap-analysis.md)
+- [IMP-02 — what the scope model uniquely enables](issues/IMP-02-model-native-capabilities.md)
+- [IMP-03 — adoption & interop friction](issues/IMP-03-adoption-and-interop.md)
+- [IMP-04 — fresh-eyes ergonomics](issues/IMP-04-fresh-eyes-ergonomics.md)
 
 ## Plan
 
@@ -84,7 +84,7 @@ production-review's README, not here.)
 
 ### 2026-07-20 — IMP-01 (field gap analysis)
 
-Output: [docs/research/field-gap-analysis.md](../../research/field-gap-analysis.md) —
+Output: [docs/research/field-gap-analysis.md](docs/research/field-gap-analysis.md) —
 the full comparison (react-query v5 / SWR 2, TanStack Router 1.170 + Start RC,
 React Router 8.2, Next 16.2; every claim cited at session time), every field feature
 classified (a) covered / (b) rejected / (c) recorded / (d) net-new, three proposals, and
@@ -110,7 +110,7 @@ or `docs/current/` changes; no bugs found to file to production-review.
 
 ### 2026-07-20 — IMP-02 (model-native capabilities)
 
-Output: [docs/research/scope-model-capabilities.md](../../research/scope-model-capabilities.md) —
+Output: [docs/research/scope-model-capabilities.md](docs/research/scope-model-capabilities.md) —
 the end-to-end walk of what "the spec is data" buys, grounded in the source (scope.ts,
 resolver.tsx, mandala.tsx, channel.ts) rather than the docs. The record's spine: the model
 holds **two graphs** no hook-based peer has — the *declared shape* (levels, keys, kinds:

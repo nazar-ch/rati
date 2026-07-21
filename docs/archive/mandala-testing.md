@@ -1,7 +1,7 @@
 # Mandala testing — what and how
 
 Testing strategy for the mandala engine, written after the selective-refresh + SSR-sources
-implementation ([directions-2026-07/mandala-refresh-and-ssr-sources.md](./directions-2026-07/mandala-refresh-and-ssr-sources.md)).
+implementation ([directions-2026-07/mandala-refresh-and-ssr-sources.md](directions-2026-07/mandala-refresh-and-ssr-sources.md)).
 Three parts: the altitude rule that keeps coverage from freezing the engine, the deterministic
 pins worth adding soon, and the design of the randomized (fuzz) foundation. The execution plan is
 the `mandala-fuzz` effort (`docs/planned/mandala-fuzz/`); jnana's fuzz conventions
@@ -84,7 +84,7 @@ behaviors. The known gaps, in rough priority order (each is a small, focused tes
 10. **Re-suspension of committed content** — a `hook()` load returning a fresh pending promise
     hides committed content (Offscreen semantics) and cycles the subtree's effects; ledger stays
     balanced through hide/reveal, no double attach, content returns on settle, data producers
-    don't re-run ([suspense-situations.md](../../packages/rati/src/__tests__/suspense-situations.md) S4).
+    don't re-run ([suspense-situations.md](packages/rati/src/__tests__/suspense-situations.md) S4).
 11. **Unmount while suspended** — late settles into a discarded tree are inert (no throw, no
     log-noise, ledger balanced with never-attached sources at 0/0) (S5).
 12. **Mid-tree source pending** — a committed source dropping to pending unmounts the levels
@@ -96,7 +96,7 @@ Each pin lands with a **kill note** (jnana discipline): the one-line source muta
 make it fail, executed once at authoring and reverted. The Suspense-produced situations behind
 pins 10–12 (and the test-harness rules they imply — the async-act mount requirement above all)
 are cataloged in
-[suspense-situations.md](../../packages/rati/src/__tests__/suspense-situations.md)
+[suspense-situations.md](packages/rati/src/__tests__/suspense-situations.md)
 (`packages/rati/src/__tests__/`), which lives with the tests.
 
 ## The fuzz foundation — model-based testing over generated scopes
@@ -239,7 +239,7 @@ a nightly lane later. Fast by default so `vp run rati#test` stays ~seconds.
 
 - **Router fuzz** — the second fuzz target (navigation command alphabet over `RouterStore` +
   memory history + route islands); designed as its own effort once the mandala foundation proves
-  the harness pattern. **Cut 2026-07-15**: [planned/router-fuzz/](../planned/router-fuzz/README.md)
+  the harness pattern. **Cut 2026-07-15**: [docs/archive/efforts/router-fuzz/](docs/archive/efforts/router-fuzz/README.md)
   — five items, starting from the pre-cut router review's hardening findings.
 - **SSR under fuzz** — `prerender` per fuzz case is expensive and the SSR paths are narrow;
   they stay deterministic (part 2 §7) until evidence says otherwise.

@@ -123,7 +123,7 @@ client half keeps living in the main barrel — decide when building.
 
 ## 5. Data-layer names (`rati/mobx`, legacy)
 
-Superseded wholesale by the companion package ([data-package.md](./data-package.md)) — its
+Superseded wholesale by the companion package ([data-package.md](data-package.md)) — its
 vocabulary is `query` / `mutation` / `collection` / `pagedCollection` / `form` / `field`.
 Specific legacy names, for the record:
 
@@ -144,7 +144,7 @@ Specific legacy names, for the record:
 The current set mixes three qualifiers for one axis: **Root**Store, **Global**Store(s),
 **Generic**StoresContext / use**Generic**Stores — plus `createUseStoresHook`, a name about
 hook-creation mechanics rather than meaning. Final names should follow the container
-redesign ([stores-and-router.md](../../research/stores-and-router.md)); the direction:
+redesign ([stores-and-router.md](docs/research/stores-and-router.md)); the direction:
 
 - One noun for the container concept. `stores` is the word both apps already use —
   `StoresProvider` (for `RootStoreProvider`), `createStoresHook` (for

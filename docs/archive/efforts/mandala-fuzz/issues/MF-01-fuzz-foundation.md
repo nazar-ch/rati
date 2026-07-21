@@ -12,7 +12,7 @@ bugs surface one review at a time unless made searchable). There is no randomize
 engine at all. This item builds the searchable form's foundation: an arbitrary over scope
 *specs*, a harness that turns a spec into a real instrumented island, a plain-JS reference model
 that computes what the island must show, and one smoke property proving the loop works
-end to end. Design record: [mandala-testing.md](../../../archive/mandala-testing.md) §"The fuzz
+end to end. Design record: [mandala-testing.md](docs/archive/mandala-testing.md) §"The fuzz
 foundation" (read it first — the KeySpec shape, the deterministic value formula, and the
 invariant altitude are specified there, not here).
 

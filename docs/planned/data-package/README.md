@@ -3,7 +3,7 @@
 Status: planned 2026-07-18, cut at the close of the implementation session.
 
 The 2026-07-18 session shipped the design record's v1 in rati
-([data-package.md](../../archive/directions-2026-07/data-package.md)): the legacy
+([data-package.md](docs/archive/directions-2026-07/data-package.md)): the legacy
 `data/` layer (and its Babel decorator toolchain) removed, and the `rati/data` entry
 landed with all five primitives — `query`, `collection`, `pagedCollection`, `mutation`,
 `form`/`field` + the validator kit — plus the shared `itemMap` reconciler, `source()`
@@ -22,7 +22,7 @@ session deliberately left.
   store observables → reactive query). A per-primitive MobX `Reaction` tracks the producer's
   synchronous prefix during the real fetch and re-runs `refresh()` (coalesced by `debounce`);
   `pagedCollection` resets to the first page instead (cursors invalidate). Design pass +
-  the four cross-checks: [data-package.md §DATA-01](../../archive/directions-2026-07/data-package.md#data-01--reactive-params-design-pass-2026-07-19).
+  the four cross-checks: [data-package.md §DATA-01](docs/archive/directions-2026-07/data-package.md#data-01--reactive-params-design-pass-2026-07-19).
 - Deviations from the design record's sketched interfaces, made during implementation
   and reflected in reference.md:
   - `Collection.refresh()` exists, delegating to `query.refresh()` — the design's own
@@ -42,28 +42,28 @@ session deliberately left.
 
 ## Items
 
-- ✅ [DATA-01 — `reactive` params for query](./issues/DATA-01-reactive-query-params.md) —
+- ✅ [DATA-01 — `reactive` params for query](issues/DATA-01-reactive-query-params.md) —
   **done 2026-07-19**: the design pass + `reactive` on `query`/`collection`/`pagedCollection`,
   tests, reference/design-record docs. (`Closes: DATA-01`.)
-- ✅ [DATA-02 — guide coverage for the data layer](./issues/DATA-02-guide-coverage.md) —
+- ✅ [DATA-02 — guide coverage for the data layer](issues/DATA-02-guide-coverage.md) —
   **done 2026-07-19**: `guide.md` now teaches the data-layer model end to end. (`Closes: DATA-02`.)
-- ✅ [DATA-03 — the load-bearing consumer migrations](./issues/DATA-03-consumer-migrations.md)
+- ✅ [DATA-03 — the load-bearing consumer migrations](issues/DATA-03-consumer-migrations.md)
   — **done 2026-07-20** on jnana (PR nazar-ch/jnana#822, merged): all three legs ran;
   the verdict and findings below. (`Closes: DATA-03`.)
-- [DATA-04 — extraction & entry-layout decision](./issues/DATA-04-extraction-decision.md)
+- [DATA-04 — extraction & entry-layout decision](issues/DATA-04-extraction-decision.md)
   — companion package vs entry, `rati/mobx` absorption, forms subpath.
-- ✅ [DATA-05 — a single-value write seam for `query`](./issues/DATA-05-query-write-seam.md)
+- ✅ [DATA-05 — a single-value write seam for `query`](issues/DATA-05-query-write-seam.md)
   — **done 2026-07-20**: `set`/`patch` (through `onSuccess`, so a collection's map stays
   coherent), tests, reference.md. (`Closes: DATA-05`.)
-- ✅ [DATA-06 — `refreshes` sees the mutation call's arguments](./issues/DATA-06-refreshes-args.md)
+- ✅ [DATA-06 — `refreshes` sees the mutation call's arguments](issues/DATA-06-refreshes-args.md)
   — **done 2026-07-20**: the declaration receives the call's args at both fire sites;
   keyed tests pin the FND-106 choreography with DATA-05. (`Closes: DATA-06`.)
-- ✅ [DATA-07 — `field.props` under `exactOptionalPropertyTypes`](./issues/DATA-07-field-props-exact-optional.md)
+- ✅ [DATA-07 — `field.props` under `exactOptionalPropertyTypes`](issues/DATA-07-field-props-exact-optional.md)
   — **done 2026-07-20**: `errorMessage` is absent while clean, genuinely `?:`.
   (`Closes: DATA-07`.)
-- [DATA-08 — the fetch-boilerplate helper decision](./issues/DATA-08-fetch-helper-decision.md)
+- [DATA-08 — the fetch-boilerplate helper decision](issues/DATA-08-fetch-helper-decision.md)
   — where the ok-check + `json()` + error mapping lives; **maintainer call**, blocked on it.
-- [DATA-09 — pin the unpinned data branches](./issues/DATA-09-unpinned-branches.md)
+- [DATA-09 — pin the unpinned data branches](issues/DATA-09-unpinned-branches.md)
   — test-only: the branches the 2026-07-20 coverage map found bare.
 
 DATA-01..03 and 05..07 are done. DATA-05 and DATA-06 were coupled through jnana's

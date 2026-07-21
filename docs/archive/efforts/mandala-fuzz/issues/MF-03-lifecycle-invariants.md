@@ -12,7 +12,7 @@ the mandala's unmount sweep is the backstop (see
 `docs/archive/directions-2026-07/mandala-refresh-and-ssr-sources.md` §"Source-lifetime
 rework"). Leaks and double-attaches in this machinery are exactly the class a fuzz ledger
 catches and example tests miss — invariant 6 of
-[mandala-testing.md](../../../archive/mandala-testing.md) §"Invariants".
+[mandala-testing.md](docs/archive/mandala-testing.md) §"Invariants".
 
 ## Scope
 

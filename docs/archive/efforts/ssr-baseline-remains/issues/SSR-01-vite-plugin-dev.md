@@ -9,7 +9,7 @@ disposition: —
 Every SSR consumer hand-rolls the same dev server: Vite in middleware mode, a piping
 dance between the Node listener and Vite's connect middleware, `ssrLoadModule` of the
 server entry, `transformIndexHtml`, `ssrFixStacktrace`. Design:
-[ssr-server-kit.md](../../../archive/directions-2026-07/ssr-server-kit.md) §Layer 2
+[ssr-server-kit.md](docs/archive/directions-2026-07/ssr-server-kit.md) §Layer 2
 (read first — the entry contract, placeholder conventions, and anti-bloat lines are
 specified there).
 
