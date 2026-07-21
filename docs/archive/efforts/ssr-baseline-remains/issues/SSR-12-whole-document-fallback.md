@@ -3,7 +3,7 @@
 area: packages/rati/src/server, packages/rati/src/ssr
 needs: design first — the render-into-document constraint below shapes everything
 disposition: design pass ran 2026-07-16 —
-[ssr-server-kit.md §The fallback for whole-document apps](../../../archive/directions-2026-07/ssr-server-kit.md).
+[ssr-server-kit.md §The fallback for whole-document apps](docs/archive/directions-2026-07/ssr-server-kit.md).
 The spike says the constraint below is **false**: `createRoot(document)` exists and works
 in React 19.2, so shape (1) lands without the recovery lean and shapes (2)/(3) lose their
 reason. **Maintainer confirmed both open points, 2026-07-16**: the supportedness soft

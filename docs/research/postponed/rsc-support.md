@@ -2,7 +2,7 @@
 
 Status: research only (2026-07-15), out of the SSR-11/streaming discussion. Extends
 the direction note in
-[directions-2026-07/improvements.md §6](./directions-2026-07/improvements.md) from
+`docs/research/directions-2026-07/improvements.md` §6 (dissolved) from
 "keep the door open" to a concrete map. Maintainer's questions: there is already a
 Vite plugin for RSC — will it work, and what does rati need to add?
 
@@ -89,14 +89,14 @@ jobs). An app picks one plugin; nothing migrates implicitly.
    context), so `<Title>`/`<Meta>` remain client components — they run in the `ssr`
    environment's HTML pass (context works there), so the read-back still functions
    for buffered HTML; under streamed HTML they hit the shell-time limits already
-   recorded in [ssr-streaming.md](./ssr-streaming.md). An RSC-native alternative
+   recorded in [ssr-streaming.md](docs/research/undecided/ssr-streaming.md). An RSC-native alternative
    (titles rendered directly in the server tree, since the root owns the whole
    document) is simpler but loses dedupe-by-depth — a design pass owns that
    trade-off.
 6. **Server actions** are optional but land on rati's open mutation question — the
    plugin provides the transform + encode/decode primitives, the framework routes
    the call and re-renders. If rati ever wants them, they belong to the
-   [data-package](./directions-2026-07/data-package.md) mutation design, not the SSR
+   [data-package](docs/archive/directions-2026-07/data-package.md) mutation design, not the SSR
    kit.
 
 ## Verdict

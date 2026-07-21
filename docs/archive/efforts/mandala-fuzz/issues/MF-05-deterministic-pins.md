@@ -8,7 +8,7 @@ disposition: —
 
 The 13 tests that landed with selective refresh + SSR sources cover happy paths and headline
 behaviors; the specific gaps (twelve pins as of this writing) are enumerated in
-[mandala-testing.md](../../../archive/mandala-testing.md) §"Deterministic pins" — races
+[mandala-testing.md](docs/archive/mandala-testing.md) §"Deterministic pins" — races
 (superseded refresh, remount mid-flight), semantics (transitive cascade with mid-chain cutoff,
 lazy read-set re-recording, hydrated-cell asymmetry, `equals` on cascade re-runs), SSR /
 StrictMode edges, and the Suspense-produced situations (re-suspension of committed content,

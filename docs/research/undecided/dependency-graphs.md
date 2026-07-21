@@ -2,7 +2,7 @@
 
 > **Exploratory / future feature.** Not implemented and not committed to. The
 > shipping model is the **scope chain** (`scope()` / `.load()`) over reactive sources
-> — see [the public guide](../public/guide.md). This doc explores the
+> — see [the public guide](docs/current/public/guide.md). This doc explores the
 > *generalization* of the chain into a free dependency graph, focused on what the
 > **types** would look like, so we can decide if/when it's worth adding. Nothing
 > here changes current behavior.
@@ -30,7 +30,7 @@ doesn't matter — which is why the chain is the default. The graph is interesti
 (a) wide fan-out where one slow branch shouldn't gate the rest, and (b) as the
 conceptual model the chain is a special case of.
 
-This doc assumes the [source model](../internals.md#sources-scopesourcets): every node is a
+This doc assumes the [source model](docs/current/internals.md#sources-scopesourcets): every node is a
 `Source<T>` — a live `pending | ready | error` machine — and the island aggregates.
 
 ## Two construction styles

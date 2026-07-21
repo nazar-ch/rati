@@ -29,7 +29,7 @@ Fully-inline output simply becomes the behavior — no new API; the current outp
 artifact of defaults, not a choice. A true streaming mode is a **different contract**
 (status commits at shell flush → effectively always 200; the head ships before
 in-Suspense `<Title>`s register) and is recorded as research, not built:
-[ssr-streaming.md](../../../research/ssr-streaming.md).
+[ssr-streaming.md](docs/research/undecided/ssr-streaming.md).
 
 ## Scope
 

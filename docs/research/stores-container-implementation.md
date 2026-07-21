@@ -1,7 +1,7 @@
 # Stores container + router: Option A implementation plan
 
-The deferred structural piece from [stores-and-router.md](./stores-and-router.md) (Option A)
-plus the [naming.md §6](../archive/directions-2026-07/naming.md) stores-cluster renames. The mechanical renames
+The deferred structural piece from [stores-and-router.md](stores-and-router.md) (Option A)
+plus the [naming.md §6](docs/archive/directions-2026-07/naming.md) stores-cluster renames. The mechanical renames
 (input vocabulary, `RouterStore`/`useRouter`, the `rati/ssr` + `rati/debug` entries) already
 landed; this is the one change that alters *shape*, not just names, so it wants its own
 session. This doc is the plan for that session.

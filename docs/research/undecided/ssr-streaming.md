@@ -5,7 +5,7 @@ rati's shipped mode is full render with fully-inline output; streaming is **not*
 knob on that renderer but a second contract. This records what the second contract
 costs, so a future consumer with a real time-to-first-byte problem can weigh it.
 Related: the per-island `ssr: false` valve
-([improvements.md §Per-island SSR opt-out](./directions-2026-07/improvements.md)) is
+(`docs/research/directions-2026-07/improvements.md` §Per-island SSR opt-out (dissolved)) is
 the sanctioned cheap answer to "one slow island blocks the page" and should be tried
 before any of this.
 
@@ -74,5 +74,5 @@ Nontrivial but tractable — the honest cost is the contract split, not the code
 build without a consumer whose slow loads are real and whose pages can accept
 200-always below the shell line. Neither nazar.ch nor the jnana website qualifies
 (SSR-04/05 measured no need). If RSC ever lands
-([rsc-support.md](./rsc-support.md)), it subsumes this — flight streaming has the same
+([rsc-support.md](docs/research/postponed/rsc-support.md)), it subsumes this — flight streaming has the same
 properties and this page's status/head analysis applies unchanged.

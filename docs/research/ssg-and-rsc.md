@@ -4,9 +4,9 @@ Direction only, **deliberately not designed** and not built — Jnana needs neit
 fully interactive and doesn't even need SSR). These ride on the `examples/ssr` gallery until
 a real consumer exists. The SSR *baseline* underneath them shipped in 2026-07 (the server
 kit — `renderApp`, `rati/vite`, `rati/server`; see the archived
-[ssr-server-kit.md](../archive/directions-2026-07/ssr-server-kit.md) and
-[ssr-nazar-patterns.md](../archive/directions-2026-07/ssr-nazar-patterns.md), and
-[../current/public/ssr.md](../current/public/ssr.md)); this note is what sits beyond it.
+[ssr-server-kit.md](docs/archive/directions-2026-07/ssr-server-kit.md) and
+[ssr-nazar-patterns.md](docs/archive/directions-2026-07/ssr-nazar-patterns.md), and
+[docs/current/public/ssr.md](docs/current/public/ssr.md)); this note is what sits beyond it.
 
 ## SSG — the near step
 
@@ -32,13 +32,13 @@ crisp. Those habits cost nothing now and keep the door open.
 
 The bundler/runtime contract now exists off the shelf (`@vitejs/plugin-rsc`); what rati would
 add, and when to revisit, is worked out in the postponed record
-[postponed/rsc-support.md](./postponed/rsc-support.md). The island-SSR dehydration decision
+[postponed/rsc-support.md](postponed/rsc-support.md). The island-SSR dehydration decision
 that bears on it (keep the framework-owned registry until a deliberate RSC adoption) is the
-archived [island-ssr-dehydration.md](../archive/island-ssr-dehydration.md).
+archived [island-ssr-dehydration.md](docs/archive/island-ssr-dehydration.md).
 
 ## The non-goal this backstops
 
 Streaming SSR stays out (`prerender` is all-or-nothing). The per-island `ssr: false` option
-([scope-and-island-directions.md](./scope-and-island-directions.md) §2) is the sanctioned
+([scope-and-island-directions.md](scope-and-island-directions.md) §2) is the sanctioned
 pressure valve for below-the-fold / expensive / personalized islands; full streaming is a
 deliberate RSC adoption with its own plan, not a rider on the resolver.

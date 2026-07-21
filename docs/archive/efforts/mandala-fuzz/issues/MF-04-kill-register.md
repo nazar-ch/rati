@@ -11,7 +11,7 @@ disposition: —
 planned kill — a one-line reintroduction of a bug-shaped mutation — has been run red, shrunk, and
 reverted. A harness that survives its kill is the counterfeit-provider failure mode and gets
 fixed, not shipped. The six planned kills are listed in
-[mandala-testing.md](../../../archive/mandala-testing.md) §"Kill register".
+[mandala-testing.md](docs/archive/mandala-testing.md) §"Kill register".
 
 ## Scope
 

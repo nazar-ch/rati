@@ -2,9 +2,9 @@
 
 > **Status 2026-07-14: absorbed.** §1–§5 shipped in rati (with deltas noted inline per
 > section); §6's example fixes landed with them. The public surface is documented in
-> [docs/current/public/ssr.md](../../current/public/ssr.md); what the implementation round added beyond
+> [docs/current/public/ssr.md](docs/current/public/ssr.md); what the implementation round added beyond
 > this list (collector error recording → status mapping, payload integrity diagnostics)
-> and the deferred options live in [scope-and-island-directions.md](../../research/scope-and-island-directions.md). Remaining:
+> and the deferred options live in [scope-and-island-directions.md](docs/research/scope-and-island-directions.md). Remaining:
 > migrating nazar.ch and the jnana website onto the new surface (tracked in the
 > ssr-baseline-remains effort).
 
@@ -71,7 +71,7 @@ rati hands the server *two* payloads (the router's `hydratedState`, the collecto
 the escaped `<script>` tag (name TBD), and a client-side `readHydration()` for the
 window global. Cheap to build, removes duplicated XSS-escaping from every consumer, and
 standardizes the payload shape — which the SSG direction
-([ssg-and-rsc.md](../../research/ssg-and-rsc.md)) independently wants ("a stable, versioned
+([ssg-and-rsc.md](docs/research/ssg-and-rsc.md)) independently wants ("a stable, versioned
 dehydration format").
 
 *Shipped with one better idea:* an inert `<script type="application/json">` tag instead
@@ -115,7 +115,7 @@ SSR the pre-redirect page and hop on the client. The honest fix is a route-level
 `redirectTo` option that `prepareRoute` reports (so the server can 30x before rendering)
 and that the client router honors like a `<Navigate>` — not sniffing `<Navigate>` out of
 a render. External URLs stay at the HTTP layer. Confirmed for the public-prep batch
-(CORE-6 in [public-prep-tasks.md](../../planned/website/public-prep-tasks.md)).
+(CORE-6 in [public-prep-tasks.md](docs/planned/website/public-prep-tasks.md)).
 
 *Shipped* as `route(…, { redirect: { to, permanent? } })` — object targets resolve
 through the table and keep search/hash, function targets map matched params (the

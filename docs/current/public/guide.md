@@ -9,7 +9,7 @@ component clean, fully-loaded, fully-typed props. No `isLoading` branches, no
 re-declaring types your backend already knows.
 
 > This guide explains the ideas with small, real examples. The complete API is in the
-> [reference](./reference.md).
+> [reference](reference.md).
 
 ## The problem
 
@@ -222,12 +222,12 @@ island({ scope: stationScope, component: Board, loading: Skeleton, error: BoardE
 Two more attempts, 500ms then 1s apart, and the `error` slot is not rendered at all until
 they are spent — the island shows its loading slot meanwhile, because an island retrying is
 an island loading. `not-available` is never retried: it is an answer, not a fault. See
-[`retry`](./reference.md#retry--trying-again-automatically).
+[`retry`](reference.md#retry--trying-again-automatically).
 
 Under server rendering a failed load ships the *loading* slot and the client re-runs it —
 React's own degradation, and self-healing. A page that would rather paint the error slot
 straight away sets
-[`ssrErrors: 'dehydrate'`](./reference.md#ssrerrors--the-error-slot-in-the-servers-html),
+[`ssrErrors: 'dehydrate'`](reference.md#ssrerrors--the-error-slot-in-the-servers-html),
 and the server renders that slot into the HTML with the failure carried alongside it.
 
 ## Routes
@@ -377,7 +377,7 @@ const { phase, isStale, retry } = useScopeControls(stationScope);
 `phase` is `'loading'`, `'ready'`, or `'error'` — the island's aggregate phase, not any one
 load's. `retry` is the error slot's retry, reachable from anywhere (the same action as
 `refresh()` with no key). `isStale` belongs to the option below; `retrying` — the same
-object's fourth read — belongs to [`retry`](./reference.md#retry--trying-again-automatically),
+object's fourth read — belongs to [`retry`](reference.md#retry--trying-again-automatically),
 and is what a loading slot switches on to say *why* it is still up.
 
 ### `keepStale` — don't blank on a re-load
@@ -502,14 +502,14 @@ and detaches on unmount, so the connection's lifetime is the screen's lifetime, 
 `useEffect` in sight.
 
 Writing a source is implementing three methods (`subscribe`, `getSnapshot`, `attach`) —
-see the [reference](./reference.md#sources). `readySource`, `promiseSource`, and
+see the [reference](reference.md#sources). `readySource`, `promiseSource`, and
 `toSource` cover the common cases. A source that should resolve on the server too can opt
 in with its `ssr` marker — see [Server rendering](#server-rendering).
 
 ## Stores and living data: `rati/data`
 
 > **Experimental.** `rati/data` is an optional entry — it needs the `mobx` peer dependency,
-> and its surface may still move. The [reference](./reference.md#ratidata) is the API
+> and its surface may still move. The [reference](reference.md#ratidata) is the API
 > station; this section teaches the model and *when to reach for which primitive*.
 
 Everything so far loads data *per screen*: the island resolves a scope, the component gets
@@ -627,7 +627,7 @@ const RenameForm = observer(({ dialog }: { dialog: RenameDialog }) => (
 `errorMessage`), so binding an input is a spread.
 
 **Two notes on the edges.** A `query`/`collection` can re-fetch when a store observable it
-reads changes (`reactive: true`) — the type-ahead case; the [reference](./reference.md#ratidata)
+reads changes (`reactive: true`) — the type-ahead case; the [reference](reference.md#ratidata)
 covers it and its one sharp edge (only reads *before the producer's first `await`* are
 tracked). And under **SSR the primitives stay pending**: a `Source` attaches from an effect,
 and the server runs none — so a `rati/data`-backed screen ships its loading slot in the HTML
@@ -668,7 +668,7 @@ route('/settings', 'settings', Settings);
 `<Link prefetch>` starts loading the chunk on hover/touch; server rendering preloads it
 before rendering, so the HTML is complete either way.
 
-Built through the [Vite plugin](./ssr.md#lazy-routes-are-preloaded), a server-rendered
+Built through the [Vite plugin](ssr.md#lazy-routes-are-preloaded), a server-rendered
 lazy route also names its chunk in the page's `<head>` — otherwise the browser can't
 learn the chunk exists until the entry has run and React has resolved the component, one
 round trip after the HTML it could have started during. Nothing to configure, and nothing
@@ -710,7 +710,7 @@ hydrateRoot(container, <App />);
 The operational half — the server entry, the Vite plugin (dev + the build), the
 production handler, document titles and meta, response statuses and load failures,
 route-level redirects, and the payload contract — is the
-[server rendering guide](./ssr.md).
+[server rendering guide](ssr.md).
 
 Two consequences worth knowing:
 

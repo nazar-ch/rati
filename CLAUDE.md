@@ -61,6 +61,11 @@ internal — callers only ever see `island`/`route`).
 - Create atomic commits as you work, on the current branch. **Conventional Commits style is
   forbidden** — match the existing history (plain imperative sentences).
 - Keep `docs/*.md` in sync with behavior changes.
+- Doc links: cross-tree references are repo-root-relative (`docs/current/internals.md`), never
+  `../` — relative depth breaks silently when a doc moves and can't be grepped from the target
+  side. Within-directory relative links are fine (they move with their folder). Cross-repo refs
+  use a scheme (`jnana:///docs/README.md`); backticked paths are deliberate non-links. Same
+  convention as jnana's docs/README.md "Doc links" (gated there by check-doc-links.ts).
 
 ## Restricted actions
 

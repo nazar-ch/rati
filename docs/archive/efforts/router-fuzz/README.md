@@ -3,14 +3,14 @@
 Cut 2026-07-15. Per-item status derives from rati git (`git log --grep 'RF-'`) — never from
 this file; conventions below.
 
-The second fuzz target, unblocked by [mandala-fuzz](../mandala-fuzz/README.md) proving the
+The second fuzz target, unblocked by [mandala-fuzz](docs/archive/efforts/mandala-fuzz/README.md) proving the
 harness pattern: an `fc.commands` model over navigation interleavings (push / replace /
 back-forward / redirects / shallow navigations / state), plus the deterministic pins the
 seams need and a small hardening item the pre-cut review produced. The discipline carries
 over wholesale — the altitude rule, kill-tested invariants, `fuzz(n)` budgets with
 `FUZZ_RUNS` / `FUZZ_LEVEL` / `FUZZ_SEED`, jnana's fuzz conventions
 (`~/Sites/jnana/.claude/fuzz-testing.md`) — and the strategy record for *why* these shapes
-work is [mandala-testing.md](../../archive/mandala-testing.md); this effort does not
+work is [mandala-testing.md](docs/archive/mandala-testing.md); this effort does not
 duplicate it.
 
 The subject is `packages/rati/src/router/`: `RouterStore` (matching, redirects, the
@@ -134,7 +134,7 @@ non-vacuity verification. RF-07 and RF-08 carry the round-2 decisions above (rel
 strings resolved at the anchor and refused in the router; dot-only param values
 refused) — hardening the review found, not new fuzz scope.
 
-Batching, dependencies, grading: [plan.md](./plan.md).
+Batching, dependencies, grading: [plan.md](plan.md).
 
 ## Kill register (executed at RF-05)
 
