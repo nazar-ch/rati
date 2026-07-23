@@ -1,7 +1,7 @@
 ---
 area: packages/rati/src/__tests__/data — tests only, no source changes expected
 needs: nothing
-status: open
+status: done
 disposition: cut 2026-07-20 from a coverage map of the data tests taken at the DATA-03 review
 ---
 

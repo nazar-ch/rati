@@ -347,6 +347,31 @@ describe('source()', () => {
         expect(onChange).toHaveBeenCalled();
         unsubscribe();
     });
+
+    test('unsubscribe stops delivery while a still-subscribed listener keeps firing', async () => {
+        const gates = [deferred<number>(), deferred<number>()];
+        let call = 0;
+        const q = query(() => gates[call++]!.promise);
+        const source = q.source();
+
+        const dropped = vi.fn();
+        const kept = vi.fn();
+        const unsubscribe = source.subscribe(dropped);
+        const keptUnsubscribe = source.subscribe(kept);
+
+        const loading = q.load();
+        gates[0]!.resolve(5);
+        await loading;
+        expect(dropped).toHaveBeenCalledTimes(1); // both saw pending → ready
+        expect(kept).toHaveBeenCalledTimes(1);
+
+        unsubscribe(); // drop the first listener…
+
+        q.reset(); // ready → pending: a real transition the derivation reports
+        expect(dropped).toHaveBeenCalledTimes(1); // …it received nothing more
+        expect(kept).toHaveBeenCalledTimes(2); // …while the live one fired again
+        keptUnsubscribe();
+    });
 });
 
 describe('reactive', () => {
@@ -494,5 +519,23 @@ describe('reactive', () => {
         });
         await q.load();
         expect(q.data).toBe('c');
+    });
+
+    test('a synchronous throw from a reactive producer lands on the error path (re-raised out of Reaction.track)', async () => {
+        // A producer that throws before returning its promise: the throw happens
+        // inside `Reaction.track`, whose own error boundary would swallow it — the
+        // `caught` plumbing in `callProducer` re-raises it outside `track` so it
+        // reaches the query's normal catch/error path.
+        const q = query<number>(
+            () => {
+                throw new Error('sync boom');
+            },
+            { reactive: true },
+        );
+
+        await q.load();
+        expect(q.phase).toBe('error');
+        expect(q.error).toMatchObject({ code: 'failed', message: 'sync boom' });
+        expect(q.data).toBeUndefined();
     });
 });

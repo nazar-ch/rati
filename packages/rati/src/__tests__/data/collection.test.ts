@@ -1,6 +1,7 @@
 import { describe, test, expect, vi } from 'vite-plus/test';
 import { autorun, observable, runInAction } from 'mobx';
 import { collection } from '../../data/collection';
+import { deferred } from '../../testing';
 
 interface Row {
     id: string;
@@ -272,5 +273,74 @@ describe('reactive (pass-through to the query)', () => {
         await c.query.load(); // reactive re-fetch, filtered
         expect(c.items.map((row) => row.id)).toEqual(['a', 'c']);
         expect(c.items[0]).toBe(alpha); // surviving row keeps its instance
+    });
+});
+
+describe('reset() and the item map', () => {
+    test('reset() clears the items through the onReset → map.clear() wiring', async () => {
+        const { c } = rowsCollection([
+            { id: 'a', title: 'Alpha' },
+            { id: 'b', title: 'Beta' },
+        ]);
+        await c.query.load();
+        expect(c.items).toHaveLength(2);
+
+        c.query.reset();
+        expect(c.items).toEqual([]); // map.clear() ran through onReset
+        expect(c.getByKey('a')).toBeUndefined();
+        expect(c.query.phase).toBe('idle');
+    });
+});
+
+describe('local writes racing an in-flight refresh (last-write-wins)', () => {
+    // The recorded stance (data-package README §Open questions): "last-write-wins —
+    // an upsert during a refresh is reconciled away if the refresh's rows disagree."
+    // The settle's `reconcile()` is the last write; these pin it in both directions.
+    test('a local upsert the server never had is reconciled away on settle', async () => {
+        const gates = [deferred<readonly Row[]>(), deferred<readonly Row[]>()];
+        let call = 0;
+        const c = collection<Row>({
+            fetch: () => gates[call++]!.promise,
+            key: (row) => row.id,
+        });
+
+        const first = c.query.load();
+        gates[0]!.resolve([{ id: 'a', title: 'Alpha' }]);
+        await first;
+
+        const refreshing = c.query.refresh(); // fetch in flight
+        c.upsert({ id: 'z', title: 'Local' }); // a server-push-style add, mid-refresh
+        expect(c.items.map((row) => row.id)).toEqual(['a', 'z']); // visible immediately…
+
+        gates[1]!.resolve([{ id: 'a', title: 'Alpha' }]); // …but the server never had 'z'
+        await refreshing;
+        expect(c.items.map((row) => row.id)).toEqual(['a']); // the reconcile dropped it
+    });
+
+    test('a local remove of a row the server still has is restored on settle', async () => {
+        const gates = [deferred<readonly Row[]>(), deferred<readonly Row[]>()];
+        let call = 0;
+        const c = collection<Row>({
+            fetch: () => gates[call++]!.promise,
+            key: (row) => row.id,
+        });
+
+        const first = c.query.load();
+        gates[0]!.resolve([
+            { id: 'a', title: 'Alpha' },
+            { id: 'b', title: 'Beta' },
+        ]);
+        await first;
+
+        const refreshing = c.query.refresh();
+        c.remove('a'); // drop 'a' locally while the fetch is out
+        expect(c.items.map((row) => row.id)).toEqual(['b']);
+
+        gates[1]!.resolve([
+            { id: 'a', title: 'Alpha' },
+            { id: 'b', title: 'Beta' },
+        ]); // the server still lists 'a'
+        await refreshing;
+        expect(c.items.map((row) => row.id)).toEqual(['a', 'b']); // reconcile restored it
     });
 });
