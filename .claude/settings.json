@@ -1,0 +1,83 @@
+{
+    "$schema": "https://json.schemastore.org/claude-code-settings.json",
+    "permissions": {
+        "deny": [],
+        "allow": []
+    },
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "KIT=\"${JNANA_KIT_HOME:-$HOME/Sites/jnana-kit}\"; sh \"$KIT/tools/deny-host-restricted.sh\""
+                    }
+                ]
+            },
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "KIT=\"${JNANA_KIT_HOME:-$HOME/Sites/jnana-kit}\"; sh \"$KIT/tools/vp-guard.sh\"",
+                        "timeout": 10
+                    }
+                ]
+            },
+            {
+                "matcher": "Bash|Edit|Write|NotebookEdit",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "KIT=\"${JNANA_KIT_HOME:-$HOME/Sites/jnana-kit}\"; sh \"$KIT/tools/run-node.sh\" \"$KIT/tools/session-lock.ts\" gate",
+                        "timeout": 10
+                    }
+                ]
+            }
+        ],
+        "SessionStart": [
+            {
+                "matcher": "startup|resume|clear",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "KIT=\"${JNANA_KIT_HOME:-$HOME/Sites/jnana-kit}\"; sh \"$KIT/tools/run-node.sh\" \"$KIT/tools/agent-session-prep.ts\" || true",
+                        "timeout": 600
+                    }
+                ]
+            }
+        ],
+        "SubagentStart": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "KIT=\"${JNANA_KIT_HOME:-$HOME/Sites/jnana-kit}\"; sh \"$KIT/tools/run-node.sh\" \"$KIT/tools/agent-subagent-notice.ts\""
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "KIT=\"${JNANA_KIT_HOME:-$HOME/Sites/jnana-kit}\"; sh \"$KIT/tools/run-node.sh\" \"$KIT/tools/agent-session-finish.ts\"; rc=$?; [ \"$rc\" -eq 2 ] && exit 2; exit 0"
+                    }
+                ]
+            }
+        ],
+        "SessionEnd": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "KIT=\"${JNANA_KIT_HOME:-$HOME/Sites/jnana-kit}\"; sh \"$KIT/tools/run-node.sh\" \"$KIT/tools/session-lock.ts\" release"
+                    }
+                ]
+            }
+        ]
+    },
+    "autoMemoryEnabled": false
+}

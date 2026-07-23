@@ -77,3 +77,8 @@ dist
 
 # Claude
 .claude/settings.local.json
+# jnana-kit runtime artifacts: one-live-session-per-checkout lock, worktree-pool claim marker,
+# dev-server pid/log state (the last only if a slot runs one)
+.claude/session.lock
+.jnana-kit-wt-claim
+/.dev-servers
