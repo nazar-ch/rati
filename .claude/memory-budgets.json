@@ -1,0 +1,12 @@
+{
+    "defaults": {
+        "leafBudget": 10000,
+        "stubExemptBelow": 800
+    },
+    "files": {
+        "CLAUDE.md": {
+            "budget": 18000,
+            "note": "the sole always-on doc: mental model, workflow + kit seams, toolchain, source-layout map, key patterns, and examples status — a framework's whole orientation in one file"
+        }
+    }
+}

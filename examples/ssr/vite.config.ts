@@ -4,8 +4,8 @@ import { ratiSsr } from 'rati/vite';
 
 const conditions = ['rati-dev', 'import', 'module', 'browser', 'default'];
 
-// Type-checking is handled by tsgo (`yarn typecheck`), not an in-dev plugin —
-// vite-plugin-checker was dropped with the move off the `typescript` package onto tsgo.
+// Type-checking is handled by tsc (the native TS7 compiler, via `yarn typecheck`),
+// not an in-dev plugin — vite-plugin-checker isn't used.
 export default defineConfig({
     // `lazyPlugins` returns `undefined` for non-Vite commands (it skips
     // instantiating the plugins then); `?? []` keeps the type a plain

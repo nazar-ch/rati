@@ -54,13 +54,20 @@ internal — callers only ever see `island`/`route`).
 - Clarify and ask for information you need.
 - Run commands from the repo root; target a workspace with `vp run <pkg>#<script>`
   (e.g. `vp run rati#typecheck`).
-- Verify changes with **type-check and lint**: `vp run rati#typecheck` (tsgo — the
+- Verify changes with **type-check and lint**: `vp run rati#typecheck` (tsc — the
   authoritative type gate) **and** `vp lint`. `vp check` runs format + lint (no type-check).
 - The whole gate in one command: `yarn ci` (`scripts/ci.ts` — fmt / lint / typecheck /
   test / deep fuzz / build, aggregated; a subset by stage name, `FUZZ_RUNS=…` to deepen
-  the randomized stage). It is the stand-in for hosted CI — run it before handing work over.
-- Create atomic commits as you work, on the current branch. **Conventional Commits style is
-  forbidden** — match the existing history (plain imperative sentences).
+  the randomized stage). It is the stand-in for hosted CI. The **pre-push gate** is
+  `.claude/kit.json` `verify` — the fast subset `yarn ci fmt lint typecheck test` (it skips
+  the 500-run deep fuzz and the example builds); run full `yarn ci` yourself before a release
+  or when you touch the mandala engine or the packaging/build.
+- **Branch, rebase, push** per the kit's git workflow
+  (`$JNANA_KIT_HOME/plugin/docs/git-workflow.md`): cut a fresh `claude/<NS>/<desc>` off
+  `origin/main` before editing, make atomic commits as you work (**don't ask**; **Conventional
+  Commits style is forbidden** — match the existing plain-imperative history), rebase — never
+  merge, PR to `main`, **always push**. The session hooks (wired via `.claude/settings.json`)
+  surface your start state and hold you to the push.
 - Keep `docs/*.md` in sync with behavior changes.
 - Doc links: cross-tree references are repo-root-relative (`docs/current/internals.md`), never
   `../` — relative depth breaks silently when a doc moves and can't be grepped from the target
@@ -100,11 +107,13 @@ compatible with it, minus the `tools/issues.ts` tooling rati doesn't have).
 - **Don't publish.** `scripts/release.sh` (the `release` script) bumps the version, tags,
   and runs `yarn npm publish`. Never run it — releasing is the maintainer's call (see
   `docs/current/RELEASING.md`). `--dry-run` is the only safe form, and still: leave it to
-  the user.
+  the user. This is **hook-enforced on the host**: `.claude/kit.json` `denyRules` denies
+  `scripts/release.sh` and every `npm publish` form (inert inside a sandbox VM, where the
+  Keychain token is absent anyway).
 - **Don't run `vp lint --fix` blindly.** oxlint's `no-unnecessary-type-assertion` autofix
-  disagrees with tsgo (it ignores `noUncheckedIndexedAccess` and strips load-bearing
+  disagrees with tsc (it ignores `noUncheckedIndexedAccess` and strips load-bearing
   generic casts), so it can break the typecheck — that rule is off in the config for this
-  reason, and tsgo is the authoritative gate. Other autofixes (e.g. consistent-type-imports)
+  reason, and tsc is the authoritative gate. Other autofixes (e.g. consistent-type-imports)
   are safe.
 - Don't remove `console.*` or commented-out code; preserve comments that explain *why*
   (update/amend your own when reasonable). Offer fixes if they touch the current scope.
@@ -113,14 +122,16 @@ compatible with it, minus the `tools/issues.ts` tooling rati doesn't have).
 
 rati runs on **Vite+** (the `vp` CLI bundling Vite/Rolldown, Vitest, oxlint, oxfmt). All
 lint/format config lives in the root `vite.config.ts` `lint`/`fmt` blocks — there is no
-eslint/prettier. Node is pinned to **26** via `devEngines.runtime`. Type-checking is
-**tsgo** (`@typescript/native-preview`, the TypeScript 7 native compiler) — there is no
-`typescript` dependency.
+eslint/prettier. Node is pinned to **26** via `devEngines.runtime`. Type-checking is **tsc**
+— the released **TypeScript 7** native compiler (the `typescript` 7.0.x devDependency), run
+from the workspace root as `yarn run -T tsc`. Yarn is pinned **≥ 4.17.1** (`packageManager`):
+the released `typescript` package needs the berry#7190 gate or the first install crashes, so
+don't drop below it.
 
 ```bash
-vp run rati#build         # vite lib bundle + tsgo emits dist/*.d.ts
-vp run rati#typecheck     # tsgo --noEmit (src); rati#typecheck:test for the test tree
-vp run rati#test          # Vitest (runtime + *.test-d.ts type tests via the tsgo checker)
+vp run rati#build         # vite lib bundle + tsc emits dist/*.d.ts
+vp run rati#typecheck     # tsc --noEmit (src); rati#typecheck:test for the test tree
+vp run rati#test          # Vitest (runtime + *.test-d.ts type tests via the tsc checker)
 vp lint                   # oxlint   (vp lint --type-aware for the type-aware pass)
 vp fmt                    # oxfmt
 vp check                  # fmt + lint (NOT type-check)
@@ -221,3 +232,31 @@ gallery leans on: server-only data must be an **async** load to be dehydrated (a
 isn't serialized and would mismatch on hydration), and a `Source` stays *pending* under SSR
 (its `attach` runs from an effect, which `prerender` doesn't run) — so source-backed pages
 ship their loading slot in the HTML and come alive only after hydration.
+
+## Memory
+
+**Shared knowledge lives in repo docs, not memory** — this repo is read from several checkouts
+and from disposable VMs, and file-based memory travels with none of them. The canonical docs
+(above) are the stations; point-in-time status → the owning work-item record, never memory.
+Budgets for this repo's memory surface are in
+[.claude/memory-budgets.json](.claude/memory-budgets.json), which the `/memory-prune` skill
+reads — never raise a cap to clear a warning; that's a user decision
+(`$JNANA_KIT_HOME/plugin/docs/memory.md`).
+
+## This repo runs on jnana-kit
+
+The workflow skills, the session hooks, and the doctrine come from the kit checkout at
+`$JNANA_KIT_HOME` (unset ⇒ `~/Sites/jnana-kit` on the host, `~/jnana-kit` in a sandbox VM).
+This repo carries only the seams: `.claude/kit.json` (what the kit needs to know about rati —
+the `verify` gate, `bootstrap`, host deny rules), `.claude/settings.json` (the hook shim), and
+this file. rati keeps its **own** work-item tracking under `docs/planned/…` (above);
+env-feedback about the kit or the shared tooling goes to the central `jnana-kit-feedback` repo,
+not a local note.
+
+- Kit tools run from the repo root as
+  `sh "$JNANA_KIT_HOME/tools/run-node.sh" "$JNANA_KIT_HOME/tools/<script>" …` — never from
+  inside the kit checkout, which is a different repo.
+- Doctrine the skills point at instead of restating lives in `$JNANA_KIT_HOME/plugin/docs/`
+  (git workflow, issue tracking, memory, planning).
+- The skills (`/do-effort`, `/plan-effort`, `/close-effort`, `/triage-feedback`,
+  `/memory-prune`) are installed in user scope, so they are available in every session here.

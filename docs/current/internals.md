@@ -739,10 +739,11 @@ rati runs on **Vite+** (`vp` — bundles Vite/Rolldown, Vitest, oxlint, oxfmt). 
 config lives in the root `vite.config.ts` `lint`/`fmt` blocks (no eslint/prettier); Node is
 pinned to 26 via `devEngines.runtime`.
 
-Types: **tsgo** (`@typescript/native-preview`, the TS 7 native compiler) — there is no
-`typescript` dep. `vp run typecheck` type-checks (`tsconfig.json` for src,
+Types: **tsc** — the released **TypeScript 7** native compiler (the `typescript` 7.0.x dep;
+Yarn is pinned ≥ 4.17.1 in `packageManager` for the berry#7190 gate, without which the first
+install crashes). `vp run typecheck` type-checks (`tsconfig.json` for src,
 `tsconfig.test.json` for the test tree), `vp run build` emits `.d.ts` via
-`tsgo -p tsconfig.build.json`, and Vitest's `--typecheck` pass over `*.test-d.ts` uses tsgo
+`tsc -p tsconfig.build.json`, and Vitest's `--typecheck` pass over `*.test-d.ts` uses tsc
 through `test.typecheck.checker`. The whole repo is decorator-free (the legacy `data/`
 layer that needed `@babel/plugin-proposal-decorators` is gone; `rati/data` uses plain
 observable objects from factories), so there is no Babel in the toolchain.
@@ -750,7 +751,7 @@ observable objects from factories), so there is no Babel in the toolchain.
 Lint deviates from a stock config for a generics-heavy framework: the type-machinery rules
 (`no-explicit-any`, `no-non-null-assertion`, `no-empty-object-type`,
 `no-redundant-type-constituents`) are `warn`, and `no-unnecessary-type-assertion` is `off`
-because tsgolint's necessity analysis disagrees with tsgo (it ignores
-`noUncheckedIndexedAccess` and strips load-bearing generic casts). tsgo is the authoritative
+because tsgolint's necessity analysis disagrees with tsc (it ignores
+`noUncheckedIndexedAccess` and strips load-bearing generic casts). tsc is the authoritative
 type gate. Commands: `vp build` / `vp test` / `vp run typecheck` / `vp lint` / `vp fmt` /
 `vp check`. Releasing: [RELEASING.md](RELEASING.md).

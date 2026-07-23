@@ -5,9 +5,9 @@
     "type": "module",
     "scripts": {
         "dev": "vp dev",
-        "build": "tsgo --noEmit && vp build",
+        "build": "tsc --noEmit && vp build",
         "preview": "vp preview",
-        "typecheck": "tsgo --noEmit"
+        "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "rati": "workspace:*",

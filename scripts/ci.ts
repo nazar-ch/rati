@@ -49,7 +49,7 @@ const stages: Stage[] = [
     { name: 'lint', what: 'oxlint, repo-wide', run: () => exitOf(sh`vp lint`) },
     {
         name: 'typecheck',
-        what: 'tsgo over every workspace, src and test trees',
+        what: 'tsc (native TS7) over every workspace, src and test trees',
         run: () =>
             runAll([
                 'rati#typecheck',

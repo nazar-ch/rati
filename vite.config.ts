@@ -174,12 +174,12 @@ export default defineConfig({
                     // Keep values out of templates / String() unless they stringify meaningfully.
                     'typescript/restrict-template-expressions': 'error',
                     'typescript/no-base-to-string': 'error',
-                    // Off: tsgolint's necessity analysis disagrees with tsgo (the authoritative
+                    // Off: tsgolint's necessity analysis disagrees with tsc (the authoritative
                     // type gate) on rati's code — it doesn't model `noUncheckedIndexedAccess`
                     // (so it strips `arr[i]!` the tests need) and flags load-bearing generic
                     // assertions (`scopeOption as Scope<any>`, `component as ComponentType<any>`)
                     // as redundant. Its autofix removes exactly those, breaking the typecheck, so
-                    // this rule can't be `error`/`warn` here (warn still autofixes). tsgo is the gate.
+                    // this rule can't be `error`/`warn` here (warn still autofixes). tsc is the gate.
                     'typescript/no-unnecessary-type-assertion': 'off',
                     // Catch-callback variables are `unknown`, not implicit `any`.
                     'typescript/use-unknown-in-catch-callback-variable': 'error',
@@ -287,10 +287,10 @@ export default defineConfig({
         options: {
             // Type-aware lint RULES (no-misused-promises, no-floating-promises, …) — keep on.
             typeAware: true,
-            // Type-CHECKING stays in tsgo, not the linter. The linter type-checks every file it
+            // Type-CHECKING stays in tsc, not the linter. The linter type-checks every file it
             // touches against the nearest tsconfig, which pulls in files the curated per-package
             // tsconfig programs deliberately exclude and surfaces noise tsc never gates on. The
-            // per-package `typecheck` scripts (tsgo) remain the authoritative type gate.
+            // per-package `typecheck` scripts (tsc) remain the authoritative type gate.
             typeCheck: false,
         },
         jsPlugins: [
@@ -334,12 +334,14 @@ export default defineConfig({
         // output. (Same caveat documented in Jnana.) `.yarnrc.yml`: yarn owns and rewrites it
         // in its own 2-space style, so formatting it just creates churn (found by the
         // `scripts/ci.ts` fmt stage — the first thing to ever run `vp fmt --check` repo-wide).
-        ignorePatterns: ['**/dist', '**/*.md', '.yarnrc.yml'],
+        // `.claude/kit.json`: the jnana-kit manifest is JSONC (comments + trailing commas), and
+        // oxfmt reads it as strict JSON and strips both — which breaks the manifest.
+        ignorePatterns: ['**/dist', '**/*.md', '.yarnrc.yml', '.claude/kit.json'],
     },
     staged: {
         // Pre-commit gate (run by `vp staged` from .vite-hooks/pre-commit). Type-aware lint
         // RULES run here (config `typeAware`), but type-CHECKING does not (`typeCheck: false`) —
-        // tsgo owns that. A function (not a bare command) so the lint step can drop files oxlint
+        // tsc owns that. A function (not a bare command) so the lint step can drop files oxlint
         // ignores (`*.config.*`): handing `vp lint` only ignored paths makes it exit 1 with
         // "No files found to lint", which would break config-only commits.
         '*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}': (files) => {
@@ -349,7 +351,12 @@ export default defineConfig({
             return tasks;
         },
         // fmt-only (oxlint doesn't lint these). `.md` is intentionally absent — oxfmt corrupts
-        // Markdown (see `fmt.ignorePatterns`).
-        '*.{json,html,css,scss,less,yml,yaml}': 'vp fmt',
+        // Markdown (see `fmt.ignorePatterns`). `.claude/kit.json` is JSONC and fmt-excluded there
+        // too; handing `vp fmt` only excluded files makes it exit 1, so drop it and skip when none
+        // remain.
+        '*.{json,html,css,scss,less,yml,yaml}': (files) => {
+            const fmtable = files.filter((file) => !file.endsWith('.claude/kit.json'));
+            return fmtable.length > 0 ? [`vp fmt ${fmtable.join(' ')}`] : [];
+        },
     },
 });
