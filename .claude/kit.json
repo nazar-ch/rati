@@ -1,0 +1,58 @@
+// kit.json — rati's jnana-kit manifest: the facts a kit tool would otherwise hard-code about this
+// repo. One kit serves many projects; this file is the seam. JSONC (comments + trailing commas,
+// like tsconfig). Contract: jnana-kit `docs/design.md` §2; schema `tools/kit.schema.json`. Every
+// field is optional; a malformed manifest is a hard error naming the field, because a typo'd
+// guardrail must never read as "no guardrail".
+{
+    "$schema": "../../jnana-kit/tools/kit.schema.json",
+
+    // Short name — pool slot dirs (`rati-wt-<n>`), central-feedback filenames, registry key.
+    "project": "rati",
+
+    // The one pre-push gate. rati already owns the cleanest gate in the family — `yarn ci`
+    // (`scripts/ci.ts`), the hosted-CI stand-in — so `verify` points straight at it rather than a
+    // rebuilt `verify:*` set. The fast subset chosen for the pre-push gate: fmt + lint + typecheck +
+    // the full Vitest suite (at its tiny default fuzz budget). It deliberately SKIPS the deep
+    // `fuzz` stage (500 runs) and the `build` stage — run `yarn ci` (all stages) yourself before a
+    // release or when you touch the mandala engine or the packaging/build.
+    "verify": "yarn ci fmt lint typecheck test",
+
+    // Idempotent "make this checkout runnable": install deps only (Node 26 + Yarn 4.17.1 via
+    // corepack, `enableScripts: false`). No codegen; never git sync.
+    "bootstrap": "yarn install",
+    "bootstrapStale": {
+        "missing": ["node_modules"],
+        "newerThan": [{ "source": "yarn.lock", "target": "node_modules/.yarn-state.yml" }],
+    },
+
+    // Host guardrail: the publish path stays user-run outside a sandbox VM, layered over the kit
+    // baseline (`ansible`; `prisma` minus `prisma:generate` — neither used here). `scripts/release.sh`
+    // bumps the version, git-tags, and runs `yarn npm publish` to npmjs with the token in this
+    // machine's Keychain — an irreversible publish of the public `rati` package. Inert inside a VM
+    // (marker present), where the Keychain token is absent anyway.
+    "denyRules": {
+        "keywords": ["release", "publish"],
+        "rules": [
+            {
+                "id": "release",
+                "category": "package publish",
+                // `bash scripts/release.sh` / `./scripts/release.sh` tokenize to `release.sh`; the
+                // `release` npm script to `release`. The `^publish$` token pattern catches every
+                // wrapping of the publish itself — `npm publish`, `yarn npm publish`,
+                // `yarn workspace rati npm publish` — which the command-word rules alone can't
+                // (`yarn npm publish`'s command word is `npm`). `--publish` (release.sh's auth
+                // check) is a different token and stays allowed.
+                "command": ["release.sh", "release"],
+                "tokenPattern": "^publish$",
+                "reason": "scripts/release.sh (the `release` script) and a bare `yarn npm publish` bump and publish the public `rati` package to npmjs with the token in this machine's Keychain, and re-running does not undo a publish. Releasing is the maintainer's call (docs/current/RELEASING.md); `--dry-run` is the only safe form and is still user-run."
+            },
+        ],
+    },
+
+    // rati files no LOCAL env-feedback — friction goes to the central jnana-kit-feedback repo.
+    // Everything else in scanRoots takes jnana's default layout (docs/planned/<effort>/issues/,
+    // which rati already uses).
+    "scanRoots": {
+        "feedback": null,
+    },
+}

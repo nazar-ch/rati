@@ -1,0 +1,24 @@
+{
+    // https://github.com/tsconfig/bases/blob/main/bases/strictest.json
+    "extends": ["@tsconfig/strictest/tsconfig.json"],
+    "compilerOptions": {
+        // ESNext lib for Symbol.dispose / Disposable (explicit resource management),
+        // used by the experimental island disposal contract
+        "lib": ["ESNext", "DOM", "DOM.Iterable"],
+        "useDefineForClassFields": true,
+        "verbatimModuleSyntax": true,
+        "forceConsistentCasingInFileNames": true,
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "rootDir": "./src",
+        "jsx": "react-jsx",
+        "noEmit": true,
+        // `node`: the `rati/vite` plugin runs in the Vite process and reads the app's
+        // template off disk. It buys Node globals for the whole src program, which the
+        // browser side has no use for — tolerated because the alternative is a second
+        // program for one directory.
+        "types": ["vite-plus/client", "node"]
+    },
+    "exclude": ["dist", "node_modules", "build", "src/__tests__"],
+    "include": ["src"]
+}

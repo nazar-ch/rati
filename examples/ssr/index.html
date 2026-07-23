@@ -1,0 +1,24 @@
+<!doctype html>
+<!--
+  The shell, and only the shell. It carries no <script> and no stylesheet: the client
+  entry is the build's own input, so the plugin knows its hashed URL and its CSS and
+  reports both through virtual:rati/assets. entry-server hands those to renderApp,
+  React emits the script, and the links land in the head slot below — so this file is
+  not a build input, and never has to agree with a build output.
+-->
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <!-- The head slot: the stylesheet links and this route's chunk preload (from
+             assets), then headTags() — the <title> (store default when no page declares
+             one) and any page <Meta> tags, read after prerender. -->
+        <!--app-head-->
+    </head>
+    <body>
+        <div id="root"><!--app-html--></div>
+        <!-- serializeHydration() emits a complete inert JSON script tag — no window
+             global, no execution, no placement constraint. -->
+        <!--app-state-->
+    </body>
+</html>

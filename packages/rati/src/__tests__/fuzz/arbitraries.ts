@@ -1,0 +1,84 @@
+import type { Parameters } from 'fast-check';
+
+/*
+    Fuzz conventions for rati's randomized suites (ported from jnana's fuzz playbook —
+    ~/Sites/jnana/.claude/fuzz-testing.md). Effort record: docs/planned/mandala-fuzz/.
+
+      - `fuzz(n)` builds the fast-check `Parameters` for one property. `numRuns` defaults to
+        the small per-property `n`, so the default `vp run rati#test` stays fast; the knobs:
+
+          FUZZ_RUNS=<m>   raise every property's numRuns to at least m (the manual deep run):
+                          FUZZ_RUNS=500 vp run rati#test src/__tests__/fuzz/
+          FUZZ_LEVEL=<l>  scale the *shape* of generated cases (0 = default) — suites size
+                          their knobs with `byLevel(base, perLevel)`; orthogonal to FUZZ_RUNS
+                          (case count vs case size).
+          FUZZ_SEED=<s>   pin the generator seed for a whole run.
+
+      - `verbose` is always on: a failure prints `Property failed … { seed, path } …` plus the
+        shrunk counterexample. Replay: `FUZZ_SEED=<seed> vp run rati#test src/__tests__/fuzz/`,
+        or pin `{ seed, path }` into that property's params for the exact shrink path.
+*/
+
+const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+
+function envInt(name: string): number | undefined {
+    const raw = env?.[name];
+    if (!raw) return undefined;
+    const value = Number.parseInt(raw, 10);
+    return Number.isNaN(value) ? undefined : value;
+}
+
+export function fuzz(numRuns: number): Parameters<unknown> {
+    const forcedRuns = envInt('FUZZ_RUNS');
+    const seed = envInt('FUZZ_SEED');
+    return {
+        numRuns: forcedRuns !== undefined ? Math.max(forcedRuns, numRuns) : numRuns,
+        verbose: true,
+        ...(seed !== undefined && { seed }),
+    };
+}
+
+/**
+ * The deep fuzz budget: the `numRuns` floor the `fuzz` stage always runs (`FUZZ_RUNS=500`,
+ * scripts/ci.ts) and the mandala-fuzz effort's deep-run bar. Below it a rare, multi-step
+ * shape can honestly go ungenerated in a given run.
+ */
+const DEEP_FUZZ_RUNS = 500;
+
+/**
+ * Whether this run is at (or above) the deep fuzz budget — reads the same `FUZZ_RUNS` env
+ * `fuzz()` reads. A coverage-guard meta-check that asserts every listed shape was generated
+ * gates on this: at the tiny default per-property budget a shape needing a multi-step
+ * conspiracy can go unreached honestly, so asserting there cries wolf — the inverse of the
+ * guard's purpose. The `fuzz` stage always clears the bar, so nothing is lost at the gate
+ * (RF-09).
+ */
+export function atDeepFuzzBudget(): boolean {
+    return (envInt('FUZZ_RUNS') ?? 0) >= DEEP_FUZZ_RUNS;
+}
+
+/** Size a shape knob by complexity level: `base` at FUZZ_LEVEL=0, `+perLevel` per level. */
+export function byLevel(base: number, perLevel: number): number {
+    return base + (envInt('FUZZ_LEVEL') ?? 0) * perLevel;
+}
+
+/**
+ * Vitest's per-test timeout for a fuzz property, scaled to the budget it was asked for.
+ *
+ * The default 5s bound is blind to the one knob that decides how long a property runs:
+ * `FUZZ_RUNS`. `scripts/ci.ts` documents `FUZZ_RUNS=2000` as the way to deepen, and at that
+ * budget a property can walk into a timeout that reads exactly like a property failure —
+ * "Tests 1 failed", no counterexample, and nothing wrong with the code under test. Costly
+ * to diagnose, and it fires on the deep runs that are meant to be the trustworthy ones.
+ *
+ * The floor is well above 5s for the same reason at the *default* budget: under a full
+ * `yarn ci` pass the whole suite runs in parallel, and the contention alone pushed the
+ * mandala properties past 5s on an otherwise clean tree (the scope-and-island effort's
+ * 2026-07-20 finding — a flaky `ci` with nothing wrong under test).
+ *
+ * Generous on purpose: this is a hang-catcher, not a performance gate. The budgets that
+ * keep the suite fast are `fuzz(n)` and `byLevel`.
+ */
+export function fuzzTimeout(): number {
+    return Math.max(30_000, (envInt('FUZZ_RUNS') ?? 0) * 30);
+}

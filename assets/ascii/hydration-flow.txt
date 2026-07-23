@@ -1,0 +1,8 @@
+    SERVER                            CLIENT
+ +------------------+             +-------------------+
+ | resolve scopes   |    HTML     | hydrateRoot()     |
+ | prerender HTML   |     +       | read the payload  |
+ | dehydrate values | ----------> | skip every fetch  |
+ +------------------+   payload   +-------------------+
+
+           zero loads re-run on the client

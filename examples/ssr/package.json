@@ -1,0 +1,29 @@
+{
+    "name": "ssr-demo",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vp dev",
+        "build": "vp build",
+        "start": "NODE_ENV=production node serve.ts",
+        "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
+    },
+    "dependencies": {
+        "mobx": "^6.16.1",
+        "mobx-react-lite": "^4.1.1",
+        "rati": "workspace:*",
+        "react": "^19.2.7",
+        "react-dom": "^19.2.7"
+    },
+    "devDependencies": {
+        "@tsconfig/strictest": "^2.0.8",
+        "@tsconfig/vite-react": "^7.0.2",
+        "@types/node": "^26.0.1",
+        "@types/react": "^19.2.17",
+        "@types/react-dom": "~19.2.3",
+        "@vitejs/plugin-react": "^6.0.1",
+        "vite": "catalog:",
+        "vite-plus": "catalog:"
+    }
+}
