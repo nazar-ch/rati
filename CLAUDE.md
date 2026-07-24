@@ -253,9 +253,8 @@ this file. rati keeps its **own** work-item tracking under `docs/planned/…` (a
 env-feedback about the kit or the shared tooling goes to the central `jnana-kit-feedback` repo,
 not a local note.
 
-- Kit tools run from the repo root as
-  `sh "$JNANA_KIT_HOME/tools/run-node.sh" "$JNANA_KIT_HOME/tools/<script>" …` — never from
-  inside the kit checkout, which is a different repo.
+- Kit tools run from the repo root as `<script>.ts …` — never from inside the kit checkout, which
+  is a different repo.
 - Doctrine the skills point at instead of restating lives in `$JNANA_KIT_HOME/plugin/docs/`
   (git workflow, issue tracking, memory, planning).
 - The skills (`/do-effort`, `/plan-effort`, `/close-effort`, `/triage-feedback`,
