@@ -78,8 +78,9 @@ internal — callers only ever see `island`/`route`).
 ## Work items
 
 Tasks and issues are one primitive — a **work item**: one file per item,
-`docs/planned/<effort>/issues/<ID>-<slug>.md` (jnana's convention; kept deliberately
-compatible with it, minus the `tools/issues.ts` tooling rati doesn't have).
+`docs/planned/<effort>/issues/<ID>-<slug>.md` (jnana's convention, shared via the kit —
+the kit's `issues.ts` runs here from the repo root; doctrine:
+`$JNANA_KIT_HOME/plugin/docs/issue-tracking.md`).
 
 - **Anatomy** — a leading `---` frontmatter block, then the title `# <ID> — <imperative
   summary>`. The block holds `area:`, `needs:` (ids this depends on), `status:`
@@ -101,6 +102,11 @@ compatible with it, minus the `tools/issues.ts` tooling rati doesn't have).
   (rati's records mostly lead with `cut …`) reads as a note and leaves the record live.
 - **Prefix commit subjects with the id**: `SI-03: <what>`. Never hand-maintain a list or
   status table of items in any doc — effort READMEs carry narrative and ordering only.
+- **File new records with `issues.ts new <PREFIX> <slug>`** — it mints the next number
+  atomically on origin (a hand-picked number is a collision across parallel sandboxes) and
+  stages the record. Mid-session out-of-scope spots are **findings**: `issues.ts new FND
+  <slug>` lands them in the inbox at `docs/backlog/findings/issues/`. `issues.ts list` /
+  `show <ID>` / `check` read the corpus.
 
 ## Restricted actions
 
