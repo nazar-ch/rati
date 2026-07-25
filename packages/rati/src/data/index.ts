@@ -29,7 +29,7 @@
     provides the underlying `observableSource` bridge).
 */
 
-export { query, type Query, type QueryOptions, type QueryPhase } from './query';
+export { query, type Query, type QueryOptions, type QueryPhase, type ReadyQuery } from './query';
 export { collection, type Collection, type CollectionOptions } from './collection';
 export { reconciled, type Reconciled, type ReconciledOptions } from './reconciled';
 export {

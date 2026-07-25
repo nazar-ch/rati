@@ -28,6 +28,9 @@ export default defineConfig({
                 'vite/index': 'src/vite/index.ts',
                 'debug/index': 'src/debug/index.ts',
                 'testing/index': 'src/testing/index.ts',
+                // Separate from `testing/index` so the main testing barrel stays
+                // MobX-free (same boundary as `rati/data` vs `rati`).
+                'testing/data/index': 'src/testing/data/index.ts',
             },
             // the proper extensions will be added
             fileName: (_format, entryName) => `${entryName}.js`,

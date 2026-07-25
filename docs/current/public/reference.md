@@ -12,6 +12,7 @@ the [guide](guide.md).
 | `rati/mobx` | Optional MobX bindings (`observableSource`) and the legacy data layer. |
 | `rati/debug` | Opt-in debug tooling (`navTrace`, `dataTrace`). |
 | `rati/testing` | Test utilities: `deferred`/`flush`/`controllableSource`, island/router/stores render harnesses, an SSR round-trip kit (test-env only). |
+| `rati/testing/data` | The `rati/data` half of the test kit: `controllableProducer`, `controllableQuery` (test-env only; separate because it imports MobX). |
 
 > **Status:** first public iteration. The stores container surface (§Stores) is being
 > finalized; names there may still move.
@@ -887,6 +888,16 @@ refreshes and refresh errors are the instance's own observable state and never r
 the island. `attach()` triggers `prime()` (ensure semantics); detach does nothing — the
 store owns the data's lifetime.
 
+`query.source()` is typed `Source<ReadyQuery<T>>`, where `ReadyQuery<T> = Query<T> &
+{ readonly data: T }` — the resolved prop's `data` is `T`, not `T | undefined`, so a
+component never writes `props.row.data!` or `?? fallback` for a value whose presence is
+*why* it rendered. The claim is honest by construction: the source goes ready only once
+the query holds a value, and `reset()` drops it back to `pending`, re-tripping the
+island. It is a read-side claim only — `refresh()`, `set()`, `patch()` and `reset()` all
+still take a `ReadyQuery`, which is the same live instance. `collection.source()` and
+`pagedCollection.source()` need no equivalent: their `items` is `readonly Item[]` in
+every phase (empty before the first fetch), so there is nothing to strip.
+
 ```ts
 class SpacesManagementStore {
     spaces = collection({ fetch: (signal) => fetchSpaces(signal), key: (s) => s.spaceId });
@@ -1203,6 +1214,105 @@ the wire value and *returns* the seeded value — the source is `ready` before `
 throw from it to model a store rejecting a stale seed; combines with `loads` for
 "load on attach unless already seeded"; mutually exclusive with `ssr`), `onAttach` /
 `onDetach` (run at the ledger edges, for asserting attach ordering).
+
+### `rati/testing/data`
+
+The same hand-drive idea for the [`rati/data`](#ratidata) primitives, in its own subpath
+because it imports MobX — an app that never touches `rati/data` keeps the optional peer
+uninstalled and still gets everything above.
+
+| Export | Purpose |
+| --- | --- |
+| `controllableProducer<T, Args?>()` | a producer whose every call the test settles, with the call ledger: `producer`, `calls`, `callCount`, `lastCall`, `pendingCall`, `resolve(value)`, `reject(reason?)` |
+| `controllableQuery<T>(options?)` | a **real** `query` pre-wired to one — the query's whole surface plus the settle controls on a single object. `options` are `QueryOptions` (`debounce`, `reactive`) |
+
+`controllableProducer` replaces the three lines every data suite wrote by hand — a
+`deferred` array, a call counter, and a closure indexing into them — and adds what that
+version kept leaving out: which call is which, whether it settled, and each call's own
+`AbortSignal`. Hand `producer` to a `query`, a `collection`'s `fetch`, or a
+`pagedCollection`'s `fetchPage`; the trailing parameter is always the signal rati passes,
+and `Args` names whatever precedes it (`controllableProducer<PageResult<Row, string>,
+[string | null]>()` for a `fetchPage`, whose `lastCall.args` is then the cursor).
+
+| Member | Purpose |
+| --- | --- |
+| `producer` | `(...args, signal) => Promise<T>` — the thing under test calls it |
+| `calls` | every call so far, oldest first; live, and each carries `index`, `args`, `signal`, `promise`, `settled`, `aborted`, `resolve`, `reject` |
+| `callCount` | `calls.length` — "did it re-fetch?" in one assertion |
+| `lastCall` / `pendingCall` | the most recent call, and the oldest un-settled one. Both throw with a diagnostic when there is no such call |
+| `resolve(value)` / `reject(reason?)` | settle `pendingCall` — so calls settle in order unless you address one directly (`calls[1].resolve(…)`) |
+
+`controllableQuery` is not a wrapper: the controls are defined onto the real query
+instance, so `q.source()` still resolves with `q` itself — the identity an island
+receives. Settles are **raw**, like `controllableSource`'s mutators: awaiting the
+`prime()` / `refresh()` promise is the settle point, and a React test wraps the drive in
+`act` or follows it with `await flush()`.
+
+```ts
+import { controllableQuery } from 'rati/testing/data';
+
+test('a refresh failure keeps the stale rows on screen', async () => {
+    const q = controllableQuery<Row[]>();
+
+    const loading = q.prime();
+    expect(q.phase).toBe('loading');
+    q.resolve([{ id: 'a', title: 'Alpha' }]);
+    await loading;
+
+    const failing = q.refresh();
+    q.reject(new Error('offline'));
+    await failing;
+
+    expect(q.phase).toBe('error');
+    expect(q.data).toHaveLength(1);              // …still visible, beside the error
+    expect(q.error).toMatchObject({ code: 'failed' });
+});
+```
+
+A store test uses the low-level piece, because the store builds its own primitives — you
+inject the producer, not the query:
+
+```ts
+import { controllableProducer } from 'rati/testing/data';
+
+class SettingsStore {
+    constructor(fetchSettings: (signal: AbortSignal) => Promise<Settings>) {
+        this.settings = query(fetchSettings);
+    }
+    get retentionDays() { return this.settings.data?.retentionDays ?? 30; }
+}
+
+test('a failed refresh keeps the last good settings', async () => {
+    const server = controllableProducer<Settings>();
+    const store = new SettingsStore(server.producer);
+
+    const loading = store.settings.prime();
+    server.resolve({ retentionDays: 7 });
+    await loading;
+    expect(store.retentionDays).toBe(7);
+
+    const failing = store.settings.refresh();
+    server.reject(new Error('offline'));
+    await failing;
+    expect(store.retentionDays).toBe(7);         // stale-but-good, not the default
+    expect(server.callCount).toBe(2);
+});
+```
+
+Three patterns worth naming, all of which real suites needed:
+
+- **Abort on supersede** — `server.calls[0].aborted` after a `reset()` or a reactive
+  invalidation, with no `let signal` capture.
+- **Out-of-order settles** — address the call: `server.calls[1].resolve('new')` before
+  `server.calls[0].resolve('old')` pins that a superseded settle is ignored.
+- **The debounced path** — `vi.useFakeTimers()`, then `q.refresh()` twice, `expect(q.callCount).toBe(0)`,
+  `await vi.advanceTimersByTimeAsync(waitMs)`, `expect(q.callCount).toBe(1)`: the coalescing
+  is visible as calls that never happened. Reset with `vi.useRealTimers()` in `afterEach`.
+
+One limit on `reactive: true`: a bare `controllableQuery` producer reads nothing
+observable, so there is nothing for the reaction to track. Put the tracked read in your
+own producer and use `controllableProducer` for the settle —
+`query((signal) => { const term = filter.term; return server.producer(signal); }, { reactive: true })`.
 
 **`renderIsland(target, options?)`** mounts an island and hands back a handle for driving
 it. Pass a `{ scope, component, loading?, error? }` config (the full-featured path) or an

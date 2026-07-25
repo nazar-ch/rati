@@ -3,7 +3,10 @@ import { autorun, observable, runInAction } from 'mobx';
 import { query } from '../../data/query';
 // A deferred fake walks a query through every phase without module mocking — the
 // "testability by construction" ground rule (data-package.md), now `rati/testing`'s.
+// `controllableProducer` is the same idea for a *sequence* of fetches: the gate array
+// plus call counter this file used to spell out by hand, with each call's signal on it.
 import { deferred } from '../../testing';
+import { controllableProducer } from '../../testing/data';
 
 afterEach(() => {
     vi.useRealTimers();
@@ -29,12 +32,11 @@ describe('query phases', () => {
     });
 
     test('a failed first load is error with no data; retrying shows loading, not refreshing', async () => {
-        const gates = [deferred<number>(), deferred<number>()];
-        let call = 0;
-        const q = query(() => gates[call++]!.promise);
+        const server = controllableProducer<number>();
+        const q = query(server.producer);
 
         const first = q.prime();
-        gates[0]!.reject(new Error('boom'));
+        server.reject(new Error('boom'));
         await first;
         expect(q.phase).toBe('error');
         expect(q.error).toMatchObject({ code: 'failed', message: 'boom' });
@@ -44,7 +46,7 @@ describe('query phases', () => {
         const second = q.prime();
         // …and with no data yet the pending phase reads loading.
         expect(q.phase).toBe('loading');
-        gates[1]!.resolve(7);
+        server.resolve(7);
         await second;
         expect(q.phase).toBe('ready');
         expect(q.error).toBeNull();
@@ -69,34 +71,32 @@ describe('prime() is ensure', () => {
 
 describe('refresh()', () => {
     test('keeps data visible while re-fetching', async () => {
-        const gates = [deferred<number>(), deferred<number>()];
-        let call = 0;
-        const q = query(() => gates[call++]!.promise);
+        const server = controllableProducer<number>();
+        const q = query(server.producer);
 
         const first = q.prime();
-        gates[0]!.resolve(1);
+        server.resolve(1);
         await first;
 
         const second = q.refresh();
         expect(q.phase).toBe('refreshing');
         expect(q.data).toBe(1); // stale value stays on screen
-        gates[1]!.resolve(2);
+        server.resolve(2);
         await second;
         expect(q.data).toBe(2);
         expect(q.phase).toBe('ready');
     });
 
     test('a refresh failure keeps the stale data alongside the error', async () => {
-        const gates = [deferred<number>(), deferred<number>(), deferred<number>()];
-        let call = 0;
-        const q = query(() => gates[call++]!.promise);
+        const server = controllableProducer<number>();
+        const q = query(server.producer);
 
         const first = q.prime();
-        gates[0]!.resolve(1);
+        server.resolve(1);
         await first;
 
         const failing = q.refresh();
-        gates[1]!.reject(new Error('offline'));
+        server.reject(new Error('offline'));
         await failing;
         expect(q.phase).toBe('error');
         expect(q.data).toBe(1); // the component shows the stale list plus an error badge
@@ -105,7 +105,7 @@ describe('refresh()', () => {
         // prime() from error re-fetches and recovers.
         const recovering = q.prime();
         expect(q.phase).toBe('refreshing'); // data present → not loading
-        gates[2]!.resolve(3);
+        server.resolve(3);
         await recovering;
         expect(q.phase).toBe('ready');
         expect(q.data).toBe(3);
@@ -147,14 +147,13 @@ describe('set() and patch() — the single-value write seam', () => {
     });
 
     test('set does not touch a standing error (a local write is no evidence of recovery)', async () => {
-        const gates = [deferred<number>(), deferred<number>()];
-        let call = 0;
-        const q = query(() => gates[call++]!.promise);
+        const server = controllableProducer<number>();
+        const q = query(server.producer);
         const first = q.prime();
-        gates[0]!.resolve(1);
+        server.resolve(1);
         await first;
         const failing = q.refresh();
-        gates[1]!.reject(new Error('offline'));
+        server.reject(new Error('offline'));
         await failing;
 
         q.set(2);
@@ -163,34 +162,32 @@ describe('set() and patch() — the single-value write seam', () => {
     });
 
     test('a refresh overwrites the patched value wholesale — the recovery path', async () => {
-        const gates = [deferred<number>(), deferred<number>()];
-        let call = 0;
-        const q = query(() => gates[call++]!.promise);
+        const server = controllableProducer<number>();
+        const q = query(server.producer);
         const first = q.prime();
-        gates[0]!.resolve(10);
+        server.resolve(10);
         await first;
 
         q.patch(() => 99); // optimistic hop
         expect(q.data).toBe(99);
 
         const refreshing = q.refresh(); // e.g. mutation onError: 'refresh'
-        gates[1]!.resolve(10); // server truth unchanged
+        server.resolve(10); // server truth unchanged
         await refreshing;
         expect(q.data).toBe(10); // no dirty-mark needed: refresh replaces the ref
     });
 
     test('a patch during an in-flight refresh loses to the settle (last-write-wins)', async () => {
-        const gates = [deferred<number>(), deferred<number>()];
-        let call = 0;
-        const q = query(() => gates[call++]!.promise);
+        const server = controllableProducer<number>();
+        const q = query(server.producer);
         const first = q.prime();
-        gates[0]!.resolve(1);
+        server.resolve(1);
         await first;
 
         const refreshing = q.refresh();
         q.patch(() => 5); // visible immediately…
         expect(q.data).toBe(5);
-        gates[1]!.resolve(2);
+        server.resolve(2);
         await refreshing;
         expect(q.data).toBe(2); // …until the settle brings server truth
     });
@@ -198,35 +195,30 @@ describe('set() and patch() — the single-value write seam', () => {
 
 describe('race guard and abort', () => {
     test('reset() aborts the in-flight fetch and its late settle is ignored', async () => {
-        const gate = deferred<string>();
-        let signal: AbortSignal | undefined;
-        const q = query((abortSignal) => {
-            signal = abortSignal;
-            return gate.promise;
-        });
+        const server = controllableProducer<string>();
+        const q = query(server.producer);
 
         const loading = q.prime();
-        expect(signal!.aborted).toBe(false);
+        expect(server.calls[0]!.aborted).toBe(false);
         q.reset();
-        expect(signal!.aborted).toBe(true);
+        expect(server.calls[0]!.aborted).toBe(true);
         expect(q.phase).toBe('idle');
 
-        gate.resolve('late');
+        server.resolve('late');
         await loading;
         expect(q.phase).toBe('idle'); // the superseded settle went into the void
         expect(q.data).toBeUndefined();
     });
 
     test('a superseded fetch cannot clobber the current one', async () => {
-        const gates = [deferred<string>(), deferred<string>()];
-        let call = 0;
-        const q = query(() => gates[call++]!.promise);
+        const server = controllableProducer<string>();
+        const q = query(server.producer);
 
         const first = q.prime();
         q.reset();
         const second = q.prime();
-        gates[0]!.resolve('old');
-        gates[1]!.resolve('new');
+        server.resolve('old'); // the superseded call — oldest first
+        server.resolve('new');
         await Promise.all([first, second]);
         expect(q.data).toBe('new');
     });
@@ -297,9 +289,8 @@ describe('debounce', () => {
 
 describe('source()', () => {
     test('pending until the first ready, then ready forever with the instance', async () => {
-        const gates = [deferred<number>(), deferred<number>()];
-        let call = 0;
-        const q = query(() => gates[call++]!.promise);
+        const server = controllableProducer<number>();
+        const q = query(server.producer);
         const source = q.source();
         expect(q.source()).toBe(source); // memoized
 
@@ -308,13 +299,13 @@ describe('source()', () => {
         // attach() triggers prime() (ensure semantics).
         const detach = source.attach();
         expect(q.phase).toBe('loading');
-        gates[0]!.resolve(1);
+        server.resolve(1);
         await q.prime();
         expect(source.getSnapshot()).toEqual({ status: 'ready', value: q });
 
         // A refresh failure is the instance's own state — the island never re-trips.
         const failing = q.refresh();
-        gates[1]!.reject(new Error('offline'));
+        server.reject(new Error('offline'));
         await failing;
         expect(q.phase).toBe('error');
         expect(source.getSnapshot()).toEqual({ status: 'ready', value: q });
@@ -349,9 +340,8 @@ describe('source()', () => {
     });
 
     test('unsubscribe stops delivery while a still-subscribed listener keeps firing', async () => {
-        const gates = [deferred<number>(), deferred<number>()];
-        let call = 0;
-        const q = query(() => gates[call++]!.promise);
+        const server = controllableProducer<number>();
+        const q = query(server.producer);
         const source = q.source();
 
         const dropped = vi.fn();
@@ -360,7 +350,7 @@ describe('source()', () => {
         const keptUnsubscribe = source.subscribe(kept);
 
         const loading = q.prime();
-        gates[0]!.resolve(5);
+        server.resolve(5);
         await loading;
         expect(dropped).toHaveBeenCalledTimes(1); // both saw pending → ready
         expect(kept).toHaveBeenCalledTimes(1);
