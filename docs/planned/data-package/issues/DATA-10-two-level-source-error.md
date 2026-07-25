@@ -1,7 +1,7 @@
 ---
 area: packages/rati/src/scope/source.ts (+ reference.md §Sources)
 needs: nothing; DATA-11 builds on it
-status: open
+status: done
 disposition: cut 2026-07-25 from the second-round migration feedback (maintainer-agreed design)
 ---
 

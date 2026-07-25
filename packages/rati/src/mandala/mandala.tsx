@@ -18,7 +18,7 @@ import { registerScopeChannel, setScopeLabel } from './channel';
 import { registerScopeControlsChannel } from './controls';
 import { discardRun, RefreshController } from './refresh';
 import { LoadingDelay, noDelaySubscribe, notHeld } from './loadingDelay';
-import { RetryPolicy, type RetryOptions } from './retryPolicy';
+import { RetryPolicy, resolveRetry, type RetryOption } from './retryPolicy';
 import { createRejectionGuard } from './ssrErrors';
 import { MandalaErrorBoundary } from './boundary';
 import { HydrationContext } from './hydration';
@@ -113,24 +113,31 @@ export type MandalaConfig<S extends Scope<any>> = {
     loadingDelayMs?: number;
 
     /**
-     * Re-resolve automatically when the resolution fails? Absent (the default) means no
-     * automatic retry: a failure shows the `error` slot at once, as it always has.
+     * Re-resolve automatically when the resolution fails. **On by default** — an island
+     * with no `retry` option takes up to two further attempts at a failure the app
+     * classified `retryable: true` (a 5xx, a dropped connection), with a jittered
+     * exponential backoff. Nothing else is retried by default: a terminal failure
+     * (`retryable: false`) and one the app never classified both go straight to the `error`
+     * slot, so an app that classifies nothing gets exactly the behavior it had before.
+     * Classifying at your transport edge (see `SourceError`) is how you buy the default.
      *
-     * `{ count, backoffMs }` — up to `count` further attempts, waiting `backoffMs` before
-     * the first and doubling for each one after (`{ count: 3, backoffMs: 500 }` → 500ms,
-     * 1s, 2s). While the policy is working the island is *not* in its error state: it shows
-     * the `loading` slot (or the kept run, under `keepStale`) and
-     * `useScopeControls().retrying` says which attempt is in flight. Only once the budget
-     * is spent does the `error` slot come up — with its manual `retry`, which buys a fresh
-     * budget.
+     * While the policy is working the island is *not* in its error state: it shows the
+     * `loading` slot (or the kept run, under `keepStale`) and `useScopeControls().retrying`
+     * says which attempt is in flight. Only once the budget is spent does the `error` slot
+     * come up — with its manual `retry`, which buys a fresh budget.
      *
-     * **`failed` only.** A `not-available` — or any other code a load coins — is an answer,
-     * not a transient fault; retrying it just delays the 404 the user is owed.
+     * `{ count, backoffMs? }` asks for more: `count` attempts, and a broader reach — an
+     * unclassified `failed` (a bare `throw new Error`) is retried too, while `retryable:
+     * false` is still declined. `backoffMs` (default 500) is the *first ceiling*; it
+     * doubles per attempt (capped), and each wait is a full-jitter draw from `[0, ceiling]`
+     * so a backend blip doesn't bring every island back on the same tick.
+     *
+     * `false` — or `{ count: 0 }` — opts out entirely: the `error` slot, on the spot.
      *
      * Client-only: a server render takes its one attempt per request and reports the
      * failure as always.
      */
-    retry?: RetryOptions;
+    retry?: RetryOption;
 
     /**
      * What a server render does with a load that *failed*. Default `'retry'`.
@@ -147,9 +154,9 @@ export type MandalaConfig<S extends Scope<any>> = {
      *
      * Two things to know before opting in. The failure's `message` is written into the
      * HTML, so a load whose errors carry backend text should say something else instead
-     * (`cause` never travels — see the payload contract). And with an automatic
-     * {@link MandalaConfig.retry} policy configured, the policy picks a dehydrated failure
-     * up like any other: the island retries on the client instead of sitting on the error
+     * (`cause` never travels — see the payload contract). And the {@link MandalaConfig.retry}
+     * policy picks a dehydrated failure up like any other — `retryable` crosses the wire, so
+     * a transient one has the island retrying on the client instead of sitting on the error
      * slot the HTML shipped.
      *
      * Either way the server's own knowledge is unchanged: the failure is recorded, and the
@@ -325,9 +332,10 @@ export function createMandala<S extends Scope<any>>(
     // previous run for the whole re-resolution, a bare delay only until its deadline. With
     // neither, nothing is kept and the engine behaves exactly as it did before either landed.
     const keepsRun = keepStale || delayed;
-    // `count: 0` is the absent option spelled out — no policy, no wrapper on the manual
-    // retry, nothing to report.
-    const retryOptions = config.retry && config.retry.count > 0 ? config.retry : null;
+    // Default-on: absent means the default policy (classified failures only), `false` —
+    // or `count: 0`, which has always meant off — means no policy, no wrapper on the
+    // manual retry, nothing to report.
+    const retrySettings = resolveRetry(config.retry);
     const dehydrateErrors = config.ssrErrors === 'dehydrate';
     const provideChannel = (config.scope as Scope).provideDef?.channel;
 
@@ -426,7 +434,7 @@ export function createMandala<S extends Scope<any>>(
         // The `retry` policy, same shape: one per instance, only when the option is set —
         // without it nothing below this line does anything at all.
         const policyRef = useRef<RetryPolicy | null>(null);
-        if (retryOptions) policyRef.current ??= new RetryPolicy(retryOptions);
+        if (retrySettings) policyRef.current ??= new RetryPolicy(retrySettings);
         const policy = policyRef.current;
         if (!cacheRef.current || cacheRef.current.key !== treeKey) {
             const previous = cacheRef.current;
@@ -502,7 +510,7 @@ export function createMandala<S extends Scope<any>>(
         // a ref so the error slot's `retry` prop keeps the stable identity `bumpRetry` had;
         // without the option it *is* `bumpRetry`, and nothing here is in the way.
         const manualRetryRef = useRef<(() => void) | null>(null);
-        if (retryOptions) {
+        if (retrySettings) {
             manualRetryRef.current ??= () => {
                 policyRef.current?.reset();
                 bumpRetry();
@@ -682,7 +690,7 @@ export function createMandala<S extends Scope<any>>(
             // The leaf reports its commit only where something reads it: with none of the
             // three options there is no baseline to keep and no streak to end, and the
             // default path stays untouched.
-            commit: keepsRun || retryOptions ? commitRun : undefined,
+            commit: keepsRun || retrySettings ? commitRun : undefined,
             swap: keepsRun ? swapRun : undefined,
             retainProvided: keepsRun ? retainProvided : undefined,
         };

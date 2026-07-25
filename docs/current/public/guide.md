@@ -192,8 +192,10 @@ const StationBoard = island({
 When an input changes, the island re-resolves; when it unmounts, everything it started is
 torn down — subscriptions detached, provided values disposed.
 
-The `error` slot receives a structured `error` (`error.code` is `'not-available'` for
-missing data, `'failed'` for everything else) and a `retry` function:
+The `error` slot receives a structured `error` — `error.code` says which flavor of failure
+it was (`'not-available'` for missing data, `'failed'` for an unclassified one; the whole
+[vocabulary](reference.md#sourceerror--the-two-levels) is short and open) — and a `retry`
+function:
 
 ```tsx
 import type { ScopeInputs, SourceError } from 'rati';
@@ -211,18 +213,18 @@ function BoardError({ inputs, error, retry }: {
 Throw `NotAvailableError` in a load to signal "this doesn't exist" as data, not as a
 crash.
 
-If the failure you expect is a flaky network rather than a real one, let the island try
-again on its own instead of writing that button:
+If the failure you expect is a flaky network rather than a real one, the island already
+tries again on its own — **retry is on by default**, and the button is the fallback rather
+than the plan. Two more attempts, under 500ms then under 1s apart (jittered), and the
+`error` slot is not rendered at all until they are spent: the island shows its loading slot
+meanwhile, because an island retrying is an island loading.
 
-```tsx
-island({ scope: stationScope, component: Board, loading: Skeleton, error: BoardError,
-         retry: { count: 2, backoffMs: 500 } });
-```
-
-Two more attempts, 500ms then 1s apart, and the `error` slot is not rendered at all until
-they are spent — the island shows its loading slot meanwhile, because an island retrying is
-an island loading. `not-available` is never retried: it is an answer, not a fault. See
-[`retry`](reference.md#retry--trying-again-automatically).
+What earns those attempts is the error's own `retryable` flag, which your fetch layer sets
+when it maps a response to a failure — a 5xx or a dropped connection is worth another go, a
+403 or a `not-available` is an answer, not a fault. A failure nobody classified is left
+alone too; `retry: { count, backoffMs }` asks for a bigger budget and covers those as well,
+and `retry: false` opts out. See [`retry`](reference.md#retry--trying-again-automatically)
+and [`SourceError`](reference.md#sourceerror--the-two-levels).
 
 Under server rendering a failed load ships the *loading* slot and the client re-runs it —
 React's own degradation, and self-healing. A page that would rather paint the error slot

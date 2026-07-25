@@ -1,7 +1,7 @@
 ---
 area: packages/rati/src/mandala/retryPolicy.ts (+ island docs: reference.md §retry)
 needs: DATA-10 (the retryable semantics it gates on)
-status: open
+status: done
 disposition: cut 2026-07-25 from the second-round migration feedback; absorbs docs/backlog/findings/issues/FND-02-retry-gate-by-error-class.md
 ---
 
@@ -58,3 +58,20 @@ is what makes that safe: the gate can tell a transient fault from an answer.
   error slot with no extra attempts; a 5xx-shaped one (`retryable: true`) retries —
   on an island with **no** retry config.
 - Finishing commit flips FND-02's record to `status: done` alongside this one.
+
+## As landed (2026-07-25)
+
+Two notes for whoever reads this next.
+
+- **Explicit config reaches the unclassified `failed`, not every unflagged code.**
+  Item 2 said "anything with `retryable !== false`"; taken literally that would start
+  retrying `not-available`, which contradicts the doctrine this record repeats (an
+  answer is not a fault) and the pin that has held it since SI-05. So the gate is
+  FND-02 option 1 verbatim: the flag decides wherever the app set it, and for an
+  unclassified failure the reach decides — the default policy declines, an explicit
+  one falls back to the legacy code rule (`failed` only). The intent of item 2 —
+  unclassified `failed` retries, a classified terminal one no longer does — holds.
+- **Numbers:** `count: 2`, `backoffMs: 500` (now optional — the first *ceiling*), full
+  jitter over `min(10s, backoffMs * 2 ** (attempt - 1))`. The `Retry-After` gap the
+  Boundaries called out is stated in reference.md §retry: rati never sees response
+  headers, so a rate limiter's advice arrives only as `retryable`.

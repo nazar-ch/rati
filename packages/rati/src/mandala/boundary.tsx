@@ -55,11 +55,15 @@ export class MandalaErrorBoundary extends Component<ErrorBoundaryProps, { error:
     override render() {
         if (this.state.error !== null) {
             const { errorSlot: ErrorSlot, inputs, retry, policy } = this.props;
+            // The whole error, not just its code: the policy gates on `retryable` (the
+            // transient/terminal level) and falls back to the code only for a failure the
+            // app never classified.
+            const error = asSourceError(this.state.error);
             // An automatic attempt is not an error state — the island is still resolving —
             // so it shows what it shows while resolving. Decided here rather than from an
             // effect: the error slot would otherwise mount for a commit (running its
             // effects: the log, the toast, the Sentry report) before anything took it back.
-            if (policy?.accept(asSourceError(this.state.error).code, this.props.resetKey)) {
+            if (policy?.accept(error, this.props.resetKey)) {
                 return this.props.slot;
             }
             // The slot replaces the whole inner tree, kept content included — an error is
@@ -69,9 +73,7 @@ export class MandalaErrorBoundary extends Component<ErrorBoundaryProps, { error:
                 // No slot — propagate to the nearest outer ErrorBoundary.
                 throw this.state.error;
             }
-            return (
-                <ErrorSlot inputs={inputs} error={asSourceError(this.state.error)} retry={retry} />
-            );
+            return <ErrorSlot inputs={inputs} error={error} retry={retry} />;
         }
         return this.props.children;
     }

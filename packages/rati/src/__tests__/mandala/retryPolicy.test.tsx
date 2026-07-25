@@ -3,6 +3,12 @@ import { act } from 'react';
 import { scope, input } from '../../scope/scope';
 import { NotAvailableError, type SourceError } from '../../scope/source';
 import { island } from '../../island/island';
+import {
+    RetryPolicy,
+    resolveRetry,
+    DEFAULT_BACKOFF_MS,
+    MAX_BACKOFF_MS,
+} from '../../mandala/retryPolicy';
 import { flush, renderIsland, ssrRender, cleanup } from '../../testing';
 
 /*
@@ -11,28 +17,42 @@ import { flush, renderIsland, ssrRender, cleanup } from '../../testing';
     The shape the pins hold: an accepted failure is *not* an error state. The island keeps
     showing what it shows while resolving (the loading slot, or the kept run under
     `keepStale`), the error slot never mounts, and `retrying` says which attempt is in
-    flight. Only a spent budget — or an error that was never a fault to begin with
-    (`not-available`) — puts the error slot up, and the manual `retry` on it starts over.
+    flight. Only a spent budget — or a failure that was never a transient fault — puts the
+    error slot up, and the manual `retry` on it starts over.
 
-    The cadence is exponential from `backoffMs`, so `{ count: 2, backoffMs: 500 }` means one
-    attempt at 500ms and one at 1500ms. Fake timers make that a step rather than a wait.
+    Who is retried at all is the two-level error's business (DATA-10). The policy is **on by
+    default** and reads `retryable`: a classified transient failure is retried with no
+    config at all, a terminal one never is. An island that asks for a policy explicitly gets
+    a broader reach — the unclassified `failed` a bare `throw new Error` produces — and
+    `retry: false` opts out of the whole thing.
+
+    The cadence is exponential from `backoffMs`, drawn with **full jitter**: each wait is a
+    random point in `[0, ceiling]`. `Math.random` is stubbed at 1 below so the pins can name
+    an exact tick — that is the ceiling itself, the longest wait the schedule can produce.
 */
 
 const BACKOFF = 500;
 const POLICY = { count: 2, backoffMs: BACKOFF };
 
-type Attempts = { calls: string[]; failing: boolean };
+type Attempts = { calls: string[]; failing: boolean; throws?: () => unknown };
+
+/** What an app's transport edge throws: a plain error carrying both levels. */
+function classified(code: string, retryable: boolean) {
+    return () => Object.assign(new Error(`${code} failure`), { code, retryable });
+}
 
 /**
  * A scope whose one load fails while `attempts.failing` is set, recording every call. The
- * `id` input is there so the param-change pin has something to change.
+ * `id` input is there so the param-change pin has something to change; `throws` is what it
+ * fails with (an unclassified `Error` unless a test says otherwise).
  */
 function flakyConfig(attempts: Attempts, extra = {}) {
     return {
         scope: scope({ id: input<string>() }).load({
             label: async ({ id }: { id: string }) => {
                 attempts.calls.push(id);
-                if (attempts.failing) throw new Error('backend exploded');
+                if (attempts.failing)
+                    throw (attempts.throws ?? (() => new Error('backend exploded')))();
                 return `page ${id}`;
             },
         }),
@@ -47,10 +67,14 @@ function flakyConfig(attempts: Attempts, extra = {}) {
 describe('retry — the client', () => {
     beforeEach(() => {
         vi.useFakeTimers();
+        // The longest draw the jitter can make, so a wait is exactly its ceiling and the
+        // cadence pins below can name a tick. The jitter itself is pinned further down.
+        vi.spyOn(Math, 'random').mockReturnValue(1);
     });
     afterEach(() => {
         cleanup();
         vi.useRealTimers();
+        vi.restoreAllMocks();
     });
 
     /** Step the fake clock and let the generation it started resolve (or fail) all the way. */
@@ -149,7 +173,8 @@ describe('retry — the client', () => {
             { props: { id: 'a' } },
         );
 
-        // Straight to the slot the user is owed: one call, no backoff, no delay.
+        // Straight to the slot the user is owed: one call, no backoff, no delay. Even an
+        // explicit policy's broader reach stops at the code a load coined.
         expect(calls).toHaveLength(1);
         expect(handle.slot()).toBe('error');
         expect(handle.text()).toBe('error: not-available');
@@ -244,29 +269,180 @@ describe('retry — the client', () => {
         expect(vi.getTimerCount()).toBe(before);
     });
 
-    test('count: 0 is the absent option — the error slot, on the spot', async () => {
+    test('count: 0 and `retry: false` are the opt-out — the error slot, on the spot', async () => {
+        for (const option of [{ count: 0, backoffMs: BACKOFF }, false]) {
+            const attempts: Attempts = {
+                calls: [],
+                failing: true,
+                // Transient, and still not retried: opting out means opting out.
+                throws: classified('failed', true),
+            };
+            const before = vi.getTimerCount();
+            const handle = await renderIsland(flakyConfig(attempts, { retry: option }), {
+                props: { id: 'a' },
+            });
+
+            expect(handle.slot()).toBe('error');
+            expect(attempts.calls).toHaveLength(1);
+            expect(handle.controls().retrying).toBe(0);
+            expect(vi.getTimerCount()).toBe(before);
+            cleanup();
+        }
+    });
+});
+
+describe('retry — default-on, no config at all', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+        vi.spyOn(Math, 'random').mockReturnValue(1);
+    });
+    afterEach(() => {
+        cleanup();
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+    });
+
+    async function advance(ms: number): Promise<void> {
+        await act(async () => {
+            vi.advanceTimersByTime(ms);
+        });
+        await flush(2);
+    }
+
+    /** The same flaky island, with the `retry` key genuinely absent. */
+    function unconfigured(attempts: Attempts, extra = {}) {
+        return flakyConfig(attempts, { retry: undefined, ...extra });
+    }
+
+    test('a transient failure retries — the whole point of default-on', async () => {
+        const attempts: Attempts = { calls: [], failing: true, throws: classified('failed', true) };
+        const handle = await renderIsland(unconfigured(attempts), { props: { id: 'a' } });
+
+        // No `retry` option anywhere, and the island is already on its second attempt.
+        expect(attempts.calls).toHaveLength(1);
+        expect(handle.slot()).toBe('loading');
+        expect(handle.controls().retrying).toBe(1);
+
+        attempts.failing = false;
+        await advance(DEFAULT_BACKOFF_MS);
+
+        expect(handle.slot()).toBe('content');
+        expect(handle.text()).toBe('page a');
+        expect(attempts.calls).toHaveLength(2);
+    });
+
+    test('a terminal failure reaches the error slot with no extra attempts', async () => {
+        const attempts: Attempts = {
+            calls: [],
+            failing: true,
+            // The 403 shape: FND-02's acceptance check, on an island with no retry config.
+            throws: classified('forbidden', false),
+        };
+        const before = vi.getTimerCount();
+        const handle = await renderIsland(unconfigured(attempts), { props: { id: 'a' } });
+
+        expect(handle.slot()).toBe('error');
+        expect(handle.text()).toBe('error: forbidden');
+        expect(attempts.calls).toHaveLength(1);
+        expect(handle.controls().retrying).toBe(0);
+        expect(vi.getTimerCount()).toBe(before);
+    });
+
+    test('an unclassified failure is not retried either — classifying is what buys it', async () => {
         const attempts: Attempts = { calls: [], failing: true };
         const before = vi.getTimerCount();
-        const handle = await renderIsland(
-            flakyConfig(attempts, { retry: { count: 0, backoffMs: BACKOFF } }),
-            { props: { id: 'a' } },
-        );
+        const handle = await renderIsland(unconfigured(attempts), { props: { id: 'a' } });
 
+        // An app that never classifies is exactly where default-on retry would hammer its
+        // 404s, so it gets the behavior it had before the default existed.
+        expect(handle.slot()).toBe('error');
+        expect(attempts.calls).toHaveLength(1);
+        expect(handle.controls().retrying).toBe(0);
+        expect(vi.getTimerCount()).toBe(before);
+    });
+
+    test('the default budget is two attempts, then the error slot', async () => {
+        const attempts: Attempts = { calls: [], failing: true, throws: classified('failed', true) };
+        const handle = await renderIsland(unconfigured(attempts), { props: { id: 'a' } });
+
+        await advance(DEFAULT_BACKOFF_MS);
+        expect(attempts.calls).toHaveLength(2);
+        await advance(DEFAULT_BACKOFF_MS * 2);
+        expect(attempts.calls).toHaveLength(3);
+
+        expect(handle.slot()).toBe('error');
+        expect(handle.controls().retrying).toBe(0);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    test('an explicit policy declines a terminal failure too — the FND-02 fix', async () => {
+        const attempts: Attempts = {
+            calls: [],
+            failing: true,
+            throws: classified('forbidden', false),
+        };
+        const before = vi.getTimerCount();
+        const handle = await renderIsland(flakyConfig(attempts), { props: { id: 'a' } });
+
+        // The configured island used to hammer this one `count` times over.
         expect(handle.slot()).toBe('error');
         expect(attempts.calls).toHaveLength(1);
         expect(vi.getTimerCount()).toBe(before);
     });
+});
 
-    test('an island without the option is untouched', async () => {
-        const attempts: Attempts = { calls: [], failing: true };
-        const before = vi.getTimerCount();
-        const handle = await renderIsland(flakyConfig(attempts, { retry: undefined }), {
-            props: { id: 'a' },
+describe('retry — the backoff schedule', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    /** Drive a policy's arm loop directly and collect the waits it schedules. */
+    function waitsFor(settings: { count: number; backoffMs: number }): number[] {
+        const waits: number[] = [];
+        const timer = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+            _fn: () => void,
+            ms?: number,
+        ) => {
+            waits.push(ms ?? 0);
+            return 0 as unknown as ReturnType<typeof setTimeout>;
+        }) as unknown as typeof setTimeout);
+        const policy = new RetryPolicy(resolveRetry(settings)!);
+        policy.wire({ retry: () => {}, report: () => {} });
+        for (let attempt = 0; attempt < settings.count; attempt++) {
+            // A fresh generation each time — that is what buys the next attempt.
+            policy.accept({ code: 'failed', retryable: true }, `gen-${attempt}`);
+            policy.arm();
+        }
+        timer.mockRestore();
+        return waits;
+    }
+
+    test('every wait is a draw inside its doubling ceiling, and the ceiling is capped', () => {
+        const backoffMs = 1000;
+        const waits = waitsFor({ count: 8, backoffMs });
+
+        expect(waits).toHaveLength(8);
+        waits.forEach((wait, index) => {
+            const ceiling = Math.min(MAX_BACKOFF_MS, backoffMs * 2 ** index);
+            expect(wait).toBeGreaterThanOrEqual(0);
+            expect(wait).toBeLessThanOrEqual(ceiling);
         });
+        // The cap binds well before the last attempt — an un-capped schedule would ask for
+        // 128s here, which is a hang wearing a spinner.
+        expect(Math.max(...waits)).toBeLessThanOrEqual(MAX_BACKOFF_MS);
+    });
 
-        expect(handle.slot()).toBe('error');
-        expect(handle.controls().retrying).toBe(0);
-        expect(vi.getTimerCount()).toBe(before);
+    test('the draws differ — the schedule is a ceiling, not an appointment', () => {
+        // Un-jittered, every island that failed in the same blip comes back on the same
+        // tick. 8 identical draws off a 10s ceiling is not something to see in a lifetime.
+        const waits = waitsFor({ count: 8, backoffMs: MAX_BACKOFF_MS });
+        expect(new Set(waits).size).toBeGreaterThan(1);
+    });
+
+    test('`backoffMs` is optional — the default fills in', () => {
+        vi.spyOn(Math, 'random').mockReturnValue(1);
+        expect(waitsFor({ count: 1, backoffMs: DEFAULT_BACKOFF_MS })).toEqual([DEFAULT_BACKOFF_MS]);
+        expect(resolveRetry({ count: 1 })).toMatchObject({ backoffMs: DEFAULT_BACKOFF_MS });
     });
 });
 
@@ -278,7 +454,7 @@ describe('retry — SSR', () => {
         const failingScope = scope().load({
             greeting: async () => {
                 calls.push('call');
-                throw new Error('backend exploded');
+                throw Object.assign(new Error('backend exploded'), { retryable: true });
             },
         });
         const config = {
@@ -287,7 +463,8 @@ describe('retry — SSR', () => {
             loading: () => <div>LOADING-SLOT</div>,
             error: ({ error }: { error: SourceError }) => <div>ERROR-SLOT: {error.code}</div>,
         };
-        const Plain = island(config);
+        // Opted out vs. the default policy vs. an explicit one: server-side, all the same.
+        const Plain = island({ ...config, retry: false as const });
         const Retrying = island({ ...config, retry: POLICY });
 
         const plain = await ssrRender(<Plain />, { onError: () => {} });

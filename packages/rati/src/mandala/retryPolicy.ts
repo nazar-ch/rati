@@ -8,6 +8,11 @@
     the budget runs out does the `error` slot come up, with its manual `retry` armed as
     always.
 
+    **Default-on** since DATA-11: every island has a policy unless it opts out, because the
+    two-level `SourceError` (DATA-10) is what makes that safe — the gate reads `retryable`,
+    so it can tell a transient fault from an answer instead of hammering a 403. What the
+    island's option changes is only the policy's *reach*, see `resolveRetry`.
+
     Two halves, the same split `LoadingDelay` uses and for the same reason. `accept` is
     render-time — the boundary's render is where the error is seen, and the decision has to
     be made *there* or the error slot mounts for a frame (its effects with it) before
@@ -16,16 +21,71 @@
     client-only" — one attempt per request, no machinery needed to enforce it.
 */
 
-/** The `retry` option — see {@link MandalaConfig.retry}. */
+import type { SourceError } from '../scope/source';
+
+/** The `retry` option's configured form — see {@link MandalaConfig.retry}. */
 export type RetryOptions = {
     /** How many automatic attempts after the first failure. `0` disables the policy. */
     count: number;
     /**
-     * The first backoff, in milliseconds. Each further attempt doubles it, so
-     * `{ count: 3, backoffMs: 500 }` waits 500ms, then 1s, then 2s.
+     * The first backoff's ceiling, in milliseconds (default {@link DEFAULT_BACKOFF_MS}).
+     * Each further attempt doubles it — and each wait is a *full-jitter* draw from
+     * `[0, ceiling]`, so `{ count: 3, backoffMs: 500 }` waits somewhere under 500ms, then
+     * under 1s, then under 2s.
      */
-    backoffMs: number;
+    backoffMs?: number;
 };
+
+/** The `retry` option as an island writes it: absent = the default policy, `false` = off. */
+export type RetryOption = RetryOptions | false;
+
+/** The default policy's budget — enough to ride out a blip, not enough to be a hammer. */
+export const DEFAULT_RETRY_COUNT = 2;
+/** The default first ceiling. */
+export const DEFAULT_BACKOFF_MS = 500;
+/**
+ * The ceiling's own ceiling. A doubling schedule with a generous base disappears for
+ * minutes on a long budget, which reads as a hang; past this a spinner is a lie and the
+ * error slot is the honest answer.
+ */
+export const MAX_BACKOFF_MS = 10_000;
+
+/**
+ * How far the gate reaches over failures the app never classified (`retryable` absent).
+ *
+ *   - `classified` — the default policy: only `retryable === true` is retried. An app that
+ *     classifies nothing gets no automatic retries at all, which is the point: default-on
+ *     retry over unclassified failures would hammer its 404s.
+ *   - `broad` — an island that asked for a policy: the legacy code rule stands for
+ *     unclassified failures (the catch-all `failed` retries, a coined code does not), and
+ *     the flag overrides it in both directions.
+ */
+export type RetryReach = 'classified' | 'broad';
+
+/** What {@link resolveRetry} hands the policy: the option, resolved against the defaults. */
+export type RetrySettings = {
+    count: number;
+    backoffMs: number;
+    reach: RetryReach;
+};
+
+/**
+ * The island's option → the policy to build, or `null` for no policy at all.
+ *
+ * Absent is the *default* policy, not the absent one — retry should just work. `false` (and
+ * `{ count: 0 }`, which has always meant off) is the opt-out.
+ */
+export function resolveRetry(option: RetryOption | undefined): RetrySettings | null {
+    if (option === undefined) {
+        return { count: DEFAULT_RETRY_COUNT, backoffMs: DEFAULT_BACKOFF_MS, reach: 'classified' };
+    }
+    if (option === false || option.count <= 0) return null;
+    return {
+        count: option.count,
+        backoffMs: option.backoffMs ?? DEFAULT_BACKOFF_MS,
+        reach: 'broad',
+    };
+}
 
 type PolicyWiring = {
     /** Re-resolve from scratch — the mandala's retry bump, unwrapped (this *is* the retry). */
@@ -40,6 +100,7 @@ const NO_GENERATION = Symbol('rati.retry.none');
 export class RetryPolicy {
     private readonly count: number;
     private readonly backoffMs: number;
+    private readonly reach: RetryReach;
     private wiring: PolicyWiring | null = null;
 
     /** Automatic attempts spent in the current failure streak. */
@@ -59,9 +120,10 @@ export class RetryPolicy {
      */
     private version = 0;
 
-    constructor(options: RetryOptions) {
-        this.count = options.count;
-        this.backoffMs = options.backoffMs;
+    constructor(settings: RetrySettings) {
+        this.count = settings.count;
+        this.backoffMs = settings.backoffMs;
+        this.reach = settings.reach;
     }
 
     /** Wired every render, like the refresh controller's: the verbs stay current. */
@@ -72,18 +134,14 @@ export class RetryPolicy {
     /**
      * Render-time, from the error boundary: does this failure get an automatic attempt?
      *
-     * `failed` only. A `not-available` retried is still a `not-available` — the load said
-     * the thing does not exist, which is an answer, not a transient fault; retrying it just
-     * delays the 404 the user is owed. Same for any other code a load coins.
-     *
      * Idempotent per generation: the boundary re-renders while it holds an error (its
      * parent re-renders, a source ticks), and each of those must re-read the ruling rather
      * than buy another attempt. One generation can only be failing once.
      */
-    accept(code: string, generation: unknown): boolean {
+    accept(error: SourceError, generation: unknown): boolean {
         if (this.ruledOn === generation) return this.accepted;
         this.ruledOn = generation;
-        this.accepted = code === 'failed' && this.spent < this.count;
+        this.accepted = this.eligible(error) && this.spent < this.count;
         if (this.accepted) {
             this.spent += 1;
             this.report(this.spent);
@@ -93,6 +151,21 @@ export class RetryPolicy {
             this.report(0);
         }
         return this.accepted;
+    }
+
+    /**
+     * Is this failure the kind worth another attempt? The two-level error, read top level
+     * first: the app's own classification wins wherever it exists.
+     *
+     * `retryable: false` is an answer, not a fault — a 403 will not become a 200 in 500ms
+     * and a 404 retried is still a 404, so retrying only delays what the user is owed.
+     * `true` is a blip. Absent means the app never said, and then the reach decides: the
+     * default policy declines (see {@link RetryReach}), a configured one falls back to the
+     * code rule it has always had — the catch-all `failed`, and nothing a load coined.
+     */
+    private eligible(error: SourceError): boolean {
+        if (error.retryable !== undefined) return error.retryable;
+        return this.reach === 'broad' && error.code === 'failed';
     }
 
     /**
@@ -107,8 +180,13 @@ export class RetryPolicy {
         this.clear();
         // Exponential from `backoffMs`: a backend that just failed is the one case where
         // trying again immediately is least likely to help, and three attempts 300ms apart
-        // are barely different from one.
-        const wait = this.backoffMs * 2 ** (this.spent - 1);
+        // are barely different from one. Capped, then drawn from with **full jitter** — the
+        // schedule is a ceiling, not an appointment. Every island that failed in the same
+        // backend blip would otherwise re-fire on the same synchronized tick, a small
+        // thundering herd back at a server already struggling; spreading them over the
+        // window costs one `Math.random()` (FND-02).
+        const ceiling = Math.min(MAX_BACKOFF_MS, this.backoffMs * 2 ** (this.spent - 1));
+        const wait = Math.round(Math.random() * ceiling);
         this.timer = setTimeout(() => {
             this.timer = null;
             this.wiring?.retry();
