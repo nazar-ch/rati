@@ -56,7 +56,7 @@ describe('optimistic choreography', () => {
             fetch: () => Promise.resolve([{ id: 'a', title: serverTitle }]),
             key: (row) => row.id,
         });
-        await spaces.query.load();
+        await spaces.query.prime();
 
         const gate = deferred<void>();
         const rename = mutation(
@@ -89,7 +89,7 @@ describe('optimistic choreography', () => {
             fetch: () => Promise.resolve([{ id: 'a', title: 'Alpha' }]),
             key: (row) => row.id,
         });
-        await spaces.query.load();
+        await spaces.query.prime();
 
         const rename = mutation(
             (_id: string, _title: string) => Promise.reject(new Error('denied')),
@@ -120,8 +120,8 @@ describe('optimistic choreography', () => {
                 }),
             ]),
         );
-        await membersFor.get('a')!.load();
-        await membersFor.get('b')!.load();
+        await membersFor.get('a')!.prime();
+        await membersFor.get('b')!.prime();
         fetches.length = 0;
 
         const touch = mutation((_spaceId: string) => Promise.resolve(), {
@@ -137,7 +137,7 @@ describe('optimistic choreography', () => {
         // DATA-05 + DATA-06 together — the FND-106 choreography: patch the one
         // query the call names, and let onError: 'refresh' restore its truth.
         const members = query(() => Promise.resolve({ retention: 30 }));
-        await members.load();
+        await members.prime();
         const membersFor = (_spaceId: string) => members;
 
         const setRetention = mutation(

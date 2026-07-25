@@ -87,7 +87,7 @@ export function collection<T, Item = T>(options: CollectionOptions<T, Item>): Co
             memoizedSource ??= instanceSource(
                 self,
                 () => ({ hasData: q.data !== undefined, error: q.error }),
-                () => void q.load(),
+                () => void q.prime(),
             );
             return memoizedSource;
         },

@@ -798,7 +798,7 @@ works from island error slots to in-content badges.
 **The scope seam.** Read-side primitives expose `source()`: pending until the first
 ready, then ready forever with **the instance itself** as the resolved prop — later
 refreshes and refresh errors are the instance's own observable state and never re-trip
-the island. `attach()` triggers `load()` (ensure semantics); detach does nothing — the
+the island. `attach()` triggers `prime()` (ensure semantics); detach does nothing — the
 store owns the data's lifetime.
 
 ```ts
@@ -827,11 +827,18 @@ keyed by the call is declarable — `refreshes: (spaceId) => [this.membersFor(sp
 
 Division of labor: the island covers loading/error for the **first** resolution; the
 primitives' phases drive everything after — `refreshing` for stale display, per-page
-phases for pagination rows, `isSubmitting` for buttons. `query.load()` is idempotent
+phases for pagination rows, `isSubmitting` for buttons. `query.prime()` is idempotent
 *ensure* (fetches from `idle`/`error`, no-ops when `ready`, dedupes in flight);
 `refresh()` is the only re-fetch and keeps stale data visible, even through a refresh
 failure. Under SSR the primitives stay pending (a `Source` attaches in effects) — this
 entry is for the interactive app, not the SSR path.
+
+**`prime()` vs the scope's `.load({…})`** — same word, two surfaces, and only one of
+them is here. A scope's [`.load(level)`](#loadlevel) declares a waterfall level and is
+the framework's resolution machinery; a data primitive's `prime()` is the *ensure* on
+one instance: fetch if there is nothing (or an error), otherwise do nothing. Wiring
+`prime()` to a user gesture ("Reload") is the classic mistake — an already-ready query
+no-ops. Gestures call `refresh()`.
 
 **Single-value writes.** `query` mirrors the collection's write seam for its one value:
 `set(next)` replaces it locally (the server-push case, `upsert`'s sibling) and
@@ -845,7 +852,7 @@ underlying query, a local write reconciles the item map like a fetch would.
 
 **Reactive params** (`reactive: true`, opt-in). A `query` marked `reactive` re-fetches when
 the observables its producer reads **synchronously** change — the type-ahead / filter case,
-replacing a store's manual `load()`-after-every-setter. The re-run is a `refresh()`, so
+replacing a store's manual `prime()`-after-every-setter. The re-run is a `refresh()`, so
 `debounce` coalesces the burst; `collection` forwards both options to its query.
 
 ```ts

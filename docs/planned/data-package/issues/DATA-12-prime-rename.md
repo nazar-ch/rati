@@ -1,7 +1,7 @@
 ---
 area: packages/rati/src/data — query.ts and every caller (+ reference.md, internals.md)
 needs: nothing; DATA-13 lands on the renamed surface (same leg)
-status: open
+status: done
 disposition: cut 2026-07-25 from the second-round migration feedback (breaking; pre-1.0 and allowed)
 ---
 

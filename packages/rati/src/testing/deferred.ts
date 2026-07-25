@@ -10,9 +10,9 @@
  * ```ts
  * const gate = deferred<number>();
  * const q = query(() => gate.promise);
- * q.load();                 // → loading
+ * const primed = q.prime(); // → loading
  * gate.resolve(42);
- * await q.ensureLoaded();   // → ready, data === 42
+ * await primed;             // → ready, data === 42
  * ```
  */
 export interface Deferred<T> {

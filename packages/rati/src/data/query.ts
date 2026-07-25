@@ -7,9 +7,12 @@ import { toSourceError, type Source, type SourceError } from '../scope/source';
     current value, honest phases, race-guarded. Design record:
     docs/archive/directions-2026-07/data-package.md §1.
 
-      - `load()` is idempotent *ensure*: it fetches from `idle` or `error`, no-ops
-        when `ready`, and returns the in-flight promise while pending. Scopes (via
-        `source()`) and effects call it.
+      - `prime()` is idempotent *ensure*: it fetches from `idle` or `error`,
+        no-ops when `ready`, and returns the in-flight promise while pending.
+        Scopes (via `source()`) and effects call it. Priming an already-primed
+        pump does nothing — the name says so, which the old `load()` did not
+        (a UI button wired to it was a silent no-op; that trap is why it was
+        renamed).
       - `refresh()` is the only re-fetch; the data stays visible (phase
         `refreshing`), and a refresh failure keeps the stale value alongside the
         error. Mutations and user gestures call it.
@@ -18,7 +21,7 @@ import { toSourceError, type Source, type SourceError } from '../scope/source';
       - `set()`/`patch()` are the single-value write seam (`upsert`/`patchItem`'s
         siblings): local truth now, server truth on the next refresh. They swap
         the `data` reference (the notification) and touch no fetch and no error.
-      - `load()`/`refresh()` resolve when the fetch settles either way — failure is
+      - `prime()`/`refresh()` resolve when the fetch settles either way — failure is
         state (`phase`/`error`), not a rejection.
       - `reactive: true` re-fetches when the producer's *synchronous prefix* reads
         change (opt-in — implicit refetching is never the default). A MobX
@@ -33,14 +36,14 @@ export interface QueryOptions {
     /**
      * Coalesce `refresh()` bursts (the type-ahead case): the fetch fires `waitMs`
      * after the last call, but no later than `maxWaitMs` after the first of the
-     * burst. All coalesced calls share one promise. `load()` never debounces —
+     * burst. All coalesced calls share one promise. `prime()` never debounces —
      * an ensure wants data now (it does join an already-scheduled fetch).
      */
     debounce?: { waitMs: number; maxWaitMs?: number };
     /**
      * Opt-in: re-fetch when the observables the producer reads *synchronously*
      * (before its first `await`) change — the type-ahead / filter case, the fix
-     * for a store's manual `load()`-after-every-setter. The re-run is a
+     * for a store's manual `prime()`-after-every-setter. The re-run is a
      * `refresh()`, so it flows through `debounce` if set. Reads made after the
      * first `await` are **not** tracked (MobX's async boundary) — destructure
      * every reactive dependency at the top of the producer. Never the default;
@@ -58,7 +61,7 @@ export interface Query<T> {
     /** loading || refreshing */
     readonly isPending: boolean;
     /** Ensure: fetches only from idle/error; dedupes in flight. */
-    load(): Promise<void>;
+    prime(): Promise<void>;
     /** Explicit re-fetch; `data` stays visible; dedupes in flight. */
     refresh(): Promise<void>;
     /**
@@ -81,7 +84,7 @@ export interface Query<T> {
      * Bridge to a scope's `.load()`: pending until the first ready, then ready
      * forever with **this instance** as the value — later refreshes and refresh
      * errors are the instance's own observable state and never re-trip the
-     * island. `attach()` triggers `load()` (ensure); detach does nothing — the
+     * island. `attach()` triggers `prime()` (ensure); detach does nothing — the
      * store owns the data's lifetime, not the island.
      */
     source(): Source<Query<T>>;
@@ -239,7 +242,7 @@ export function createQuery<T>(
         void startFetch().then(current.resolve);
     }
 
-    function load(): Promise<void> {
+    function prime(): Promise<void> {
         if (scheduled) return scheduled.promise;
         if (inFlight) return inFlight;
         if (state.hasData && !state.error) return Promise.resolve(); // ready → no-op
@@ -291,7 +294,7 @@ export function createQuery<T>(
             scheduled.resolve(); // a cancelled coalesced refresh resolves, not hangs
             scheduled = null;
         }
-        // Stop reacting: the next explicit load()/refresh() re-establishes tracking.
+        // Stop reacting: the next explicit prime()/refresh() re-establishes tracking.
         reaction?.dispose();
         reaction = null;
         runInAction(() => {
@@ -318,7 +321,7 @@ export function createQuery<T>(
         get isPending() {
             return state.pending;
         },
-        load,
+        prime,
         refresh,
         set,
         patch,
@@ -327,7 +330,7 @@ export function createQuery<T>(
             memoizedSource ??= instanceSource(
                 self,
                 () => ({ hasData: state.hasData, error: state.error }),
-                () => void load(),
+                () => void prime(),
             );
             return memoizedSource;
         },
@@ -339,7 +342,7 @@ export function createQuery<T>(
  * Package-internal: the shared `source()` shape — pending until the instance's
  * first ready, then ready forever with the same reference (data-package.md
  * ground rules). An error *before* the first ready surfaces to the island's
- * error slot; its `retry` remounts → `attach()` → `load()` re-fetches from
+ * error slot; its `retry` remounts → `attach()` → `prime()` re-fetches from
  * `error`.
  */
 export function instanceSource<I>(
