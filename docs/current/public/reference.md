@@ -875,6 +875,91 @@ mutations), commits on success, distributes a thrown `FormError` onto fields, an
 anything else on `form.error`. The returned function never rejects, so it is usable
 directly as `<form action={store.save}>`.
 
+### `keyed` — one instance per id
+
+`keyed(factory)` is the lazy per-key instance map every keyed resource otherwise
+hand-rolls (`Map<id, instance>` plus get-or-create). It is deliberately thin and
+**primitive-agnostic**: the factory returns whatever you build — a `query` of a composite
+payload, a `collection`, a `pagedCollection`, or a store class stitching several — and
+`keyed` never calls into it.
+
+| Member | Purpose |
+| --- | --- |
+| `get(key)` | get-or-create: the first call for a key runs the factory, every later one returns **that same instance** — per-key identity is the contract |
+| `peek(key)` | the instance if one exists, `undefined` otherwise; never creates. Reactive: a derivation that peeked a missing key re-runs once `get` creates it |
+| `reset()` | drop every instance (the sign-out case). It does *not* call into them — dropping the references *is* the semantics; a caller still holding one resets it itself |
+
+Keys are `string | number` (they are `Map` keys, so identity is `===`); a branded id type
+is a `string` and passes.
+
+```ts
+class SpacesStore {
+    // A composite payload per space: the query is the unit, `keyed` holds one per id.
+    overview = keyed((spaceId: SpaceId) =>
+        query(async (signal) => ({
+            space: await fetchSpace(spaceId, signal),
+            members: await fetchMembers(spaceId, signal),
+        })),
+    );
+
+    // …or a collection per space, when the keyed resource *is* a list.
+    members = keyed((spaceId: SpaceId) =>
+        collection({
+            fetch: (signal) => fetchMembers(spaceId, signal),
+            key: (member) => member.userId,
+        }),
+    );
+}
+```
+
+A store class per key is the shape to reach for once a space owns more than one
+resource — the instance is an ordinary store, so it holds mutations, derived state and
+UI state alongside its data:
+
+```ts
+class SpaceStore {
+    constructor(readonly spaceId: SpaceId) {}
+
+    members = collection({
+        fetch: (signal) => fetchMembers(this.spaceId, signal),
+        key: (member) => member.userId,
+    });
+    jobs = pagedCollection({
+        fetchPage: (cursor, signal) => fetchJobs(this.spaceId, cursor, signal),
+        key: (job) => job.jobId,
+    });
+}
+
+class SpacesStore {
+    byId = keyed((spaceId: SpaceId) => new SpaceStore(spaceId));
+
+    invite = mutation(inviteRequest, {
+        // The call's own arguments name the instance it invalidated.
+        refreshes: (spaceId: SpaceId) => [this.byId.get(spaceId).members],
+    });
+}
+```
+
+That last line is the point of stable per-key identity: `refreshes` receives the call's
+arguments, so `get(spaceId)` reaches exactly the instance the mutation touched — and
+under the default `onError: 'refresh'`, the recovery reaches it too. Scopes read the
+same way, keyed by a route param:
+
+```ts
+export const spaceScope = scope({ spaceId: input<SpaceId>() })
+    .load({ stores: hook(() => useStores()) })
+    .load({ space: ({ spaceId, stores }) => stores.spaces.byId.get(spaceId) })
+    .load({ members: ({ space }) => space.members.source() });
+```
+
+**A map, not a cache.** No eviction, no TTL, no LRU, and no cross-key identity: two keys
+whose payloads mention the same entity hold two independent instances. An *unbounded*
+key space (a search result's every row) wants a **selection** — one instance whose
+parameters change, via `reactive: true` or a scope input — not a map that grows for the
+lifetime of the tab. And because `get` creates, call it from an action, an event
+handler or a scope load, never from inside a `computed`, which may not cause side effects;
+`peek` is the read-side twin for those.
+
 ---
 
 ## `rati/debug`

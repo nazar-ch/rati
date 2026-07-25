@@ -1,7 +1,7 @@
 ---
 area: packages/rati/src/data — new keyed.ts (+ reference.md)
 needs: nothing hard; examples read better after DATA-13 (reconciled/store-class pattern)
-status: open
+status: done
 disposition: cut 2026-07-25 from the second-round migration feedback (first wave asked for it; second round demoted it to the thin map it is)
 ---
 
