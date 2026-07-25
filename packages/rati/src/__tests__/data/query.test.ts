@@ -16,7 +16,7 @@ describe('query phases', () => {
         expect(q.phase).toBe('idle');
         expect(q.data).toBeUndefined();
 
-        const loading = q.load();
+        const loading = q.prime();
         expect(q.phase).toBe('loading');
         expect(q.isPending).toBe(true);
 
@@ -33,15 +33,15 @@ describe('query phases', () => {
         let call = 0;
         const q = query(() => gates[call++]!.promise);
 
-        const first = q.load();
+        const first = q.prime();
         gates[0]!.reject(new Error('boom'));
         await first;
         expect(q.phase).toBe('error');
         expect(q.error).toMatchObject({ code: 'failed', message: 'boom' });
         expect(q.data).toBeUndefined();
 
-        // load() fetches from `error` (the ensure pair covers retry)…
-        const second = q.load();
+        // prime() fetches from `error` (the ensure pair covers retry)…
+        const second = q.prime();
         // …and with no data yet the pending phase reads loading.
         expect(q.phase).toBe('loading');
         gates[1]!.resolve(7);
@@ -51,18 +51,18 @@ describe('query phases', () => {
     });
 });
 
-describe('load() is ensure', () => {
+describe('prime() is ensure', () => {
     test('no-ops when ready, dedupes in flight', async () => {
         const producer = vi.fn(() => Promise.resolve('value'));
         const q = query(producer);
 
-        const a = q.load();
-        const b = q.load();
+        const a = q.prime();
+        const b = q.prime();
         expect(b).toBe(a); // the in-flight promise is returned, not a second fetch
         await a;
         expect(producer).toHaveBeenCalledTimes(1);
 
-        await q.load(); // ready → no-op
+        await q.prime(); // ready → no-op
         expect(producer).toHaveBeenCalledTimes(1);
     });
 });
@@ -73,7 +73,7 @@ describe('refresh()', () => {
         let call = 0;
         const q = query(() => gates[call++]!.promise);
 
-        const first = q.load();
+        const first = q.prime();
         gates[0]!.resolve(1);
         await first;
 
@@ -91,7 +91,7 @@ describe('refresh()', () => {
         let call = 0;
         const q = query(() => gates[call++]!.promise);
 
-        const first = q.load();
+        const first = q.prime();
         gates[0]!.resolve(1);
         await first;
 
@@ -102,8 +102,8 @@ describe('refresh()', () => {
         expect(q.data).toBe(1); // the component shows the stale list plus an error badge
         expect(q.error).toMatchObject({ code: 'failed', message: 'offline' });
 
-        // load() from error re-fetches and recovers.
-        const recovering = q.load();
+        // prime() from error re-fetches and recovers.
+        const recovering = q.prime();
         expect(q.phase).toBe('refreshing'); // data present → not loading
         gates[2]!.resolve(3);
         await recovering;
@@ -116,7 +116,7 @@ describe('refresh()', () => {
 describe('set() and patch() — the single-value write seam', () => {
     test('patch swaps the reference and notifies an observer', async () => {
         const q = query(() => Promise.resolve({ retention: 30, role: 'admin' }));
-        await q.load();
+        await q.prime();
 
         const seen: number[] = [];
         const dispose = autorun(() => seen.push(q.data!.retention));
@@ -150,7 +150,7 @@ describe('set() and patch() — the single-value write seam', () => {
         const gates = [deferred<number>(), deferred<number>()];
         let call = 0;
         const q = query(() => gates[call++]!.promise);
-        const first = q.load();
+        const first = q.prime();
         gates[0]!.resolve(1);
         await first;
         const failing = q.refresh();
@@ -166,7 +166,7 @@ describe('set() and patch() — the single-value write seam', () => {
         const gates = [deferred<number>(), deferred<number>()];
         let call = 0;
         const q = query(() => gates[call++]!.promise);
-        const first = q.load();
+        const first = q.prime();
         gates[0]!.resolve(10);
         await first;
 
@@ -183,7 +183,7 @@ describe('set() and patch() — the single-value write seam', () => {
         const gates = [deferred<number>(), deferred<number>()];
         let call = 0;
         const q = query(() => gates[call++]!.promise);
-        const first = q.load();
+        const first = q.prime();
         gates[0]!.resolve(1);
         await first;
 
@@ -205,7 +205,7 @@ describe('race guard and abort', () => {
             return gate.promise;
         });
 
-        const loading = q.load();
+        const loading = q.prime();
         expect(signal!.aborted).toBe(false);
         q.reset();
         expect(signal!.aborted).toBe(true);
@@ -222,9 +222,9 @@ describe('race guard and abort', () => {
         let call = 0;
         const q = query(() => gates[call++]!.promise);
 
-        const first = q.load();
+        const first = q.prime();
         q.reset();
-        const second = q.load();
+        const second = q.prime();
         gates[0]!.resolve('old');
         gates[1]!.resolve('new');
         await Promise.all([first, second]);
@@ -269,13 +269,13 @@ describe('debounce', () => {
         expect(producer).toHaveBeenCalledTimes(1);
     });
 
-    test('load() joins a scheduled fetch instead of jumping the queue', async () => {
+    test('prime() joins a scheduled fetch instead of jumping the queue', async () => {
         vi.useFakeTimers();
         const producer = vi.fn(() => Promise.resolve('value'));
         const q = query(producer, { debounce: { waitMs: 100 } });
 
         const scheduled = q.refresh();
-        expect(q.load()).toBe(scheduled);
+        expect(q.prime()).toBe(scheduled);
         expect(producer).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(100);
         expect(producer).toHaveBeenCalledTimes(1);
@@ -305,11 +305,11 @@ describe('source()', () => {
 
         expect(source.getSnapshot()).toEqual({ status: 'pending' });
 
-        // attach() triggers load() (ensure semantics).
+        // attach() triggers prime() (ensure semantics).
         const detach = source.attach();
         expect(q.phase).toBe('loading');
         gates[0]!.resolve(1);
-        await q.load();
+        await q.prime();
         expect(source.getSnapshot()).toEqual({ status: 'ready', value: q });
 
         // A refresh failure is the instance's own state — the island never re-trips.
@@ -326,7 +326,7 @@ describe('source()', () => {
         const q = query(() => gate.promise);
         const source = q.source();
         source.attach();
-        const loading = q.load(); // joins the fetch attach() started
+        const loading = q.prime(); // joins the fetch attach() started
         gate.reject(new Error('down'));
         await loading;
         expect(source.getSnapshot()).toMatchObject({
@@ -341,7 +341,7 @@ describe('source()', () => {
         const source = q.source();
         const onChange = vi.fn();
         const unsubscribe = source.subscribe(onChange);
-        const loading = q.load();
+        const loading = q.prime();
         gate.resolve(5);
         await loading;
         expect(onChange).toHaveBeenCalled();
@@ -359,7 +359,7 @@ describe('source()', () => {
         const unsubscribe = source.subscribe(dropped);
         const keptUnsubscribe = source.subscribe(kept);
 
-        const loading = q.load();
+        const loading = q.prime();
         gates[0]!.resolve(5);
         await loading;
         expect(dropped).toHaveBeenCalledTimes(1); // both saw pending → ready
@@ -386,14 +386,14 @@ describe('reactive', () => {
             { reactive: true },
         );
 
-        await q.load(); // establishes tracking, reads term 'a'
+        await q.prime(); // establishes tracking, reads term 'a'
         expect(q.data).toBe('result:a');
         expect(seen).toEqual(['a']);
 
         runInAction(() => {
             store.term = 'b';
         });
-        await q.load(); // await the reactive re-fetch (joins the in-flight one)
+        await q.prime(); // await the reactive re-fetch (joins the in-flight one)
         expect(q.data).toBe('result:b');
         expect(seen).toEqual(['a', 'b']);
     });
@@ -410,7 +410,7 @@ describe('reactive', () => {
             { reactive: true },
         );
 
-        await q.load();
+        await q.prime();
         expect(q.data).toBe('a:x');
 
         // Changing the post-await read does not re-fetch.
@@ -425,7 +425,7 @@ describe('reactive', () => {
         runInAction(() => {
             store.tracked = 'b';
         });
-        await q.load();
+        await q.prime();
         expect(q.data).toBe('b:y');
     });
 
@@ -443,7 +443,7 @@ describe('reactive', () => {
             { reactive: true },
         );
 
-        const first = q.load(); // fetch #0 for 'a', in flight
+        const first = q.prime(); // fetch #0 for 'a', in flight
         expect(q.isPending).toBe(true);
 
         runInAction(() => {
@@ -451,7 +451,7 @@ describe('reactive', () => {
         });
         gates[0]!.resolve(); // #0 settles late — superseded, ignored
         gates[1]!.resolve();
-        await Promise.all([first, q.load()]);
+        await Promise.all([first, q.prime()]);
         expect(q.data).toBe('result:b');
         expect(call).toBe(2); // two real fetches — the change was not deduped away
     });
@@ -462,7 +462,7 @@ describe('reactive', () => {
         const producer = vi.fn(async () => `result:${store.term}`);
         const q = query(producer, { reactive: true, debounce: { waitMs: 100 } });
 
-        await q.load(); // load() never debounces
+        await q.prime(); // prime() never debounces
         expect(producer).toHaveBeenCalledTimes(1);
         expect(q.data).toBe('result:a');
 
@@ -488,7 +488,7 @@ describe('reactive', () => {
         const producer = vi.fn(async () => store.term);
         const q = query(producer); // no reactive
 
-        await q.load();
+        await q.prime();
         runInAction(() => {
             store.term = 'b';
         });
@@ -497,11 +497,11 @@ describe('reactive', () => {
         expect(producer).toHaveBeenCalledTimes(1); // opt-in only — no implicit tracking
     });
 
-    test('reset() disposes the reaction; tracking resumes on the next load', async () => {
+    test('reset() disposes the reaction; tracking resumes on the next prime', async () => {
         const store = observable({ term: 'a' });
         const producer = vi.fn(async () => store.term);
         const q = query(producer, { reactive: true });
-        await q.load();
+        await q.prime();
         expect(producer).toHaveBeenCalledTimes(1);
 
         q.reset();
@@ -513,11 +513,11 @@ describe('reactive', () => {
         expect(producer).toHaveBeenCalledTimes(1);
         expect(q.phase).toBe('idle');
 
-        await q.load(); // re-establishes tracking
+        await q.prime(); // re-establishes tracking
         runInAction(() => {
             store.term = 'c';
         });
-        await q.load();
+        await q.prime();
         expect(q.data).toBe('c');
     });
 
@@ -533,7 +533,7 @@ describe('reactive', () => {
             { reactive: true },
         );
 
-        await q.load();
+        await q.prime();
         expect(q.phase).toBe('error');
         expect(q.error).toMatchObject({ code: 'failed', message: 'sync boom' });
         expect(q.data).toBeUndefined();

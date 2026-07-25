@@ -118,8 +118,8 @@ describe('the keyed dependent a mutation refreshes', () => {
         }
         const store = new Store();
 
-        await store.members.get('s1').load();
-        await store.members.get('s2').load();
+        await store.members.get('s1').prime();
+        await store.members.get('s2').prime();
         expect(fetches).toEqual(['s1', 's2']);
 
         await store.invite('s1', 'a@example.com');

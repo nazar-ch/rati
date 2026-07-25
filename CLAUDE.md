@@ -154,7 +154,7 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
 - `router/` — `route.tsx`, `store.ts` (RouterStore), `Router`/`Link`/`Navigate`,
   `useRouteContext`, `prepareRoute`, `history`, `scrollRestoration`, `lazy`.
 - `data/` — the `rati/data` entry: the MobX-shaped data primitives (`query`, `collection`,
-  `mutation`, `form`/`field` + the validator kit), successor of the deleted legacy layer
+  `reconciled`, `mutation`, `form`/`field` + the validator kit), successor of the deleted legacy layer
   (`remoteData`/`ActiveData`) and Jnana's `FetchStore` family. Experimental; design record:
   `docs/archive/directions-2026-07/data-package.md`; pending extraction to a companion
   package. Plain observable objects from factories — no decorators, no classes.

@@ -178,7 +178,7 @@ export function pagedCollection<T, C = string, Item = T>(
         loadMore() {
             const tail = state.records[state.records.length - 1];
             if (!tail || tail.query.data !== undefined) return Promise.resolve(); // fully loaded
-            return tail.query.load(); // idle → fetch; error → retry; in flight → join
+            return tail.query.prime(); // idle → fetch; error → retry; in flight → join
         },
         async refresh() {
             for (let index = 0; index < state.records.length; index++) {
@@ -207,7 +207,7 @@ export function pagedCollection<T, C = string, Item = T>(
                         error: first?.query.error ?? null,
                     };
                 },
-                () => void firstPage().query.load(),
+                () => void firstPage().query.prime(),
             );
             return memoizedSource;
         },

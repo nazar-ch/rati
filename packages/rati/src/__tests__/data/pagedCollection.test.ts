@@ -180,7 +180,7 @@ describe('reactive', () => {
         expect(source.getSnapshot()).toEqual({ status: 'pending' });
         expect(c.items).toEqual([]);
 
-        await c.pages[0]!.load(); // await the reload of the fresh first page
+        await c.pages[0]!.prime(); // await the reload of the fresh first page
         expect(fetchPage).toHaveBeenLastCalledWith(null, 'b'); // re-anchored at cursor null
         expect(c.items.map((item) => item.id)).toEqual(['b1', 'b2']);
         expect(c.pages).toHaveLength(1);

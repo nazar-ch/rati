@@ -5,10 +5,12 @@
     docs/archive/directions-2026-07/data-package.md.
 
     Data in an app has four moments; each primitive owns exactly one, plus one
-    for fetch topology:
+    for fetch topology and one for row identity:
 
       - `query` — read one value (refreshable, race-guarded, honest phases)
       - `collection` — read a keyed set (identity-stable reconciliation)
+      - `reconciled` — that identity story over rows you already have (the
+        list half of a composite response), with no fetch of its own
       - `pagedCollection` — read in pages (pages are queries; structural has-more)
       - `form` + `field` — stage local edits (baseline / dirty / validate)
       - `mutation` — write (optimistic patch + refresh choreography)
@@ -29,6 +31,7 @@
 
 export { query, type Query, type QueryOptions, type QueryPhase } from './query';
 export { collection, type Collection, type CollectionOptions } from './collection';
+export { reconciled, type Reconciled, type ReconciledOptions } from './reconciled';
 export {
     pagedCollection,
     type PagedCollection,

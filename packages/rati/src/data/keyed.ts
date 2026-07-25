@@ -57,7 +57,7 @@ export function keyed<K extends KeyedKey, I>(factory: (key: K) => I): Keyed<K, I
             // nullish value, and re-running the factory would break identity.
             if (instances.has(key)) return existing as I;
             // The factory runs outside the action: it typically constructs a
-            // query/collection/store, and whatever it kicks off (a `load()`,
+            // query/collection/store, and whatever it kicks off (a `prime()`,
             // say) shouldn't be silently batched into our write.
             const created = factory(key);
             runInAction(() => {
