@@ -1,7 +1,7 @@
 import { describe, test, expect, vi } from 'vite-plus/test';
 import { autorun, observable, runInAction } from 'mobx';
 import { collection } from '../../data/collection';
-import { deferred } from '../../testing';
+import { controllableProducer } from '../../testing/data';
 
 interface Row {
     id: string;
@@ -201,9 +201,8 @@ describe('the flat facade', () => {
     // DATA-13: fetch state and item state sit side by side; there is no `.query`
     // to reach through, and no raw pre-reconcile array either.
     test('phase / error / isPending / prime / refresh reach the backing query', async () => {
-        const gates = [deferred<readonly Row[]>(), deferred<readonly Row[]>()];
-        let call = 0;
-        const c = collection<Row>({ fetch: () => gates[call++]!.promise, key: (row) => row.id });
+        const server = controllableProducer<readonly Row[]>();
+        const c = collection<Row>({ fetch: server.producer, key: (row) => row.id });
         expect(c.phase).toBe('idle');
         expect(c.error).toBeNull();
         expect(c.isPending).toBe(false);
@@ -212,7 +211,7 @@ describe('the flat facade', () => {
         const priming = c.prime();
         expect(c.phase).toBe('loading');
         expect(c.isPending).toBe(true);
-        gates[0]!.resolve([{ id: 'a', title: 'Alpha' }]);
+        server.resolve([{ id: 'a', title: 'Alpha' }]);
         await priming;
         expect(c.phase).toBe('ready');
         expect(c.items).toHaveLength(1);
@@ -220,7 +219,7 @@ describe('the flat facade', () => {
         const refreshing = c.refresh();
         expect(c.phase).toBe('refreshing'); // items stay visible
         expect(c.items).toHaveLength(1);
-        gates[1]!.reject(new Error('offline'));
+        server.reject(new Error('offline'));
         await refreshing;
         expect(c.phase).toBe('error');
         expect(c.error?.message).toBe('offline');
@@ -322,36 +321,28 @@ describe('local writes racing an in-flight refresh (last-write-wins)', () => {
     // an upsert during a refresh is reconciled away if the refresh's rows disagree."
     // The settle's `reconcile()` is the last write; these pin it in both directions.
     test('a local upsert the server never had is reconciled away on settle', async () => {
-        const gates = [deferred<readonly Row[]>(), deferred<readonly Row[]>()];
-        let call = 0;
-        const c = collection<Row>({
-            fetch: () => gates[call++]!.promise,
-            key: (row) => row.id,
-        });
+        const server = controllableProducer<readonly Row[]>();
+        const c = collection<Row>({ fetch: server.producer, key: (row) => row.id });
 
         const first = c.prime();
-        gates[0]!.resolve([{ id: 'a', title: 'Alpha' }]);
+        server.resolve([{ id: 'a', title: 'Alpha' }]);
         await first;
 
         const refreshing = c.refresh(); // fetch in flight
         c.upsert({ id: 'z', title: 'Local' }); // a server-push-style add, mid-refresh
         expect(c.items.map((row) => row.id)).toEqual(['a', 'z']); // visible immediately…
 
-        gates[1]!.resolve([{ id: 'a', title: 'Alpha' }]); // …but the server never had 'z'
+        server.resolve([{ id: 'a', title: 'Alpha' }]); // …but the server never had 'z'
         await refreshing;
         expect(c.items.map((row) => row.id)).toEqual(['a']); // the reconcile dropped it
     });
 
     test('a local remove of a row the server still has is restored on settle', async () => {
-        const gates = [deferred<readonly Row[]>(), deferred<readonly Row[]>()];
-        let call = 0;
-        const c = collection<Row>({
-            fetch: () => gates[call++]!.promise,
-            key: (row) => row.id,
-        });
+        const server = controllableProducer<readonly Row[]>();
+        const c = collection<Row>({ fetch: server.producer, key: (row) => row.id });
 
         const first = c.prime();
-        gates[0]!.resolve([
+        server.resolve([
             { id: 'a', title: 'Alpha' },
             { id: 'b', title: 'Beta' },
         ]);
@@ -361,7 +352,7 @@ describe('local writes racing an in-flight refresh (last-write-wins)', () => {
         c.remove('a'); // drop 'a' locally while the fetch is out
         expect(c.items.map((row) => row.id)).toEqual(['b']);
 
-        gates[1]!.resolve([
+        server.resolve([
             { id: 'a', title: 'Alpha' },
             { id: 'b', title: 'Beta' },
         ]); // the server still lists 'a'

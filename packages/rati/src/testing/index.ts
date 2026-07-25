@@ -9,6 +9,10 @@
     Depends on `react` / `react-dom/client` (already peers). It does *not* pull in
     `@testing-library/react`: the render harnesses use `react-dom/client` directly and return
     a container you can query with whatever you already use.
+
+    The `rati/data` half — `controllableProducer` and `controllableQuery` — lives one
+    subpath over, in `rati/testing/data`, because it imports MobX; this barrel stays
+    MobX-free so an app that never uses `rati/data` needn't install the optional peer.
 */
 
 export { deferred, type Deferred } from './deferred';
