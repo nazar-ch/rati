@@ -56,7 +56,7 @@ describe('optimistic choreography', () => {
             fetch: () => Promise.resolve([{ id: 'a', title: serverTitle }]),
             key: (row) => row.id,
         });
-        await spaces.query.prime();
+        await spaces.prime();
 
         const gate = deferred<void>();
         const rename = mutation(
@@ -79,8 +79,8 @@ describe('optimistic choreography', () => {
 
         gate.resolve();
         await call;
-        await spaces.query.refresh(); // join the fired refresh (dedupes in flight)
-        expect(spaces.query.phase).toBe('ready');
+        await spaces.refresh(); // join the fired refresh (dedupes in flight)
+        expect(spaces.phase).toBe('ready');
         expect(spaces.getByKey('a')!.title).toBe('Beta'); // now actual truth
     });
 
@@ -89,7 +89,7 @@ describe('optimistic choreography', () => {
             fetch: () => Promise.resolve([{ id: 'a', title: 'Alpha' }]),
             key: (row) => row.id,
         });
-        await spaces.query.prime();
+        await spaces.prime();
 
         const rename = mutation(
             (_id: string, _title: string) => Promise.reject(new Error('denied')),
@@ -103,7 +103,7 @@ describe('optimistic choreography', () => {
         );
 
         await expect(rename('a', 'Beta')).rejects.toThrow('denied');
-        await spaces.query.refresh(); // join the recovery refresh
+        await spaces.refresh(); // join the recovery refresh
         expect(spaces.getByKey('a')!.title).toBe('Alpha'); // patch undone by truth
     });
 

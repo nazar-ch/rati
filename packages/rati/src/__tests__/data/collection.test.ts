@@ -25,11 +25,11 @@ describe('reconciliation', () => {
             { id: 'a', title: 'Alpha' },
             { id: 'b', title: 'Beta' },
         ]);
-        await c.query.prime();
+        await c.prime();
         const items = c.items;
         const [first] = items;
 
-        await c.query.refresh(); // same content, fresh objects
+        await c.refresh(); // same content, fresh objects
         expect(c.items).toBe(items); // no-op recompute doesn't churn the array
         expect(c.items[0]).toBe(first);
     });
@@ -39,7 +39,7 @@ describe('reconciliation', () => {
             { id: 'a', title: 'Alpha' },
             { id: 'b', title: 'Beta' },
         ]);
-        await c.query.prime();
+        await c.prime();
         const items = c.items;
         const first = c.items[0]!;
 
@@ -52,7 +52,7 @@ describe('reconciliation', () => {
             { id: 'a', title: 'Alpha v2' },
             { id: 'b', title: 'Beta' },
         ]);
-        await c.query.refresh();
+        await c.refresh();
 
         expect(c.items[0]).toBe(first); // same instance…
         expect(first.title).toBe('Alpha v2'); // …new fields
@@ -66,14 +66,14 @@ describe('reconciliation', () => {
             { id: 'a', title: 'Alpha' },
             { id: 'b', title: 'Beta' },
         ]);
-        await c.query.prime();
+        await c.prime();
         const [first, second] = c.items;
 
         setRows([
             { id: 'b', title: 'Beta' },
             { id: 'a', title: 'Alpha' },
         ]);
-        await c.query.refresh();
+        await c.refresh();
         expect(c.items[0]).toBe(second);
         expect(c.items[1]).toBe(first);
     });
@@ -83,14 +83,14 @@ describe('reconciliation', () => {
             { id: 'a', title: 'Alpha' },
             { id: 'b', title: 'Beta' },
         ]);
-        await c.query.prime();
+        await c.prime();
         const second = c.items[1]!;
 
         setRows([
             { id: 'b', title: 'Beta' },
             { id: 'c', title: 'Gamma' },
         ]);
-        await c.query.refresh();
+        await c.refresh();
         expect(c.items.map((item) => item.id)).toEqual(['b', 'c']);
         expect(c.items[0]).toBe(second);
     });
@@ -100,7 +100,7 @@ describe('reconciliation', () => {
             { id: 'a', title: 'First' },
             { id: 'a', title: 'Second' },
         ]);
-        await c.query.prime();
+        await c.prime();
         expect(c.items).toHaveLength(1);
         expect(c.items[0]!.title).toBe('First');
     });
@@ -126,13 +126,13 @@ describe('reconciliation', () => {
             key: (row) => row.id,
             into: (raw, prev) => (prev ? prev.update(raw) : new SpaceRow(raw.id, raw)),
         });
-        await c.query.prime();
+        await c.prime();
         const item = c.items[0]!;
         expect(item).toBeInstanceOf(SpaceRow);
         item.expanded = true;
 
         rows = [{ id: 'a', title: 'Alpha v2' }];
-        await c.query.refresh();
+        await c.refresh();
         expect(c.items[0]).toBe(item);
         expect(item.title).toBe('Alpha v2');
         expect(item.expanded).toBe(true);
@@ -142,7 +142,7 @@ describe('reconciliation', () => {
 describe('optimistic edits and server truth', () => {
     test('patchItem edits in place; the next refresh restores server truth even for an unchanged row', async () => {
         const { c } = rowsCollection([{ id: 'a', title: 'Alpha' }]);
-        await c.query.prime();
+        await c.prime();
         const item = c.items[0]!;
 
         c.patchItem('a', (current) => {
@@ -152,14 +152,14 @@ describe('optimistic edits and server truth', () => {
 
         // The mutation failed; onError: 'refresh' re-fetches — the server rows are
         // byte-identical to the last fetch, and the patch must still be undone.
-        await c.query.refresh();
+        await c.refresh();
         expect(c.items[0]).toBe(item);
         expect(item.title).toBe('Alpha');
     });
 
     test('patchItem can return a replacement item', async () => {
         const { c } = rowsCollection([{ id: 'a', title: 'Alpha' }]);
-        await c.query.prime();
+        await c.prime();
         const original = c.items[0]!;
 
         c.patchItem('a', (current) => ({ ...current, title: 'Replaced' }));
@@ -170,7 +170,7 @@ describe('optimistic edits and server truth', () => {
 
     test('upsert reconciles one row: updates in place, appends unknown keys', async () => {
         const { c } = rowsCollection([{ id: 'a', title: 'Alpha' }]);
-        await c.query.prime();
+        await c.prime();
         const item = c.items[0]!;
 
         c.upsert({ id: 'a', title: 'Pushed' }); // server-push update
@@ -181,28 +181,12 @@ describe('optimistic edits and server truth', () => {
         expect(c.items.map((row) => row.id)).toEqual(['a', 'b']);
     });
 
-    test('a set on the underlying query reconciles the item map (stays coherent)', async () => {
-        const { c } = rowsCollection([{ id: 'a', title: 'Alpha' }]);
-        await c.query.prime();
-        const item = c.items[0]!;
-
-        // A whole-list local write lands through onSuccess like a fetch would —
-        // items and query.data never diverge.
-        c.query.set([
-            { id: 'a', title: 'Alpha v2' },
-            { id: 'b', title: 'Beta' },
-        ]);
-        expect(c.items[0]).toBe(item); // reconciled, not replaced
-        expect(item.title).toBe('Alpha v2');
-        expect(c.items.map((row) => row.id)).toEqual(['a', 'b']);
-    });
-
     test('insert places locally, remove drops locally', async () => {
         const { c } = rowsCollection([
             { id: 'a', title: 'Alpha' },
             { id: 'c', title: 'Gamma' },
         ]);
-        await c.query.prime();
+        await c.prime();
 
         c.insert({ id: 'b', title: 'Beta' }, 1);
         expect(c.items.map((row) => row.id)).toEqual(['a', 'b', 'c']);
@@ -213,6 +197,47 @@ describe('optimistic edits and server truth', () => {
     });
 });
 
+describe('the flat facade', () => {
+    // DATA-13: fetch state and item state sit side by side; there is no `.query`
+    // to reach through, and no raw pre-reconcile array either.
+    test('phase / error / isPending / prime / refresh reach the backing query', async () => {
+        const gates = [deferred<readonly Row[]>(), deferred<readonly Row[]>()];
+        let call = 0;
+        const c = collection<Row>({ fetch: () => gates[call++]!.promise, key: (row) => row.id });
+        expect(c.phase).toBe('idle');
+        expect(c.error).toBeNull();
+        expect(c.isPending).toBe(false);
+        expect('query' in c).toBe(false);
+
+        const priming = c.prime();
+        expect(c.phase).toBe('loading');
+        expect(c.isPending).toBe(true);
+        gates[0]!.resolve([{ id: 'a', title: 'Alpha' }]);
+        await priming;
+        expect(c.phase).toBe('ready');
+        expect(c.items).toHaveLength(1);
+
+        const refreshing = c.refresh();
+        expect(c.phase).toBe('refreshing'); // items stay visible
+        expect(c.items).toHaveLength(1);
+        gates[1]!.reject(new Error('offline'));
+        await refreshing;
+        expect(c.phase).toBe('error');
+        expect(c.error?.message).toBe('offline');
+        expect(c.items).toHaveLength(1); // …still visible, beside the error
+    });
+
+    test('prime() is the ensure: a second call on a ready collection does not re-fetch', async () => {
+        const { c, fetch } = rowsCollection([{ id: 'a', title: 'Alpha' }]);
+        await c.prime();
+        await c.prime();
+        expect(fetch).toHaveBeenCalledTimes(1);
+
+        await c.refresh(); // the gesture *is* the re-fetch
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+});
+
 describe('source()', () => {
     test('pending until the first fetch, then ready with the collection itself', async () => {
         const { c } = rowsCollection([{ id: 'a', title: 'Alpha' }]);
@@ -220,7 +245,7 @@ describe('source()', () => {
         expect(source.getSnapshot()).toEqual({ status: 'pending' });
 
         source.attach(); // triggers query.prime()
-        await c.query.prime();
+        await c.prime();
         expect(source.getSnapshot()).toEqual({ status: 'ready', value: c });
     });
 
@@ -234,11 +259,11 @@ describe('source()', () => {
             key: (row) => row.id,
         });
         const source = c.source();
-        await c.query.prime();
+        await c.prime();
 
         fail = true;
-        await c.query.refresh();
-        expect(c.query.phase).toBe('error');
+        await c.refresh();
+        expect(c.phase).toBe('error');
         expect(c.items).toHaveLength(1); // stale rows still on screen
         expect(source.getSnapshot()).toEqual({ status: 'ready', value: c });
     });
@@ -263,32 +288,32 @@ describe('reactive (pass-through to the query)', () => {
             reactive: true,
         });
 
-        await c.query.prime(); // term '' → all three
+        await c.prime(); // term '' → all three
         expect(c.items.map((row) => row.id)).toEqual(['a', 'b', 'c']);
         const alpha = c.items[0]!;
 
         runInAction(() => {
             store.term = 'Al';
         });
-        await c.query.prime(); // reactive re-fetch, filtered
+        await c.prime(); // reactive re-fetch, filtered
         expect(c.items.map((row) => row.id)).toEqual(['a', 'c']);
         expect(c.items[0]).toBe(alpha); // surviving row keeps its instance
     });
 });
 
 describe('reset() and the item map', () => {
-    test('reset() clears the items through the onReset → map.clear() wiring', async () => {
+    test('reset() empties the rows the view tracks, so the items go with them', async () => {
         const { c } = rowsCollection([
             { id: 'a', title: 'Alpha' },
             { id: 'b', title: 'Beta' },
         ]);
-        await c.query.prime();
+        await c.prime();
         expect(c.items).toHaveLength(2);
 
-        c.query.reset();
-        expect(c.items).toEqual([]); // map.clear() ran through onReset
+        c.reset();
+        expect(c.items).toEqual([]); // the view re-reconciled against no rows
         expect(c.getByKey('a')).toBeUndefined();
-        expect(c.query.phase).toBe('idle');
+        expect(c.phase).toBe('idle');
     });
 });
 
@@ -304,11 +329,11 @@ describe('local writes racing an in-flight refresh (last-write-wins)', () => {
             key: (row) => row.id,
         });
 
-        const first = c.query.prime();
+        const first = c.prime();
         gates[0]!.resolve([{ id: 'a', title: 'Alpha' }]);
         await first;
 
-        const refreshing = c.query.refresh(); // fetch in flight
+        const refreshing = c.refresh(); // fetch in flight
         c.upsert({ id: 'z', title: 'Local' }); // a server-push-style add, mid-refresh
         expect(c.items.map((row) => row.id)).toEqual(['a', 'z']); // visible immediately…
 
@@ -325,14 +350,14 @@ describe('local writes racing an in-flight refresh (last-write-wins)', () => {
             key: (row) => row.id,
         });
 
-        const first = c.query.prime();
+        const first = c.prime();
         gates[0]!.resolve([
             { id: 'a', title: 'Alpha' },
             { id: 'b', title: 'Beta' },
         ]);
         await first;
 
-        const refreshing = c.query.refresh();
+        const refreshing = c.refresh();
         c.remove('a'); // drop 'a' locally while the fetch is out
         expect(c.items.map((row) => row.id)).toEqual(['b']);
 

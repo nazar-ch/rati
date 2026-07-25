@@ -522,6 +522,7 @@ a websocket updates, a draft you stage before saving. For that, rati has a small
 | --- | --- |
 | `query` | one value that refreshes (a detail, a count) |
 | `collection` | a keyed list whose rows keep their identity across refreshes |
+| `reconciled` | that identity, over rows you already have — the list half of a composite payload |
 | `pagedCollection` | that list, loaded in pages |
 | `mutation` | a write, with the optimistic-patch-then-refresh dance owned for you |
 | `form` + `field` | edits staged locally before a save |
@@ -551,6 +552,21 @@ class StationsStore {
 }
 ```
 
+**When the response isn't the list.** A `collection` fetches the array itself. Plenty of
+endpoints return the array *inside* something — `{ usefulData, stations }` — and that is a
+plain `query`. Give its list half the same identity story with `reconciled`, a derived view
+over rows you already have (no fetch, no phases of its own — the query keeps those):
+
+```ts
+class OverviewStore {
+    overview = query((signal) => api.overview(signal)); // declared before the view
+    stations = reconciled(() => this.overview.data?.stations ?? [], { key: (s) => s.id });
+}
+```
+
+`stations.items` reconciles on every `overview.refresh()`, and a `collection` is exactly
+this pairing pre-wired.
+
 **Bridged into a scope through `source()`.** A read-side primitive exposes `source()` — the
 same `Source` from the last section — so a scope's `.load()` awaits its *first* readiness and
 the island's loading/error slots cover that first load:
@@ -577,7 +593,7 @@ import type { ScopeProps } from 'rati';
 const StationList = observer(({ stations }: ScopeProps<typeof stationsScope>) => (
     <List
         items={stations.items}
-        dimmed={stations.query.phase === 'refreshing'} // stale-while-refetch, for free
+        dimmed={stations.phase === 'refreshing'} // stale-while-refetch, for free
     />
 ));
 ```

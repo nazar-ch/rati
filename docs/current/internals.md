@@ -43,8 +43,8 @@ src/
              the generated module). Node-side, never bundled into an app; type-imports
              the RenderAppResult contract and nothing else
   data/      the rati/data entry: MobX-shaped data primitives (query, collection,
-             mutation, form/field) — experimental, pending extraction to a
-             companion package (docs/archive/directions-2026-07/data-package.md)
+             reconciled, mutation, form/field) — experimental, pending extraction
+             to a companion package (docs/archive/directions-2026-07/data-package.md)
   testing/   the rati/testing entry: test utilities (deferred, flush,
              controllableSource, the island/router/stores render harnesses, and
              the SSR round-trip kit) — the generic cores promoted out of the
@@ -361,14 +361,27 @@ scopes await first readiness through `source()`.
   check plus an `AbortController` per fetch. `instanceSource` (shared) implements the
   source contract every read-side primitive uses: pending until first ready, then ready
   forever with the instance itself.
-- `itemMap.ts` — the shared reconciler under both collections: the keyed entry map,
+- `itemMap.ts` — the shared reconciler under everything keyed: the entry map,
   identity-stable reconcile, in-place default updates (shallow-observable rows) or
   app-owned `into` instances, and the `dirty` marking that makes a refresh reapply
-  server truth over optimistic patches.
-- `collection.ts` / `pagedCollection.ts` — thin compositions: a query (or an array of
-  page queries anchoring cursor-to-predecessor) feeding the item map. Pages materialize
-  structurally: a `nextCursor` appends an unloaded tail record, `hasMore` derives from
-  its existence, truncation drops stale successors when a refreshed page ends the list.
+  server truth over optimistic patches. Package-internal; `reconciled` is its public face.
+- `reconciled.ts` — the item map plus a derivation: an eager `autorun` (named
+  `rati.reconciled`) re-running `reconcile` when the rows getter's output changes, and
+  `dispose()` to stop it. Eager rather than lazy because reconciling on the first `items`
+  read would write observable state from inside whatever derivation read it — illegal in
+  a `computed`; the cost is identical either way (one reconcile per rows change). The
+  reconcile runs in an action, and actions are untracked, so the map's own reads never
+  become dependencies and its writes can't re-trigger the derivation.
+- `collection.ts` — the layering, three deep: `createQuery` (fetch, phases, race guard) +
+  `reconciled` over `query.data ?? []` (identity) behind one flat facade (no `.query`, no
+  raw array). The query's `onSuccess`/`onReset` hooks aren't used here — every way a value
+  lands is a `data` ref swap, which the view already tracks.
+- `pagedCollection.ts` — the same two halves, wired by hand for the paged topology: an
+  array of page queries anchoring cursor-to-predecessor, feeding `itemMap` directly
+  through `onSuccess` (its rows are a concat across pages, not one getter). Pages
+  materialize structurally: a `nextCursor` appends an unloaded tail record, `hasMore`
+  derives from its existence, truncation drops stale successors when a refreshed page
+  ends the list.
 - `mutation.ts`, `form.ts` + `field.ts`, `validators.ts` — the write side and staged
   edits; `form` reaches fields' server-error seam through the package-internal
   `FieldExternalErrors` symbol.

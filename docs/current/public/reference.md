@@ -778,12 +778,13 @@ legacy data layer and of app-side `FetchStore` families; design record:
 intended to eventually extract into a companion package.
 
 Data in an app has four moments; each primitive owns exactly one, plus one for fetch
-topology:
+topology and one for row identity:
 
 | Export | Purpose |
 | --- | --- |
 | `query(producer, { debounce?, reactive? }?)` | read one value: one async producer (`(signal: AbortSignal) => Promise<T>`), honest phases (`idle → loading → ready / refreshing / error`), race-guarded; `set`/`patch` write it locally |
-| `collection({ fetch, key, equals?, into?, debounce?, reactive? })` | read a keyed set: identity-stable reconciliation, `patchItem`/`upsert`/`insert`/`remove` |
+| `collection({ fetch, key, equals?, into?, debounce?, reactive? })` | read a keyed set: one flat surface over the fetch (`items`, `phase`, `error`, `isPending`, `prime`, `refresh`, `reset`) plus identity-stable `patchItem`/`upsert`/`insert`/`remove` |
+| `reconciled(rows, { key, equals?, into? })` | the identity story alone, over rows you already have (the list half of a composite response) — no fetch, no phase |
 | `pagedCollection({ fetchPage, key, equals?, into?, reactive? })` | read in pages: pages *are* queries (per-page phase/error/retry), structural `hasMore`, cursor re-anchoring `refresh()` |
 | `mutation(perform, { optimistic?, refreshes?, onError? }?)` | write: callable with observable `isPending`/`error`, optimistic patch + refresh choreography |
 | `form(fields)`, `field(initial, { validate?, equals? }?)` | stage local edits: per-field baseline (`isDirty`/`reset()`/`commit()`), validate-on-submit, RAC-shaped `props`, action-compatible `submit()` |
@@ -817,7 +818,7 @@ export const spacesScope = scope()
     .load({ spaces: ({ stores }) => stores.spacesManagement.spaces.source() });
 
 const SpacesPage = observer(({ spaces }: ScopeProps<typeof spacesScope>) => (
-    <List items={spaces.items} dimmed={spaces.query.phase === 'refreshing'} />
+    <List items={spaces.items} dimmed={spaces.phase === 'refreshing'} />
 ));
 ```
 
@@ -840,6 +841,47 @@ one instance: fetch if there is nothing (or an error), otherwise do nothing. Wir
 `prime()` to a user gesture ("Reload") is the classic mistake — an already-ready query
 no-ops. Gestures call `refresh()`.
 
+**`collection` is one flat surface.** Fetch state and item state sit side by side on the
+instance — `items`, `phase`, `error`, `isPending`, `prime()`, `refresh()`, `reset()`, and
+the keyed ops (`getByKey`, `patchItem`, `upsert`, `insert`, `remove`), plus `source()`.
+There is no backing query to reach through and no raw pre-reconcile array: `items` *is*
+the value surface, so nothing has to be asked "is this on the collection or the query?".
+
+**`reconciled` — the composite-response answer.** A `collection` assumes the response
+*is* the array. When it isn't — `{ usefulData: string; spaces: SpaceRow[] }` — the fetch
+is a plain `query`, and `reconciled(rows, { key })` gives its list half the same
+identity-stable reconciliation, over any observable rows:
+
+```ts
+class SpaceOverviewStore {
+    // Declaration order matters (see below): the query, then the view over it.
+    overview = query((signal) => fetchOverview(this.spaceId, signal));
+    spaces = reconciled(() => this.overview.data?.spaces ?? [], { key: (s) => s.id });
+
+    get usefulData() {
+        return this.overview.data?.usefulData;
+    }
+}
+```
+
+One fetch, one payload; `usefulData` is read straight off the query, and `spaces.items`
+keeps its item instances across every `overview.refresh()`. The view has **no fetch, no
+phase, no error and no `source()`** — the backing query owns all of those, and it is the
+query a scope loads and a mutation's `refreshes` lists. What the view exposes is exactly
+the identity half: `items`, `getByKey`, `patchItem`, `upsert`, `insert`, `remove` — the
+same contract as inside a collection, including the patch marking that lets the next
+reconcile restore server truth. `collection` is now literally this composition, pre-wired.
+
+Two things follow from the derivation being **eager** (a MobX reaction established at
+construction, re-reconciling whenever the getter's output changes — precisely when a
+collection reconciled before):
+
+- the rows getter runs **once immediately**, so in a class the backing query must be
+  declared *above* the view; a field initializer reading a not-yet-assigned field throws
+  at construction;
+- the view holds its subscription for its lifetime. `dispose()` releases it — needed only
+  when a view outlives the store that owns it.
+
 **Single-value writes.** `query` mirrors the collection's write seam for its one value:
 `set(next)` replaces it locally (the server-push case, `upsert`'s sibling) and
 `patch((current) => next)` is the optimistic edit (`patchItem`'s sibling — a
@@ -847,8 +889,8 @@ no-ops. Gestures call `refresh()`.
 reference (**return a new object** — an in-place edit of a plain payload is invisible),
 touch no fetch and no standing error, and lose to any later settle: a refresh
 overwrites wholesale, which is exactly what makes `onError: 'refresh'` recovery work
-with no dirty-mark. `patch` no-ops before the first value; on a `collection`'s
-underlying query, a local write reconciles the item map like a fetch would.
+with no dirty-mark. `patch` no-ops before the first value; under a `reconciled` view, a
+local write to the query reconciles the items like a fetch would.
 
 **Reactive params** (`reactive: true`, opt-in). A `query` marked `reactive` re-fetches when
 the observables its producer reads **synchronously** change — the type-ahead / filter case,
