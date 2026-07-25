@@ -13,6 +13,10 @@
       - `form` + `field` — stage local edits (baseline / dirty / validate)
       - `mutation` — write (optimistic patch + refresh choreography)
 
+    `keyed` is not a fifth moment — it is the lazy per-key instance map the
+    store graph uses to hold one of the above *per id* (get-or-create, stable
+    identity), so a `mutation` can refresh exactly the instance it invalidated.
+
     Instance-owned data: each primitive is an object living in the app's store
     graph; sharing happens by sharing the instance. Read-side primitives bridge
     to scope loads via `source()` — pending until first ready, then ready forever
@@ -32,6 +36,7 @@ export {
     type PageResult,
 } from './pagedCollection';
 export { mutation, type Mutation, type MutationOptions } from './mutation';
+export { keyed, type Keyed, type KeyedKey } from './keyed';
 export { field, type Field, type FieldOptions, type FieldProps, type Validator } from './field';
 export { form, FormError, type Form, type FormValues } from './form';
 export { max, maxLength, min, minLength, pattern, required } from './validators';
