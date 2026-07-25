@@ -46,7 +46,8 @@ judgements are already written down.
 
 - `vp check` green (markdown is hand-formatted — oxfmt excludes it).
 - Each judgement from the feedback list appears exactly once, with its "why".
-- Website renders it if the guide grew a page (docs/website-plan.md conventions).
+- Website renders it if the guide grew a page (docs/planned/website/website-plan.md
+  conventions).
 
 ## Closing notes (2026-07-25)
 

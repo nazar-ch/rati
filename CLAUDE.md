@@ -24,7 +24,8 @@ behavior they describe.
 - `docs/planned/` — committed efforts: an effort `README.md` (framing, decisions,
   narrative item map), an optional `plan.md` (batches + grading), and one **work-item
   record** per item under `issues/<ID>-<slug>.md`. Conventions below.
-- `docs/current/RELEASING.md` — release process; `docs/website-plan.md` — the public site.
+- `docs/current/RELEASING.md` — release process; `docs/planned/website/website-plan.md` — the
+  public site.
 
 ## Mental model
 
