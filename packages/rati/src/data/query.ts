@@ -86,9 +86,28 @@ export interface Query<T> {
      * errors are the instance's own observable state and never re-trip the
      * island. `attach()` triggers `prime()` (ensure); detach does nothing — the
      * store owns the data's lifetime, not the island.
+     *
+     * Typed {@link ReadyQuery} — the resolved prop's `data` is `T`, not
+     * `T | undefined`.
      */
-    source(): Source<Query<T>>;
+    source(): Source<ReadyQuery<T>>;
 }
+
+/**
+ * A {@link Query} seen from *after* its first ready: `data` is `T`, no narrowing.
+ *
+ * The type a `source()` resolves with. The source only goes ready once `hasData`
+ * is set, and it is `hasData` — never a refresh, never a refresh error — that the
+ * island gates on, so a component holding the resolved prop is holding a query
+ * that has a value. `reset()` clears `hasData`, which drops the source back to
+ * `pending` and re-trips the island, so the claim can't go stale under a live
+ * component.
+ *
+ * The brand is a *read-side* claim only. Everything else on the query still
+ * works through it — `refresh()`, `set()`, `patch()`, `reset()` — because it is
+ * the same instance, not a frozen view of one.
+ */
+export type ReadyQuery<T> = Query<T> & { readonly data: T };
 
 /** Package-internal hooks — the seam `collection` builds on. Not public API. */
 export interface QueryInternalOptions<T> extends QueryOptions {
@@ -145,7 +164,7 @@ export function createQuery<T>(
         resolve: () => void;
     } | null = null;
     let reaction: Reaction | null = null;
-    let memoizedSource: Source<Query<T>> | undefined;
+    let memoizedSource: Source<ReadyQuery<T>> | undefined;
 
     // Track the producer's synchronous reads during the *real* fetch (zero extra
     // producer executions): a tracked observable changing re-runs the query. The
@@ -327,8 +346,11 @@ export function createQuery<T>(
         patch,
         reset,
         source() {
+            // The cast is the whole of DATA-15: `instanceSource` only publishes
+            // the instance once `hasData`, which is exactly the claim
+            // `ReadyQuery` makes. Nothing at runtime changes.
             memoizedSource ??= instanceSource(
-                self,
+                self as ReadyQuery<T>,
                 () => ({ hasData: state.hasData, error: state.error }),
                 () => void prime(),
             );

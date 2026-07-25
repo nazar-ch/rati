@@ -887,6 +887,16 @@ refreshes and refresh errors are the instance's own observable state and never r
 the island. `attach()` triggers `prime()` (ensure semantics); detach does nothing — the
 store owns the data's lifetime.
 
+`query.source()` is typed `Source<ReadyQuery<T>>`, where `ReadyQuery<T> = Query<T> &
+{ readonly data: T }` — the resolved prop's `data` is `T`, not `T | undefined`, so a
+component never writes `props.row.data!` or `?? fallback` for a value whose presence is
+*why* it rendered. The claim is honest by construction: the source goes ready only once
+the query holds a value, and `reset()` drops it back to `pending`, re-tripping the
+island. It is a read-side claim only — `refresh()`, `set()`, `patch()` and `reset()` all
+still take a `ReadyQuery`, which is the same live instance. `collection.source()` and
+`pagedCollection.source()` need no equivalent: their `items` is `readonly Item[]` in
+every phase (empty before the first fetch), so there is nothing to strip.
+
 ```ts
 class SpacesManagementStore {
     spaces = collection({ fetch: (signal) => fetchSpaces(signal), key: (s) => s.spaceId });
