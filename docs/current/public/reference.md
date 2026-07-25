@@ -944,6 +944,8 @@ is a `string` and passes.
 ```ts
 class SpacesStore {
     // A composite payload per space: the query is the unit, `keyed` holds one per id.
+    // (A list inside such a payload wants a `reconciled` view beside the query — see
+    // above; the store-class shape below is where that pair usually lives.)
     overview = keyed((spaceId: SpaceId) =>
         query(async (signal) => ({
             space: await fetchSpace(spaceId, signal),
