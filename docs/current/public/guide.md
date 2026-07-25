@@ -654,6 +654,68 @@ and comes alive on hydration. That's usually right for live, interactive data, b
 simpler and dehydrates. Reach for `rati/data` when the data is long-lived, edited in place,
 or live — otherwise a `scope().load()` over your API client is the smaller thing.
 
+### Choosing a shape
+
+The primitives are easy to use and easy to *pick wrong*. In practice that's where the time
+goes: not the API, but deciding which shape a given piece of data is. The same handful of
+judgements keeps coming up, so here they are, each with the reason behind it.
+
+**Is the response the array?** A `collection` fetches the rows themselves — its `fetch`
+returns `T[]`. Plenty of endpoints return the rows *inside* something, and a composite
+payload is **one value with one fetch and one error**, which is a `query`. Give its list
+half the identity story with `reconciled`, rather than bending the payload into a shape it
+isn't:
+
+```ts
+collection({ fetch: (signal) => api.stations.list(signal), key: (s) => s.id }); // → Station[]
+query((signal) => api.overview(signal));                                       // → { totals, stations }
+reconciled(() => this.overview.data?.stations ?? [], { key: (s) => s.id });    // its list half
+pagedCollection({ fetchPage: (cursor, signal) => api.stations.page(cursor, signal), key: (s) => s.id });
+```
+
+The split is about *fetch topology*, not about lists: reconciliation is identity work over
+rows you hold, and it doesn't need to own the request. Forcing a composite response into a
+collection means either fetching it twice or inventing an array the endpoint never returned
+— and the sibling fields (`totals` here) end up homeless either way.
+
+**Store-owned, or per-mount?** A read whose lifetime *is* the visit belongs to the screen:
+declare it as a `scope().load()` and let the island resolve it. Data that outlives one
+screen, is edited in place, or is shared between screens belongs to an instance in your
+store graph. The question that decides it: *who else looks at this, and is it still
+interesting after I navigate away?* If the answer is "nobody" and "no", it's a load.
+
+Choosing store-owned doesn't cost you the island's slots — that's what `source()` is for.
+It bridges either way: the primitive lives in the store, and the screen still gets a first
+load covered by `loading`/`error`.
+
+**`keyed` is a map, not a cache.** It has no eviction, no TTL and no size bound, so it is
+the right tool exactly when the key space is **bounded by something real**: the spaces
+you're a member of, the tabs that are open, the handful of ids a session touches. An
+*unbounded* key space — a result per search term, an instance per row a list might show —
+wants the opposite shape: **one instance whose parameters change**, driven by a
+`reactive: true` producer or by a scope input. A map keyed by search term is a leak with a
+lookup table in front of it.
+
+**When it isn't a primitive at all.** Two shapes look like they want one and don't:
+
+- **Derived values.** A number computed from data you already hold is a getter (a MobX
+  `computed`), not a second `query`. Fetching it again buys a second thing to refresh and a
+  second way to disagree with the first.
+- **A one-shot read a scope level already covers.** A value the screen fetches once and
+  drops is already handled all-or-nothing by the island. Wrapping it in a store `query`
+  adds an instance, a phase machine and a lifetime question to something that had none.
+
+**Identity comes at three levels**, and it's worth knowing which one you're being given:
+
+- **Per key** — `keyed`'s contract: `get(id)` returns *that same instance* for the life of
+  the map.
+- **Within a key** — the reconciler's: a row keeps its object identity across refreshes for
+  as long as its key does, whether the reconciler is inside a `collection` or a standalone
+  `reconciled` view. That's what lets selection, drag state and refs survive a refresh.
+- **Across keys** — deliberately none. Two keys whose payloads mention the same entity hold
+  two independent objects, and nothing normalizes them into one. There is no global cache
+  here; if your app needs a single canonical object per entity, it owns that itself.
+
 ## `hook()` — context, and other data libraries
 
 Some values can only come from React: context, or libraries that only expose hooks.

@@ -877,6 +877,10 @@ happens by sharing the instance — no keyed cache, no normalized store. Everyth
 fails normalizes to [`SourceError`](#sources), so one `code` switch
 works from island error slots to in-content badges.
 
+Not sure which one a given piece of data is? This entry documents each primitive; the
+guide's [choosing a shape](guide.md#choosing-a-shape) makes the calls between them —
+composite payload vs list, store-owned vs per-mount, a bounded map vs a selection.
+
 **The scope seam.** Read-side primitives expose `source()`: pending until the first
 ready, then ready forever with **the instance itself** as the resolved prop — later
 refreshes and refresh errors are the instance's own observable state and never re-trip
@@ -952,6 +956,8 @@ query a scope loads and a mutation's `refreshes` lists. What the view exposes is
 the identity half: `items`, `getByKey`, `patchItem`, `upsert`, `insert`, `remove` — the
 same contract as inside a collection, including the patch marking that lets the next
 reconcile restore server truth. `collection` is now literally this composition, pre-wired.
+(Which of the two a response wants:
+[choosing a shape](guide.md#choosing-a-shape).)
 
 Two things follow from the derivation being **eager** (a MobX reaction established at
 construction, re-reconciling whenever the getter's output changes — precisely when a
@@ -1088,7 +1094,8 @@ export const spaceScope = scope({ spaceId: input<SpaceId>() })
 whose payloads mention the same entity hold two independent instances. An *unbounded*
 key space (a search result's every row) wants a **selection** — one instance whose
 parameters change, via `reactive: true` or a scope input — not a map that grows for the
-lifetime of the tab. And because `get` creates, call it from an action, an event
+lifetime of the tab ([choosing a shape](guide.md#choosing-a-shape) draws the bounded /
+unbounded line). And because `get` creates, call it from an action, an event
 handler or a scope load, never from inside a `computed`, which may not cause side effects;
 `peek` is the read-side twin for those.
 
