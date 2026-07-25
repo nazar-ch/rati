@@ -1,7 +1,7 @@
 ---
 area: packages/rati/src/util/utils.ts (is.class) + a regression test; CLAUDE.md "Known" note falls when fixed
 needs: nothing
-status: open
+status: done
 disposition: —
 ---
 
@@ -53,3 +53,24 @@ rather than forcing a marker.
 - `yarn ci` fully green (this touches the engine's load path — run the full gate,
   not the fast subset).
 - The production `/counter` page renders; the unit matrix passes.
+
+## Outcome (2026-07-25)
+
+The port's origin is **@sindresorhus/is** (named in the licence header above `is` in
+utils.ts), which closed this exact hole in **7.1.1** — "Fix `is.class` for minified
+class expression" (#217) — by testing `/^class(?:\s+|\{)/` rather than
+`startsWith('class ')`. rati now tests `/^class[\s{]/` (same shape; the port had
+frozen the pre-7.1.1 form). No marker was needed.
+
+Worth recording for whoever reads the old note: **curl cannot see this bug.** Vite
+does not minify the SSR environment, so the server HTML was always correct — the
+break was client-only. Headless Chrome against the production server:
+
+- before — `#root` empty (React discarded the good server HTML), console
+  `Uncaught TypeError: Class constructor dc cannot be invoked without 'new'`, where
+  `dc` is the bundle's `class{count=0;…}`;
+- after — the counter markup renders, no console error.
+
+[REV-03](docs/planned/production-review/issues/REV-03-packaging-and-production-build.md)
+step 1 ("the known bug first") is satisfied by this; the rest of that item — including
+its minification-robustness sweep for sibling string-shape assumptions — stands.
