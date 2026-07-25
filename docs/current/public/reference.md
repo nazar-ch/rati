@@ -396,13 +396,67 @@ type SourceState<T> =
 | `isSource(x)` | type guard |
 | `toSourceError(reason)` | map a thrown value to a `SourceError` |
 | `NotAvailableError` | throw/reject with it → `error.code === 'not-available'` |
-| `SourceError` | `{ code: 'not-available' | 'failed', … }` — switch on `code` in error slots |
+| `SourceError` | the unified failure — see [the two levels](#sourceerror--the-two-levels) |
+| `SourceErrorCode` | the blessed `code` vocabulary (an open set) |
 | `SourceSSR` | the `ssr` marker type |
 | `SourceSymbol` | the brand symbol |
 
 Authoring rules: start the underlying work in `attach()` (not in the constructor), return
 its cleanup; keep `getSnapshot()` stable between changes; call the `subscribe` listeners
 after each state change.
+
+### `SourceError` — the two levels
+
+Every failure — a rejected load, a source that errored, a throw in a class constructor —
+normalizes to one shape, in two levels:
+
+```ts
+interface SourceError {
+    code: SourceErrorCode;  // the flavor: what an error slot switches on
+    message?: string;
+    cause?: unknown;
+    retryable?: boolean;    // the axis: transient (true) / terminal (false) / unclassified
+}
+```
+
+- **`retryable` is the top level** — the transient/terminal axis, and the only thing the
+  automatic [`retry`](#retry--trying-again-automatically) policy consults. `true` = a blip
+  worth another attempt; `false` = an answer, not a fault; **absent** = the app never
+  classified it.
+- **`code` is the flavor** — what the error slot renders on. The blessed vocabulary, with
+  the HTTP status it usually comes from:
+
+| `code` | Meaning | Typical origin | Class |
+| --- | --- | --- | --- |
+| `not-available` | the thing does not exist | 404 / 410 | terminal |
+| `forbidden` | not yours, or not signed in | 401 / 403 | terminal |
+| `invalid` | the request itself is wrong | 400 / 422 | terminal |
+| `unreachable` | the network never got there | fetch threw, DNS, offline | transient |
+| `failed` | anything else — and the fallback | 5xx, an unclassified throw | transient |
+
+The set is **open**: `SourceErrorCode` is those five plus `(string & {})`, so you get
+completion on them and can still coin `'rate-limited'` without augmenting anything.
+
+**Classification is yours, at the transport edge.** rati is transport-neutral — it ships no
+fetch helper and never sees a status code — so the status → `code` / `retryable` mapping
+lives in the one function your app already funnels responses through. The seam is plain: any
+thrown `Error` carrying a string `code` (and optionally a boolean `retryable`) maps through
+`toSourceError` with both intact, no subclass of rati's required.
+
+```ts
+// your app's edge — jnana's okJson.ts is the worked example
+export async function okJson(response: Response) {
+    if (response.ok) return response.json();
+    throw Object.assign(new Error(await response.text()), {
+        code: CODES[response.status] ?? 'failed',  // 403 → 'forbidden', …
+        retryable: response.status >= 500 || response.status === 429,
+    });
+}
+```
+
+A load that classifies nothing still works: a plain `throw new Error(…)` is
+`{ code: 'failed' }` with `retryable` absent, and `NotAvailableError` is
+`{ code: 'not-available' }` as it always was.
 
 A source that changes value re-runs the loads that read it, by the same rules a
 [`refresh()`](#usescopecontrolsscope) cascade follows: the new value goes through the load's

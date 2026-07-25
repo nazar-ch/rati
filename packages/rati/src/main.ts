@@ -86,6 +86,7 @@ export {
     type Source,
     type SourceState,
     type SourceError,
+    type SourceErrorCode,
     type SourceSSR,
 } from './scope/source';
 

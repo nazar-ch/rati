@@ -24,14 +24,45 @@ export class NotAvailableError extends Error {
 }
 
 /**
- * The one error shape. not-available / forbidden / failed / … all collapse here
- * because the island's behavior is identical; `code` stays machine-readable so the
- * error slot (and, later, routing/SSR) can still tell them apart.
+ * The blessed `code` vocabulary — the flavors an error slot switches on. An **open
+ * set**: the `(string & {})` arm keeps completion for the five while letting a load
+ * coin its own code, so nothing has to be augmented to say something new.
+ *
+ * The typical HTTP origin of each, mapped at the consumer's transport edge (rati
+ * ships no fetch helper and knows nothing of status codes):
+ *
+ *   - `not-available` — 404 / 410. The thing does not exist. Terminal.
+ *   - `forbidden` — 401 / 403. Not yours (or not signed in). Terminal.
+ *   - `invalid` — 400 / 422. The request itself is wrong. Terminal.
+ *   - `unreachable` — the network never got there. Transient.
+ *   - `failed` — 5xx, and the fallback for anything unclassified.
+ */
+export type SourceErrorCode =
+    | 'not-available'
+    | 'forbidden'
+    | 'invalid'
+    | 'unreachable'
+    | 'failed'
+    | (string & {});
+
+/**
+ * The one error shape, in two levels. not-available / forbidden / failed / … all
+ * collapse here because the island's behavior is identical; `code` stays
+ * machine-readable so the error slot (and routing/SSR) can still tell them apart.
+ *
+ *   - `retryable` is the **top level**: the transient/terminal axis, and the only
+ *     thing the automatic retry policy consults.
+ *   - `code` is the **flavor** — see {@link SourceErrorCode}.
  */
 export interface SourceError {
-    code: string;
+    code: SourceErrorCode;
     message?: string;
     cause?: unknown;
+    /**
+     * Is another attempt worth making? `true` = transient (a blip, a 5xx, a dropped
+     * connection), `false` = terminal — an answer, not a fault. **Absent = unclassified**:
+     * the app never said, so the retry policy falls back to the code (see `retry`).
+     */
     retryable?: boolean;
 }
 
@@ -169,15 +200,44 @@ export function asSourceError(thrown: unknown): SourceError {
     return toSourceError(thrown);
 }
 
-/** Maps an arbitrary thrown/rejected reason to the unified SourceError. */
+/**
+ * Maps an arbitrary thrown/rejected reason to the unified SourceError.
+ *
+ * The classification seam: **any** thrown `Error` carrying a string `code` — and,
+ * optionally, a boolean `retryable` — maps through with both intact. That is how an
+ * app's transport edge speaks to rati (`Object.assign(new Error(text), { code:
+ * 'forbidden', retryable: false })`, or its own `ApiError` class); no subclass of
+ * ours is needed to smuggle a code through. {@link NotAvailableError} is one such
+ * error and keeps working exactly as before.
+ *
+ * Anything else — a plain `Error`, a rejected non-error — is **unclassified**:
+ * `code: 'failed'` with `retryable` absent, which is what the retry policy reads as
+ * "the app never said".
+ */
 export function toSourceError(reason: unknown): SourceError {
-    if (reason instanceof NotAvailableError) {
+    if (reason instanceof Error) {
+        const carried = reason as Error & { code?: unknown; retryable?: unknown };
+        const code = typeof carried.code === 'string' ? carried.code : undefined;
+        const retryable = typeof carried.retryable === 'boolean' ? carried.retryable : undefined;
+        // `retryable` is optional under exactOptionalPropertyTypes — an unclassified
+        // failure must have no key at all, not an `undefined` one.
+        const classification = retryable === undefined ? {} : { retryable };
+        if (reason instanceof NotAvailableError) {
+            return {
+                code: code ?? 'not-available',
+                message: reason.message,
+                cause: reason.cause,
+                ...classification,
+            };
+        }
+        // `cause` is the error itself here (not `error.cause`): a plain throw carries no
+        // deeper reason, and the error is what a slot wants to inspect.
         return {
-            code: reason.code ?? 'not-available',
+            code: code ?? 'failed',
             message: reason.message,
-            cause: reason.cause,
+            cause: reason,
+            ...classification,
         };
     }
-    if (reason instanceof Error) return { code: 'failed', message: reason.message, cause: reason };
     return { code: 'failed', cause: reason };
 }

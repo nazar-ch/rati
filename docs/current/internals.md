@@ -343,10 +343,14 @@ A `Source<T>` is a reactive `pending | ready | error` machine: `subscribe`/`getS
 `useSyncExternalStore`-shaped (the Step reads them through uSES, so transitions re-render;
 `getSnapshot` must return a stable reference while unchanged) and `attach()` starts/holds the
 underlying work and returns a detach function. The unified `SourceError` collapses
-not-available / forbidden / failed into one shape with a machine-readable `code`. CRDT
-resources, REST loaders and promises all implement the interface, so the resolver is
-source-agnostic. `readySource` / `promiseSource` / `toSource` are the adapters; `toSourceError`
-normalizes thrown reasons. The optional `ssr` marker (`SourceSSR<T>`) declares a source
+not-available / forbidden / failed into one shape, in two levels: `retryable` (transient /
+terminal / absent = unclassified — the retry policy's gate) over a machine-readable `code`
+(the blessed vocabulary, an open set — see reference.md §Sources). CRDT resources, REST
+loaders and promises all implement the interface, so the resolver is source-agnostic.
+`readySource` / `promiseSource` / `toSource` are the adapters; `toSourceError` normalizes
+thrown reasons — and is the classification seam: any thrown `Error` carrying a string `code`
+(optionally a boolean `retryable`) maps through with them intact, which is how an app's
+transport edge speaks to rati without a rati subclass. The optional `ssr` marker (`SourceSSR<T>`) declares a source
 server-resolvable — see the next section.
 
 ## The data primitives (`data/` — the rati/data entry)
