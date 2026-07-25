@@ -192,8 +192,10 @@ const StationBoard = island({
 When an input changes, the island re-resolves; when it unmounts, everything it started is
 torn down — subscriptions detached, provided values disposed.
 
-The `error` slot receives a structured `error` (`error.code` is `'not-available'` for
-missing data, `'failed'` for everything else) and a `retry` function:
+The `error` slot receives a structured `error` — `error.code` says which flavor of failure
+it was (`'not-available'` for missing data, `'failed'` for an unclassified one; the whole
+[vocabulary](reference.md#sourceerror--the-two-levels) is short and open) — and a `retry`
+function:
 
 ```tsx
 import type { ScopeInputs, SourceError } from 'rati';
