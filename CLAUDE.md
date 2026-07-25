@@ -218,11 +218,6 @@ so `index.html` is a plain shell — no `<script>`, no build input — and `serv
 lines over `rati/server` (`vp run ssr-demo#start`, after `vp run rati#build` — plain node
 resolves the published entry, not the `rati-dev` source condition).
 
-**Known**: the gallery's `/counter` renders blank in any *production* build (dev is fine).
-It is not the example: `is.class` (`util/utils.ts`) detects a class by reading
-`Function.prototype.toString`, and minification rewrites `class CounterStore {…}` into an
-anonymous `class{…}`, so the class load is called without `new`. Pre-dates the server kit.
-
 The SSR mechanism: a route's scope is an island that resolves at render time, so the server
 uses `react-dom/static` `prerender` (not `renderToString`, which can't await the island's
 Suspense) and dehydrates the resolved promise values through `HydrationProvider` (from the
