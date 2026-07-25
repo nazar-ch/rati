@@ -868,7 +868,7 @@ topology and one for row identity:
 | `reconciled(rows, { key, equals?, into? })` | the identity story alone, over rows you already have (the list half of a composite response) — no fetch, no phase |
 | `pagedCollection({ fetchPage, key, equals?, into?, reactive? })` | read in pages: pages *are* queries (per-page phase/error/retry), structural `hasMore`, cursor re-anchoring `refresh()` |
 | `mutation(perform, { optimistic?, refreshes?, onError? }?)` | write: callable with observable `isPending`/`error`, optimistic patch + refresh choreography |
-| `form(fields)`, `field(initial, { validate?, equals? }?)` | stage local edits: per-field baseline (`isDirty`/`reset()`/`commit()`), validate-on-submit, RAC-shaped `props`, action-compatible `submit()` |
+| `form(fields)`, `field(initial, { validate?, equals? }?)` | stage local edits: per-field baseline (`isDirty`/`reset()`/`commit()`), validate-on-submit, RAC-shaped `props`, a `submit()` that never rejects |
 | `required`, `minLength`, `maxLength`, `min`, `max`, `pattern` | the validator kit — a validator is just `(value: T) => string \| undefined`; all but `required` skip empty values |
 | `FormError` | thrown by a submit handler to distribute `fieldErrors` onto matching fields (the API layer decides where a 422 becomes one) |
 
@@ -1008,8 +1008,15 @@ Forms never touch the island: they are synchronous local state seeded from data 
 island already resolved — `form({ title: field(space.title, { validate: required() }) })`
 is the draft; `submit(handler)` validates, runs the handler (typically awaiting
 mutations), commits on success, distributes a thrown `FormError` onto fields, and lands
-anything else on `form.error`. The returned function never rejects, so it is usable
-directly as `<form action={store.save}>`.
+anything else on `form.error`. The returned function never rejects: a call site never has
+to catch, and `isSubmitting` is the whole pending story.
+
+That shape is action-compatible — but **don't wire it as a function `action=`** when the
+inputs are controlled by the fields. React resets a form once an action settles, and since
+a failed submit still *completes* the action, the reset erases the draft on exactly the
+submits the user needs to correct. Wire it through `onSubmit` + `preventDefault` instead;
+the guide's [with React Aria Components](guide.md#with-react-aria-components) has the
+mechanism and the wrapper to put it in.
 
 ### `keyed` — one instance per id
 

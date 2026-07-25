@@ -626,7 +626,8 @@ class RenameDialog {
     constructor(store: StationsStore, station: Station) {
         this.form = form({ name: field(station.name, { validate: required() }) });
         // submit() validates, runs the handler, commits the baseline on success,
-        // and distributes a thrown FormError onto the fields. It never rejects…
+        // and distributes a thrown FormError onto the fields. It never rejects, so
+        // nothing at the call site has to catch.
         this.save = this.form.submit(async ({ name }) => {
             await store.rename(station.id, name);
         });
@@ -634,7 +635,7 @@ class RenameDialog {
 }
 
 const RenameForm = observer(({ dialog }: { dialog: RenameDialog }) => (
-    <form action={dialog.save}>                       {/* …so it drops straight into action= */}
+    <form onSubmit={(event) => { event.preventDefault(); void dialog.save(); }}>
         <TextField {...dialog.form.fields.name.props} label="Name" />
         <button type="submit" disabled={dialog.form.isSubmitting}>Save</button>
     </form>
@@ -643,6 +644,12 @@ const RenameForm = observer(({ dialog }: { dialog: RenameDialog }) => (
 
 `fields.name.props` is React Aria Components-shaped (`value` / `onChange` / `isInvalid` /
 `errorMessage`), so binding an input is a spread.
+
+Note the wiring: `onSubmit` + `preventDefault`, **not** React's function `action={dialog.save}`.
+The seam is shaped to be action-compatible and it fits, but with controlled fields behind the
+inputs the action's completion reset erases the user's draft — the first trap in
+[With React Aria Components](#with-react-aria-components), which is where the rest of that
+story lives.
 
 **Two notes on the edges.** A `query`/`collection` can re-fetch when a store observable it
 reads changes (`reactive: true`) — the type-ahead case; the [reference](reference.md#ratidata)
@@ -715,6 +722,169 @@ lookup table in front of it.
 - **Across keys** — deliberately none. Two keys whose payloads mention the same entity hold
   two independent objects, and nothing normalizes them into one. There is no global cache
   here; if your app needs a single canonical object per entity, it owns that itself.
+
+## With React Aria Components
+
+rati is headless and stack-neutral: it has no UI dependency, no adapter, and nothing in it
+knows what a text field is. But it is developed against one production app, and that app is
+built on **React Aria Components** (RAC) — so the seams between the two have been walked
+already, and a few of them cost real debugging. What follows is field notes, not an
+endorsement and not an integration: symptom, cause, and the wiring that works. On another
+component library they're still useful as the shape of question to ask yours.
+
+### A function `action` erases the user's draft
+
+**Symptom.** The user submits, the server refuses, the error message renders — and every
+input is empty. Same on a validation failure: the fields blank out under a row of "Required"
+messages, with nothing left to correct.
+
+**Cause.** Two reasonable designs meeting badly. `submit()` never rejects — that is the
+contract that makes it action-compatible — so *every* submit, refused or invalid or fine,
+looks to React like an action that **completed**. And React resets a form when a function
+action settles. That reset is a native `form.reset()`; React's value tracker turns it into a
+synthetic `change` on every input whose value moved; a RAC field answers by pushing itself
+back to its mount-time value through `onChange`. With a controlled `field` behind the input,
+that empty value lands in your state and the draft is gone. None of this is rati-specific or
+MobX-specific — it reproduces with a plain `useState` behind the same input.
+
+**The pattern.** Submit through `onSubmit` and `preventDefault`, which React leaves alone.
+Put it in the form component you already own, so no call site has to remember:
+
+```tsx
+import type { FormEvent } from 'react';
+import { Form as RACForm, type FormProps } from 'react-aria-components';
+
+/** `submit` is a rati form's submit seam — wired through onSubmit, never React's action=. */
+export function Form({ submit, ...props }: FormProps & { submit?: () => Promise<void> }) {
+    return (
+        <RACForm
+            {...props}
+            {...(submit && {
+                onSubmit: (event: FormEvent<HTMLFormElement>) => {
+                    event.preventDefault();
+                    void submit();
+                },
+            })}
+        />
+    );
+}
+
+// every form in the app, then:
+<Form submit={dialog.save} validationBehavior="aria">…</Form>
+```
+
+Wrapping each handler in a helper works too, and is worse: an `onSubmit` that forgets
+`preventDefault` looks correct and silently wipes the draft, so the behavior belongs
+somewhere a call site *cannot* forget it.
+
+One consequence to plan for: with no function action there is no `useFormStatus` either.
+Read pending off the form — `form.isSubmitting` — which is where the rest of the state
+already is.
+
+### The browser blocks submit before your validators run
+
+**Symptom.** Your field validators never fire. The user gets a native browser tooltip instead
+of your messages, and the submit handler is never called at all.
+
+**Cause.** RAC's `Form` defaults to `validationBehavior="native"`, so the browser's own
+constraint validation runs first and refuses the submit — before `submit()` ever reaches
+`validate()`.
+
+**The pattern.** `validationBehavior="aria"` on every form whose own validators decide:
+
+```tsx
+<Form submit={login.submit} validationBehavior="aria">
+    <TextField {...fields.email.props} name="email" type="email" label="Email" />
+</Form>
+```
+
+Know what you're trading. In `aria` mode the form renders `noValidate`, so `type="email"`,
+`minLength` and friends stop constraining anything — the validator kit becomes the *only*
+check left. Whatever the markup used to promise has to exist in the field:
+
+```ts
+form({ email: field('', { validate: [required(), pattern(/.+@.+/, 'Enter an email address')] }) });
+```
+
+### Render props run outside your `observer`
+
+**Symptom.** A dialog's controlled input doesn't update as the user types — it only catches up
+when something else re-renders — and the value that reaches the server is the last keystroke
+alone.
+
+**Cause.** RAC invokes a render-prop child — `<Dialog>{({ close }) => …}</Dialog>` — from
+inside **its own** render, not yours. `observer` tracks what *your* component's render reads;
+reads inside that function belong to RAC's component, so nothing subscribes to the field.
+
+**The pattern.** Pass children as an element, and take whatever the render prop offered
+(`close`) from state you own instead:
+
+```tsx
+const CreateSpaceDialog = observer(function CreateSpaceDialog({ create }: { create: CreateForm }) {
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+        <DialogTrigger isOpen={isOpen} onOpenChange={setIsOpen}>
+            <Button>Create space</Button>
+            <Modal>
+                {/* Children as an element, not a render prop: a render prop runs inside
+                    RAC's own render, so the field reads below would fall outside this
+                    observer and the input would never see its own edits. */}
+                <Dialog>
+                    <Form submit={create.save} validationBehavior="aria">
+                        <TextField {...create.form.fields.title.props} label="Title" autoFocus />
+                        <Button onPress={() => setIsOpen(false)}>Cancel</Button>
+                    </Form>
+                </Dialog>
+            </Modal>
+        </DialogTrigger>
+    );
+});
+```
+
+Keeping the render prop is fine if you'd rather — then its body becomes its own `observer`
+component. The rule underneath is the general one: whatever reads the observable data has to
+be the thing being observed, and a callback the library runs during *its* render isn't.
+
+### `field.props` fits a text field, not every widget
+
+**Symptom.** The spread that works on a `TextField` doesn't type-check on a `Select`, or
+type-checks on a `Checkbox` and binds the wrong thing.
+
+**Cause.** `props` is `value` / `onChange` / `isInvalid` / `errorMessage` — one shape, because
+widget kind is the component's business and rati keeps one field type rather than one per
+widget. A `Select`'s selection handler yields a `Key`, not your field's type; a `Checkbox`
+wants `isSelected`.
+
+**The pattern.** Spread where it fits, bridge by hand where it doesn't — it's two lines:
+
+```tsx
+<TextField {...fields.email.props} name="email" label="Email" />
+
+<Checkbox isSelected={fields.rememberMe.value} onChange={fields.rememberMe.setValue}>
+    Remember me
+</Checkbox>
+
+<Select
+    label="Role"
+    selectedKey={fields.role.value}
+    onSelectionChange={(key) => fields.role.setValue(key as Role)}
+/>
+```
+
+Note the `name` on the text field: `props` doesn't carry one (submit reads the form object,
+not a `FormData`), and password managers and autofill still want it.
+
+### Two more from the same app, not React Aria's fault
+
+- **Reach your API client from inside the producer, not from a field initializer.** A store
+  graph is usually built during boot — before the client exists, and before a test harness
+  has finished standing one in — while a producer body runs at fetch time, when everything
+  is up. `fetch: (signal) => api.jobs.list(signal)` is safe; a field initialized to
+  `api.jobs` at construction is a boot-order bug waiting for its first cold start.
+- **A `reactive` producer only tracks its synchronous prefix**, so every reactive input has
+  to be read before the first `await` — the one sharp edge of `reactive: true`, spelled out
+  in the [reference](reference.md#ratidata).
 
 ## `hook()` — context, and other data libraries
 
