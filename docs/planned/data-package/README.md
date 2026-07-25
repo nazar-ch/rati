@@ -65,9 +65,43 @@ ordering only:
 - [DATA-07 — `field.props` under `exactOptionalPropertyTypes`](issues/DATA-07-field-props-exact-optional.md)
   — `errorMessage` is absent while clean, genuinely `?:` (2026-07-20).
 - [DATA-08 — the fetch-boilerplate helper decision](issues/DATA-08-fetch-helper-decision.md)
-  — where the ok-check + `json()` + error mapping lives; **maintainer call**, blocked on it.
+  — decided 2026-07-25: consumer-side (jnana's `okJson.ts`); rati's share moved to DATA-10.
 - [DATA-09 — pin the unpinned data branches](issues/DATA-09-unpinned-branches.md)
   — test-only: the branches the 2026-07-20 coverage map found bare.
+
+Second round (cut 2026-07-25 from the wave-two feedback, below; decisions in each record):
+
+- [DATA-10 — two-level `SourceError`](issues/DATA-10-two-level-source-error.md) — honor
+  `retryable` as the transient/terminal top level, bless the code vocabulary
+  (`not-available` / `forbidden` / `invalid` / `unreachable` / `failed`), give
+  `toSourceError` a real seam.
+- [DATA-11 — default-on retry](issues/DATA-11-default-on-retry.md) — retry "just works":
+  no config, gated by error class, jittered backoff; absorbs backlog FND-02.
+- [DATA-12 — rename `Query.load()` → `prime()`](issues/DATA-12-prime-rename.md) — the
+  ensure keeps its semantics and loses its trap of a name.
+- [DATA-13 — `reconciled()` + collection as full facade](issues/DATA-13-reconciled-and-collection-facade.md)
+  — the reconciler split out of the fetch (composite payloads get identity-stable list
+  halves); `.query` reach-through dies. No fold into `query` — clean extension.
+- [DATA-14 — `keyed()`](issues/DATA-14-keyed-factory.md) — the thin, primitive-agnostic
+  lazy per-key instance map.
+- [DATA-15 — brand the ready source](issues/DATA-15-ready-source-branding.md) —
+  `Source<ReadyQuery<T>>`; type-level only.
+- [DATA-16 — data-layer test helpers](issues/DATA-16-data-testing-helpers.md) —
+  `controllableQuery` + `controllableProducer` in `rati/testing`.
+- [DATA-17 — the "choosing a shape" page](issues/DATA-17-choosing-a-shape-page.md) — the
+  doc gap both waves ranked first.
+- [DATA-18 — "with React Aria Components"](issues/DATA-18-react-aria-section.md) — the
+  consumer-stack field notes, mined from jnana.
+- [DATA-19 — form success state](issues/DATA-19-form-success-state.md) — **deferred**:
+  jnana latches app-side; the record parks the two-level-shape discussion.
+
+Related, outside this effort:
+[FND-03 — `is.class` under minification](docs/backlog/findings/issues/FND-03-is-class-minification.md)
+runs in this batch (the class-factory pattern DATA-13/14 bless must not be prod-broken).
+
+Batch structure: wave 1 runs four independent legs — A: DATA-10+11 (errors + retry) ·
+B: DATA-12+13 (rename + reconciled/facade, one branch, that order) · C: DATA-14 ·
+E: FND-03. Wave 2, on the landed surfaces — D: DATA-15+16 · F: DATA-17+18.
 
 DATA-05 and DATA-06 were coupled through jnana's ◊FND-106: restoring the optimistic
 retention hop needs the seam (05) *and* the on-error recovery refresh of a keyed query
@@ -141,6 +175,39 @@ were out of scope; it dies with them.
 Separately, a 2026-07-20 coverage map of rati's own data tests found unpinned branches
 (sync throw inside the reactive `track`, `itemMap`'s insert-existing-key/`clear`/custom
 `equals` paths, upsert racing a reconcile, unsubscribe actually stopping) → DATA-09.
+
+## Wave-two findings — the second jnana migration round (recorded 2026-07-25)
+
+A second migration wave (three parallel legs on jnana) produced two feedback records;
+the 2026-07-25 maintainer discussion turned them into the second-round items above.
+The load-bearing judgements, so they aren't re-derived:
+
+- **The line-count test is retired.** DATA-03 measured +4; the second wave's legs
+  measured +11, +10, and +129 — three independent runs, same direction, and the
+  diagnosis holds: the primitives import a mechanism but add a surface, so lines move
+  out of component bodies and grow in transit (the auth views lost 165 lines while
+  their extracted state modules added 294 — a good trade the metric scores as a loss).
+  What the migrations actually shrank: concept count and page bodies; what they bought:
+  validation and race-correctness the old code didn't have, plus three real user-facing
+  bugs found, one live in shipped code. Future migrations read a flat or positive line
+  delta as "find out where the lines went," not "the primitives failed" — and no new
+  leg gets graded on line count.
+- **What held up** (second wave, live-confirmed): `source()` gating only the first
+  resolution (refreshes never re-trip an island — "the best idea in the package"); the
+  race guard as an invariant (deleted `FetchStore.#requestId` and
+  `SearchStore.requestSeq` with nothing lost); `reactive: true` on the jobs
+  collections; refresh-as-rollback.
+- **The recurring cost** was never the API — it was *choosing the shape* (query vs
+  collection, store-owned vs per-mount, cache vs selection): → DATA-17. The
+  per-invocation gap (hand-kept `runningName` / `revokingToken` / per-row pending /
+  per-mount error lifetimes) is the one cluster deliberately **not** taken this round:
+  maintainer call 2026-07-25 — jnana builds a generic helper on its side first (the
+  same treatment as DATA-19's form success state), and lifting is considered once its
+  real shape is known. The eventual design pass treats those findings as one problem —
+  the call, not the operation, as the unit the UI renders.
+- **Process note, kept for the next wave**: two parallel legs independently spent real
+  effort discovering the same form-reset bug. Parallel legs are worth it for
+  *confirmation*, but sequencing costs less total work — pick deliberately.
 
 ## Per-item conventions
 

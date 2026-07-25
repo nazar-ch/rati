@@ -1,7 +1,7 @@
 ---
 area: design — rati/data's transport stance (and/or jnana's API layer)
 needs: the maintainer's call; blocked on it
-status: open
+status: done
 disposition: cut 2026-07-20 from the DATA-03 findings (gap 3)
 ---
 
@@ -39,3 +39,19 @@ Options on the table:
 - The decision recorded here and in the effort README (with the design record's
   helper line answered either way); if option 1, the helper + tests + reference.md;
   if option 2, a guide note and a jnana-side follow-up.
+
+## Decision — option 2, consumer-side (maintainer, 2026-07-25)
+
+jnana wrote the helper (`frontend/src/common/api/okJson.ts`: `okJson`/`expectOk` +
+an `ApiError` carrying the status→code mapping) during the second migration wave, and
+the maintainer confirmed the stance: **the helper does not move into rati.** Responses
+have too many shapes for a general-purpose framework to own the response half; a
+Hono-targeted form would belong only to a hypothetical adapter entry
+(`rati/data/hono`) — not designed unless a second consumer materializes. Proper error
+handling stays on the jnana side.
+
+What *is* rati's share moved to DATA-10: `toSourceError` gets a real seam (a `code` /
+`retryable` carried on any thrown error maps through — killing jnana's
+`ApiError extends NotAvailableError` wart), and the code vocabulary jnana invented
+(`forbidden`, `unreachable`, …) becomes the blessed, documented set. The design
+record's "typed HTTP fetch helper" line is answered: **no**, by this record.
