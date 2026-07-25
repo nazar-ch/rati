@@ -1,7 +1,7 @@
 ---
 area: docs/current/public/guide.md (or a sibling page + website nav)
 needs: DATA-13 + DATA-14 landed (the guidance names reconciled/keyed); wave 2
-status: open
+status: done
 disposition: cut 2026-07-25 from the second-round migration feedback ("the doc gap I'd fix first")
 ---
 
@@ -47,3 +47,18 @@ judgements are already written down.
 - `vp check` green (markdown is hand-formatted — oxfmt excludes it).
 - Each judgement from the feedback list appears exactly once, with its "why".
 - Website renders it if the guide grew a page (docs/website-plan.md conventions).
+
+## Closing notes (2026-07-25)
+
+Landed as a section, not a page: `docs/current/public/guide.md` §"Choosing a shape",
+inside the existing `rati/data` section (guide.md is one page of `##` sections and did
+not need splitting). Five judgements, one each: response-is-the-array (`collection` vs
+`query` + `reconciled` vs `pagedCollection`), store-owned vs per-mount (with `source()`
+as the bridge that costs nothing either way), `keyed` bounded vs unbounded key spaces,
+the two shapes that want no primitive (derived values; a one-shot read the island
+already covers), and identity at three levels (per key / within a key / none across
+keys).
+
+Cross-links from `docs/current/public/reference.md`: the `rati/data` intro (after the
+primitive table), the end of the `reconciled` explanation, and `keyed`'s "a map, not a
+cache" paragraph.

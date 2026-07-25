@@ -12,11 +12,17 @@ import { FieldExternalErrors, type Field, type FieldInternal } from './field';
     `reset()`); after submit it is the mutation's optimistic patch — each side
     stays small because the other exists.
 
-    `submit(handler)` returns an **action-compatible** function: usable as
-    `<form action={store.save}>`, so `useFormStatus().pending` agrees with
-    `isSubmitting` by construction. It therefore never rejects — failures land on
-    the fields (a thrown `FormError`'s `fieldErrors`) or on `form.error` as a
-    `SourceError`; success commits (the baseline tracks saved truth).
+    `submit(handler)` returns an **action-compatible** function — one call, no
+    result to inspect, so it never rejects: failures land on the fields (a thrown
+    `FormError`'s `fieldErrors`) or on `form.error` as a `SourceError`; success
+    commits (the baseline tracks saved truth).
+
+    That shape fits React's function `action=`, but do not wire it there when the
+    inputs are controlled by the fields: a failed submit still *completes* the
+    action, and React's action-completion form reset pushes every controlled input
+    back to its mount-time value — erasing the draft on exactly the submits the
+    user must correct. `onSubmit` + `preventDefault` is the wiring
+    (docs/current/public/guide.md §"With React Aria Components").
 */
 
 /** Thrown by a submit handler (typically built by the API layer from a 422). */
