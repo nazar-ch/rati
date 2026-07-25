@@ -2,10 +2,17 @@
 area: packages/rati/src/mandala/retryPolicy.ts, packages/rati/src/scope/source.ts (the `retryable` flag); packages/rati/src/data if a status classifier lands there
 needs:
 status: open
-disposition: —
+disposition: adopted 2026-07-25 into docs/planned/data-package/issues/DATA-11-default-on-retry.md
 ---
 
 # FND-02 — gate automatic retries by error class: spare terminal 4xx, be gentler with 5xx
+
+**Adopted 2026-07-25** into the data-package effort: options 1 + 4 (honor `retryable`,
+jittered backoff) ride
+[DATA-11](docs/planned/data-package/issues/DATA-11-default-on-retry.md) — which goes
+further than this record asked: retry becomes default-on, gated by the class. Option 3's
+classification stays consumer-side per DATA-08's decision; option 2 (a `shouldRetry`
+predicate) was not taken. DATA-11's finishing commit flips this record to done.
 
 ## Problem
 
