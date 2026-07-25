@@ -142,7 +142,7 @@ island({
     ssr,            // optional: boolean, default true — resolve during a server render?
     keepStale,      // optional: boolean, default false — keep the last content while re-resolving?
     loadingDelayMs, // optional: number, default 0 — hold the loading slot back this long
-    retry,          // optional: { count, backoffMs } — re-resolve automatically on a failure
+    retry,          // optional: { count, backoffMs? } | false — automatic retry, on by default
     ssrErrors,      // optional: 'retry' (default) | 'dehydrate' — what SSR does with a failure
 });
 ```
@@ -235,10 +235,31 @@ island({ scope: stationScope, component: Board, loading: Skeleton, loadingDelayM
 
 ### `retry` — trying again automatically
 
-A flaky backend makes every consumer write the same retry button. `retry: { count,
-backoffMs }` gives the island up to `count` further attempts of its own, waiting `backoffMs`
-before the first and doubling for each one after — `{ count: 3, backoffMs: 500 }` means
-500ms, then 1s, then 2s.
+A flaky backend makes every consumer write the same retry button, so the island writes it
+for you: **the policy is on by default**, with no `retry` option anywhere. An island whose
+resolution fails with a failure your app classified [`retryable:
+true`](#sourceerror--the-two-levels) takes two more attempts of its own before it shows the
+`error` slot.
+
+```ts
+island({ scope: stationScope, component: Board, loading: Skeleton, error: BoardError });
+// a 5xx or a dropped connection → two more goes, jittered. A 403 → the error slot, now.
+```
+
+That is safe only because the failure says which kind it is, so the gate is:
+
+| Failure | Default (no option) | `retry: { count, … }` | `retry: false` |
+| --- | --- | --- | --- |
+| `retryable: true` (a 5xx, network) | retried | retried | no |
+| `retryable: false` (403, 404, 422) | **no** — the error slot, at once | **no** | no |
+| unclassified (a bare `throw`) | **no** | retried (`code: 'failed'`) | no |
+
+**Classifying at your transport edge is how you buy the default.** An app that classifies
+nothing behaves exactly as it did before the default existed — default-on retry over
+unclassified failures would hammer its 404s, which is the thing worth avoiding.
+
+Ask for more with the option — a bigger budget, and the broader reach over unclassified
+failures:
 
 ```ts
 island({
@@ -246,10 +267,14 @@ island({
     component: Board,
     loading: Skeleton,
     error: BoardError,
-    retry: { count: 2, backoffMs: 500 },
+    retry: { count: 3, backoffMs: 500 },  // or `false` to opt out entirely
 });
 ```
 
+- **The backoff is jittered.** `backoffMs` (default 500) is the first *ceiling*; it doubles
+  per attempt and is capped at 10s, and each wait is a random draw from `[0, ceiling]`. A
+  fixed schedule brings every island that failed in the same backend blip back on the same
+  tick — a small thundering herd at a server already struggling.
 - **A retry in progress is not an error.** The `error` slot is not rendered at all while the
   policy works — the island shows its `loading` slot (or the kept run, under `keepStale`),
   exactly as for any other re-resolution. It comes up only once the budget is spent. (Under
@@ -258,9 +283,6 @@ island({
 - **`useScopeControls(scope).retrying`** is the attempt in flight (`1`, `2`, …) and `0`
   whenever none is — including in the error slot, which is a spent budget, not a retry.
   `phase` is unaffected: an island retrying is an island resolving.
-- **`failed` only.** A `not-available` — or any other `code` a load coins — goes straight to
-  the `error` slot. It is an answer, not a transient fault, and retrying it only delays the
-  404 the user is owed.
 - **The manual `retry` buys a fresh budget**, so the error slot's button (and
   `useScopeControls().retry`) works after exhaustion and starts the policy over. A human
   asking again is new information.
@@ -268,8 +290,13 @@ island({
   when its inputs change — which also cancels a countdown belonging to the old ones.
 - **Client-only.** A server render takes its one attempt per request and reports the failure
   as always (see [response statuses](ssr.md#response-statuses-and-load-failures)); the
-  client's own resolution then runs the policy.
-- **`count: 0` and absent are identical.** Types: `RetryOptions`.
+  client's own resolution then runs the policy — including over a failure the server
+  [dehydrated](#ssrerrors--the-error-slot-in-the-servers-html), since `retryable` crosses
+  the wire.
+- **`count: 0` and `false` are identical** — both opt out. Types: `RetryOption`
+  (`RetryOptions | false`).
+- rati never sees response headers, so there is no `Retry-After` / 429 plumbing: a rate
+  limiter's advice reaches the policy only as `retryable`.
 
 ### `ssrErrors` — the error slot in the server's HTML
 

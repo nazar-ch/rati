@@ -464,8 +464,8 @@ error slot is still a 500. What crosses the wire is `code`, `message` and `retry
 `cause` is dropped, and the `message` is written into the HTML, so a load whose failures
 carry backend text should say something else before rejecting.
 
-An island's [`retry`](reference.md#retry--trying-again-automatically) policy changes
-nothing here: the server takes its one attempt per request, records the failure, and lets
+The [`retry`](reference.md#retry--trying-again-automatically) policy — on by default —
+changes nothing here: the server takes its one attempt per request, records the failure, and lets
 the status be what it is — a page that eventually recovers on the client should not have
 held the response open to find out. The policy runs on the client's own resolution.
 

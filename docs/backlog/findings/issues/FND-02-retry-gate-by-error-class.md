@@ -1,7 +1,7 @@
 ---
 area: packages/rati/src/mandala/retryPolicy.ts, packages/rati/src/scope/source.ts (the `retryable` flag); packages/rati/src/data if a status classifier lands there
 needs:
-status: open
+status: done
 disposition: adopted 2026-07-25 into docs/planned/data-package/issues/DATA-11-default-on-retry.md
 ---
 

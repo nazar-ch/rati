@@ -21,7 +21,7 @@ src/
     ssrErrors.ts    the ssrErrors: 'dehydrate' guard (server-side, one per run)
     afterHydration.tsx  the ssr: false gate (server + hydration pass render the slot)
     loadingDelay.ts the loadingDelayMs gate (one window per island, client-only)
-    retryPolicy.ts  the retry option's driver (one budget per island, client-only)
+    retryPolicy.ts  the retry policy's driver (default-on, one budget per island, client-only)
   island/    island.ts — public island() wrapper + Island* / Hydration* aliases
   head/      store.ts (HeadStore/createHeadStore), HeadProvider, Title/useTitle/Meta,
              useHeadTag (shared registration), domSync (client title/meta reconciler),
@@ -228,8 +228,22 @@ mandala effect runs the same `releaseKept` the swap does.
 `RetryPolicy` (mandala/retryPolicy.ts) is one budget per island instance, driving the retry
 counter `bumpRetry` already owned. The boundary asks it before it does anything with a
 caught error: an accepted failure returns the mandala's built `slot` (loading, or the kept
-run under `keepStale`) in place of the error slot, and a timer re-resolves from scratch
-after `backoffMs * 2 ** (attempt - 1)`.
+run under `keepStale`) in place of the error slot, and a timer re-resolves from scratch once
+the backoff elapses.
+
+- **On by default, with a reach.** `resolveRetry(config.retry)` turns the island's option
+  into settings or `null`: absent ⇒ the default policy (`count: 2`, `backoffMs: 500`, reach
+  `classified`), `false` / `count: 0` ⇒ `null` (no policy at all, the pre-DATA-11 default
+  path), anything else ⇒ the configured budget at reach `broad`. So the mandala builds a
+  policy for nearly every island now — dormant until something fails.
+- **The gate is the two-level error** (`accept(error, generation)` → `eligible`):
+  `error.retryable` decides wherever the app set it. Absent, the reach does: `classified`
+  declines (an app that classifies nothing gets no automatic retries), `broad` falls back to
+  the legacy code rule — the catch-all `failed` only, so `not-available` and any code a load
+  coins still go straight to the slot.
+- **Full jitter over a capped ceiling.** `min(MAX_BACKOFF_MS, backoffMs * 2 ** (attempt -
+  1))` is a ceiling, and the wait is `Math.random()` of it. Un-jittered, every island that
+  failed in one backend blip re-fires on the same tick (FND-02).
 
 - **`accept` is render-time, `arm` is commit-time** — `LoadingDelay`'s split, for two
   different reasons. Deciding from an effect would mount the error slot for a commit, and
@@ -242,7 +256,6 @@ after `backoffMs * 2 ** (attempt - 1)`.
   key). The boundary re-renders while it holds an error, and a static rejected promise
   hands the *same* reason object to every generation — the generation is the only identity
   that distinguishes one failure from the next.
-- **`failed` only.** `not-available` (or any code a load coins) is an answer, not a fault.
 - **The budget is per failure streak**, restored by `reset()` from three places: the leaf's
   commit (content is on screen — hence `Shared.commit` is now wired for `keepsRun` **or** a
   retry policy), a manual retry (the mandala wraps `bumpRetry` for the error slot's prop and

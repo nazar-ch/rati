@@ -2,7 +2,7 @@ import type { ComponentType, ReactNode } from 'react';
 import type { TupleToUnion } from '../types/generic';
 import type { Scope, ScopeComponent, ScopeProvidesOf } from '../scope/scope';
 import { createMandala, type MandalaConfig } from '../mandala/mandala';
-import type { RetryOptions } from '../mandala/retryPolicy';
+import type { RetryOption } from '../mandala/retryPolicy';
 
 //--------------------------------------------
 
@@ -162,10 +162,12 @@ export type RouteOptions<TScope extends Scope<any> | undefined, Path extends str
      */
     loadingDelayMs?: TScope extends Scope<any> ? number : undefined;
     /**
-     * Re-resolve automatically on a `failed` resolution, `count` times with an exponential
-     * backoff from `backoffMs` — the mandala's `retry` option (see `island`). The page shows
-     * its `loading` slot while the policy works, and the `error` slot only once the budget
-     * is spent. Only meaningful alongside `scope`.
+     * The automatic retry policy — the mandala's `retry` option (see `island`), on by
+     * default: a failure the app classified `retryable: true` earns a couple more attempts
+     * with a jittered backoff. `{ count, backoffMs? }` asks for more (and reaches an
+     * unclassified failure too), `false` opts out. The page shows its `loading` slot while
+     * the policy works, and the `error` slot only once the budget is spent. Only meaningful
+     * alongside `scope`.
      */
     retry?: TScope extends Scope<any> ? MandalaConfig<TScope>['retry'] : undefined;
     /**
@@ -228,7 +230,7 @@ export function buildRouteComponent(
         ssr?: boolean | undefined;
         keepStale?: boolean | undefined;
         loadingDelayMs?: number | undefined;
-        retry?: RetryOptions | undefined;
+        retry?: RetryOption | undefined;
         ssrErrors?: 'retry' | 'dehydrate' | undefined;
     },
 ): ComponentType<any> {
@@ -263,7 +265,7 @@ export type RouteFoldInputs = {
     ssr?: boolean | undefined;
     keepStale?: boolean | undefined;
     loadingDelayMs?: number | undefined;
-    retry?: RetryOptions | undefined;
+    retry?: RetryOption | undefined;
     ssrErrors?: 'retry' | 'dehydrate' | undefined;
 };
 
@@ -316,7 +318,7 @@ export function route<
                   ssr: options.ssr as boolean | undefined,
                   keepStale: options.keepStale as boolean | undefined,
                   loadingDelayMs: options.loadingDelayMs as number | undefined,
-                  retry: options.retry as RetryOptions | undefined,
+                  retry: options.retry as RetryOption | undefined,
                   ssrErrors: options.ssrErrors as 'retry' | 'dehydrate' | undefined,
               })
             : component;
@@ -342,7 +344,7 @@ export function route<
                       ssr: options.ssr as boolean | undefined,
                       keepStale: options.keepStale as boolean | undefined,
                       loadingDelayMs: options.loadingDelayMs as number | undefined,
-                      retry: options.retry as RetryOptions | undefined,
+                      retry: options.retry as RetryOption | undefined,
                       ssrErrors: options.ssrErrors as 'retry' | 'dehydrate' | undefined,
                   } satisfies RouteFoldInputs,
               }
