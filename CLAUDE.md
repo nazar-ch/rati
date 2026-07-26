@@ -158,8 +158,10 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
   per-level Step tree), `channel.ts` (the scope-keyed value channel + `useScope`),
   `boundary.tsx`, `hydration.tsx` (SSR). Internal.
 - `island/island.ts` — the public `island()` wrapper.
-- `router/` — `route.tsx`, `store.ts` (RouterStore), `Router`/`Link`/`Navigate`,
-  `useRouteContext`, `prepareRoute`, `history`, `scrollRestoration`, `lazy`.
+- `router/` — `route.tsx`, `store.ts` (the internal RouterStore), `router.ts` (the public
+  `Router` interface), `createRouter`, `RouterProvider` (context + `useRouter`),
+  `RouterOutlet`/`Link`/`Navigate`, `useRouteContext`, `prepareRoute`, `history`,
+  `scrollRestoration`, `lazy`.
 - `data/` — the `rati/data` entry: the MobX-shaped data primitives (`query`, `collection`,
   `reconciled`, `mutation`, `form`/`field` + the validator kit), successor of the deleted legacy layer
   (`remoteData`/`ActiveData`) and Jnana's `FetchStore` family. Experimental; design record:
@@ -179,14 +181,19 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
   the MIME table). Production only — dev is the plugin's.
 - `debug/index.ts` — the `rati/debug` entry: the two opt-in console tracers — `navTrace`
   (from `util/navTrace.ts`) and `dataTrace` (from `util/dataTrace.ts`, island resolution).
-- `stores/` — `RootStore`, `GlobalStore`. `types/` — `generic.ts`. `util/` — `utils.ts`.
+- `types/` — `generic.ts`. `util/` — `utils.ts`.
 
 ## Key patterns
 
 - **Reactivity = `useSyncExternalStore`.** Core is MobX-free: a `Source` is a
-  `subscribe`/`getSnapshot` pair, `RouterStore` is a plain external store, and components
+  `subscribe`/`getSnapshot` pair, the router is a plain external store, and components
   read both through uSES (no `observer`). Optional MobX bindings (`observableSource`) live in
   `rati/mobx`.
+- **No stores container.** rati ships no store skeleton (`RootStore`/`GlobalStore` are
+  gone) — an app's store graph is app code behind its own context. The router is provided
+  on its own (`createRouter` → `RouterProvider` → `useRouter`), and the `Router` type is
+  table-blind (typed off the `RatiUserTypes` augmentation), so app containers hold it
+  without importing the route table.
 - **No decorators anywhere.** The legacy decorator-using `data/` layer is gone, and the
   Babel lowering (`@babel/plugin-proposal-decorators`) went with it — the toolchain is
   pure oxc. `rati/data` models state as plain observable objects from factories.

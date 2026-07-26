@@ -29,11 +29,9 @@ describe('prepareRoute', () => {
     });
 
     test('captures route params for parameterized routes', async () => {
-        const router = new RouterStore([route('/users/:userId', 'user', UserComponent)] as const,
-            {
-                history: createMemoryHistory({ url: '/users/42?tab=posts#bio' }),
-            },
-        );
+        const router = new RouterStore([route('/users/:userId', 'user', UserComponent)] as const, {
+            history: createMemoryHistory({ url: '/users/42?tab=posts#bio' }),
+        });
 
         const prepared = await prepareRoute(router);
 
@@ -56,7 +54,8 @@ describe('prepareRoute', () => {
     });
 
     test('falls through to a wildcard route when nothing else matches', async () => {
-        const router = new RouterStore([route('/', 'home', HomeComponent), route('*', 'notFound', NoopComponent)] as const,
+        const router = new RouterStore(
+            [route('/', 'home', HomeComponent), route('*', 'notFound', NoopComponent)] as const,
             {
                 history: createMemoryHistory({ url: '/missing' }),
             },

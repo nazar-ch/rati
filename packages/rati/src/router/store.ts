@@ -2,12 +2,7 @@ import type { ComponentType, ReactNode } from 'react';
 import { createBrowserHistory, type History, type Location } from './history';
 import { navTrace } from '../util/navTrace';
 import { installScrollRestoration, type ScrollRestorationOptions } from './scrollRestoration';
-import {
-    PARAM_RE,
-    type GenericRouteType,
-    type NameToRoute,
-    type RouteRedirect,
-} from './route';
+import { PARAM_RE, type GenericRouteType, type NameToRoute, type RouteRedirect } from './route';
 import type { ActiveRouteOf, NavigateOptions, Router } from './router';
 
 // Redirect chains longer than this are treated as a cycle (see setPath).
@@ -26,8 +21,7 @@ type RouteRenderFields = {
 };
 
 /** Activated route shape: the public discriminated part plus the render internals. */
-type StoreActiveRoute<T extends readonly GenericRouteType[]> = ActiveRouteOf<T> &
-    RouteRenderFields;
+type StoreActiveRoute<T extends readonly GenericRouteType[]> = ActiveRouteOf<T> & RouteRenderFields;
 
 /**
  * What rati's router-consuming seams accept: the public augmentation-typed face, or the
@@ -652,10 +646,7 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
      * survives back/forward). Coexists with `keepCurrentRoute`'s internal skip
      * marker.
      */
-    navigate(
-        to: NameToRoute<T> | string,
-        options: NavigateOptions = {},
-    ) {
+    navigate(to: NameToRoute<T> | string, options: NavigateOptions = {}) {
         this.pushOrReplace('push', to, options);
     }
 
@@ -678,10 +669,7 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
      * survives back/forward). Coexists with `keepCurrentRoute`'s internal skip
      * marker.
      */
-    replace(
-        to: NameToRoute<T> | string,
-        options: NavigateOptions = {},
-    ) {
+    replace(to: NameToRoute<T> | string, options: NavigateOptions = {}) {
         this.pushOrReplace('replace', to, options);
     }
 

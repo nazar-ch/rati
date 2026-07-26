@@ -76,7 +76,7 @@ describe('RouterStore.preloadRoute', () => {
 
 describe('<Link prefetch>', () => {
     // A real test router mounted around the bare <Link> (its `ui`) — the prefetch handlers
-    // read the router from the store, no GenericStoresContext hand-wiring. cleanup() disposes.
+    // read the router from the harness, no provider hand-wiring. cleanup() disposes.
     function renderLink(opts: {
         routes: ReturnType<typeof route>[];
         prefetch: boolean;

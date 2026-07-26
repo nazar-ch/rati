@@ -26,9 +26,12 @@ src/
   head/      store.ts (HeadStore/createHeadStore), HeadProvider, Title/useTitle/Meta,
              useHeadTag (shared registration), domSync (client title/meta reconciler),
              context
-  router/    route.tsx (route() + route/param/redirect types), store.ts (RouterStore),
-             Router (keys the page per navigation — by route name for a kept run), Link,
-             Navigate, useRouteContext, prepareRoute, history, scrollRestoration, lazy
+  router/    route.tsx (route() + route/param/redirect types), store.ts (the internal
+             RouterStore), router.ts (the public Router interface + ActiveRoute types),
+             createRouter, RouterProvider (context + useRouter/useRouterStore),
+             RouterOutlet (keys the page per navigation — by route name for a kept run),
+             Link, Navigate, useRouteContext, prepareRoute, history, scrollRestoration,
+             lazy
   scope/     scope.ts (scope/input/load/provide/hook/data + scope types), source.ts
   ssr/       index.ts (the rati/ssr entry) + renderApp, renderToHtml, payload
              (serializeHydration/readHydration), headTags, html (template filling /
@@ -50,7 +53,6 @@ src/
              the SSR round-trip kit) — the generic cores promoted out of the
              suites' hand-rolls. Test-environment only; shipped for consumers
   debug/     index.ts — the rati/debug entry: the two opt-in console tracers
-  stores/    RootStore, GlobalStore (store roots)
   util/      utils.ts, navTrace.ts (the navigation timeline), dataTrace.ts (island
              resolution: level starts, cell settles, refreshes) — both gated on a
              flag off globalThis.__DEBUG__, both re-exported by debug/
@@ -195,11 +197,11 @@ stopped being *owned*. Everything else follows from that:
   the mandala's own effect — a Suspense retry re-renders the boundary's children, not the
   mandala, so the commit that ends the window would not run one. Release order is
   `disposeProvided` then `discardRun`, preserving dispose-before-detach.
-- **The Router keys these routes by name.** `Router` normally keys a route's element by a
-  per-navigation counter, remounting the component on every navigation — fatal for a kept
-  run, which lives on the island instance. `createMandala` hangs `keepsRun` on the
-  component (like `preload` / `moduleId`) and `Router` reads it. Opt-in: every other route
-  keeps the counter.
+- **The RouterOutlet keys these routes by name.** `RouterOutlet` normally keys a route's
+  element by a per-navigation counter, remounting the component on every navigation — fatal
+  for a kept run, which lives on the island instance. `createMandala` hangs `keepsRun` on
+  the component (like `preload` / `moduleId`) and `RouterOutlet` reads it. Opt-in: every
+  other route keeps the counter.
 
 ### The delay window (`loadingDelayMs`)
 
@@ -482,7 +484,7 @@ registry, keyed `mandalaId (useId) → scopeKey → value`, in three wire sectio
 
 The routing snapshot is separate: `prepareRoute(router)` (`router/prepareRoute.ts`) drives a
 memory-history router to its matched route and returns the server's decision object:
-`RouterHydratedState` (seeded back via `RouterStoreOptions.hydratedState`),
+`RouterHydratedState` (seeded back via `RouterOptions.hydratedState`),
 `matchedCatchAll`, and the followed `redirect`, if any.
 
 ## The rati/ssr entry (`ssr/`)
@@ -647,11 +649,17 @@ never there, leaving a client-only page that declares no title without its
 
 ## Router (`router/`)
 
-`RouterStore` (`store.ts`) owns history, the active route, basename
+`RouterStore` (`store.ts`, internal) owns history, the active route, basename
 handling, and navigation (`navigate`/`replace`/`setSearchParams`/`preloadRoute`). It is a
 plain external store — a listener `Set` plus `subscribe`/`getSnapshot` (a version counter);
 `useRouter` reads it through `useSyncExternalStore`, so every consumer re-renders on a
-change. `route()`
+change. The public face is the `Router` interface (`router.ts`): table-blind, typed off the
+`RatiUserTypes` augmentation (`NameToRoute<UserRoutes>` targets, a name-discriminated
+`ActiveRoute` union) — `createRouter` mints one (the sanctioned widening cast lives there
+and in `useRouter`), `RouterProvider` carries it in the router's own context, and rati
+internals narrow back to the store via `toRouterStore`/`useRouterStore` (RouterOutlet needs
+the matched component — a render field the public shape deliberately omits, so a container
+holding `Router` never embeds component types). `route()`
 (`route.tsx`) is a thin wrapper over `createMandala` plus the route/param **types**:
 
 - `ExtractRouteParams<Path>` turns `:param` segments into a typed param record.
@@ -689,18 +697,19 @@ deterministic pin list, the fuzz harness design — is
 
 The utilities the suites lean on ship as the public **`rati/testing`** entry (`src/testing/`
 — `deferred`, `flush`, `controllableSource`, `renderIsland`, `createTestRouter`,
-`renderWithStores`, `prerenderToString`/`ssrRender`), so both a consumer and rati's own suites
-use one implementation. It is *promotion*: the generic cores were extracted out of the ~8
+`prerenderToString`/`ssrRender`), so both a consumer and rati's own suites use one
+implementation. It is *promotion*: the generic cores were extracted out of the ~8
 hand-rolled `testSource`/`loaderSource` copies, the `deferred`/`flush` idioms, the island
 mount + slot-reader hand-inlined across the mandala suites (now `renderIsland` + `slot()`,
 which wraps each slot in a private marker so testids stay out of the island API), and the
-`createMemoryHistory` + `new RouterStore` + provider dance inlined across ~20 router suites
-(now `createTestRouter`, over a memory history it disposes). The three render harnesses share
+`createMemoryHistory` + router + provider dance inlined across ~20 router suites
+(now `createTestRouter`, over a memory history it disposes). The render harnesses share
 one mount (`testing/dom.tsx`: `mountTree` + a single `cleanup()` + a per-mount dispose hook —
-where a test router's history is detached). `renderWithStores` is the stores-injection seam: a
-partial container behind `RootStoreProvider`, killing the `as unknown as GlobalStores` cast
-the component suites hand-roll (it builds on the shipped `RootStore`/`RootStoreProvider`, not
-on any internalized context — see the effort README's DX-03 delta).
+where a test router's history is detached). App-store injection is not a rati seam anymore:
+with the stores container gone (rati has none), a suite provides its own context through
+`createTestRouter`'s `wrapper` option, and the typed-partial-container pattern the old
+`renderWithStores`/`storesWrapper` helpers embodied lives with the app that owns the
+context.
 
 The **SSR round-trip kit** (`testing/ssr.tsx`) is the same promotion for the prerender→
 collect→hydrate loop hand-rolled across the `islandSsr*`, `router/hydration`, and `ssr/*`

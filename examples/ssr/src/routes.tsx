@@ -72,7 +72,7 @@ export const routes = [
     // server is rendered as the error slot *and* carried to the client — which hydrates
     // onto that slot instead of re-running the load. Answered with a 500 either way.
     route('/broken', 'broken', Broken),
-    // Throws during the server render from its `wrapper` — which the Router renders
+    // Throws during the server render from its `wrapper` — which the RouterOutlet renders
     // outside the route's island, so no boundary catches it and `renderApp` rejects
     // rather than encoding it in a status. rati/server answers that with the CSR shell
     // (assets, no payload), so the page still works in the browser.
