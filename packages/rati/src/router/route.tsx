@@ -278,7 +278,7 @@ export type RouteFoldInputs = {
  *
  * When `options.scope` is given, the component + scope (+ `loading`, `error`) are folded
  * into a mandala and stored as the route's component, so resolution goes through the
- * source-based mandala engine — the Router renders that component directly, handing it the
+ * source-based mandala engine — the RouterOutlet renders that component directly, handing it the
  * route params. So a route declares its data inline, no separate `island` module needed:
  *
  *     route('/spaces/:spaceId/pages/:pageId', 'page', PageBody, {

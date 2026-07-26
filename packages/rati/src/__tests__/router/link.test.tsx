@@ -4,7 +4,7 @@ import { act, render, fireEvent, cleanup } from '@testing-library/react';
 import { RouterStore } from '../../router/store';
 import { route } from '../../router/route';
 import { Link } from '../../router/Link';
-import { GenericStoresContext } from '../../stores/RootStore';
+import { RouterProvider } from '../../router/RouterProvider';
 
 /**
  * RF-07's pins: `<Link>` navigates to the URL the *anchor* resolved, and decides active
@@ -44,13 +44,13 @@ afterEach(() => {
 /** Render a `<Link href>` with the browser sitting at `at`, and hand back the anchor. */
 function renderLinkAt(at: string, href: string, props: { prefetch?: boolean } = {}) {
     window.history.replaceState(null, '', at);
-    const router = new RouterStore({}, routes);
+    const router = new RouterStore(routes);
     const utils = render(
-        <GenericStoresContext.Provider value={{ router }}>
+        <RouterProvider router={router}>
             <Link href={href} {...props}>
                 go
             </Link>
-        </GenericStoresContext.Provider>,
+        </RouterProvider>,
     );
     return { router, anchor: utils.container.querySelector('a')!, ...utils };
 }

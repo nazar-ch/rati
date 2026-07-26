@@ -2,7 +2,7 @@ import { describe, test, expect, afterEach } from 'vite-plus/test';
 import { act, lazy, type FC } from 'react';
 import { screen } from '@testing-library/react';
 import { route } from '../../router/route';
-import { Router } from '../../router/Router';
+import { RouterOutlet } from '../../router/RouterOutlet';
 import { createTestRouter, cleanup } from '../../testing';
 
 const HomePage: FC = () => <div data-testid="home">home</div>;
@@ -10,7 +10,7 @@ const HomePage: FC = () => <div data-testid="home">home</div>;
 afterEach(cleanup);
 
 // The route-level Suspense fallback (for a lazy chunk), tagged so the tests can see it.
-const loadingRouter = <Router Loading={() => <div data-testid="loading">loading…</div>} />;
+const loadingRouter = <RouterOutlet Loading={() => <div data-testid="loading">loading…</div>} />;
 
 describe('Router + Suspense', () => {
     test('renders an eager component synchronously without showing Loading', async () => {

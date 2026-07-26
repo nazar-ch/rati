@@ -2,7 +2,7 @@ import { createContext, memo, type PropsWithChildren, useCallback, useContext } 
 
 import { type NameToRoute, type GenericRouteType, type UserRoutes } from './route';
 import { type RouterStore } from './store';
-import { useRouter } from '../stores/RootStore';
+import { useRouterStore } from './RouterProvider';
 import { navTraceStart } from '../util/navTrace';
 
 type GenericAnchorProps = Omit<
@@ -50,7 +50,7 @@ const GenericAnchor = function GenericAnchor({
     onTouchStart: userOnTouchStart,
     ...props
 }: PropsWithChildren<RatiGenericAnchorProps>) {
-    const router = useRouter();
+    const router = useRouterStore();
 
     const handleOnClick = useCallback(
         (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
@@ -102,7 +102,7 @@ export const Link = function Link({
     href,
     ...props
 }: PropsWithChildren<RatiRegularAnchorProps<UserRoutes>>) {
-    const router = useRouter();
+    const router = useRouterStore();
 
     const resolvedHref = to ? router.getPath(to) : href!;
     const isActive = isHrefActive(router, resolvedHref);
@@ -117,7 +117,7 @@ export const LinkContextProvider = memo(function LinkContextProvider({
     children: React.ReactNode;
     to: NameToRoute<UserRoutes> | string;
 }) {
-    const router = useRouter();
+    const router = useRouterStore();
 
     return (
         <LinkContext.Provider value={new LinkContextStore(router, to)}>
@@ -131,7 +131,7 @@ export const ContextualLink = function ContextualAnchor(
 ) {
     // Subscribe to the router so active state re-renders on navigation — the
     // LinkContextStore getters derive from it. Replaces the old mobx `observer`.
-    useRouter();
+    useRouterStore();
     const linkContext = useLinkContext();
 
     return (

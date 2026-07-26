@@ -19,7 +19,7 @@ beforeEach(() => {
 
 describe('RouterStore route matching', () => {
     test('matches the root route on initial load', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('home');
         expect(router.path).toBe('/');
@@ -28,7 +28,7 @@ describe('RouterStore route matching', () => {
 
     test('matches a static route from the URL', async () => {
         window.history.replaceState(null, '', '/dashboard');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('dashboard');
         router.dispose();
@@ -36,7 +36,7 @@ describe('RouterStore route matching', () => {
 
     test('extracts a single path parameter', async () => {
         window.history.replaceState(null, '', '/users/42');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('user');
         expect(router.activeRoute?.routeParams).toEqual({ userId: '42' });
@@ -45,7 +45,7 @@ describe('RouterStore route matching', () => {
 
     test('extracts multiple path parameters', async () => {
         window.history.replaceState(null, '', '/users/42/posts/abc');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('userPost');
         expect(router.activeRoute?.routeParams).toEqual({ userId: '42', postId: 'abc' });
@@ -54,7 +54,7 @@ describe('RouterStore route matching', () => {
 
     test('falls through to the wildcard catch-all when nothing matches', async () => {
         window.history.replaceState(null, '', '/no/such/route');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('notFound');
         router.dispose();
@@ -63,7 +63,7 @@ describe('RouterStore route matching', () => {
     test('leaves activeRoute null when no route matches and no catch-all is defined', async () => {
         const noCatchAll = [route('/known', 'known', NoopComponent)] as const;
         window.history.replaceState(null, '', '/unknown');
-        const router = new RouterStore({}, noCatchAll);
+        const router = new RouterStore(noCatchAll);
         await Promise.resolve();
         expect(router.activeRoute).toBeFalsy();
         router.dispose();
@@ -71,7 +71,7 @@ describe('RouterStore route matching', () => {
 
     test('matches paths with or without a trailing slash', async () => {
         window.history.replaceState(null, '', '/dashboard/');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('dashboard');
         router.dispose();
@@ -80,13 +80,13 @@ describe('RouterStore route matching', () => {
 
 describe('RouterStore.getPath', () => {
     test('returns the path verbatim for parameterless routes', () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         expect(router.getPath({ name: 'dashboard' })).toBe('/dashboard');
         router.dispose();
     });
 
     test('substitutes params into the path', () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         expect(router.getPath({ name: 'user', userId: '42' })).toBe('/users/42');
         expect(router.getPath({ name: 'userPost', userId: '42', postId: 'abc' })).toBe(
             '/users/42/posts/abc',
@@ -95,14 +95,14 @@ describe('RouterStore.getPath', () => {
     });
 
     test('returns string arguments verbatim', () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         expect(router.getPath('/raw/url?x=1#y')).toBe('/raw/url?x=1#y');
         router.dispose();
     });
 
     // Observed red once against the unfixed engine, which threw the TypeError below.
     test('throws a named error for a route that is not in the table', () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         // A typo in a route name used to surface as `Cannot read properties of
         // undefined (reading 'path')` from the non-null assertion on `find`.
         expect(() => router.getPath({ name: 'dashbaord' } as never)).toThrow(
@@ -115,7 +115,7 @@ describe('RouterStore.getPath', () => {
 describe('RouterStore.isPath', () => {
     test('matches the current path', async () => {
         window.history.replaceState(null, '', '/dashboard');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         expect(router.isPath('/dashboard')).toBe(true);
         expect(router.isPath('/users/1')).toBe(false);
@@ -125,7 +125,7 @@ describe('RouterStore.isPath', () => {
 
 describe('RouterStore navigation', () => {
     test('navigate() pushes a new history entry and resolves the route', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         const startLength = window.history.length;
 
@@ -141,7 +141,7 @@ describe('RouterStore navigation', () => {
     });
 
     test('replace() updates the URL via history.replace', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         const startLength = window.history.length;
 
@@ -157,7 +157,7 @@ describe('RouterStore navigation', () => {
     });
 
     test('replace() accepts a string URL', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         router.replace('/dashboard');
         await Promise.resolve();
@@ -167,7 +167,7 @@ describe('RouterStore navigation', () => {
 
     test('replace({ keepCurrentRoute: true }) updates the URL but keeps the current route mounted', async () => {
         window.history.replaceState(null, '', '/dashboard');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         const before = router.activeRoute;
 
@@ -184,7 +184,7 @@ describe('RouterStore navigation', () => {
 
     test('navigate({ keepCurrentRoute: true }) grows the back stack but keeps the route mounted', async () => {
         window.history.replaceState(null, '', '/dashboard');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         const before = router.activeRoute;
         const startLength = window.history.length;
@@ -203,7 +203,7 @@ describe('RouterStore navigation', () => {
 
     test('navigate({ keepCurrentRoute, state }) stamps the entry and exposes the state', async () => {
         window.history.replaceState(null, '', '/dashboard');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         const before = router.activeRoute;
 
@@ -223,7 +223,7 @@ describe('RouterStore navigation', () => {
 
     test('a state-only change on the same path re-resolves the route', async () => {
         window.history.replaceState(null, '', '/users/1');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         const before = router.activeRoute;
 
@@ -241,7 +241,7 @@ describe('RouterStore navigation', () => {
 
     test('a same-path navigation with equal state does not re-resolve', async () => {
         window.history.replaceState(null, '', '/users/1');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         router.navigate('/users/1', { state: { panelId: 'p0' } });
@@ -258,7 +258,7 @@ describe('RouterStore navigation', () => {
     });
 
     test('history.push() triggers a route resolution', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         router.history.push('/dashboard');
@@ -269,7 +269,7 @@ describe('RouterStore navigation', () => {
 
     test('does not re-resolve the route when navigating to the same pathname', async () => {
         window.history.replaceState(null, '', '/dashboard');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         const before = router.activeRoute;
 
@@ -302,7 +302,7 @@ describe('RouterStore refuses a non-absolute string target', () => {
         ['an empty string', ''],
     ])('navigate rejects %s', async (_label, target) => {
         window.history.replaceState(null, '', '/users/1');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         expect(() => router.navigate(target)).toThrow(/not an absolute path/);
@@ -326,7 +326,7 @@ describe('RouterStore refuses a non-absolute string target', () => {
         ['a tab-smuggled authority', '/\t/example.com/x'],
     ])('navigate rejects %s — it resolves off the origin', async (_label, target) => {
         window.history.replaceState(null, '', '/users/1');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         expect(() => router.navigate(target)).toThrow(/resolves off the app's origin/);
@@ -335,7 +335,7 @@ describe('RouterStore refuses a non-absolute string target', () => {
     });
 
     test('replace rejects a relative string, naming itself', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         expect(() => router.replace('sub')).toThrow(/\[rati\] replace:/);
@@ -343,7 +343,7 @@ describe('RouterStore refuses a non-absolute string target', () => {
     });
 
     test('the error names the alternatives', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         expect(() => router.navigate('sub')).toThrow(/getPath|setSearchParams|<Link>/);
@@ -351,7 +351,7 @@ describe('RouterStore refuses a non-absolute string target', () => {
     });
 
     test('absolute string targets still navigate', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         router.navigate('/dashboard');
@@ -361,7 +361,7 @@ describe('RouterStore refuses a non-absolute string target', () => {
     });
 
     test('an object target is unaffected — the table builds an absolute path', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         router.navigate({ name: 'user', userId: '7' });
@@ -373,7 +373,7 @@ describe('RouterStore refuses a non-absolute string target', () => {
 
 describe('RouterStore.dispose', () => {
     test('stops responding to history changes after dispose', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         router.dispose();
 
@@ -391,7 +391,7 @@ describe('RouterStore.dispose', () => {
     // empties that set. The leak is only visible to a listener the disposed history
     // should no longer be able to reach.
     test('dispose() detaches the history the store created from the DOM', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
         const history = router.history;
         router.dispose();
@@ -411,7 +411,7 @@ describe('RouterStore.dispose', () => {
         const listener = vi.fn();
         history.listen(listener);
 
-        const router = new RouterStore({}, routes, { history });
+        const router = new RouterStore(routes, { history });
         await Promise.resolve();
         router.dispose();
 

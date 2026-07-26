@@ -11,7 +11,7 @@ const UserComponent = (props: any) => <div>user {props.userId}</div>;
 
 describe('prepareRoute', () => {
     test('returns a hydrated state snapshot for a static route', async () => {
-        const router = new RouterStore({}, [route('/', 'home', HomeComponent)] as const, {
+        const router = new RouterStore([route('/', 'home', HomeComponent)] as const, {
             history: createMemoryHistory({ url: '/' }),
         });
 
@@ -29,9 +29,7 @@ describe('prepareRoute', () => {
     });
 
     test('captures route params for parameterized routes', async () => {
-        const router = new RouterStore(
-            {},
-            [route('/users/:userId', 'user', UserComponent)] as const,
+        const router = new RouterStore([route('/users/:userId', 'user', UserComponent)] as const,
             {
                 history: createMemoryHistory({ url: '/users/42?tab=posts#bio' }),
             },
@@ -47,7 +45,7 @@ describe('prepareRoute', () => {
     });
 
     test('returns null when no route matches and there is no wildcard', async () => {
-        const router = new RouterStore({}, [route('/', 'home', HomeComponent)] as const, {
+        const router = new RouterStore([route('/', 'home', HomeComponent)] as const, {
             history: createMemoryHistory({ url: '/no/such/route' }),
         });
 
@@ -58,9 +56,7 @@ describe('prepareRoute', () => {
     });
 
     test('falls through to a wildcard route when nothing else matches', async () => {
-        const router = new RouterStore(
-            {},
-            [route('/', 'home', HomeComponent), route('*', 'notFound', NoopComponent)] as const,
+        const router = new RouterStore([route('/', 'home', HomeComponent), route('*', 'notFound', NoopComponent)] as const,
             {
                 history: createMemoryHistory({ url: '/missing' }),
             },
@@ -76,7 +72,7 @@ describe('prepareRoute', () => {
         const factory = vi.fn(async () => ({ default: HomeComponent }));
         const LazyComponent = lazy(factory);
 
-        const router = new RouterStore({}, [route('/', 'home', LazyComponent as any)] as const, {
+        const router = new RouterStore([route('/', 'home', LazyComponent as any)] as const, {
             history: createMemoryHistory({ url: '/' }),
         });
 

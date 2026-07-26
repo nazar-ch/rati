@@ -181,10 +181,10 @@ export type MandalaComponent<S extends Scope<any>> = FC<ScopeInputs<S>> & {
     moduleId?: string;
     /**
      * Set when the mandala keeps its previous run across a re-resolve — `keepStale`, or
-     * `loadingDelayMs` (which keeps it for the length of the window) — so the `Router` can
+     * `loadingDelayMs` (which keeps it for the length of the window) — so the `RouterOutlet` can
      * tell. It keys a route's element by a per-navigation counter, which remounts the
      * component on every navigation — and a remounted island has no previous run left to
-     * keep. For these the Router keys by route name instead, so a param change on the same
+     * keep. For these the RouterOutlet keys by route name instead, so a param change on the same
      * route re-renders this instance (the mandala's own param-change path) rather than
      * replacing it. Absent otherwise, and the default keying is untouched.
      */
@@ -735,7 +735,7 @@ export function createMandala<S extends Scope<any>>(
     if (typeof lazyComponent.preload === 'function') Mandala.preload = lazyComponent.preload;
     if (lazyComponent.moduleId !== undefined) Mandala.moduleId = lazyComponent.moduleId;
 
-    // Tell the Router not to remount this one on every navigation — a kept run cannot
+    // Tell the RouterOutlet not to remount this one on every navigation — a kept run cannot
     // survive its own island being replaced. See MandalaComponent.keepsRun.
     if (keepsRun) Mandala.keepsRun = true;
 

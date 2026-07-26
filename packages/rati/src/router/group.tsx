@@ -31,7 +31,7 @@ export type GroupDefaults = {
  *     ] as const;
  *
  * Each child keeps its own options; the group only fills the gaps. `wrapper` is applied at
- * render (the Router reads `wrapperComponent`); `loading`/`error` re-fold the child's
+ * render (the RouterOutlet reads `wrapperComponent`); `loading`/`error` re-fold the child's
  * mandala, so they affect only routes that carry a `scope`.
  */
 export function group<const T extends readonly GenericRouteType[]>(

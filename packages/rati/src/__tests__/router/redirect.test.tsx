@@ -31,7 +31,7 @@ function makeRoutes() {
 }
 
 function makeRouter(url: string) {
-    return new RouterStore({}, makeRoutes(), { history: createMemoryHistory({ url }) });
+    return new RouterStore(makeRoutes(), { history: createMemoryHistory({ url }) });
 }
 
 describe('route-level redirects', () => {
@@ -167,7 +167,7 @@ describe('route-level redirects', () => {
             route('/self', 'self', Self, { redirect: { to: '/self' } }),
             route('*', 'notFound', NotFound),
         ] as const satisfies GenericRouteType[];
-        const router = new RouterStore({}, routes, {
+        const router = new RouterStore(routes, {
             history: createMemoryHistory({ url: '/home' }),
         });
 
@@ -199,7 +199,7 @@ describe('route-level redirects', () => {
             route('/self', 'self', Self, { redirect: { to: '/self' } }),
             route('*', 'notFound', NotFound),
         ] as const satisfies GenericRouteType[];
-        const router = new RouterStore({}, routes, {
+        const router = new RouterStore(routes, {
             history: createMemoryHistory({ url: '/self' }),
         });
 
@@ -225,7 +225,7 @@ describe('route-level redirects', () => {
             route('/self', 'self', Self, { redirect: { to: '/self?tab=a' } }),
             route('*', 'notFound', NotFound),
         ] as const satisfies GenericRouteType[];
-        const router = new RouterStore({}, routes, {
+        const router = new RouterStore(routes, {
             history: createMemoryHistory({ url: '/home' }),
         });
 
@@ -271,7 +271,7 @@ describe('route-level redirects', () => {
             route('/self', 'self', Self, { redirect: { to: 'self' } }),
             route('*', 'notFound', NotFound),
         ] as const satisfies GenericRouteType[];
-        const router = new RouterStore({}, routes, {
+        const router = new RouterStore(routes, {
             history: createMemoryHistory({ url: '/home' }),
         });
 
@@ -293,7 +293,7 @@ describe('route-level redirects', () => {
             route('/old/:userId', 'old', Null, { redirect: { to: ({ userId }) => userId } }),
             route('*', 'notFound', NotFound),
         ] as const satisfies GenericRouteType[];
-        const router = new RouterStore({}, routes, {
+        const router = new RouterStore(routes, {
             history: createMemoryHistory({ url: '/home' }),
         });
 
@@ -319,7 +319,7 @@ describe('route-level redirects', () => {
             route('/go/:dest', 'go', Null, { redirect: { to: ({ dest }) => dest } }),
             route('*', 'notFound', NotFound),
         ] as const satisfies GenericRouteType[];
-        const router = new RouterStore({}, routes, {
+        const router = new RouterStore(routes, {
             history: createMemoryHistory({ url: '/home' }),
         });
 

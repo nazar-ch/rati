@@ -1,8 +1,8 @@
-import type { RouterStore, RouterHydratedState } from './store';
+import { toRouterStore, type AnyRouter, type RouterStore, type RouterHydratedState } from './store';
 
 /**
  * The server's routing decision object. {@link hydratedState} is embedded in the SSR
- * HTML response and passed back to the client as `RouterStoreOptions.hydratedState`,
+ * HTML response and passed back to the client as `RouterOptions.hydratedState`,
  * so the first client render matches the server HTML without an async routing gap;
  * {@link matchedCatchAll} and {@link redirect} carry what the response should be
  * before any rendering happens.
@@ -61,7 +61,8 @@ export function redirectFromHops(
  * `prerender`) resolves it and the mandala engine dehydrates the promise values
  * (see `HydrationProvider` in `rati/ssr`). This builds only the routing snapshot.
  */
-export async function prepareRoute(router: RouterStore<any>): Promise<PreparedRoute | null> {
+export async function prepareRoute(publicRouter: AnyRouter): Promise<PreparedRoute | null> {
+    const router = toRouterStore(publicRouter);
     await router.pendingNavigation;
 
     const route = router.activeRoute;

@@ -1,8 +1,8 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vite-plus/test';
 import { RouterStore } from '../../router/store';
 import { route, type GenericRouteType } from '../../router/route';
-import { RootStore, RootStoreProvider } from '../../stores/RootStore';
-import { Router } from '../../router/Router';
+import { RouterProvider } from '../../router/RouterProvider';
+import { RouterOutlet } from '../../router/RouterOutlet';
 import { createBrowserHistory, createMemoryHistory } from '../../router/history';
 import { prepareRoute } from '../../router/prepareRoute';
 import { scope, type ScopeComponent } from '../../scope/scope';
@@ -62,27 +62,25 @@ function reactErrors(calls: unknown[][]): unknown[][] {
  */
 async function ssrThenHydrate(url: string, routes: readonly GenericRouteType[]) {
     // ----- Server: memory history, collect the dehydration payload -----
-    const serverRouter = new RouterStore({}, routes, { history: createMemoryHistory({ url }) });
-    const serverRoot = new RootStore({ router: serverRouter }, { isReady: true });
+    const serverRouter = new RouterStore(routes, { history: createMemoryHistory({ url }) });
     const prepared = await prepareRoute(serverRouter);
     const server = await ssrRender(
-        <RootStoreProvider rootStore={serverRoot}>
-            <Router />
-        </RootStoreProvider>,
+        <RouterProvider router={serverRouter}>
+            <RouterOutlet />
+        </RouterProvider>,
     );
     serverRouter.dispose();
 
     // ----- Client: browser history seeded from the routing snapshot, hydrate -----
     window.history.replaceState(null, '', url);
-    const clientRouter = new RouterStore({}, routes, {
+    const clientRouter = new RouterStore(routes, {
         history: createBrowserHistory(),
         hydratedState: prepared!.hydratedState,
     });
-    const clientRoot = new RootStore({ router: clientRouter }, { isReady: true });
     const client = await server.hydrate(
-        <RootStoreProvider rootStore={clientRoot}>
-            <Router />
-        </RootStoreProvider>,
+        <RouterProvider router={clientRouter}>
+            <RouterOutlet />
+        </RouterProvider>,
         { onDispose: () => clientRouter.dispose() },
     );
 

@@ -7,7 +7,7 @@ import {
 } from '../mandala/hydration';
 import { createMemoryHistory, type History } from '../router/history';
 import { prepareRoute, redirectFromHops } from '../router/prepareRoute';
-import type { RouterStore } from '../router/store';
+import { toRouterStore, type AnyRouter } from '../router/store';
 import { headTags } from './headTags';
 import { serializeHydration, type HydrationState } from './payload';
 import { renderToHtml } from './renderToHtml';
@@ -20,14 +20,14 @@ import { renderToHtml } from './renderToHtml';
 */
 
 export interface RenderAppSetup {
-    /** Memory history at the requested URL — hand it to the RouterStore. */
+    /** Memory history at the requested URL — hand it to `createRouter`. */
     history: History;
     /** Collector wiring — spread into the app's HydrationProvider. */
     hydration: Pick<Hydration, 'collect' | 'collectError'>;
 }
 
 export interface RenderAppInstance {
-    router: RouterStore<any>;
+    router: AnyRouter;
     App: ComponentType;
     /** This request's head store, when the app declares titles/meta. */
     head?: HeadStore;
@@ -132,7 +132,9 @@ export async function renderApp(options: RenderAppOptions): Promise<RenderAppRes
         // so there is no route to describe — but the author's declared 30x stands, and
         // serving the target is someone else's job. The hops are the router's own;
         // prepareRoute reads the same ones when it has a route to attach them to.
-        const redirect = prepared ? prepared.redirect : redirectFromHops(router.redirectHops);
+        const redirect = prepared
+            ? prepared.redirect
+            : redirectFromHops(toRouterStore(router).redirectHops);
         if (redirect) {
             return {
                 kind: 'redirect',
