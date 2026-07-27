@@ -1,8 +1,8 @@
 ---
 area: docs/current/ — a changelog/migration home; RELEASING.md gains the step
 needs: nothing
-status: open
-disposition: —
+status: done
+disposition: closed 2026-07-27 — root CHANGELOG.md seeded with the 0.6.3 entry as the format exemplar + the RELEASING.md pre-bump step; no consumer needed the 0.6.3 backfill by then (all four migrated), so the value is forward-looking
 ---
 
 # FND-05 — no changelog or migration note carries a consumer across a breaking release
