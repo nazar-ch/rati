@@ -16,9 +16,9 @@
     Two halves, the same split `LoadingDelay` uses and for the same reason. `accept` is
     render-time — the boundary's render is where the error is seen, and the decision has to
     be made *there* or the error slot mounts for a frame (its effects with it) before
-    anything could take it back. `arm` is commit-time, so it starts no timer during a server
-    render: the server has no commit phase, which is the whole of "the policy is
-    client-only" — one attempt per request, no machinery needed to enforce it.
+    anything could take it back. `arm` is commit-time and owns everything stateful — the
+    budget spend and the timer — so a server render (no commit phase) takes one attempt per
+    request with no machinery, and a discarded concurrent render spends nothing.
 */
 
 import type { SourceError } from '../scope/source';
@@ -137,15 +137,16 @@ export class RetryPolicy {
      * Idempotent per generation: the boundary re-renders while it holds an error (its
      * parent re-renders, a source ticks), and each of those must re-read the ruling rather
      * than buy another attempt. One generation can only be failing once.
+     *
+     * The ruling only *decides* here — the budget is spent in {@link arm}, at commit. A
+     * concurrent render can be discarded, and a discarded render's failure never commits;
+     * spending against it would burn attempts on failures the screen never saw.
      */
     accept(error: SourceError, generation: unknown): boolean {
         if (this.ruledOn === generation) return this.accepted;
         this.ruledOn = generation;
         this.accepted = this.eligible(error) && this.spent < this.count;
-        if (this.accepted) {
-            this.spent += 1;
-            this.report(this.spent);
-        } else {
+        if (!this.accepted) {
             // Out of budget (or never eligible): the error slot takes over, and an island
             // showing its error is not retrying.
             this.report(0);
@@ -169,14 +170,16 @@ export class RetryPolicy {
     }
 
     /**
-     * Commit-time, from the boundary's `componentDidCatch` / `componentDidUpdate`: start the
-     * countdown of an accepted attempt. Idempotent, and a no-op when render declined — so
-     * the only thing that can start a timer is a commit, which is what keeps the server out
-     * of it.
+     * Commit-time, from the boundary's `componentDidCatch` / `componentDidUpdate`: spend
+     * the accepted attempt and start its countdown. Idempotent, and a no-op when render
+     * declined — so the only thing that can spend budget or start a timer is a commit,
+     * which is what keeps the server out of it (and discarded renders free).
      */
     arm(): void {
         if (!this.accepted || this.armedFor === this.ruledOn) return;
         this.armedFor = this.ruledOn;
+        this.spent += 1;
+        this.report(this.spent);
         this.clear();
         // Exponential from `backoffMs`: a backend that just failed is the one case where
         // trying again immediately is least likely to help, and three attempts 300ms apart

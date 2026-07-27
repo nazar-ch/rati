@@ -273,9 +273,10 @@ island({
 ```
 
 - **The backoff is jittered.** `backoffMs` (default 500) is the first *ceiling*; it doubles
-  per attempt and is capped at 10s, and each wait is a random draw from `[0, ceiling]`. A
-  fixed schedule brings every island that failed in the same backend blip back on the same
-  tick — a small thundering herd at a server already struggling.
+  per attempt and is capped at 10s, and each wait is a random draw from `[0, ceiling]`,
+  counted from the failure it follows. A fixed schedule brings every island that failed in
+  the same backend blip back on the same tick — a small thundering herd at a server already
+  struggling.
 - **A retry in progress is not an error.** The `error` slot is not rendered at all while the
   policy works — the island shows its `loading` slot (or the kept run, under `keepStale`),
   exactly as for any other re-resolution. It comes up only once the budget is spent. (Under
