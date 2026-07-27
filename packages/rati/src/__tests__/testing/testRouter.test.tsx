@@ -1,9 +1,8 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
-import { act, type FC } from 'react';
+import { act, createContext, useContext, type FC, type ReactNode } from 'react';
 import { route, type GenericRouteType } from '../../router/route';
 import { Link } from '../../router/Link';
-import { createUseStoresHook, type GlobalStores } from '../../stores/RootStore';
-import { createTestRouter, renderWithStores, storesWrapper, cleanup } from '../../testing';
+import { createTestRouter, cleanup } from '../../testing';
 
 afterEach(cleanup);
 
@@ -74,50 +73,6 @@ describe('createTestRouter', () => {
     });
 });
 
-// The stores seam: a component reading two stores, rendered with a *partial* container and no
-// `as unknown as GlobalStores` cast — the shape Jnana's ten fake-container tests build by hand.
-interface FooStore {
-    label: string;
-}
-interface BarStore {
-    count: number;
-}
-interface AppStores extends GlobalStores {
-    foo: FooStore;
-    bar: BarStore;
-}
-const useAppStores = createUseStoresHook<AppStores>();
-
-const TwoStoreReader: FC = () => {
-    const { foo, bar } = useAppStores();
-    return (
-        <div>
-            {foo.label}/{bar.count}
-        </div>
-    );
-};
-
-describe('renderWithStores', () => {
-    test('injects a partial container the component reads — no cast', async () => {
-        const handle = await renderWithStores<AppStores>(<TwoStoreReader />, {
-            // Only the two stores this component reads, typed against AppStores — the router
-            // (and any other store) is simply omitted. No `as unknown as` in sight.
-            stores: { foo: { label: 'hi' }, bar: { count: 3 } },
-        });
-        expect(handle.text()).toBe('hi/3');
-    });
-
-    test('rerender keeps the stores provider (does not drop it)', async () => {
-        const handle = await renderWithStores<AppStores>(<TwoStoreReader />, {
-            stores: { foo: { label: 'a' }, bar: { count: 1 } },
-        });
-        // A bare mount re-render would render the new tree outside RootStoreProvider, and
-        // useAppStores would throw; the handle re-wraps it.
-        await handle.rerender(<TwoStoreReader />);
-        expect(handle.text()).toBe('a/1');
-    });
-});
-
 describe('createTestRouter — state', () => {
     test('seeds the initial entry state', async () => {
         const tr = await createTestRouter(routes, { url: '/', state: { panel: 'left' } });
@@ -136,41 +91,30 @@ describe('createTestRouter — basename', () => {
     });
 });
 
-describe('storesWrapper — the mount-free seam', () => {
-    // The provider alone, for suites that keep their own renderer (RTL's `wrapper` option,
-    // vitest-browser-react). Here it wraps a renderWithStores-free mount path: any harness
-    // that takes a component tree works the same way.
-    test('wraps a tree so useStores resolves, with no mount of its own', async () => {
-        const Wrapper = storesWrapper<AppStores>({ foo: { label: 'wrapped' }, bar: { count: 9 } });
-        const handle = await renderWithStores(
-            <Wrapper>
-                <TwoStoreReader />
-            </Wrapper>,
-        );
-        expect(handle.text()).toBe('wrapped/9');
-    });
-});
+describe('createTestRouter — wrapper', () => {
+    // The seam an app's own stores/DI provider rides in on (rati has no stores container;
+    // an app provides its own context and passes its provider here). It renders inside
+    // the router context, so the wrapped tree can use <Link> and useRouter too.
+    const AppContext = createContext<string | null>(null);
+    const AppProvider: FC<{ children?: ReactNode }> = ({ children }) => (
+        <AppContext.Provider value="app">{children}</AppContext.Provider>
+    );
+    const CtxPage: FC = () => <div>ctx {useContext(AppContext)}</div>;
 
-describe('renderWithStores — per-store slices', () => {
-    // The Jnana shape: stores are classes with methods, but a component reads a flat slice.
-    // The container-level cast died in DX-03; the per-store slice cast dies here.
-    class CountedBarStore implements BarStore {
-        count = 5;
-        recount(): void {
-            this.count += 1;
-        }
-    }
-    interface ClassyStores extends GlobalStores {
-        bar: CountedBarStore;
-    }
-    const useClassyStores = createUseStoresHook<ClassyStores>();
-    const BarReader: FC = () => <div>bar {useClassyStores().bar.count}</div>;
-
-    test('a store slice type-checks without any cast (methods omitted)', async () => {
-        const handle = await renderWithStores<ClassyStores>(<BarReader />, {
-            // Just the field the component reads — `recount()` is not provided, no cast.
-            stores: { bar: { count: 5 } },
+    test('renders app context inside the router context', async () => {
+        const tr = await createTestRouter([route('/', 'home', CtxPage)], {
+            wrapper: AppProvider,
         });
-        expect(handle.text()).toBe('bar 5');
+        expect(tr.text()).toBe('ctx app');
+    });
+
+    test('rerender keeps both providers', async () => {
+        const tr = await createTestRouter([route('/', 'home', HomePage)], {
+            wrapper: AppProvider,
+            ui: <CtxPage />,
+        });
+        expect(tr.text()).toBe('ctx app');
+        await tr.rerender(<CtxPage />);
+        expect(tr.text()).toBe('ctx app');
     });
 });

@@ -4,9 +4,9 @@ import { HeadProvider } from '../../head/HeadProvider';
 import { Title } from '../../head/Title';
 import { HydrationProvider } from '../../mandala/hydration';
 import { route, type GenericRouteType } from '../../router/route';
-import { Router } from '../../router/Router';
+import { RouterOutlet } from '../../router/RouterOutlet';
 import { RouterStore } from '../../router/store';
-import { RootStore, RootStoreProvider } from '../../stores/RootStore';
+import { RouterProvider } from '../../router/RouterProvider';
 import { scope, input } from '../../scope/scope';
 import { NotAvailableError } from '../../scope/source';
 import { renderApp, type RenderAppSetup } from '../../ssr/renderApp';
@@ -48,19 +48,18 @@ const routes = [
 ] as const satisfies GenericRouteType[];
 
 function createApp({ history, hydration }: RenderAppSetup) {
-    const router = new RouterStore({}, routes, { history });
-    const root = new RootStore({ router }, { isReady: true });
+    const router = new RouterStore(routes, { history });
     const head = createHeadStore({ titleTemplate: (title) => `${title} · Blog` });
 
     function App() {
         return (
-            <RootStoreProvider rootStore={root}>
+            <RouterProvider router={router}>
                 <HeadProvider store={head}>
                     <HydrationProvider {...hydration}>
-                        <Router />
+                        <RouterOutlet />
                     </HydrationProvider>
                 </HeadProvider>
-            </RootStoreProvider>
+            </RouterProvider>
         );
     }
     return { router, App, head };
@@ -184,16 +183,15 @@ describe('renderApp', () => {
         const result = await renderApp({
             url: '/absent',
             createApp: ({ history, hydration }) => {
-                const router = new RouterStore({}, bare, { history });
-                const root = new RootStore({ router }, { isReady: true });
+                const router = new RouterStore(bare, { history });
                 return {
                     router,
                     App: () => (
-                        <RootStoreProvider rootStore={root}>
+                        <RouterProvider router={router}>
                             <HydrationProvider {...hydration}>
-                                <Router />
+                                <RouterOutlet />
                             </HydrationProvider>
-                        </RootStoreProvider>
+                        </RouterProvider>
                     ),
                 };
             },
@@ -214,16 +212,15 @@ describe('renderApp', () => {
         const result = await renderApp({
             url: '/old',
             createApp: ({ history, hydration }) => {
-                const router = new RouterStore({}, redirectOnly, { history });
-                const root = new RootStore({ router }, { isReady: true });
+                const router = new RouterStore(redirectOnly, { history });
                 return {
                     router,
                     App: () => (
-                        <RootStoreProvider rootStore={root}>
+                        <RouterProvider router={router}>
                             <HydrationProvider {...hydration}>
-                                <Router />
+                                <RouterOutlet />
                             </HydrationProvider>
-                        </RootStoreProvider>
+                        </RouterProvider>
                     ),
                 };
             },
@@ -240,16 +237,15 @@ describe('renderApp', () => {
         const result = await renderApp({
             url: '/a',
             createApp: ({ history, hydration }) => {
-                const router = new RouterStore({}, chain, { history });
-                const root = new RootStore({ router }, { isReady: true });
+                const router = new RouterStore(chain, { history });
                 return {
                     router,
                     App: () => (
-                        <RootStoreProvider rootStore={root}>
+                        <RouterProvider router={router}>
                             <HydrationProvider {...hydration}>
-                                <Router />
+                                <RouterOutlet />
                             </HydrationProvider>
-                        </RootStoreProvider>
+                        </RouterProvider>
                     ),
                 };
             },

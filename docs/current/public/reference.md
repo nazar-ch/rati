@@ -203,7 +203,7 @@ island({ scope: stationScope, component: Board, loading: Skeleton, keepStale: tr
 - **A source returning to pending is not a re-resolution** and still shows the loading slot.
 - **Under SSR the option is inert** — the server never re-resolves; dehydration is
   unchanged.
-- **On a route**, the Router keys the page by name rather than by navigation, so a param
+- **On a route**, the RouterOutlet keys the page by name rather than by navigation, so a param
   change re-renders the same island instead of replacing it. Navigating to a *different*
   route still remounts, so nothing is carried across pages.
 
@@ -232,7 +232,7 @@ island({ scope: stationScope, component: Board, loading: Skeleton, loadingDelayM
 - **Under SSR the option is inert** — the server waits for the resolution regardless, and
   dehydration is unchanged. A slot that belongs in the HTML (an `ssr: false` island, a
   source that stays pending server-side) is shipped and survives hydration unblanked.
-- **On a route**, the Router keys the page by name for the same reason `keepStale` does.
+- **On a route**, the RouterOutlet keys the page by name for the same reason `keepStale` does.
 
 ### `retry` — trying again automatically
 
@@ -608,15 +608,16 @@ tuple; paths stay absolute. A child's own `ssr` / `keepStale` / `loadingDelayMs`
 `ssrErrors` survives the group's rebuild; the group has no default of its own for any of
 them — they are per-route judgments, not shared presentation.
 
-### `RouterStore`
+### `createRouter(routes, options?)` → `Router`
 
-The router object: owns history, the active route, and navigation. A plain external store
-(subscribable; no rendering).
+Builds the router: a plain external store (subscribable; no rendering) that owns history,
+the active route, and navigation. One per app on the client; one per request on the server
+(with a memory `history`).
 
 ```ts
-new RouterStore(routes, options?);
+const router = createRouter(routes, options?);
 
-interface RouterStoreOptions {
+interface RouterOptions {
     history?: History;                                   // default: browser history
     basename?: string;                                   // mount prefix ('/admin'): stripped before matching, prepended to hrefs
     scrollRestoration?: false | ScrollRestorationOptions; // default: scroll-to-top on navigation
@@ -624,17 +625,26 @@ interface RouterStoreOptions {
 }
 ```
 
+The `Router` type is **table-blind**: navigation targets and `activeRoute` are typed off
+the `RatiUserTypes` augmentation (the same source `<Link>`'s `to` reads), never off an
+imported route table. That is what makes it safe to hold anywhere — a store container
+included — without dragging the route components' types into the holder's own type.
+`createRouter` takes no type parameter for the same reason.
+
 Members:
 
 | Member | Behavior |
 | --- | --- |
-| `activeRoute` | the matched route (name, params) or `null` |
+| `activeRoute` | the matched route or `null` — a union discriminated by `name`, so matching on `activeRoute.name` narrows `routeParams` |
 | `path` / `state` | current path; per-entry navigation state |
-| `navigate(to, options?)` | push. `to`: `{ name, …params }` (typed off the table) or a string |
+| `search` / `hash` / `searchParams` | the query string (raw and parsed) and fragment |
+| `navigate(to, options?)` | push. `to`: `{ name, …params }` (typed off the augmentation) or a string |
 | `replace(to, options?)` | replace — back skips the current URL |
 | `getPath(to)` | build an href from a typed route reference (params percent-encoded); throws if the name isn't in the table |
 | `setSearchParams(params)` | update the query string |
-| `subscribe(fn)` | change notification (for non-React consumers) |
+| `isPath(path)` | whether a `getPath`-style path names the current route |
+| `preloadRoute(path)` | start loading the matching `lazy()` route's chunk, without navigating |
+| `subscribe(fn)` / `getSnapshot()` | change notification (`useSyncExternalStore`-shaped, for non-React consumers too) |
 | `dispose()` | release history listeners, and the history itself if the router created it (one router per SSR request — dispose after render) |
 
 `navigate`/`replace` options: `keepCurrentRoute` (change the URL without re-resolving the
@@ -661,11 +671,12 @@ state resolves the same way before comparing.
 
 | Export | Purpose |
 | --- | --- |
-| `<Router />` | renders the active route's component (with its `wrapper`) |
+| `<RouterProvider router={…}>` | provides the router to the tree — wrap everything that navigates, shells included |
+| `<RouterOutlet />` | renders the active route's component (with its `wrapper`); one per app, anywhere under the provider |
 | `<Link to={…} prefetch?>` | typed link; `prefetch` preloads a lazy chunk on hover/touch |
 | `<Navigate to={…} />` | declarative redirect on mount |
 | `ContextualLink`, `LinkContextProvider`, `useLinkContext` | links resolved against a provided base (nested UI that builds relative links) |
-| `useRouter()` | the router, subscribed — reading `activeRoute`/`path` re-renders on navigation |
+| `useRouter()` | the router (`Router`), subscribed — reading `activeRoute`/`path` re-renders on navigation |
 | `useRouteContext(name)` | what the named route's scope provides, typed off the routes table; accepts only scope-carrying route names |
 
 ### History & scroll
@@ -682,7 +693,7 @@ A traversal reports back at different times on the two histories: the memory his
 its stack and emits before `go` returns, while the browser queues the traversal and the
 `POP` arrives on a later task (via `popstate`). Code that must work on both awaits the
 listener rather than reading `location` on the next line.
-| `installScrollRestoration(options?)` | standalone installer; usually configured via `RouterStoreOptions.scrollRestoration` |
+| `installScrollRestoration(options?)` | standalone installer; usually configured via `RouterOptions.scrollRestoration` |
 
 ### `lazy(loader)`
 
@@ -706,20 +717,13 @@ interface).
 
 ## Stores
 
-> Being finalized in the current iteration; the shape below is the target surface.
-
-A minimal stores container: construct your stores in one place (the router among them),
-provide the container, read it with a typed hook — including inside scope loads via
-`hook()`.
-
-| Export | Purpose |
-| --- | --- |
-| `StoresProvider` | provides the app's stores container |
-| `createStoresHook<T>()` | builds the typed `useStores()` hook for your container type |
-| `useRouter()` | reads `stores.router` (see Routing) |
-
-The container is app-owned — a plain class whose fields are your stores. rati only needs
-`router` to be one of them.
+rati ships **no stores container** — an app's store layer is app code (a plain class whose
+fields are your stores, behind your own React context and `useStores` hook), and the
+router is provided on its own (`RouterProvider`, see Routing). A container that wants the
+router holds the `Router` type: it is typed off the `RatiUserTypes` augmentation, so
+holding it never imports the route table — which is exactly what keeps the classic cycle
+(stores → routes → components → stores) from forming. Read the container anywhere,
+including inside scope loads via `hook(() => useStores())`.
 
 ---
 
@@ -1186,11 +1190,9 @@ deep inside React — a component crash in the report, a bundling event in reali
 | `controllableSource<T>(options?)` | a real `Source<T>` you drive by hand, with an attach/detach ledger |
 | `renderIsland(target, options?)` | mount an island (or `{ scope, component, … }` config) and drive it; async, returns a handle. See below |
 | `createTestRouter(routes, options?)` | memory history + router + provider, rendered and disposed for you; async, returns a handle. See below |
-| `renderWithStores(ui, options?)` | render a tree with a *partial* stores container — the fake-container cast, gone. See below |
-| `storesWrapper(stores?)` | just the provider component for that partial container — pass it as RTL's `wrapper` (or wrap any harness's tree) when you keep your own renderer. See below |
 | `prerenderToString(node, options?)` | drain `react-dom/static` `prerender` to an HTML string (it awaits Suspense; `renderToString` cannot). See below |
 | `ssrRender(node, options?)` | a collected server render — HTML + dehydrated payload, plus `.hydrate()` for the client half. The SSR round-trip. See below |
-| `cleanup()` | unmount every tree the harness mounted (islands, routers, stores renders, hydrated round-trips) — wire up `afterEach(cleanup)` |
+| `cleanup()` | unmount every tree the harness mounted (islands, routers, hydrated round-trips) — wire up `afterEach(cleanup)` |
 
 `controllableSource` is a genuine source — an island attaches it, subscribes, and
 re-renders on every transition. Its mutators are **raw**: they set state and notify
@@ -1363,19 +1365,20 @@ test('loading → content', async () => {
 });
 ```
 
-**`createTestRouter(routes, options?)`** wires a **memory** history + `RouterStore` +
-`RootStoreProvider` and renders it — replacing the `createMemoryHistory` / `new RouterStore` /
-provider / `<Router>` boilerplate. `options`: `url` (initial URL, default `/`), `state`
-(initial entry state), `ui` (what to render — defaults to `<Router />`; pass a custom tree, or
-`<Router Loading={…} />`), `stores` (extra stores merged alongside the router — each store
-itself partial-able, see `renderWithStores`), `basename` (mount the table under a prefix),
-`hydratedState` (seed the router from a dehydrated navigation — the SSR client path). Because a real
-router is mounted, **`<Link>` works with no `vi.mock`**. Scroll restoration is off (jsdom has
-no layout), and `cleanup()` disposes the router — detaching its history.
+**`createTestRouter(routes, options?)`** wires a **memory** history + a router +
+`RouterProvider` and renders it — replacing the `createMemoryHistory` / `createRouter` /
+provider / `<RouterOutlet>` boilerplate. `options`: `url` (initial URL, default `/`), `state`
+(initial entry state), `ui` (what to render — defaults to `<RouterOutlet />`; pass a custom
+tree, or `<RouterOutlet Loading={…} />`), `wrapper` (your app's own provider — stores/DI
+context — rendered inside the router context around `ui`), `basename` (mount the table under
+a prefix), `hydratedState` (seed the router from a dehydrated navigation — the SSR client
+path). Because a real router is mounted, **`<Link>` works with no `vi.mock`**. Scroll
+restoration is off (jsdom has no layout), and `cleanup()` disposes the router — detaching its
+history.
 
 | Handle member | Purpose |
 | --- | --- |
-| `router` / `history` | the live `RouterStore` and its memory `History` — navigate, read `path`/`activeRoute`, spy, or `push`/`go` directly |
+| `router` / `history` | the live router (the concrete store — internals reachable) and its memory `History` — navigate, read `path`/`activeRoute`, spy, or `push`/`go` directly |
 | `container` / `text()` | the mounted node and what it says — `text()` skips React's hidden subtrees, so a boundary's Suspense-hidden previous children don't read as a second copy of the page |
 | `navigate(to)` / `back()` / `forward()` | drive navigation, settled (async) |
 | `rerender(node)` / `unmount()` / `dispose()` | re-render, unmount; `dispose()` also disposes the router |
@@ -1395,41 +1398,6 @@ test('a Link navigates — no mocks', async () => {
     expect(tr.text()).toBe('about page');
 });
 ```
-
-**`renderWithStores(ui, options?)`** renders a tree under a stores container built from
-`options.stores` — a **partial** of the app's stores, and each provided store may itself be
-a partial (the slice the component actually reads, typed against the real store). A
-component test provides only what it reads; the `as unknown as GlobalStores` cast the
-hand-rolled fake containers needed lives once inside the helper instead of in every test.
-
-```ts
-interface AppStores extends GlobalStores { foo: FooStore; bar: BarStore }
-
-const handle = await renderWithStores<AppStores>(<TwoStoreReader />, {
-    stores: { foo, bar: { count: 3 } },   // only what this component reads — no cast
-});
-expect(handle.text()).toBe('hi/3');
-```
-
-**`storesWrapper(stores?)`** is the same seam without the mount: it returns just the
-provider component, for suites that keep their own renderer — pass it as
-`@testing-library/react`'s `wrapper` option, or wrap the tree handed to
-`vitest-browser-react` (or any other harness). `renderWithStores` is this wrapper plus the
-entry's own mount.
-
-```ts
-const wrapper = storesWrapper<AppStores>({ foo, bar: { count: 3 } });
-render(<TwoStoreReader />, { wrapper });   // RTL stays the renderer
-```
-
-The partial is one level deep: a nested model hanging off a store (a `user`, say) is taken
-whole — faking just a field of it needs a per-field cast, by design. And a slot declared as
-a `RouterStore` additionally accepts a **real `RouterStore` over any route table**: an app
-container typically types its router against the app's exact tuple
-(`RouterStore<typeof routes>`), which a plain partial would demand verbatim — rejecting the
-honest test value, a store built over a minimal local table. Build one with
-`createMemoryHistory` and hand it in; when the test *drives* navigation, prefer
-`createTestRouter`, which wires and disposes it for you.
 
 ### The SSR round-trip kit
 
@@ -1530,22 +1498,20 @@ one for the client seeded from [`prepareRoute`](#ratissr), and hand the two tree
 `ssrRender` / `.hydrate`:
 
 ```ts
-const serverRouter = new RouterStore({}, routes, { history: createMemoryHistory({ url }) });
-const serverRoot = new RootStore({ router: serverRouter }, { isReady: true });
+const serverRouter = createRouter(routes, { history: createMemoryHistory({ url }) });
 const prepared = await prepareRoute(serverRouter);
 const server = await ssrRender(
-    <RootStoreProvider rootStore={serverRoot}><Router /></RootStoreProvider>,
+    <RouterProvider router={serverRouter}><RouterOutlet /></RouterProvider>,
 );
 serverRouter.dispose();
 
 window.history.replaceState(null, '', url);
-const clientRouter = new RouterStore({}, routes, {
+const clientRouter = createRouter(routes, {
     history: createBrowserHistory(),
     hydratedState: prepared!.hydratedState,
 });
-const clientRoot = new RootStore({ router: clientRouter }, { isReady: true });
 const client = await server.hydrate(
-    <RootStoreProvider rootStore={clientRoot}><Router /></RootStoreProvider>,
+    <RouterProvider router={clientRouter}><RouterOutlet /></RouterProvider>,
     { onDispose: () => clientRouter.dispose() },
 );
 expect(client.recovered).toEqual([]);   // hydrated the route with no mismatch

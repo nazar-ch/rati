@@ -1,14 +1,15 @@
-import { useState } from 'react';
 import './App.css';
-import { Router as RatiRouter, RootStore, RootStoreProvider } from 'rati';
-import { GlobalStoresContainer } from './globalStores';
+import { createRouter, RouterOutlet, RouterProvider } from 'rati';
+import { routes } from './routes';
+
+// One router for the app's lifetime, built at module scope — nothing about it is
+// React state.
+const router = createRouter(routes);
 
 export function App() {
-    const [rootStore] = useState(new RootStore(new GlobalStoresContainer()));
-
     return (
-        <RootStoreProvider rootStore={rootStore}>
-            <RatiRouter />
-        </RootStoreProvider>
+        <RouterProvider router={router}>
+            <RouterOutlet />
+        </RouterProvider>
     );
 }

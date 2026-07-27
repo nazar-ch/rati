@@ -2,8 +2,8 @@ import { describe, test, expect } from 'vite-plus/test';
 import { renderToString } from 'react-dom/server';
 import { RouterStore } from '../../router/store';
 import { route, type GenericRouteType } from '../../router/route';
-import { RootStore, RootStoreProvider } from '../../stores/RootStore';
-import { Router } from '../../router/Router';
+import { RouterProvider } from '../../router/RouterProvider';
+import { RouterOutlet } from '../../router/RouterOutlet';
 import { createMemoryHistory } from '../../router/history';
 import { prepareRoute } from '../../router/prepareRoute';
 import { scope, type ScopeComponent } from '../../scope/scope';
@@ -31,16 +31,15 @@ const routes = [
 ] as const;
 
 function buildAppFor(url: string, routesArg: readonly GenericRouteType[] = routes) {
-    const router = new RouterStore({}, routesArg, {
+    const router = new RouterStore(routesArg, {
         history: createMemoryHistory({ url }),
     });
-    const root = new RootStore({ router }, { isReady: true });
     const App = () => (
-        <RootStoreProvider rootStore={root}>
-            <Router />
-        </RootStoreProvider>
+        <RouterProvider router={router}>
+            <RouterOutlet />
+        </RouterProvider>
     );
-    return { router, root, App };
+    return { router, App };
 }
 
 describe('renderToString with RouterStore + memory history', () => {

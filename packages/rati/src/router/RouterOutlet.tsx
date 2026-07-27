@@ -5,28 +5,30 @@ import React, {
     Suspense,
     useDeferredValue,
 } from 'react';
-import { useRouter } from '../stores/RootStore';
+import { useRouterStore } from './RouterProvider';
 import { navTrace } from '../util/navTrace';
 
-export const Router: FC<{
-    // router: RouterStore<any[] | readonly any[]>;
+/**
+ * The outlet — renders the active route (its wrapper, then the route component under a
+ * Suspense for `lazy()` chunks). Render exactly one, anywhere under `<RouterProvider>`.
+ */
+export const RouterOutlet: FC<{
     /** Wrapper for routes that set none. Handed the route's element as `children`. */
     DefaultWrapper?: ComponentType<{ children: ReactNode }>;
     Loading?: ComponentType;
 }> = ({ DefaultWrapper = EmptyWrapper, Loading = DefaultLoading }) => {
-    // TODO: make this work with react native router too
-    const router = useRouter();
+    const router = useRouterStore();
 
     // Defer the active route so that a navigation to a still-loading lazy
     // route keeps showing the previous page instead of flashing the Suspense
-    // fallback. useRouter reads via useSyncExternalStore, so startTransition
+    // fallback. useRouterStore reads via useSyncExternalStore, so startTransition
     // wouldn't take effect here — useDeferredValue does.
     const activeRoute = useDeferredValue(router.activeRoute);
 
     // The deferred value lags `router.activeRoute` by one low-priority render. The
     // gap between `setPath` and this mark showing the *new* route name is the
     // useDeferredValue deferral — a large gap means the old page lingered.
-    navTrace(`Router render → ${activeRoute?.name ?? 'none'} (deferred)`);
+    navTrace(`RouterOutlet render → ${activeRoute?.name ?? 'none'} (deferred)`);
 
     if (!activeRoute) {
         return null;

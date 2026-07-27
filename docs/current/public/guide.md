@@ -1014,39 +1014,42 @@ On a client-only app the option does nothing at all.
 
 ## App setup
 
-Minimal setup is a router and the `Router` component:
+Minimal setup is a router, its provider, and the outlet:
 
 ```tsx
-import { Router, RouterStore, StoresProvider } from 'rati';
+import { createRouter, RouterOutlet, RouterProvider } from 'rati';
 import { routes } from './routes';
 
-const router = new RouterStore(routes);
+const router = createRouter(routes);
 
 export function App() {
     return (
-        <StoresProvider stores={{ router }}>
-            <Router />
-        </StoresProvider>
+        <RouterProvider router={router}>
+            <RouterOutlet />
+        </RouterProvider>
     );
 }
 ```
 
-Apps with their own store layer put those stores in the same container and read them
-anywhere (including in scope loads, via `hook()`):
+`RouterProvider` makes the router reachable (for `<Link>`, `useRouter()`, and the outlet);
+`RouterOutlet` renders the active route. Anything that navigates — a nav bar, an app
+shell — goes inside the provider, and the outlet can sit anywhere under it.
+
+rati ships no store container: an app's store layer is app code. A container that wants
+the router holds the `Router` type — it is typed off the same `declare module 'rati'`
+augmentation as `<Link>`, so holding it never imports the route table:
 
 ```ts
-import { createStoresHook } from 'rati';
+import type { Router } from 'rati';
 
 export class AppStores {
-    constructor(public router: AppRouter) {}
+    constructor(public router: Router) {}
     favorites = new FavoritesStore(this);
 }
-
-export const useStores = createStoresHook<AppStores>();
 ```
 
-Note: the stores surface is being finalized in the current iteration — see the reference
-for the up-to-date names.
+Provide the container through your own React context (a `createContext` + a `useStores`
+hook is all it takes), and read it anywhere — including in scope loads, via `hook()`.
 
 ## What rati is not
 

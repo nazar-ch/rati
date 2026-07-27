@@ -133,7 +133,7 @@ function teardown(mount: Mount): void {
 
 /**
  * Unmount every tree the testing harness mounted — islands (`renderIsland`), routers
- * (`createTestRouter`), stores renders (`renderWithStores`) — and remove its container. The
+ * (`createTestRouter`) — and remove its container. The
  * RTL `cleanup` analogue for this entry, and the seam where a router's history is detached
  * (the RF-01 leak lesson). Wire it up as `afterEach(cleanup)`.
  */

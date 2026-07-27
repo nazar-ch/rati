@@ -26,7 +26,7 @@ describe('RouterStore across back/forward', () => {
     // left mounted, stranded on an entry whose URL names another one.
     test('a POP back onto a shallow entry finds its marker stale and re-resolves', () => {
         const history = createMemoryHistory({ url: '/dashboard' });
-        const router = new RouterStore({}, routes, { history });
+        const router = new RouterStore(routes, { history });
         const kept = router.activeRoute;
 
         // Shallow push: the URL moves to /users/1 while the dashboard stays mounted.
@@ -50,7 +50,7 @@ describe('RouterStore across back/forward', () => {
     // skipped, and this reads 'dashboard'.
     test("a shallow entry's marker is stale for the next session's store", () => {
         const history = createMemoryHistory({ url: '/dashboard' });
-        const first = new RouterStore({}, routes, { history });
+        const first = new RouterStore(routes, { history });
         first.navigate({ name: 'user', userId: '1' }, { keepCurrentRoute: true });
         history.back();
         first.dispose();
@@ -60,7 +60,7 @@ describe('RouterStore across back/forward', () => {
         // store replays the same navigation count over the same stack, so it arrives
         // holding exactly the counter the marker embeds. Only the session id, which a
         // new store cannot reproduce, says the marker belongs to someone else.
-        const second = new RouterStore({}, routes, { history });
+        const second = new RouterStore(routes, { history });
         expect(second.activeRoute?.name).toBe('dashboard');
 
         history.forward();
@@ -75,7 +75,7 @@ describe('RouterStore across back/forward', () => {
     // route keyed to the entry the user just left.
     test('stepping back between two entries that share a URL but not their state re-resolves', () => {
         const history = createMemoryHistory({ url: '/users/1' });
-        const router = new RouterStore({}, routes, { history });
+        const router = new RouterStore(routes, { history });
 
         router.navigate('/users/1', { state: { panelId: 'p0' } });
         router.navigate('/users/1', { state: { panelId: 'p1' } });

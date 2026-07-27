@@ -32,7 +32,7 @@ beforeEach(() => {
 
 describe('route param codec', () => {
     test('a value with a space round-trips out through getPath and back into the params', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         expect(router.getPath({ name: 'page', pageId: 'hello world' })).toBe(
@@ -50,7 +50,7 @@ describe('route param codec', () => {
     });
 
     test('a value with a slash stays inside its own segment', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         // Unencoded, this would read as two segments and miss the route entirely.
@@ -65,7 +65,7 @@ describe('route param codec', () => {
     });
 
     test('values carrying URL syntax round-trip', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         for (const value of ['a?b', 'a#b', 'a&b=c', '100%', 'Ünïcødé', 'ключ']) {
@@ -78,7 +78,7 @@ describe('route param codec', () => {
     });
 
     test('a base64url uuid is byte-identical through the URL (the jnana shape)', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         const path = router.getPath({ name: 'page', pageId: BASE64URL_UUID });
@@ -98,7 +98,7 @@ describe('route param codec', () => {
         // A hand-typed or truncated URL. Decoding this throws a URIError; the app
         // must survive it.
         window.history.replaceState(null, '', '/pages/%zz');
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         expect(router.activeRoute?.name).toBe('page');
@@ -118,14 +118,14 @@ describe('route param codec under SSR', () => {
         const url = `/pages/${encodeURIComponent(value)}`;
 
         // The server renders off a memory history — no DOM, same codec.
-        const server = new RouterStore({}, routes, { history: createMemoryHistory({ url }) });
+        const server = new RouterStore(routes, { history: createMemoryHistory({ url }) });
         expect(server.activeRoute?.routeParams).toEqual({ pageId: value });
 
         // The params the server dehydrates into the HTML are already decoded, so the
         // client must seed them as-is. Decoding again here would corrupt the value
         // (and only for values that survive one pass — hence the `%d`).
         const dehydrated = JSON.parse(JSON.stringify(server.activeRoute!.routeParams));
-        const client = new RouterStore({}, routes, {
+        const client = new RouterStore(routes, {
             history: createMemoryHistory({ url }),
             hydratedState: {
                 path: url,
@@ -144,7 +144,7 @@ describe('route param codec under SSR', () => {
 
 describe('getPath param substitution', () => {
     test('a param name that prefixes another is substituted at its own boundary', () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
 
         // `id` first is the order a substring scan corrupts: `:id` matches inside
         // `:idx`, so `/x/:idx/:id` came out as `/x/7x/:id`.
@@ -156,7 +156,7 @@ describe('getPath param substitution', () => {
     });
 
     test('a prefix-colliding route round-trips into the right params', async () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         await Promise.resolve();
 
         router.navigate({ name: 'prefixCollision', id: '7', idx: '9' });
@@ -177,7 +177,7 @@ describe('getPath dot-only param refusal', () => {
     // ("expected [Function] to throw an error"); the other 8 pins in this file, including
     // the dot-carrying ones, stayed green. Throw restored afterward.
     test('a param value of exactly "." throws, naming the route', () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
 
         expect(() => router.getPath({ name: 'page', pageId: '.' })).toThrow(/page/);
 
@@ -185,7 +185,7 @@ describe('getPath dot-only param refusal', () => {
     });
 
     test('a param value of exactly ".." throws, naming the route', () => {
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
 
         expect(() => router.getPath({ name: 'page', pageId: '..' })).toThrow(/page/);
 

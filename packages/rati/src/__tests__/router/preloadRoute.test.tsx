@@ -20,7 +20,7 @@ afterEach(() => {
 describe('RouterStore.preloadRoute', () => {
     test('returns undefined for an eager (non-lazy) component', () => {
         const routes = [route('/', 'home', NoopComponent)];
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
         expect(router.preloadRoute('/')).toBeUndefined();
         router.dispose();
     });
@@ -29,7 +29,7 @@ describe('RouterStore.preloadRoute', () => {
         const factory = vi.fn(async () => ({ default: NoopComponent }));
         const Page = lazy(factory);
         const routes = [route('/page', 'page', Page)];
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
 
         await router.preloadRoute('/page');
         await router.preloadRoute('/page');
@@ -43,7 +43,7 @@ describe('RouterStore.preloadRoute', () => {
         const factory = vi.fn(async () => ({ default: NoopComponent }));
         const Page = lazy(factory);
         const routes = [route('/users/:id', 'user', Page)];
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
 
         await router.preloadRoute('/users/42');
         expect(factory).toHaveBeenCalledOnce();
@@ -54,7 +54,7 @@ describe('RouterStore.preloadRoute', () => {
         const factory = vi.fn(async () => ({ default: NoopComponent }));
         const Page = lazy(factory);
         const routes = [route('/page', 'page', Page)];
-        const router = new RouterStore({}, routes);
+        const router = new RouterStore(routes);
 
         await router.preloadRoute('/page?q=1#section');
         expect(factory).toHaveBeenCalledOnce();
@@ -65,7 +65,7 @@ describe('RouterStore.preloadRoute', () => {
         const factory = vi.fn(async () => ({ default: NoopComponent }));
         const Page = lazy(factory);
         const routes = [route('/page', 'page', Page)];
-        const router = new RouterStore({}, routes, { basename: '/admin' });
+        const router = new RouterStore(routes, { basename: '/admin' });
 
         // Caller passes the URL-as-rendered (with basename), as `<Link>` does.
         await router.preloadRoute('/admin/page');
@@ -76,7 +76,7 @@ describe('RouterStore.preloadRoute', () => {
 
 describe('<Link prefetch>', () => {
     // A real test router mounted around the bare <Link> (its `ui`) — the prefetch handlers
-    // read the router from the store, no GenericStoresContext hand-wiring. cleanup() disposes.
+    // read the router from the harness, no provider hand-wiring. cleanup() disposes.
     function renderLink(opts: {
         routes: ReturnType<typeof route>[];
         prefetch: boolean;

@@ -14,7 +14,7 @@ const routes = [
 describe('RouterStore with injected history', () => {
     test('uses the injected history instead of auto-detecting', async () => {
         const history = createMemoryHistory({ url: '/users/42' });
-        const router = new RouterStore({}, routes, { history });
+        const router = new RouterStore(routes, { history });
         await Promise.resolve();
         expect(router.history).toBe(history);
         expect(router.activeRoute?.name).toBe('user');
@@ -24,7 +24,7 @@ describe('RouterStore with injected history', () => {
 
     test('navigates via the injected history without touching window.location', async () => {
         const history = createMemoryHistory({ url: '/' });
-        const router = new RouterStore({}, routes, { history });
+        const router = new RouterStore(routes, { history });
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('home');
 
@@ -39,7 +39,7 @@ describe('RouterStore with injected history', () => {
 
     test('can match wildcard routes through injected history', async () => {
         const history = createMemoryHistory({ url: '/no/such/route' });
-        const router = new RouterStore({}, routes, { history });
+        const router = new RouterStore(routes, { history });
         await Promise.resolve();
         expect(router.activeRoute?.name).toBe('notFound');
         router.dispose();

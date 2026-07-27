@@ -4,19 +4,15 @@
 // SSR surface (`HydrationProvider`, `createHydrationCollector`, `prepareRoute`) in
 // `rati/ssr` — all kept out of the client-focused main barrel.
 
+export { createRouter } from './router/createRouter';
 export {
-    RootStore,
-    type RootStoreOptions,
-    type GlobalStores,
-    useGenericStores,
-    useRouter,
-    RootStoreProvider,
-    GenericStoresContext,
-    createUseStoresHook,
-} from './stores/RootStore';
-export { GlobalStore } from './stores/GlobalStore';
-
-export { RouterStore, type RouterStoreOptions, type RouterHydratedState } from './router/store';
+    type Router,
+    type ActiveRoute,
+    type ActiveRouteOf,
+    type NavigateOptions,
+} from './router/router';
+export { RouterProvider, useRouter } from './router/RouterProvider';
+export { type RouterOptions, type RouterHydratedState } from './router/store';
 export {
     route,
     type RouteOptions,
@@ -30,7 +26,7 @@ export {
     type RouteContextNames,
 } from './router/route';
 export { group, type GroupDefaults } from './router/group';
-export { Router } from './router/Router';
+export { RouterOutlet } from './router/RouterOutlet';
 export {
     createBrowserHistory,
     createMemoryHistory,

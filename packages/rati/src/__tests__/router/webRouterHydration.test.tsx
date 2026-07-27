@@ -22,7 +22,7 @@ describe('RouterStore with hydratedState', () => {
             activeRouteName: 'user',
             routeParams: { userId: '42' },
         };
-        const router = new RouterStore({}, baseRoutes, {
+        const router = new RouterStore(baseRoutes, {
             history: createMemoryHistory({ url: '/users/42?tab=posts#bio' }),
             hydratedState,
         });
@@ -38,7 +38,7 @@ describe('RouterStore with hydratedState', () => {
     });
 
     test('populates activeRoute with the route definition', () => {
-        const router = new RouterStore({}, baseRoutes, {
+        const router = new RouterStore(baseRoutes, {
             history: createMemoryHistory({ url: '/' }),
             hydratedState: {
                 path: '/',
@@ -55,7 +55,7 @@ describe('RouterStore with hydratedState', () => {
 
     test('falls back to URL matching when activeRouteName is unknown', async () => {
         // Server and client routes drifted: hydrated name doesn't exist here.
-        const router = new RouterStore({}, baseRoutes, {
+        const router = new RouterStore(baseRoutes, {
             history: createMemoryHistory({ url: '/users/42' }),
             hydratedState: {
                 path: '/users/42',
@@ -73,7 +73,7 @@ describe('RouterStore with hydratedState', () => {
 
     test('re-resolves activeRoute on a subsequent navigation', async () => {
         const history = createMemoryHistory({ url: '/users/42' });
-        const router = new RouterStore({}, baseRoutes, {
+        const router = new RouterStore(baseRoutes, {
             history,
             hydratedState: {
                 path: '/users/42',

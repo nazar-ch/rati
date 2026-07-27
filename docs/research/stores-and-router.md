@@ -1,5 +1,17 @@
 # The stores container, the router, and the dependency cycles
 
+> **Resolved 2026-07-26 — superseded by a stronger cut than Option A.** The session that
+> implemented this went further: rati **dropped the stores skeleton entirely**
+> (`RootStore`, `RootStoreProvider`, `GlobalStore`, `GlobalStores`,
+> `GenericStoresContext`, `createUseStoresHook` — all removed; app store graphs are app
+> code), and the router got its own surface: `createRouter(routes, options): Router`
+> (factory; the class is internal), the table-blind `Router` interface this doc sketched
+> as `AppRouter`, `RouterProvider`, and the outlet renamed `Router` → `RouterOutlet`.
+> The cycle analysis below still holds — the table-blind interface is exactly what
+> shipped — but the container the "Verdict" defends is no longer rati's to keep; it
+> lives on as an app-land pattern (Jnana's own context + container, see the migration
+> finding filed in Jnana's tracker). Kept for the analysis.
+
 The pattern under review: a single container class whose fields are the app's stores, each
 store receiving the container so it can reach siblings without injection wiring —
 `this.stores.router.activeRoute`, and in nested graphs

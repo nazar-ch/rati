@@ -1,16 +1,45 @@
+import type { ComponentType, ReactNode } from 'react';
 import { createBrowserHistory, type History, type Location } from './history';
 import { navTrace } from '../util/navTrace';
 import { installScrollRestoration, type ScrollRestorationOptions } from './scrollRestoration';
-import { GlobalStore } from '../stores/GlobalStore';
-import { PARAM_RE, type GenericRouteType, type NameToRoute } from './route';
+import { PARAM_RE, type GenericRouteType, type NameToRoute, type RouteRedirect } from './route';
+import type { ActiveRouteOf, NavigateOptions, Router } from './router';
 
 // Redirect chains longer than this are treated as a cycle (see setPath).
 const MAX_REDIRECT_DEPTH = 10;
 
-type GetActiveRoute = ReturnType<RouterStore<GenericRouteType[]>['getActiveRoute']>;
+/**
+ * What rendering the matched route needs beyond the public `activeRoute` shape
+ * (`RouterOutlet` reads these off the concrete store; the `Router` interface exposes
+ * only name/path/params, so containers holding it never see a component type).
+ */
+type RouteRenderFields = {
+    component: any;
+    wrapperComponent?: ComponentType<{ children: ReactNode }> | undefined;
+    redirect?: RouteRedirect | undefined;
+    pathCounter: number;
+};
 
-/** Activated route shape. */
-type ActiveRoute = NonNullable<GetActiveRoute>;
+/** Activated route shape: the public discriminated part plus the render internals. */
+type StoreActiveRoute<T extends readonly GenericRouteType[]> = ActiveRouteOf<T> & RouteRenderFields;
+
+/**
+ * What rati's router-consuming seams accept: the public augmentation-typed face, or the
+ * concrete store (rati's own tests hold one; an app normally never sees it).
+ */
+export type AnyRouter = Router | RouterStore;
+
+/**
+ * Narrow the public {@link Router} back to the implementation. Everything rati hands
+ * out is one (`createRouter` constructs it); the throw catches a hand-rolled object at
+ * the seam where it was passed in, instead of as a property crash later.
+ */
+export function toRouterStore(router: AnyRouter): RouterStore {
+    if (!(router instanceof RouterStore)) {
+        throw new Error('[rati] expected a router built by createRouter().');
+    }
+    return router;
+}
 
 /**
  * Snapshot used to seed a router on the client after server rendering. Mirrors
@@ -28,7 +57,7 @@ export interface RouterHydratedState {
     routeParams: Record<string, string>;
 }
 
-export interface RouterStoreOptions {
+export interface RouterOptions {
     /**
      * Inject a {@link History} instance instead of letting the store create
      * one. Pair with `createMemoryHistory({ url })` for server rendering or
@@ -194,9 +223,7 @@ function shallowEqualState(a: unknown, b: unknown): boolean {
     return true;
 }
 
-export class RouterStore<
-    T extends readonly GenericRouteType[] = readonly GenericRouteType[],
-> extends GlobalStore<any> {
+export class RouterStore<T extends readonly GenericRouteType[] = readonly GenericRouteType[]> {
     history: History;
 
     unlistenHistory: () => void;
@@ -237,12 +264,9 @@ export class RouterStore<
     }
 
     constructor(
-        stores: any,
         public routes: T,
-        options: RouterStoreOptions = {},
+        options: RouterOptions = {},
     ) {
-        super(stores);
-
         this.basename = normalizeBasename(options.basename);
 
         const listener = ({ location }: { location: Location }) => {
@@ -302,7 +326,7 @@ export class RouterStore<
             routeParams: state.routeParams,
             redirect: matched.redirect,
             pathCounter: this.pathCounter,
-        };
+        } as StoreActiveRoute<T>;
         this.emitChange();
     }
 
@@ -431,7 +455,7 @@ export class RouterStore<
     private _hash: string = '';
     private _state: unknown = null;
 
-    activeRoute: ActiveRoute | null = null;
+    activeRoute: StoreActiveRoute<T> | null = null;
 
     /**
      * The route-level redirects the *current* navigation followed, oldest first —
@@ -491,7 +515,6 @@ export class RouterStore<
             const matched =
                 this.getActiveRoute(
                     this.path,
-                    this.stores as any,
                     // Using this number as `key` ensures that the route that was not
                     // skipped above will be rerendered
                     this.pathCounter,
@@ -580,7 +603,7 @@ export class RouterStore<
     private pushOrReplace(
         mode: 'push' | 'replace',
         to: NameToRoute<T> | string,
-        options: { keepCurrentRoute?: boolean; state?: Record<string, unknown> },
+        options: NavigateOptions,
     ) {
         let path: string;
         if (typeof to === 'string') {
@@ -623,10 +646,7 @@ export class RouterStore<
      * survives back/forward). Coexists with `keepCurrentRoute`'s internal skip
      * marker.
      */
-    navigate(
-        to: NameToRoute<T> | string,
-        options: { keepCurrentRoute?: boolean; state?: Record<string, unknown> } = {},
-    ) {
+    navigate(to: NameToRoute<T> | string, options: NavigateOptions = {}) {
         this.pushOrReplace('push', to, options);
     }
 
@@ -649,14 +669,11 @@ export class RouterStore<
      * survives back/forward). Coexists with `keepCurrentRoute`'s internal skip
      * marker.
      */
-    replace(
-        to: NameToRoute<T> | string,
-        options: { keepCurrentRoute?: boolean; state?: Record<string, unknown> } = {},
-    ) {
+    replace(to: NameToRoute<T> | string, options: NavigateOptions = {}) {
         this.pushOrReplace('replace', to, options);
     }
 
-    getActiveRoute(currentPath: string, _stores: any, pathCounter: number) {
+    getActiveRoute(currentPath: string, pathCounter: number): StoreActiveRoute<T> | undefined {
         for (const { pathRe, path, name, component, wrapperComponent, redirect } of this.routes) {
             let result;
 
@@ -677,7 +694,7 @@ export class RouterStore<
                     wrapperComponent,
                     redirect,
                     pathCounter,
-                };
+                } as StoreActiveRoute<T>;
             }
         }
         return undefined;

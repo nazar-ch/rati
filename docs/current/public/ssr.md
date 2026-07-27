@@ -50,21 +50,23 @@ inside the build, and your production server is not part of one — so the modul
 *was* built is how the values reach it.
 
 `createApp` is the same factory the client uses — it builds one app instance per call
-(router, stores, head store) and mounts `HydrationProvider`:
+(router, head store) and mounts `HydrationProvider`:
 
 ```tsx
 // createApp.tsx
 export function createApp({ history, hydratedState, hydration }: CreateAppOptions) {
-    const router = new RouterStore(routes, { history, hydratedState });
+    const router = createRouter(routes, { history, hydratedState });
     const head = createHeadStore({ titleTemplate: (title) => `${title} · MySite` });
 
     function App() {
         return (
-            <HeadProvider store={head}>
-                <HydrationProvider {...hydration}>
-                    <Router />
-                </HydrationProvider>
-            </HeadProvider>
+            <RouterProvider router={router}>
+                <HeadProvider store={head}>
+                    <HydrationProvider {...hydration}>
+                        <RouterOutlet />
+                    </HydrationProvider>
+                </HeadProvider>
+            </RouterProvider>
         );
     }
     return { router, App, head };

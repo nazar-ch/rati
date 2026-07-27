@@ -4,8 +4,8 @@ import { render } from '@testing-library/react';
 import { route, type GenericRouteType, type RouteRedirect } from '../../router/route';
 import { RouterStore } from '../../router/store';
 import { createMemoryHistory } from '../../router/history';
-import { Router } from '../../router/Router';
-import { RootStore, RootStoreProvider, useRouter } from '../../stores/RootStore';
+import { RouterOutlet } from '../../router/RouterOutlet';
+import { RouterProvider, useRouter } from '../../router/RouterProvider';
 import { byLevel } from './arbitraries';
 import {
     buildPath,
@@ -613,7 +613,7 @@ export function buildHarness(table: RouteTable, initialUrl: string): Harness {
             : route(spec.path, spec.name, makeProbe(spec.name, mounts)),
     ) as unknown as GenericRouteType[];
 
-    const router = new RouterStore({}, routes, {
+    const router = new RouterStore(routes, {
         history: createMemoryHistory({ url: initialUrl }),
         ...(table.basename ? { basename: table.basename } : {}),
         // Out of scope, and loud: scroll restoration would fire a double rAF and a
@@ -623,12 +623,11 @@ export function buildHarness(table: RouteTable, initialUrl: string): Harness {
         scrollRestoration: false,
     });
 
-    const root = new RootStore({ router }, { isReady: true });
     const view = render(
-        <RootStoreProvider rootStore={root}>
-            <Router />
+        <RouterProvider router={router}>
+            <RouterOutlet />
             <RouterConsumer />
-        </RootStoreProvider>,
+        </RouterProvider>,
     );
 
     return {

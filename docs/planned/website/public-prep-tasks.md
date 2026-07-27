@@ -16,9 +16,10 @@ keep `docs/*.md` in sync with behavior changes; never publish.
 
 **Prerequisite (in execution, not a task here):** the stores/router redesign —
 [naming.md §6](docs/archive/directions-2026-07/naming.md) +
-[stores-and-router.md Option A](docs/research/stores-and-router.md)
-(router constructed outside the container, `new RouterStore(routes, options?)`,
-`StoresProvider` / `createStoresHook`). DOC-2 and SITE-1 consume its result.
+[stores-and-router.md](docs/research/stores-and-router.md). **Landed 2026-07-26**, beyond
+Option A: the stores skeleton is gone from rati; the surface is `createRouter(routes,
+options?)` → `Router` + `RouterProvider` + `RouterOutlet` (no `StoresProvider` /
+`createStoresHook` — app stores are app code). DOC-2 and SITE-1 consume its result.
 
 ---
 
