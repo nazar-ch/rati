@@ -91,6 +91,19 @@ export interface Router {
     replace(to: NameToRoute<UserRoutes> | string, options?: NavigateOptions): void;
     /** Build the URL path for a route reference (or pass a string through verbatim). */
     getPath(to: NameToRoute<UserRoutes> | string): string;
+    /**
+     * Traverse the history stack by `delta` entries — the back/forward buttons,
+     * programmatically. A thin pass-through to the history: the update lands as a POP and
+     * resolves the route it restores. Out of range does nothing (the browser's rule). Note
+     * the timing difference between hosts: the browser's traversal is asynchronous (the
+     * update arrives on a later task), a memory history's is synchronous — code that must
+     * work on both subscribes rather than reading the location on the next line.
+     */
+    go(delta: number): void;
+    /** `go(-1)` — "close this and go back". */
+    back(): void;
+    /** `go(1)`. */
+    forward(): void;
     /** Update the query string in place (`replace` by default; `{ mode: 'push' }` to stack). */
     setSearchParams(
         init: ConstructorParameters<typeof URLSearchParams>[0] | URLSearchParams,

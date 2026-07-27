@@ -421,6 +421,19 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
         return this._state;
     }
 
+    /** See {@link Router.go} — forwarded, not the whole history: `listen`/`replace` stay in. */
+    go(delta: number): void {
+        this.history.go(delta);
+    }
+
+    back(): void {
+        this.history.back();
+    }
+
+    forward(): void {
+        this.history.forward();
+    }
+
     isPath(path: string) {
         // `path` here is a URL path (the value returned by getPath, used in href
         // attributes), so strip the basename before comparing against the

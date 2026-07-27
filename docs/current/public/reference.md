@@ -643,6 +643,8 @@ Members:
 | `replace(to, options?)` | replace — back skips the current URL |
 | `getPath(to)` | build an href from a typed route reference (params percent-encoded); throws if the name isn't in the table |
 | `setSearchParams(params)` | update the query string |
+| `go(delta)` | traverse the history stack — lands as a POP and resolves the restored route; out of range does nothing. Browser traversal is async (memory history's is sync): subscribe rather than read on the next line |
+| `back()` / `forward()` | `go(-1)` / `go(1)` |
 | `isPath(path)` | whether a `getPath`-style path names the current route |
 | `preloadRoute(path)` | start loading the matching `lazy()` route's chunk, without navigating |
 | `subscribe(fn)` / `getSnapshot()` | change notification (`useSyncExternalStore`-shaped, for non-React consumers too) |
