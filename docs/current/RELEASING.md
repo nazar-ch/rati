@@ -1,5 +1,12 @@
 # Releasing `rati`
 
+**Before the version bump: write the [CHANGELOG.md](../../CHANGELOG.md) entry.** Pre-1.0,
+a minor bump under `^` lands on consumers automatically, so the entry is the half of the
+break the version number doesn't carry: every removal paired with its replacement, renames
+called out — especially one that keeps an old import resolving with a new meaning (the
+0.6.3 `Router` entry is the worked example). A release with nothing consumer-visible gets
+one line saying so.
+
 From the repo root, on a clean `main` that's in sync with origin:
 
 ```sh

@@ -1,8 +1,8 @@
 ---
 area: packages/rati/src/router/router.ts — ActiveRoute; check NameToRoute/RouteContextValueOf for the same
 needs: nothing
-status: open
-disposition: —
+status: done
+disposition: fixed 2026-07-27 — ActiveRoute resolves via indexed access (single conditional); siblings audited clean and pinned; jnana:FND-235 deletes its seam on the next release
 ---
 
 # FND-06 — `ActiveRoute` stays deferred, so `activeRoute.name === 'x'` narrows nothing
@@ -101,3 +101,27 @@ targets that should not typecheck, which is worse and silent.
 - Downstream: jnana deletes `frontend/src/common/activeRoute.ts` — a seam that exists only
   for this, re-deriving the union off `RatiUserTypes['routes']` behind one cast — and
   inlines `router.activeRoute` at its three call sites (`jnana:FND-235`).
+
+## Resolution (2026-07-27)
+
+The suggested indexed-access form needed two adjustments, both found against the type
+gate. `RatiUserTypes['routes']` is not legal inside the package (the interface has no
+`routes` member until an app augments it, and declaring one would break consumers'
+augmentations — merging demands identical member types); the legal spelling is
+`RatiUserTypes[keyof RatiUserTypes & 'routes']`, which is `never` unaugmented and the
+table under any augmentation. And the deferral returns if the indexed table is guarded by
+a second `extends` conditional — the fix keeps exactly one conditional (the `[UserRoutes]
+extends [never]` fallback gate) and applies `ActiveRouteOf` to the indexed table directly
+(`never` satisfies its constraint in the unaugmented package).
+
+Sibling audit: `NameToRoute<UserRoutes>` (`navigate`/`getPath`) does **not** fail open —
+an unregistered name and a missing param are both rejected pre-fix — and
+`RouteContextValueOf` was already covered by `routeContext.test-d.ts`. Both are pinned in
+`activeRouteNarrowing.test-d.ts` (which rides the sibling file's program-global
+augmentation rather than registering a colliding one). The name-guard probe fails on the
+pre-fix code; the `test-d` lives under `src/__tests__`, which the vitest typecheck gate
+compiles via `tsconfig.test.json` — the package-tsconfig exclusion that made the first
+probe inert does not apply there.
+
+Remaining: jnana:FND-235 (delete `frontend/src/common/activeRoute.ts`, inline
+`router.activeRoute` at its three call sites) rides the next rati release.

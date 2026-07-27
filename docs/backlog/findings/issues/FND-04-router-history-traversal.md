@@ -1,8 +1,8 @@
 ---
 area: packages/rati/src/router — router.ts (interface), store.ts
 needs: nothing
-status: open
-disposition: —
+status: done
+disposition: fixed 2026-07-27 — back/forward/go forwarded onto Router/RouterStore as thin pass-throughs (history stays unexposed); nazar.ch:FND-03 reverts to the router method on the next release
 ---
 
 # FND-04 — the Router surface lost history traversal (back/forward/go) with no replacement

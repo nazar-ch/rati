@@ -25,19 +25,26 @@ type ErrorBoundaryProps = {
     children: ReactNode;
 };
 
-export class MandalaErrorBoundary extends Component<ErrorBoundaryProps, { error: unknown }> {
-    override state: { error: unknown } = { error: null };
+type BoundaryState = { error: unknown; resetKey: unknown };
+
+export class MandalaErrorBoundary extends Component<ErrorBoundaryProps, BoundaryState> {
+    override state: BoundaryState = { error: null, resetKey: this.props.resetKey };
 
     static getDerivedStateFromError(error: unknown) {
         return { error: error ?? new Error('Mandala error') };
     }
 
-    override componentDidUpdate(prev: ErrorBoundaryProps) {
-        // A new tree (retry or param change) clears the caught error so the fresh
-        // attempt renders.
-        if (prev.resetKey !== this.props.resetKey && this.state.error !== null) {
-            this.setState({ error: null });
-        }
+    // A new tree (retry or param change) clears the caught error *in the same render pass*.
+    // Clearing from componentDidUpdate instead leaves one committed render holding the old
+    // error under the new resetKey — which the policy would read as the new generation
+    // already failing: an attempt spent before its load ran, and a backoff counting down
+    // concurrently with the attempt instead of after its failure.
+    static getDerivedStateFromProps(props: ErrorBoundaryProps, state: BoundaryState) {
+        if (state.resetKey !== props.resetKey) return { error: null, resetKey: props.resetKey };
+        return null;
+    }
+
+    override componentDidUpdate() {
         // Backstop for the line in componentDidCatch: that one fires on the catch itself,
         // this one on any commit that follows. Idempotent, so a failure whose catching
         // render was discarded still gets its countdown at the next commit.

@@ -19,6 +19,50 @@ const routes = [
     route('*', 'notFound', NoopComponent),
 ] as const;
 
+describe('Router traversal — back()/forward()/go() on the public surface', () => {
+    // The methods are pass-throughs to the history, so the pins hold both hosts: the
+    // memory history (SSR/tests — synchronous POP) and the browser one (queued POP).
+    // Losing either half is how 0.6.2's `router.history.back()` regressed into
+    // `window.history.back()` at a consumer (FND-04).
+
+    test('go(-1)/back()/forward() on a memory history resolve the restored route in place', () => {
+        const history = createMemoryHistory({ url: '/' });
+        const router = new RouterStore(routes, { history });
+        router.navigate({ name: 'dashboard' });
+        router.navigate({ name: 'user', userId: '7' });
+
+        router.back();
+        expect(router.activeRoute?.name).toBe('dashboard');
+        router.go(-1);
+        expect(router.activeRoute?.name).toBe('home');
+        router.forward();
+        expect(router.activeRoute?.name).toBe('dashboard');
+
+        // Out of range does nothing — the browser's rule, not a clamp to the ends.
+        router.go(5);
+        expect(router.activeRoute?.name).toBe('dashboard');
+        router.dispose();
+    });
+
+    test('back() on the browser history pops on a later task and re-resolves', async () => {
+        window.history.replaceState(null, '', 'http://localhost/');
+        const router = new RouterStore(routes, {});
+        router.navigate({ name: 'dashboard' });
+        router.navigate({ name: 'user', userId: '7' });
+
+        const popped = new Promise<void>((resolve) => {
+            window.addEventListener('popstate', () => resolve(), { once: true });
+        });
+        router.back();
+        // Queued, exactly as documented: nothing to read on the next line.
+        expect(router.activeRoute?.name).toBe('user');
+        await popped;
+        expect(router.activeRoute?.name).toBe('dashboard');
+        expect(router.path).toBe('/dashboard');
+        router.dispose();
+    });
+});
+
 describe('RouterStore across back/forward', () => {
     // Kill: compare the marker against the marker string alone, ignoring the counter
     // (stamp `{ skip: this.sessionId }` and test for it) — the marker then never goes

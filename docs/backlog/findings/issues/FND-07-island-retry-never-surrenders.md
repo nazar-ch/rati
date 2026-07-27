@@ -1,8 +1,8 @@
 ---
 area: packages/rati/src/mandala — retryPolicy.ts + the boundary that calls accept/arm
 needs: nothing
-status: open
-disposition: —
+status: done
+disposition: fixed 2026-07-27 (boundary same-pass reset + commit-time budget spend); live re-verification in jnana tracked by jnana:FND-237
 ---
 
 # FND-07 — a retryable island failure never reaches the error slot, and the backoff never waits
@@ -87,3 +87,27 @@ it (`jnana:FND-237`). It is shipping the classification with this outstanding.
   landing in the same tick (fake timers make the second assertion exact).
 - The `retryable: false` path is already correct — pin it in the same test so a fix can't
   trade one for the other.
+
+## Resolution (2026-07-27)
+
+Both defects reproduced deterministically at the boundary level once the tests left the
+suite's one timing corner (jitter pinned at max, microtask rejection) for the live one
+(near-zero draws, macrotask rejection). Root cause: after the retry timer fired, the
+boundary re-rendered once holding the stale error under the new `resetKey` — the policy
+read that as the new generation already failing, so it spent the attempt before its load
+ran and armed the next backoff *concurrently with the attempt*. A draw shorter than the
+load's latency then fired that timer mid-flight: the in-flight generation was discarded
+unjudged, an unbudgeted extra load ran after the budget was spent, and the error slot
+mounted transiently at exhaustion. This yields exactly the measured 3-attempts-at-ms-gaps
+signature.
+
+Fix, two halves: the boundary clears the caught error in the same render pass
+(`getDerivedStateFromProps`), so the stale-error render never exists; and the budget spend
+moved from the render-time ruling (`accept`) to the commit-time `arm`, so a discarded
+concurrent render spends nothing — the remaining suspect for the terminal hang, which
+jsdom never reproduced (every ordering here ends at the error slot). Pinned in
+`retryPolicy.test.tsx` ("live-shaped timing"); both pins fail on the pre-fix code.
+
+Remaining (needs Chrome, the macOS guest): verify in the live jnana app that the hang is
+gone and the manual-retry anomaly (1 attempt instead of a fresh budget) with it —
+`jnana:FND-237` is the downstream tracker.

@@ -36,6 +36,14 @@ export interface Keyed<K extends KeyedKey, I> {
      */
     peek(key: K): I | undefined;
     /**
+     * Drop one instance — the caller knowing the key is spent (a closed detail
+     * view, a deleted entity), which is what keeps this a map and not a cache:
+     * deleting on request is not an eviction policy. Same contract as `reset`,
+     * one key at a time: it does not call into the instance. Returns whether
+     * the key was present; the next `get` builds a fresh instance.
+     */
+    delete(key: K): boolean;
+    /**
      * Drop every instance (the sign-out case). It deliberately does **not**
      * call into the instances — dropping the references *is* the semantics, and
      * a caller still holding one resets it itself. The next `get` for a key
@@ -67,6 +75,9 @@ export function keyed<K extends KeyedKey, I>(factory: (key: K) => I): Keyed<K, I
         },
         peek(key) {
             return instances.get(key);
+        },
+        delete(key) {
+            return runInAction(() => instances.delete(key));
         },
         reset() {
             runInAction(() => {

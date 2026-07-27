@@ -1,8 +1,8 @@
 ---
 area: packages/rati/src/data/keyed.ts
 needs: a maintainer call — grow `delete`, or document the boundary
-status: open
-disposition: —
+status: done
+disposition: option 1 taken 2026-07-27 — delete(key): boolean under reset()'s contract; jnana:FND-236's second map can adopt on the next release
 ---
 
 # FND-08 — `keyed` has no per-key delete, so a bounded-but-shrinking map can't use it

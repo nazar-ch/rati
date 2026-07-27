@@ -273,9 +273,10 @@ island({
 ```
 
 - **The backoff is jittered.** `backoffMs` (default 500) is the first *ceiling*; it doubles
-  per attempt and is capped at 10s, and each wait is a random draw from `[0, ceiling]`. A
-  fixed schedule brings every island that failed in the same backend blip back on the same
-  tick — a small thundering herd at a server already struggling.
+  per attempt and is capped at 10s, and each wait is a random draw from `[0, ceiling]`,
+  counted from the failure it follows. A fixed schedule brings every island that failed in
+  the same backend blip back on the same tick — a small thundering herd at a server already
+  struggling.
 - **A retry in progress is not an error.** The `error` slot is not rendered at all while the
   policy works — the island shows its `loading` slot (or the kept run, under `keepStale`),
   exactly as for any other re-resolution. It comes up only once the budget is spent. (Under
@@ -642,6 +643,8 @@ Members:
 | `replace(to, options?)` | replace — back skips the current URL |
 | `getPath(to)` | build an href from a typed route reference (params percent-encoded); throws if the name isn't in the table |
 | `setSearchParams(params)` | update the query string |
+| `go(delta)` | traverse the history stack — lands as a POP and resolves the restored route; out of range does nothing. Browser traversal is async (memory history's is sync): subscribe rather than read on the next line |
+| `back()` / `forward()` | `go(-1)` / `go(1)` |
 | `isPath(path)` | whether a `getPath`-style path names the current route |
 | `preloadRoute(path)` | start loading the matching `lazy()` route's chunk, without navigating |
 | `subscribe(fn)` / `getSnapshot()` | change notification (`useSyncExternalStore`-shaped, for non-React consumers too) |
@@ -1045,6 +1048,7 @@ payload, a `collection`, a `pagedCollection`, or a store class stitching several
 | --- | --- |
 | `get(key)` | get-or-create: the first call for a key runs the factory, every later one returns **that same instance** — per-key identity is the contract |
 | `peek(key)` | the instance if one exists, `undefined` otherwise; never creates. Reactive: a derivation that peeked a missing key re-runs once `get` creates it |
+| `delete(key)` | drop one instance — the caller knowing the key is spent (a closed detail view, a deleted entity). Returns whether it was present; the next `get` builds fresh. Same contract as `reset`, one key at a time |
 | `reset()` | drop every instance (the sign-out case). It does *not* call into them — dropping the references *is* the semantics; a caller still holding one resets it itself |
 
 Keys are `string | number` (they are `Map` keys, so identity is `===`); a branded id type
@@ -1117,7 +1121,9 @@ whose payloads mention the same entity hold two independent instances. An *unbou
 key space (a search result's every row) wants a **selection** — one instance whose
 parameters change, via `reactive: true` or a scope input — not a map that grows for the
 lifetime of the tab ([choosing a shape](guide.md#choosing-a-shape) draws the bounded /
-unbounded line). And because `get` creates, call it from an action, an event
+unbounded line). The middle case — per-key instances the *caller* retires, like a detail
+dialog per id closed behind the user — is still a map: `delete(key)` on close is the
+caller knowing the key is spent, not a cache policy. And because `get` creates, call it from an action, an event
 handler or a scope load, never from inside a `computed`, which may not cause side effects;
 `peek` is the read-side twin for those.
 

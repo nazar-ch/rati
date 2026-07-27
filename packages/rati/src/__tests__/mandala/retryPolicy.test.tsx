@@ -291,6 +291,121 @@ describe('retry — the client', () => {
     });
 });
 
+describe('retry — live-shaped timing', () => {
+    /*
+        The pins above throw in a microtask under a jitter pinned at its ceiling — one corner
+        of the timing square. A real fetch settles on a later macrotask, and full jitter
+        legally draws near zero; that corner is where the boundary's stale-error render used
+        to spend the next attempt before its load ran and arm the backoff concurrently with
+        it (FND-07). These pins hold the other corners.
+    */
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+    afterEach(() => {
+        cleanup();
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+    });
+
+    async function advance(ms: number): Promise<void> {
+        await act(async () => {
+            vi.advanceTimersByTime(ms);
+        });
+        await flush(2);
+    }
+
+    const LATENCY = 5;
+
+    /** A fetch-shaped failure: the load rejects `LATENCY` ms after it starts, on a macrotask. */
+    function slowConfig(calls: number[], clock: { now: number }, extra = {}) {
+        return {
+            scope: scope({ id: input<string>() }).load({
+                label: ({ id: _id }: { id: string }) =>
+                    new Promise<string>((_, reject) => {
+                        calls.push(clock.now);
+                        setTimeout(() => reject(classified('failed', true)()), LATENCY);
+                    }),
+            }),
+            component: ({ label }: { label: string }) => <div>{label}</div>,
+            loading: () => <div>loading slot</div>,
+            error: ({ error }: { error: SourceError }) => <div>error: {error.code}</div>,
+            retry: POLICY,
+            ...extra,
+        };
+    }
+
+    /** Step fake time 1ms at a time so `clock.now` tracks when each load actually started. */
+    async function run(clock: { now: number }, ms: number): Promise<void> {
+        for (let tick = 0; tick < ms; tick++) {
+            clock.now += 1;
+            await advance(1);
+        }
+    }
+
+    test('the backoff counts from the failure, not from the attempt’s start', async () => {
+        vi.spyOn(Math, 'random').mockReturnValue(1);
+        const calls: number[] = [];
+        const clock = { now: 0 };
+        const handle = await renderIsland(slowConfig(calls, clock), { props: { id: 'a' } });
+
+        // Attempt 1 starts at 0 and fails at LATENCY; the first wait runs from the failure.
+        await run(clock, LATENCY + BACKOFF - 1);
+        expect(calls).toHaveLength(1);
+        await run(clock, 1);
+        expect(calls).toEqual([0, LATENCY + BACKOFF]);
+
+        // Attempt 2 fails LATENCY later; the doubled wait runs from *that* failure — armed
+        // when the attempt started, the third would land BACKOFF*2 early, mid-flight.
+        await run(clock, LATENCY + BACKOFF * 2 - 1);
+        expect(calls).toHaveLength(2);
+        await run(clock, 1);
+        expect(calls).toEqual([0, LATENCY + BACKOFF, (LATENCY + BACKOFF) * 2 + BACKOFF]);
+
+        await run(clock, LATENCY);
+        expect(handle.slot()).toBe('error');
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    test('a near-zero jitter draw still walks the whole schedule to the error slot', async () => {
+        // A draw of 0 is a legal full-jitter outcome. Before the fix it fired the
+        // prematurely-armed timer while the attempt was still in flight: the in-flight
+        // generation was discarded unjudged, an unbudgeted extra load ran after the budget
+        // was spent, and the error slot mounted transiently on the way.
+        vi.spyOn(Math, 'random').mockReturnValue(0);
+        let errorRenders = 0;
+        const calls: number[] = [];
+        const clock = { now: 0 };
+        const handle = await renderIsland(
+            slowConfig(calls, clock, {
+                error: ({ error }: { error: SourceError }) => {
+                    errorRenders++;
+                    return <div>error: {error.code}</div>;
+                },
+            }),
+            { props: { id: 'a' } },
+        );
+
+        for (let tick = 0; tick < LATENCY * 8; tick++) {
+            await run(clock, 1);
+            // The slot the policy shows while working is loading, all the way through —
+            // a transient error-slot mount would have counted a render by now.
+            if (handle.slot() !== 'error') expect(errorRenders).toBe(0);
+        }
+
+        expect(handle.slot()).toBe('error');
+        // Exactly the budget: the initial attempt plus `count` retries, each started only
+        // after the previous one failed — no discarded mid-flight attempt, no bonus load.
+        expect(calls).toHaveLength(1 + POLICY.count);
+        const failures = calls.map((start) => start + LATENCY);
+        calls.slice(1).forEach((start, index) => {
+            expect(start).toBeGreaterThanOrEqual(failures[index]!);
+        });
+        expect(handle.controls().retrying).toBe(0);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+});
+
 describe('retry — default-on, no config at all', () => {
     beforeEach(() => {
         vi.useFakeTimers();

@@ -1,4 +1,10 @@
-import type { ExtractRouteParams, GenericRouteType, NameToRoute, UserRoutes } from './route';
+import type {
+    ExtractRouteParams,
+    GenericRouteType,
+    NameToRoute,
+    RatiUserTypes,
+    UserRoutes,
+} from './route';
 
 /*
     The public face of the router. `Router` is table-blind: navigation targets and the
@@ -38,14 +44,25 @@ type GenericActiveRoute = {
 };
 
 /**
+ * The augmented table read by *indexed access*, not through `UserRoutes` — that alias
+ * `infer`s the table out of a conditional, and a type built by conditioning on it again
+ * stays deferred: `name` and `routeParams` read as the right unions, but the discriminant
+ * narrows nothing (FND-06). The `keyof … & 'routes'` intersection is what keeps the index
+ * legal inside the package, where the interface has no `routes` member yet — it resolves
+ * to `never` there, and to `'routes'` under any augmentation.
+ */
+type UserRouteTable = RatiUserTypes[keyof RatiUserTypes & 'routes'];
+
+/**
  * The current route, typed off the `RatiUserTypes` augmentation — a union discriminated
- * by `name` when the app has one, the generic shape when it doesn't.
+ * by `name` when the app has one (`activeRoute.name === 'x'` narrows `routeParams`), the
+ * generic shape when it doesn't. One conditional only: `ActiveRouteOf` is applied to the
+ * indexed table directly (`never` satisfies its constraint in the unaugmented package) —
+ * a second `extends` guard around it re-defers the result and kills the narrowing.
  */
 export type ActiveRoute = [UserRoutes] extends [never]
     ? GenericActiveRoute
-    : UserRoutes extends readonly GenericRouteType[]
-      ? ActiveRouteOf<UserRoutes>
-      : GenericActiveRoute;
+    : ActiveRouteOf<UserRouteTable>;
 
 /** Options for {@link Router.navigate} / {@link Router.replace}. */
 export interface NavigateOptions {
@@ -91,6 +108,19 @@ export interface Router {
     replace(to: NameToRoute<UserRoutes> | string, options?: NavigateOptions): void;
     /** Build the URL path for a route reference (or pass a string through verbatim). */
     getPath(to: NameToRoute<UserRoutes> | string): string;
+    /**
+     * Traverse the history stack by `delta` entries — the back/forward buttons,
+     * programmatically. A thin pass-through to the history: the update lands as a POP and
+     * resolves the route it restores. Out of range does nothing (the browser's rule). Note
+     * the timing difference between hosts: the browser's traversal is asynchronous (the
+     * update arrives on a later task), a memory history's is synchronous — code that must
+     * work on both subscribes rather than reading the location on the next line.
+     */
+    go(delta: number): void;
+    /** `go(-1)` — "close this and go back". */
+    back(): void;
+    /** `go(1)`. */
+    forward(): void;
     /** Update the query string in place (`replace` by default; `{ mode: 'push' }` to stack). */
     setSearchParams(
         init: ConstructorParameters<typeof URLSearchParams>[0] | URLSearchParams,
