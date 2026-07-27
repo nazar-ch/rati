@@ -28,9 +28,9 @@ describe('ActiveRoute through the augmentation (types)', () => {
     });
 
     test('Extract filters by name', () => {
-        expectTypeOf<
-            Extract<ActiveRoute, { name: 'profile' }>['routeParams']
-        >().toEqualTypeOf<{ userId: string }>();
+        expectTypeOf<Extract<ActiveRoute, { name: 'profile' }>['routeParams']>().toEqualTypeOf<{
+            userId: string;
+        }>();
     });
 
     test('ActiveRoute is the union ActiveRouteOf derives from the same table', () => {
