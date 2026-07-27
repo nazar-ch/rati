@@ -65,6 +65,46 @@ describe('peek', () => {
     });
 });
 
+describe('delete', () => {
+    test('drops the one instance and says whether it was there; the next get is fresh', () => {
+        const factory = vi.fn((id: string) => ({ id }));
+        const map = keyed(factory);
+        const before = map.get('a');
+        const kept = map.get('b');
+
+        expect(map.delete('a')).toBe(true);
+        expect(map.peek('a')).toBeUndefined();
+        // Absent is distinguishable from present — and not an error.
+        expect(map.delete('a')).toBe(false);
+
+        // The neighbour is untouched, and the deleted key rebuilds on demand.
+        expect(map.peek('b')).toBe(kept);
+        expect(map.get('a')).not.toBe(before);
+        expect(factory).toHaveBeenCalledTimes(3);
+    });
+
+    test('does not call into the instance — reset’s contract, one key at a time', () => {
+        const dispose = vi.fn();
+        const map = keyed((id: string) => ({ id, dispose }));
+        map.get('a');
+
+        map.delete('a');
+        expect(dispose).not.toHaveBeenCalled();
+    });
+
+    test('a delete is visible to a peeking derivation', () => {
+        const map = keyed((id: string) => ({ id }));
+        const seen: (string | undefined)[] = [];
+        const stop = autorun(() => {
+            seen.push(map.peek('a')?.id);
+        });
+        map.get('a');
+        map.delete('a');
+        expect(seen).toEqual([undefined, 'a', undefined]);
+        stop();
+    });
+});
+
 describe('reset', () => {
     test('drops every instance; the next get builds a fresh one', () => {
         const factory = vi.fn((id: string) => ({ id }));

@@ -1048,6 +1048,7 @@ payload, a `collection`, a `pagedCollection`, or a store class stitching several
 | --- | --- |
 | `get(key)` | get-or-create: the first call for a key runs the factory, every later one returns **that same instance** — per-key identity is the contract |
 | `peek(key)` | the instance if one exists, `undefined` otherwise; never creates. Reactive: a derivation that peeked a missing key re-runs once `get` creates it |
+| `delete(key)` | drop one instance — the caller knowing the key is spent (a closed detail view, a deleted entity). Returns whether it was present; the next `get` builds fresh. Same contract as `reset`, one key at a time |
 | `reset()` | drop every instance (the sign-out case). It does *not* call into them — dropping the references *is* the semantics; a caller still holding one resets it itself |
 
 Keys are `string | number` (they are `Map` keys, so identity is `===`); a branded id type
@@ -1120,7 +1121,9 @@ whose payloads mention the same entity hold two independent instances. An *unbou
 key space (a search result's every row) wants a **selection** — one instance whose
 parameters change, via `reactive: true` or a scope input — not a map that grows for the
 lifetime of the tab ([choosing a shape](guide.md#choosing-a-shape) draws the bounded /
-unbounded line). And because `get` creates, call it from an action, an event
+unbounded line). The middle case — per-key instances the *caller* retires, like a detail
+dialog per id closed behind the user — is still a map: `delete(key)` on close is the
+caller knowing the key is spent, not a cache policy. And because `get` creates, call it from an action, an event
 handler or a scope load, never from inside a `computed`, which may not cause side effects;
 `peek` is the read-side twin for those.
 
