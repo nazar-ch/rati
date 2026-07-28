@@ -62,7 +62,9 @@ internal — callers only ever see `island`/`route`).
   the randomized stage). It is the stand-in for hosted CI. The **pre-push gate** is
   `.claude/kit.json` `verify` — the fast subset `yarn ci fmt lint typecheck test` (it skips
   the 500-run deep fuzz and the example builds); run full `yarn ci` yourself before a release
-  or when you touch the mandala engine or the packaging/build.
+  or when you touch the mandala engine or the packaging/build. A run covering that subset
+  leaves the kit's run stamp, so the Stop hook nudges a session that pushes without one; a
+  narrower `yarn ci fmt` deliberately leaves none.
 - **Branch, rebase, push** per the kit's git workflow
   (`$JNANA_KIT_HOME/plugin/docs/git-workflow.md`): cut a fresh `claude/<NS>/<desc>` off
   `origin/main` before editing, make atomic commits as you work (**don't ask**; **Conventional

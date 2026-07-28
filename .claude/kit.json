@@ -49,6 +49,12 @@
         ],
     },
 
+    // Repos whose work-item ids may be cited here in the qualified `<repo>:<ID>` form. Both are
+    // already cited: rati's findings track their downstream in jnana (`jnana:FND-237`), and
+    // `scripts/ci.ts` names the kit findings its run stamp closes (`jnana-kit:FND-32`). Undeclared,
+    // a qualified id reads as a typo'd local one and `issues.ts check` errors on it.
+    "citableRepos": ["jnana", "jnana-kit"],
+
     // rati files no LOCAL env-feedback — friction goes to the central jnana-kit-feedback repo.
     // Everything else in scanRoots takes jnana's default layout (docs/planned/<effort>/issues/,
     // which rati already uses).
