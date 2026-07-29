@@ -1,10 +1,50 @@
 # Changelog
 
-What breaks and what it maps to, per release — written *with* the release (the step is in
-[docs/current/RELEASING.md](docs/current/RELEASING.md)), because rati is pre-1.0 and a
-minor bump under a caret range lands on consumers automatically. Removals are listed with
-their replacements; additions only when a consumer needs to act. Started at 0.6.3
-(FND-05); earlier releases are not reconstructed.
+What breaks and what it maps to, per release, because rati is pre-1.0 and a minor bump
+under a caret range lands on consumers automatically. Removals are listed with their
+replacements; additions only when a consumer needs to act. Started at 0.6.3 (FND-05);
+earlier releases are not reconstructed.
+
+**Write the entry when you make the change, not when you release it** — in the
+`## Unreleased` section below, in the same commit as the behavior. Releasing then only
+retitles that section (the step is in
+[docs/current/RELEASING.md](docs/current/RELEASING.md)); it is never the moment the notes
+get *written*. 0.7.0 is why: the release-time step was the whole convention, the first
+release after it shipped with no entry at all, and the consumer that adopted it read
+`git log v0.6.3..v0.7.0` instead. An empty `## Unreleased` at release time is a real
+answer — it means nothing consumer-visible changed, and the entry says so in one line.
+
+## Unreleased
+
+Nothing yet.
+
+## 0.7.0 — 2026-07-29
+
+Four consumer-reported defects, no removals — nothing to migrate. Backfilled 2026-07-29
+from `git log v0.6.3..v0.7.0`; the release itself shipped without an entry, which is what
+moved the notes to the `## Unreleased` discipline above.
+
+Fixed:
+
+- **`ActiveRoute` now narrows** (FND-06). It reached the app's route table through an
+  `infer` conditional, which left the type deferred: `activeRoute.name === 'page'` filtered
+  nothing, and reading a param off the "narrowed" route failed as an unrelated-looking
+  `TS7053` index error. It resolves the table by indexed access now. An app carrying a
+  re-derive-off-`RatiUserTypes` workaround can drop it.
+- **A `retryable: true` island failure reaches the error slot** (FND-07). It spent its
+  retry budget and then sat on the `loading` slot forever — no message, no Retry button —
+  and the backoff never applied, so all three attempts landed within ~5 ms. The boundary's
+  stale-error render was spending the next attempt before its load ran, and arming the
+  backoff concurrently with it.
+
+Added:
+
+- `keyed(...).delete(key)` (FND-08) — drop one instance, for the caller that knows a key is
+  spent (a closed detail view, a deleted entity). Same contract as `reset()`, one key at a
+  time; it does not call into the instance. Keeps `keyed` usable for a bounded-but-shrinking
+  map, which previously had to stay a hand-rolled `Map`.
+- `back()` / `forward()` / `go(delta)` on `Router` (FND-04), so history traversal has a
+  sanctioned home and `router.history` has no remaining use.
 
 ## 0.6.3 — 2026-07-25
 

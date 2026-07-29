@@ -72,6 +72,12 @@ internal — callers only ever see `island`/`route`).
   merge, PR to `main`, **always push**. The session hooks (wired via `.claude/settings.json`)
   surface your start state and hold you to the push.
 - Keep `docs/*.md` in sync with behavior changes.
+- **Consumer-visible change ⇒ a [CHANGELOG.md](CHANGELOG.md) `## Unreleased` bullet in the
+  same commit.** Anything a consumer must or may act on: a removal or rename (with its
+  replacement), a behavior fix they were working around, new public surface. A release only
+  retitles that section, so an entry missed here is an entry that never gets written —
+  0.7.0 shipped with none, and the consumer adopting it read `git log` instead. Purely
+  internal work adds nothing.
 - Doc links: cross-tree references are repo-root-relative (`docs/current/internals.md`), never
   `../` — relative depth breaks silently when a doc moves and can't be grepped from the target
   side. Within-directory relative links are fine (they move with their folder). Cross-repo refs

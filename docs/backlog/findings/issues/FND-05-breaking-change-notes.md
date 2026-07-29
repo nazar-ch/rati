@@ -61,3 +61,18 @@ deciding the import is fine.
 
 - A reader who knows only "my build broke on `RootStore`" can find the replacement from
   the docs alone, without reading the source or `git log`.
+
+## Correction (2026-07-29) — step 3's remedy did not hold on its first outing
+
+The disposition above calls the value "forward-looking". The first release forward, **0.7.0
+(2026-07-29), shipped with no entry** — two days after this closed. The step landed as prose
+in `RELEASING.md` and nothing else: no gate, and nothing written until release time, which
+is the moment with the least attention on it. jnana adopted 0.7.0 by reading
+`git log v0.6.3..v0.7.0`, which is exactly the cost this record was filed about.
+
+Fixed by moving *when* the note is written rather than adding a gate: entries go in a
+standing `## Unreleased` section in the same commit as the behavior (the rule now sits in
+`CLAUDE.md`, next to the docs-in-sync one), and a release retitles that section. 0.7.0 is
+backfilled. This record stays `done` — its scope was the artifact, and the artifact exists;
+what failed was the discipline around it, and that is now stated where the change is made
+instead of where it ships.
