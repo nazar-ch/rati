@@ -1,20 +1,29 @@
 # Releasing `rati`
 
-**Before the version bump: write the [CHANGELOG.md](../../CHANGELOG.md) entry.** Pre-1.0,
-a minor bump under `^` lands on consumers automatically, so the entry is the half of the
-break the version number doesn't carry: every removal paired with its replacement, renames
-called out — especially one that keeps an old import resolving with a new meaning (the
-0.6.3 `Router` entry is the worked example). A release with nothing consumer-visible gets
-one line saying so.
+**Before the version bump: retitle [CHANGELOG.md](../../CHANGELOG.md)'s `## Unreleased`
+section to `## <version> — <date>`, and open a fresh empty one above it.** The notes are
+written as the changes land (rati's `CLAUDE.md` carries that rule), so releasing is a
+rename, not a writing session — pre-1.0, a minor bump under `^` lands on consumers
+automatically, and the entry is the half of the break the version number doesn't carry.
+
+Two things to check while you are there, because a release is the last moment either is
+cheap: that every removal is paired with its replacement, and that a rename keeping an old
+import resolving with a *new* meaning is called out (the 0.6.3 `Router` entry is the worked
+example). An `## Unreleased` that is genuinely empty releases as one line saying nothing
+consumer-visible changed — that is an answer, not a gap.
 
 From the repo root, on a clean `main` that's in sync with origin:
 
 ```sh
-./scripts/release.sh patch          # 0.4.9 -> 0.4.10
+./scripts/release.sh                # patch, the default: 0.4.9 -> 0.4.10
 ./scripts/release.sh minor          # -> 0.5.0
 ./scripts/release.sh prerelease     # 0.4.9-alpha.1 -> 0.4.9-alpha.2
 ./scripts/release.sh 0.5.0          # explicit version
 ```
+
+It resolves the bump, prints `rati <current> → <new>` with the dist-tag and publisher, and
+waits for a single `y` — anything else aborts and puts `package.json` back. Nothing is
+committed, tagged, published or pushed before that keypress.
 
 Flags:
 
