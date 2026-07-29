@@ -3,10 +3,10 @@
 # Release script for the `rati` package.
 #
 # Usage:
-#   scripts/release.sh <bump> [--yes] [--otp <code>] [--dry-run]
+#   scripts/release.sh [bump] [--yes] [--otp <code>] [--dry-run]
 #
-#   <bump>   patch | minor | major | prepatch | preminor | premajor | prerelease
-#            or an explicit version like 0.5.0
+#   [bump]   patch (default) | minor | major | prepatch | preminor | premajor
+#            | prerelease, or an explicit version like 0.5.0
 #
 # One-time setup: see docs/RELEASING.md.
 
@@ -26,8 +26,13 @@ die()  { echo "✗ $*" >&2; exit 1; }
 info() { echo "→ $*"; }
 
 # --- args -----------------------------------------------------------------
-BUMP="${1:-}"
-shift || true
+# The bump defaults to `patch`. Only a *non-flag* first argument is read as one,
+# so `release.sh --dry-run` doesn't consume its own flag as the bump.
+BUMP="patch"
+if [[ $# -gt 0 && "$1" != -* ]]; then
+  BUMP="$1"
+  shift
+fi
 ASSUME_YES=0
 OTP=""
 DRY_RUN=0
@@ -40,8 +45,6 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
-
-[[ -n "$BUMP" ]] || die "Usage: scripts/release.sh <patch|minor|major|prerelease|x.y.z> [--yes] [--otp <code>] [--dry-run]"
 
 # --- preflight ------------------------------------------------------------
 command -v node     >/dev/null || die "node not found"
@@ -112,23 +115,34 @@ if [[ $DRY_RUN -eq 1 ]]; then
   exit 0
 fi
 
-# --- confirm --------------------------------------------------------------
-info "Current version: $CURRENT — bump: $BUMP — publisher: $WHO"
+# --- resolve the version, then confirm ------------------------------------
+# The number worth confirming is the *new* one, and only `yarn version` knows
+# how a keyword resolves (prerelease ids especially) — so the bump is written to
+# package.json here to read it back. Nothing irreversible has happened yet: the
+# commit, tag, publish and push all sit behind the prompt, and the trap puts
+# package.json back on any exit before the commit (an answer of no, but a Ctrl-C
+# just as much).
+restore_pkg_json() { git -C "$REPO_ROOT" checkout -- "$PKG_DIR/package.json" 2>/dev/null || true; }
+yarn_pkg version "$BUMP" >/dev/null
+trap restore_pkg_json EXIT
+NEW_VERSION="$(node -p "require('$PKG_DIR/package.json').version")"
+DIST_TAG="$(derive_tag "$NEW_VERSION")"
+
+info "$PACKAGE $CURRENT → $NEW_VERSION (bump: $BUMP · dist-tag: $DIST_TAG · publisher: $WHO)"
 if [[ $ASSUME_YES -ne 1 ]]; then
-  read -r -p "Bump, publish, and push $PACKAGE? [y/N] " ans
+  read -r -n 1 -p "Publish and push v$NEW_VERSION? [y/N] " ans || ans=""
+  echo
   [[ "$ans" == "y" || "$ans" == "Y" ]] || die "Aborted."
 fi
 
-# --- bump (commit + tag) --------------------------------------------------
-# `yarn version` only writes the new version into package.json; it does not
+# --- commit + tag ---------------------------------------------------------
+# `yarn version` only wrote the new version into package.json; it does not
 # create the git commit/tag we rely on below, so we make them ourselves.
 # (The tag must be annotated: `git push --follow-tags` ignores lightweight ones.)
-info "Bumping version ($BUMP)…"
-yarn_pkg version "$BUMP" >/dev/null
-NEW_VERSION="$(node -p "require('$PKG_DIR/package.json').version")"
-DIST_TAG="$(derive_tag "$NEW_VERSION")"
+info "Committing and tagging v$NEW_VERSION…"
 git -C "$REPO_ROOT" commit -q -m "release: $PACKAGE v$NEW_VERSION" -- "$PKG_DIR/package.json"
 git -C "$REPO_ROOT" tag -a "v$NEW_VERSION" -m "release: $PACKAGE v$NEW_VERSION"
+trap - EXIT
 
 # --- publish --------------------------------------------------------------
 info "Publishing $PACKAGE@$NEW_VERSION (dist-tag: $DIST_TAG)…"
