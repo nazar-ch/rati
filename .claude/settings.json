@@ -58,6 +58,27 @@
                 ]
             }
         ],
+        "WorktreeCreate": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "KIT=\"${JNANA_KIT_HOME:-$HOME/Sites/jnana-kit}\"; sh \"$KIT/tools/run-node.sh\" \"$KIT/tools/agent-worktree-create.ts\"",
+                        "timeout": 600
+                    }
+                ]
+            }
+        ],
+        "WorktreeRemove": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "KIT=\"${JNANA_KIT_HOME:-$HOME/Sites/jnana-kit}\"; sh \"$KIT/tools/run-node.sh\" \"$KIT/tools/agent-worktree-remove.ts\""
+                    }
+                ]
+            }
+        ],
         "Stop": [
             {
                 "hooks": [

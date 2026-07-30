@@ -1,1 +1,23 @@
-vp staged
+#!/bin/sh
+# why-shell: a git hook body, and the one script here that cannot move to the TS lane or into the
+# kit — git runs hooks from the repo whose commits they gate, so every consumer must carry this
+# file itself.
+#
+# So it carries as little as possible. The gate is the kit's `tools/pre-commit-gate.sh`
+# (`vp staged --no-stash`, a per-worktree backup ref, the cross-worktree commit lock — ◊WTH-03);
+# this is the seam that reaches it, in the same `${JNANA_KIT_HOME:-…}` shape `.claude/settings.json`
+# uses for the session hooks. A consumer adopts the gate by copying these lines once, and picks up
+# every later change to it by doing nothing (◊WTH-02). Sourced rather than spawned, so it needs
+# nothing on PATH that the gate does not need anyway.
+#
+# Fails OPEN to a bare `vp staged` when the kit is not resolvable: a checkout without the kit is a
+# machine without pool slots, where lint-staged's own backup is the right one and only the
+# serialization is missing. Loudly, though — a gate that quietly changed shape is how ◊FND-92 went
+# unnoticed for a whole effort.
+KIT="${JNANA_KIT_HOME:-$HOME/Sites/jnana-kit}"
+if [ -r "$KIT/tools/pre-commit-gate.sh" ]; then
+    . "$KIT/tools/pre-commit-gate.sh"
+else
+    printf 'pre-commit: no jnana-kit gate at %s — running vp staged bare: no cross-worktree commit lock, and lint-staged backs its work up onto the repo-shared refs/stash. Set JNANA_KIT_HOME.\n' "$KIT" >&2
+    exec vp staged
+fi
