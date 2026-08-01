@@ -1,0 +1,19 @@
+{
+    // https://github.com/tsconfig/bases/blob/main/bases/
+    "extends": ["@tsconfig/strictest/tsconfig.json", "@tsconfig/vite-react/tsconfig.json"],
+    "compilerOptions": {
+        "lib": ["DOM", "DOM.Iterable", "ESNext"],
+        "forceConsistentCasingInFileNames": true,
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "isolatedModules": true,
+        "noEmit": true,
+        "customConditions": ["rati-dev"],
+        // rati's source (resolved via the rati-dev condition) uses decorators, which
+        // erasableSyntaxOnly (inherited from @tsconfig/vite-react) forbids. Match the
+        // demo example and allow non-erasable syntax here.
+        "erasableSyntaxOnly": false
+    },
+    "include": ["src"],
+    "references": [{ "path": "./tsconfig.node.json" }]
+}

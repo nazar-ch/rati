@@ -1,0 +1,6 @@
+ +---------+       +----------+       +---------+
+ |  scope  | ----> |  island  | ----> |  route  |
+ +---------+       +----------+       +---------+
+   the data         + component         + a URL
+   (inputs,          + loading/
+    loads)             error slots

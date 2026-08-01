@@ -1,0 +1,11 @@
+{
+    "extends": ["@tsconfig/strictest/tsconfig.json"],
+    "compilerOptions": {
+        "composite": true,
+        "module": "nodenext",
+        "moduleResolution": "nodenext",
+        "allowSyntheticDefaultImports": true,
+        "jsx": "react-jsx"
+    },
+    "include": ["serve.ts", "vite.config.ts"]
+}

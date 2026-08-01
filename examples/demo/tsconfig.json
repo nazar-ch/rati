@@ -1,0 +1,16 @@
+{
+    // https://github.com/tsconfig/bases/blob/main/bases/
+    "extends": ["@tsconfig/strictest/tsconfig.json", "@tsconfig/vite-react/tsconfig.json"],
+    "compilerOptions": {
+        "lib": ["DOM", "DOM.Iterable", "ESNext"],
+        "forceConsistentCasingInFileNames": true,
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "isolatedModules": true,
+        "noEmit": true,
+        "jsx": "react-jsx",
+        "customConditions": ["rati-dev"],
+        "erasableSyntaxOnly": false
+    },
+    "include": ["src"]
+}
