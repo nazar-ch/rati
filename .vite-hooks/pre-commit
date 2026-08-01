@@ -4,17 +4,32 @@
 # file itself.
 #
 # So it carries as little as possible. The gate is the kit's `tools/pre-commit-gate.sh`
-# (`vp staged --no-stash`, a per-worktree backup ref, the cross-worktree commit lock — ◊WTH-03);
-# this is the seam that reaches it, in the same `${JNANA_KIT_HOME:-…}` shape `.claude/settings.json`
-# uses for the session hooks. A consumer adopts the gate by copying these lines once, and picks up
-# every later change to it by doing nothing (◊WTH-02). Sourced rather than spawned, so it needs
-# nothing on PATH that the gate does not need anyway.
+# (`vp staged --no-stash`, a per-worktree backup ref, the cross-worktree commit lock — `◊WTH-03`);
+# this is the seam that reaches it. It is the LAST place a consumer spells the kit's path itself:
+# the session hooks carried the same shape in `.claude/settings.json` until `◊IL-07` moved them to a
+# plugin that resolves the kit from its own location, needing no variable at all. A git hook cannot
+# be delivered that way. A consumer adopts the gate by copying these lines once, and picks up every
+# later change to it by doing nothing (`◊WTH-02`). Sourced rather than spawned, so it needs nothing
+# on PATH that the gate does not need anyway.
+#
+# Every id here is BACKTICK-QUOTED, which is the id gate's escape, and both spellings need it: these
+# bytes live in five repos at once. A bare sigil id resolves against whichever tracker reads the
+# line — the kit's here, a consumer's after the copy, where these ids do not exist — and a consumer's
+# gate reads a changed line as newly introduced, so an unquoted sigil reddens every re-copy. The
+# qualified `jnana-kit:<ID>` form inverts the problem: correct in a consumer, and rejected in the kit
+# as self-qualification. No unquoted spelling is right in both, and quoting says so honestly — no
+# gate can resolve a citation whose home repo depends on who is reading.
 #
 # Fails OPEN to a bare `vp staged` when the kit is not resolvable: a checkout without the kit is a
 # machine without pool slots, where lint-staged's own backup is the right one and only the
-# serialization is missing. Loudly, though — a gate that quietly changed shape is how ◊FND-92 went
+# serialization is missing. Loudly, though — a gate that quietly changed shape is how `◊FND-92` went
 # unnoticed for a whole effort.
-KIT="${JNANA_KIT_HOME:-$HOME/Sites/jnana-kit}"
+#
+# `$JNANA_KIT_HOME` is the whole of how the kit is found here, with no default behind it: this line
+# used to guess `$HOME/Sites/jnana-kit`, which was right for one machine layout and silently wrong
+# for every other. Unset now takes the same loud open arm below as a wrong path, which already
+# names the variable as the fix.
+KIT="${JNANA_KIT_HOME:-}"
 if [ -r "$KIT/tools/pre-commit-gate.sh" ]; then
     . "$KIT/tools/pre-commit-gate.sh"
 else

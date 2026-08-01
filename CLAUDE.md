@@ -263,9 +263,10 @@ reads — never raise a cap to clear a warning; that's a user decision
 ## This repo runs on jnana-kit
 
 The workflow skills, the session hooks, and the doctrine come from the kit checkout at
-`$JNANA_KIT_HOME` (unset ⇒ `~/Sites/jnana-kit` on the host, `~/jnana-kit` in a sandbox VM).
+`$JNANA_KIT_HOME`, which must be exported — nothing guesses that path.
 This repo carries only the seams: `.claude/kit.json` (what the kit needs to know about rati —
-the `verify` gate, `bootstrap`, host deny rules), `.claude/settings.json` (the hook shim), and
+the `verify` gate, `bootstrap`, host deny rules), `.claude/settings.json` (permissions — the
+hooks are the plugin's, in user scope, not this repo's), and
 this file. rati keeps its **own** work-item tracking under `docs/planned/…` (above);
 env-feedback about the kit or the shared tooling goes to the central `jnana-kit-feedback` repo,
 not a local note.
