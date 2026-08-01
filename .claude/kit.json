@@ -20,9 +20,11 @@
     // Idempotent "make this checkout runnable": install deps only (Node 26 + Yarn 4.17.1 via
     // corepack, `enableScripts: false`). No codegen; never git sync.
     "bootstrap": "yarn install",
+    // Existence only, for preflight's report — never a gate on the bootstrap above, which now runs
+    // unconditionally. A freshness pair here (yarn.lock vs the install stamp) could not be cleared
+    // by the very `yarn install` it prescribed (jnana-kit:FND-108).
     "bootstrapStale": {
         "missing": ["node_modules"],
-        "newerThan": [{ "source": "yarn.lock", "target": "node_modules/.yarn-state.yml" }],
     },
 
     // Host guardrail: the publish path stays user-run outside a sandbox VM, layered over the kit
