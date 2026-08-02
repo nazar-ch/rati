@@ -5,8 +5,8 @@
     },
     "files": {
         "CLAUDE.md": {
-            "budget": 18000,
-            "note": "the sole always-on doc: mental model, workflow + kit seams, toolchain, source-layout map, key patterns, and examples status — a framework's whole orientation in one file"
+            "budget": 14435,
+            "note": "the sole always-on doc: mental model, rati's own gate/toolchain/style residue, source-layout map, key patterns, and examples status — a framework's whole orientation in one file; the shared doctrine it used to restate is pointers at $JNANA_KIT_HOME/plugin/docs/, and this cap is the measured size at that trim"
         }
     }
 }
