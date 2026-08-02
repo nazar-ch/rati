@@ -8,6 +8,11 @@ directly (via the `rati-dev` export condition) and drives its design.
 Yarn-workspaces monorepo: `packages/rati` (the published `rati` package) plus
 `examples/{demo,ssr}` (dev/test apps). Workspace names: `rati`, `demo`, `ssr-demo`.
 
+The workflow every jnana-kit consumer shares — branch → gate → PR → push, work items and
+findings, the env-feedback boundary, the toolchain, style, memory, the seams — is already in
+your session from user scope (`$JNANA_KIT_HOME/plugin/claude-md/base.txt`), and the doctrine
+behind it is read from `$JNANA_KIT_HOME/plugin/docs/`. Below is only what is rati's.
+
 ## Canonical docs — read these first
 
 They are the source of truth and are kept current. Keep them in sync when you change
@@ -52,8 +57,8 @@ internal — callers only ever see `island`/`route`).
 
 ## Workflow
 
-- Clarify and ask for information you need.
-- **Verify before pushing:** the whole gate in one command is `yarn ci` (`scripts/ci.ts` —
+- **The gate is `yarn ci`, not just the kit runner.** The whole gate in one command is
+  `yarn ci` (`scripts/ci.ts` —
   fmt / lint / typecheck / test / deep fuzz / build, aggregated; a subset by stage name,
   `FUZZ_RUNS=…` to deepen the randomized stage). It is the stand-in for hosted CI. The
   **pre-push gate** is `.claude/kit.json` `verify` — the fast subset
@@ -61,9 +66,7 @@ internal — callers only ever see `island`/`route`).
   run full `yarn ci` yourself before a release or when you touch the mandala engine or the
   packaging/build. A run covering that subset leaves the kit's run stamp, so the Stop hook
   nudges a session that pushes without one; a narrower `yarn ci fmt` deliberately leaves none.
-- **Branch, rebase, push** per `$JNANA_KIT_HOME/plugin/docs/git-workflow.md` — cut a fresh
-  `claude/<NS>/<desc>` off `origin/main`, commit atomically as you work, rebase — never merge,
-  PR to `main`, **always push**. Match the existing plain-imperative commit history.
+- **Match the existing plain-imperative commit history** when you write a subject.
 - Keep `docs/*.md` in sync with behavior changes.
 - **Consumer-visible change ⇒ a [CHANGELOG.md](CHANGELOG.md) `## Unreleased` bullet in the
   same commit.** Anything a consumer must or may act on: a removal or rename (with its
@@ -71,39 +74,19 @@ internal — callers only ever see `island`/`route`).
   retitles that section, so an entry missed here is an entry that never gets written —
   0.7.0 shipped with none, and the consumer adopting it read `git log` instead. Purely
   internal work adds nothing.
-- Doc links follow the family convention — root-relative across trees, a repo scheme across
-  repos, backticked paths deliberately not links:
-  `$JNANA_KIT_HOME/plugin/docs/planning/doc-links.md`.
-
-## Work items
-
-Work you are assigned is a **work item record** under `docs/planned/<effort>/issues/`, and the
-record's own `status:` field is its status. The anatomy, the close ceremony, dispositions and
-the `issues.ts` surface are `$JNANA_KIT_HOME/plugin/docs/issue-tracking.md` — the kit's
-`issues.ts` runs here from the repo root. rati's id prefixes: **DATA** (the `rati/data`
-package), **DX** (testing + developer experience), **IMP** (improvement review), **REV**
-(production review), **SI** (scope/island). An out-of-scope spot worth a future session is a
-**finding** filed here — `issues.ts new FND <slug>`, landing in
-`docs/backlog/findings/issues/`; env friction about the kit or the shared tooling goes
-elsewhere, `$JNANA_KIT_HOME/plugin/docs/feedback.md`.
+- **rati's id prefixes:** **DATA** (the `rati/data` package), **DX** (testing + developer
+  experience), **IMP** (improvement review), **REV** (production review), **SI**
+  (scope/island). Findings land in `docs/backlog/findings/issues/`.
 
 ## Restricted actions
 
-- **Don't publish.** `scripts/release.sh` (the `release` script) bumps the version, tags,
-  and runs `yarn npm publish`. Never run it — releasing is the maintainer's call (see
-  `docs/current/RELEASING.md`). `--dry-run` is the only safe form, and still: leave it to
-  the user. This is **hook-enforced on the host**: `.claude/kit.json` `denyRules` denies
-  `scripts/release.sh` and every `npm publish` form (inert inside a sandbox VM, where the
-  Keychain token is absent anyway).
 - **Don't run `vp lint --fix` blindly** — `no-unnecessary-type-assertion`'s autofix breaks the
   typecheck, which is why that rule is off here and tsc is the authoritative gate; the detail
   is `$JNANA_KIT_HOME/plugin/docs/toolchain/lint.md`.
 
 ## Toolchain — Vite+ (`vp`)
 
-The basics — `vp check` is not a type-check, deps go through `yarn`, Markdown is not oxfmt's,
-the Node pin's source of truth — are `$JNANA_KIT_HOME/plugin/docs/toolchain.md`. rati's own:
-type-checking is **tsc** run from the workspace root as `yarn run -T tsc`, and lint/format
+Type-checking is **tsc** run from the workspace root as `yarn run -T tsc`, and lint/format
 config lives in the root `vite.config.ts` `lint`/`fmt` blocks.
 
 ```bash
@@ -173,14 +156,8 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
   actions). Everything else is strict; React rules apply repo-wide.
 - **oxfmt does not format Markdown** (it corrupts snake_case next to emphasis) — `**/*.md`
   is excluded in the `fmt` block; edit docs by hand.
-- rati uses **relative imports** (no `#` path alias).
-
-## Style
-
-Comments (including the *why* comments and the `console.*` you didn't write, which stay),
-one-component-per-file, formatter-enforced import order and naming are
-`$JNANA_KIT_HOME/plugin/docs/code-style.md`. rati's own are in Key patterns above: relative
-imports, and no barrel beyond `main.ts`.
+- rati uses **relative imports** (no `#` path alias), and no barrel beyond `main.ts`.
+- Keep the *why* comments and the `console.*` you didn't write.
 
 ## Examples — current status
 
@@ -210,15 +187,6 @@ ship their loading slot in the HTML and come alive only after hydration.
 
 ## Memory
 
-Tiers, budgets and where a new note goes are `$JNANA_KIT_HOME/plugin/docs/memory.md` — shared
-knowledge lives in repo docs, not agent memory. Here the canonical docs (above) are the
-stations, and point-in-time status goes to the owning work-item record. The numbers are this
-repo's, in [.claude/memory-budgets.json](.claude/memory-budgets.json), which the
-`/memory-prune` skill reads — never raise a cap to clear a warning; that's a user decision.
-
-## This repo runs on jnana-kit
-
-The skills, hooks, tracker and doctrine come from the kit checkout at `$JNANA_KIT_HOME`, which
-must be exported — nothing guesses that path. This repo carries only the seams:
-`.claude/kit.json`, `.claude/settings.json` and this file. What each seam owns, and how kit
-tools are run from here: `$JNANA_KIT_HOME/plugin/docs/kit-seams.md`.
+Where a note lands here: the canonical docs above are the stations, and point-in-time status
+goes to the owning work-item record — never to a `.claude/` note that then has to be kept in
+sync with both.
