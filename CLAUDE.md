@@ -53,24 +53,17 @@ internal — callers only ever see `island`/`route`).
 ## Workflow
 
 - Clarify and ask for information you need.
-- Run commands from the repo root; target a workspace with `vp run <pkg>#<script>`
-  (e.g. `vp run rati#typecheck`).
-- Verify changes with **type-check and lint**: `vp run rati#typecheck` (tsc — the
-  authoritative type gate) **and** `vp lint`. `vp check` runs format + lint (no type-check).
-- The whole gate in one command: `yarn ci` (`scripts/ci.ts` — fmt / lint / typecheck /
-  test / deep fuzz / build, aggregated; a subset by stage name, `FUZZ_RUNS=…` to deepen
-  the randomized stage). It is the stand-in for hosted CI. The **pre-push gate** is
-  `.claude/kit.json` `verify` — the fast subset `yarn ci fmt lint typecheck test` (it skips
-  the 500-run deep fuzz and the example builds); run full `yarn ci` yourself before a release
-  or when you touch the mandala engine or the packaging/build. A run covering that subset
-  leaves the kit's run stamp, so the Stop hook nudges a session that pushes without one; a
-  narrower `yarn ci fmt` deliberately leaves none.
-- **Branch, rebase, push** per the kit's git workflow
-  (`$JNANA_KIT_HOME/plugin/docs/git-workflow.md`): cut a fresh `claude/<NS>/<desc>` off
-  `origin/main` before editing, make atomic commits as you work (**don't ask**; **Conventional
-  Commits style is forbidden** — match the existing plain-imperative history), rebase — never
-  merge, PR to `main`, **always push**. The session hooks (wired via `.claude/settings.json`)
-  surface your start state and hold you to the push.
+- **Verify before pushing:** the whole gate in one command is `yarn ci` (`scripts/ci.ts` —
+  fmt / lint / typecheck / test / deep fuzz / build, aggregated; a subset by stage name,
+  `FUZZ_RUNS=…` to deepen the randomized stage). It is the stand-in for hosted CI. The
+  **pre-push gate** is `.claude/kit.json` `verify` — the fast subset
+  `yarn ci fmt lint typecheck test` (it skips the 500-run deep fuzz and the example builds);
+  run full `yarn ci` yourself before a release or when you touch the mandala engine or the
+  packaging/build. A run covering that subset leaves the kit's run stamp, so the Stop hook
+  nudges a session that pushes without one; a narrower `yarn ci fmt` deliberately leaves none.
+- **Branch, rebase, push** per `$JNANA_KIT_HOME/plugin/docs/git-workflow.md` — cut a fresh
+  `claude/<NS>/<desc>` off `origin/main`, commit atomically as you work, rebase — never merge,
+  PR to `main`, **always push**. Match the existing plain-imperative commit history.
 - Keep `docs/*.md` in sync with behavior changes.
 - **Consumer-visible change ⇒ a [CHANGELOG.md](CHANGELOG.md) `## Unreleased` bullet in the
   same commit.** Anything a consumer must or may act on: a removal or rename (with its
@@ -78,44 +71,21 @@ internal — callers only ever see `island`/`route`).
   retitles that section, so an entry missed here is an entry that never gets written —
   0.7.0 shipped with none, and the consumer adopting it read `git log` instead. Purely
   internal work adds nothing.
-- Doc links: cross-tree references are repo-root-relative (`docs/current/internals.md`), never
-  `../` — relative depth breaks silently when a doc moves and can't be grepped from the target
-  side. Within-directory relative links are fine (they move with their folder). Cross-repo refs
-  use a scheme (`jnana:///docs/README.md`); backticked paths are deliberate non-links. Same
-  convention as jnana's docs/README.md "Doc links" (gated there by check-doc-links.ts).
+- Doc links follow the family convention — root-relative across trees, a repo scheme across
+  repos, backticked paths deliberately not links:
+  `$JNANA_KIT_HOME/plugin/docs/planning/doc-links.md`.
 
 ## Work items
 
-Tasks and issues are one primitive — a **work item**: one file per item,
-`docs/planned/<effort>/issues/<ID>-<slug>.md` (jnana's convention, shared via the kit —
-the kit's `issues.ts` runs here from the repo root; doctrine:
-`$JNANA_KIT_HOME/plugin/docs/issue-tracking.md`).
-
-- **Anatomy** — a leading `---` frontmatter block, then the title `# <ID> — <imperative
-  summary>`. The block holds `area:`, `needs:` (ids this depends on), `status:`
-  (`open`/`done`), `disposition:` — simple `key: value` raw-string lines, one line each
-  (not full YAML: no quoting, no nesting, no wrapped continuations). It sits *above* the
-  title so a Markdown formatter treats it as opaque. Then the body: problem, why it
-  matters, links — written for a future session with none of your context.
-- **Assignable = the executable sections are present**: `## Scope` (numbered steps),
-  `## Boundaries` (what not to touch), `## Verify` (the recipe proving it done). Without
-  them a record is filed analysis awaiting planning.
-- **Status is the record's own `status:` field**, read from whatever branch you are on —
-  never derived from git log, never a table in a README. Born `open`; the finishing commit
-  flips it to `done`, and **that edit is the whole close ceremony** (no `Closes:` trailer,
-  no "(done)" title, no ✅). A commit closing several items flips each. Reopen = flip back.
-  Partial progress goes in the record's **text**, not a third state.
-- **Decisions stay separate**, in `disposition:`, with a dated line in the body saying why.
-  A disposition leading with `accepted` / `adopted` / `deferred` / `dissolved` / `retracted`
-  / `watch` / `wontfix` **holds** the item out of default views; any other leading word
-  (rati's records mostly lead with `cut …`) reads as a note and leaves the record live.
-- **Prefix commit subjects with the id**: `SI-03: <what>`. Never hand-maintain a list or
-  status table of items in any doc — effort READMEs carry narrative and ordering only.
-- **File new records with `issues.ts new <PREFIX> <slug>`** — it mints the next number
-  atomically on origin (a hand-picked number is a collision across parallel sandboxes) and
-  stages the record. Mid-session out-of-scope spots are **findings**: `issues.ts new FND
-  <slug>` lands them in the inbox at `docs/backlog/findings/issues/`. `issues.ts list` /
-  `show <ID>` / `check` read the corpus.
+Work you are assigned is a **work item record** under `docs/planned/<effort>/issues/`, and the
+record's own `status:` field is its status. The anatomy, the close ceremony, dispositions and
+the `issues.ts` surface are `$JNANA_KIT_HOME/plugin/docs/issue-tracking.md` — the kit's
+`issues.ts` runs here from the repo root. rati's id prefixes: **DATA** (the `rati/data`
+package), **DX** (testing + developer experience), **IMP** (improvement review), **REV**
+(production review), **SI** (scope/island). An out-of-scope spot worth a future session is a
+**finding** filed here — `issues.ts new FND <slug>`, landing in
+`docs/backlog/findings/issues/`; env friction about the kit or the shared tooling goes
+elsewhere, `$JNANA_KIT_HOME/plugin/docs/feedback.md`.
 
 ## Restricted actions
 
@@ -125,35 +95,22 @@ the kit's `issues.ts` runs here from the repo root; doctrine:
   the user. This is **hook-enforced on the host**: `.claude/kit.json` `denyRules` denies
   `scripts/release.sh` and every `npm publish` form (inert inside a sandbox VM, where the
   Keychain token is absent anyway).
-- **Don't run `vp lint --fix` blindly.** oxlint's `no-unnecessary-type-assertion` autofix
-  disagrees with tsc (it ignores `noUncheckedIndexedAccess` and strips load-bearing
-  generic casts), so it can break the typecheck — that rule is off in the config for this
-  reason, and tsc is the authoritative gate. Other autofixes (e.g. consistent-type-imports)
-  are safe.
-- Don't remove `console.*` or commented-out code; preserve comments that explain *why*
-  (update/amend your own when reasonable). Offer fixes if they touch the current scope.
+- **Don't run `vp lint --fix` blindly** — `no-unnecessary-type-assertion`'s autofix breaks the
+  typecheck, which is why that rule is off here and tsc is the authoritative gate; the detail
+  is `$JNANA_KIT_HOME/plugin/docs/toolchain/lint.md`.
 
 ## Toolchain — Vite+ (`vp`)
 
-rati runs on **Vite+** (the `vp` CLI bundling Vite/Rolldown, Vitest, oxlint, oxfmt). All
-lint/format config lives in the root `vite.config.ts` `lint`/`fmt` blocks — there is no
-eslint/prettier. Node is pinned to **26** via `devEngines.runtime`. Type-checking is **tsc**
-— the released **TypeScript 7** native compiler (the `typescript` 7.0.x devDependency), run
-from the workspace root as `yarn run -T tsc`. Yarn is pinned **≥ 4.17.1** (`packageManager`):
-the released `typescript` package needs the berry#7190 gate or the first install crashes, so
-don't drop below it.
+The basics — `vp check` is not a type-check, deps go through `yarn`, Markdown is not oxfmt's,
+the Node pin's source of truth — are `$JNANA_KIT_HOME/plugin/docs/toolchain.md`. rati's own:
+type-checking is **tsc** run from the workspace root as `yarn run -T tsc`, and lint/format
+config lives in the root `vite.config.ts` `lint`/`fmt` blocks.
 
 ```bash
 vp run rati#build         # vite lib bundle + tsc emits dist/*.d.ts
 vp run rati#typecheck     # tsc --noEmit (src); rati#typecheck:test for the test tree
 vp run rati#test          # Vitest (runtime + *.test-d.ts type tests via the tsc checker)
-vp lint                   # oxlint   (vp lint --type-aware for the type-aware pass)
-vp fmt                    # oxfmt
-vp check                  # fmt + lint (NOT type-check)
 ```
-
-Pre-commit hooks (`.vite-hooks/` + `prepare: vp config`) run `vp staged` (fmt + lint on the
-staged files) on every commit.
 
 ## Source layout (`packages/rati/src`)
 
@@ -220,9 +177,10 @@ Public barrel: `main.ts` (the only entry; the published surface). Internals — 
 
 ## Style
 
-- One React component per file; prefer composable components and short files.
-- Import order is oxfmt-enforced (see `fmt.importOrder`). No barrel exports beyond `main.ts`.
-- No excessive variable shortening (`rows.map((row) => …)`, not `(r) => …`).
+Comments (including the *why* comments and the `console.*` you didn't write, which stay),
+one-component-per-file, formatter-enforced import order and naming are
+`$JNANA_KIT_HOME/plugin/docs/code-style.md`. rati's own are in Key patterns above: relative
+imports, and no barrel beyond `main.ts`.
 
 ## Examples — current status
 
@@ -252,28 +210,15 @@ ship their loading slot in the HTML and come alive only after hydration.
 
 ## Memory
 
-**Shared knowledge lives in repo docs, not memory** — this repo is read from several checkouts
-and from disposable VMs, and file-based memory travels with none of them. The canonical docs
-(above) are the stations; point-in-time status → the owning work-item record, never memory.
-Budgets for this repo's memory surface are in
-[.claude/memory-budgets.json](.claude/memory-budgets.json), which the `/memory-prune` skill
-reads — never raise a cap to clear a warning; that's a user decision
-(`$JNANA_KIT_HOME/plugin/docs/memory.md`).
+Tiers, budgets and where a new note goes are `$JNANA_KIT_HOME/plugin/docs/memory.md` — shared
+knowledge lives in repo docs, not agent memory. Here the canonical docs (above) are the
+stations, and point-in-time status goes to the owning work-item record. The numbers are this
+repo's, in [.claude/memory-budgets.json](.claude/memory-budgets.json), which the
+`/memory-prune` skill reads — never raise a cap to clear a warning; that's a user decision.
 
 ## This repo runs on jnana-kit
 
-The workflow skills, the session hooks, and the doctrine come from the kit checkout at
-`$JNANA_KIT_HOME`, which must be exported — nothing guesses that path.
-This repo carries only the seams: `.claude/kit.json` (what the kit needs to know about rati —
-the `verify` gate, `bootstrap`, host deny rules), `.claude/settings.json` (permissions — the
-hooks are the plugin's, in user scope, not this repo's), and
-this file. rati keeps its **own** work-item tracking under `docs/planned/…` (above);
-env-feedback about the kit or the shared tooling goes to the central `jnana-kit-feedback` repo,
-not a local note.
-
-- Kit tools run from the repo root as `<script>.ts …` — never from inside the kit checkout, which
-  is a different repo.
-- Doctrine the skills point at instead of restating lives in `$JNANA_KIT_HOME/plugin/docs/`
-  (git workflow, issue tracking, memory, planning).
-- The skills (`/do-effort`, `/plan-effort`, `/close-effort`, `/triage-feedback`,
-  `/memory-prune`) are installed in user scope, so they are available in every session here.
+The skills, hooks, tracker and doctrine come from the kit checkout at `$JNANA_KIT_HOME`, which
+must be exported — nothing guesses that path. This repo carries only the seams:
+`.claude/kit.json`, `.claude/settings.json` and this file. What each seam owns, and how kit
+tools are run from here: `$JNANA_KIT_HOME/plugin/docs/kit-seams.md`.
