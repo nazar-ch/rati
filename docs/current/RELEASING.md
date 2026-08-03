@@ -1,6 +1,6 @@
 # Releasing `rati`
 
-**Before the version bump: retitle [CHANGELOG.md](../../CHANGELOG.md)'s `## Unreleased`
+**Before the version bump: retitle CHANGELOG.md's `## Unreleased`
 section to `## <version> — <date>`, and open a fresh empty one above it.** The notes are
 written as the changes land (rati's `CLAUDE.md` carries that rule), so releasing is a
 rename, not a writing session — pre-1.0, a minor bump under `^` lands on consumers

@@ -9,7 +9,7 @@ disposition: adopted 2026-07-25 into docs/planned/data-package/issues/DATA-11-de
 
 **Adopted 2026-07-25** into the data-package effort: options 1 + 4 (honor `retryable`,
 jittered backoff) ride
-[DATA-11](docs/planned/data-package/issues/DATA-11-default-on-retry.md) — which goes
+DATA-11 — which goes
 further than this record asked: retry becomes default-on, gated by the class. Option 3's
 classification stays consumer-side per DATA-08's decision; option 2 (a `shouldRetry`
 predicate) was not taken. DATA-11's finishing commit flips this record to done.

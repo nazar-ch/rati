@@ -12,8 +12,8 @@
 > container). The Jnana migration (§Jnana changes below, adjusted for the full drop) is
 > tracked as a finding in Jnana's tracker. Kept for the step-by-step rationale.
 
-The deferred structural piece from [stores-and-router.md](stores-and-router.md) (Option A)
-plus the [naming.md §6](docs/archive/directions-2026-07/naming.md) stores-cluster renames. The mechanical renames
+The deferred structural piece from stores-and-router.md (Option A)
+plus the docs/archive/directions-2026-07/naming.md §6 stores-cluster renames. The mechanical renames
 (input vocabulary, `RouterStore`/`useRouter`, the `rati/ssr` + `rati/debug` entries) already
 landed; this is the one change that alters *shape*, not just names, so it wants its own
 session. This doc is the plan for that session.

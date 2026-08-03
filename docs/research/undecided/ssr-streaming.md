@@ -74,5 +74,5 @@ Nontrivial but tractable — the honest cost is the contract split, not the code
 build without a consumer whose slow loads are real and whose pages can accept
 200-always below the shell line. Neither nazar.ch nor the jnana website qualifies
 (SSR-04/05 measured no need). If RSC ever lands
-([rsc-support.md](docs/research/postponed/rsc-support.md)), it subsumes this — flight streaming has the same
+(docs/research/postponed/rsc-support.md), it subsumes this — flight streaming has the same
 properties and this page's status/head analysis applies unchanged.

@@ -1,8 +1,8 @@
 # rati — internals
 
-Implementation notes for contributors. The public API lives in
-[docs/public/](public/guide.md) (the guide + [reference](public/reference.md) — the
-website's source of truth); future-facing explorations are in [research/](docs/research/).
+Implementation notes for contributors. The public API lives in docs/current/public/ —
+public/guide.md and public/reference.md, the website's source of truth; future-facing
+explorations are in docs/research.
 
 ## Source layout
 
@@ -103,7 +103,7 @@ to its subtree, and owns the data lifecycle. That shared abstraction is the **ma
 - **Errors = the boundary.** A rejected promise (`use()`) or a thrown source error reaches
   `MandalaErrorBoundary` → the `error` slot (switch on `error.code`), or rethrows to the
   nearest outer boundary when there's no slot. With a `retry` policy the boundary gets a
-  first refusal on the error — see [the retry policy](#the-retry-policy-retry).
+  first refusal on the error — see §The retry policy (retry).
 - **Live values = `useSyncExternalStore`.** Each Step subscribes to its level's sources
   through one `useSyncExternalStore`, re-keyed when a cascade swaps a source (the level's
   `sources` array is replaced). (Hook sources own their own subscription.)
@@ -125,7 +125,7 @@ rebuilt on the retry, re-run its load, and re-suspend on a brand-new promise for
 the bucket on the committed mandala ref makes the load run once per inner-tree generation.
 The bucket array is rebuilt only when the inner tree remounts (`treeKey` = inputs version +
 retry counter). The full catalog of Suspense-produced situations this design answers is
-[suspense-situations.md](packages/rati/src/__tests__/suspense-situations.md)
+packages/rati/src/__tests__/suspense-situations.md
 (`packages/rati/src/__tests__/`).
 
 ### Lifecycle & teardown ordering (structural)
@@ -295,7 +295,7 @@ through. An island retrying *is* an island resolving, so there is no fourth phas
 `useScopeControls(scope)` reads a per-mandala-instance `RefreshController` off the
 **controls channel** — a second scope-keyed context registry next to the value channel,
 provided by the mandala around its whole inner tree. Design + decisions:
-[archive/directions-2026-07/mandala-refresh-and-ssr-sources.md](docs/archive/directions-2026-07/mandala-refresh-and-ssr-sources.md).
+docs/archive/directions-2026-07/mandala-refresh-and-ssr-sources.md.
 The moving parts:
 
 - **Re-runs happen in render.** `refresh(key)` marks the cell dirty and triggers a bare
@@ -683,15 +683,15 @@ holding `Router` never embeds component types). `route()`
 - A data producer runs **at most once per inner-tree generation** (Suspense replays and
   render discards never re-run it), plus explicitly modeled refresh re-runs — the contract
   the fuzz suite's run-count invariant pins
-  ([archive/mandala-testing.md](docs/archive/mandala-testing.md)).
+  (docs/archive/mandala-testing.md).
 
 ## Testing
 
 Suites live in `packages/rati/src/__tests__/` (deterministic `mandala/`, `router/`, `scope/`
 plus the randomized `fuzz/`). The testing strategy — the contract-altitude rule, the
 deterministic pin list, the fuzz harness design — is
-[archive/mandala-testing.md](docs/archive/mandala-testing.md); the execution effort is
-[docs/archive/efforts/mandala-fuzz/](docs/archive/efforts/mandala-fuzz/README.md). Suspense-facing testing rules
+docs/archive/mandala-testing.md; the execution effort is
+docs/archive/efforts/mandala-fuzz/README.md. Suspense-facing testing rules
 (the async-act mount requirement above all) are cataloged in
 `packages/rati/src/__tests__/suspense-situations.md`.
 
@@ -735,14 +735,14 @@ The `fuzz/` harnesses keep their own **model-wired** drivers — `scopeHarness.t
 `recompute` closure, and its own testid slot readers, and its mount is instrumented for the
 command model — none of which belong in the generic core; that reconciliation (and deleting
 the remaining deterministic-suite duplicates behind the entry) is the
-[testing-and-dx effort](docs/planned/testing-and-dx/README.md)'s later dogfood sweep. Effort
-record for the entry: [planned/testing-and-dx/](docs/planned/testing-and-dx/README.md).
+testing-and-dx effort (docs/planned/testing-and-dx/README.md)'s later dogfood sweep. Effort
+record for the entry: docs/planned/testing-and-dx/README.md.
 
 `fuzz/` holds two targets sharing one budget convention (`fuzz(n)`, `FUZZ_RUNS`,
 `FUZZ_LEVEL`, `FUZZ_SEED` — documented in `fuzz/arbitraries.ts`): the mandala's scope
 harness (`scopeHarness.tsx` / `model.ts`) and the router's route-table harness
 (`routerHarness.tsx` / `routerModel.ts`, effort
-[docs/archive/efforts/router-fuzz/](docs/archive/efforts/router-fuzz/README.md)). Each model is plain JS with no
+docs/archive/efforts/router-fuzz/README.md). Each model is plain JS with no
 imports from the engine it mirrors — where the router compiles a regex, its model walks
 segments — so a bug cannot hide behind a model that shares the implementation.
 
@@ -793,4 +793,4 @@ Lint deviates from a stock config for a generics-heavy framework: the type-machi
 because tsgolint's necessity analysis disagrees with tsc (it ignores
 `noUncheckedIndexedAccess` and strips load-bearing generic casts). tsc is the authoritative
 type gate. Commands: `vp build` / `vp test` / `vp run typecheck` / `vp lint` / `vp fmt` /
-`vp check`. Releasing: [RELEASING.md](RELEASING.md).
+`vp check`. Releasing: RELEASING.md.
