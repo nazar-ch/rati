@@ -3,7 +3,7 @@
 Status: planned 2026-07-18, cut at the close of the implementation session.
 
 The 2026-07-18 session shipped the design record's v1 in rati
-([data-package.md](docs/archive/directions-2026-07/data-package.md)): the legacy
+(docs/archive/directions-2026-07/data-package.md): the legacy
 `data/` layer (and its Babel decorator toolchain) removed, and the `rati/data` entry
 landed with all five primitives — `query`, `collection`, `pagedCollection`, `mutation`,
 `form`/`field` + the validator kit — plus the shared `itemMap` reconciler, `source()`
@@ -22,7 +22,7 @@ session deliberately left.
   store observables → reactive query). A per-primitive MobX `Reaction` tracks the producer's
   synchronous prefix during the real fetch and re-runs `refresh()` (coalesced by `debounce`);
   `pagedCollection` resets to the first page instead (cursors invalidate). Design pass +
-  the four cross-checks: [data-package.md §DATA-01](docs/archive/directions-2026-07/data-package.md#data-01--reactive-params-design-pass-2026-07-19).
+  the four cross-checks: docs/archive/directions-2026-07/data-package.md §DATA-01.
 - Deviations from the design record's sketched interfaces, made during implementation
   and reflected in reference.md:
   - `Collection.refresh()` exists, delegating to `query.refresh()` — the design's own
@@ -46,57 +46,57 @@ The records are the tracker — each carries its own `status:` field
 (`grep -l 'status: open' issues/*.md` is the open list). This map is narrative and
 ordering only:
 
-- [DATA-01 — `reactive` params for query](issues/DATA-01-reactive-query-params.md) —
+- DATA-01 — `reactive` params for query (issues/DATA-01-reactive-query-params.md) —
   the design pass + `reactive` on `query`/`collection`/`pagedCollection`, tests,
   reference/design-record docs (2026-07-19).
-- [DATA-02 — guide coverage for the data layer](issues/DATA-02-guide-coverage.md) —
+- DATA-02 — guide coverage for the data layer (issues/DATA-02-guide-coverage.md) —
   `guide.md` teaches the data-layer model end to end (2026-07-19).
-- [DATA-03 — the load-bearing consumer migrations](issues/DATA-03-consumer-migrations.md)
+- DATA-03 — the load-bearing consumer migrations (issues/DATA-03-consumer-migrations.md)
   — all three legs ran on jnana (PR nazar-ch/jnana#822, merged, 2026-07-20); the verdict
   and findings below.
-- [DATA-04 — extraction & entry-layout decision](issues/DATA-04-extraction-decision.md)
+- DATA-04 — extraction & entry-layout decision (issues/DATA-04-extraction-decision.md)
   — companion package vs entry, `rati/mobx` absorption, forms subpath.
-- [DATA-05 — a single-value write seam for `query`](issues/DATA-05-query-write-seam.md)
+- DATA-05 — a single-value write seam for `query` (issues/DATA-05-query-write-seam.md)
   — `set`/`patch` (through `onSuccess`, so a collection's map stays coherent), tests,
   reference.md (2026-07-20).
-- [DATA-06 — `refreshes` sees the mutation call's arguments](issues/DATA-06-refreshes-args.md)
+- DATA-06 — `refreshes` sees the mutation call's arguments (issues/DATA-06-refreshes-args.md)
   — the declaration receives the call's args at both fire sites; keyed tests pin the
   FND-106 choreography with DATA-05 (2026-07-20).
-- [DATA-07 — `field.props` under `exactOptionalPropertyTypes`](issues/DATA-07-field-props-exact-optional.md)
+- DATA-07 — `field.props` under `exactOptionalPropertyTypes` (issues/DATA-07-field-props-exact-optional.md)
   — `errorMessage` is absent while clean, genuinely `?:` (2026-07-20).
-- [DATA-08 — the fetch-boilerplate helper decision](issues/DATA-08-fetch-helper-decision.md)
+- DATA-08 — the fetch-boilerplate helper decision (issues/DATA-08-fetch-helper-decision.md)
   — decided 2026-07-25: consumer-side (jnana's `okJson.ts`); rati's share moved to DATA-10.
-- [DATA-09 — pin the unpinned data branches](issues/DATA-09-unpinned-branches.md)
+- DATA-09 — pin the unpinned data branches (issues/DATA-09-unpinned-branches.md)
   — test-only: the branches the 2026-07-20 coverage map found bare.
 
 Second round (cut 2026-07-25 from the wave-two feedback, below; decisions in each record):
 
-- [DATA-10 — two-level `SourceError`](issues/DATA-10-two-level-source-error.md) — honor
+- issues/DATA-10-two-level-source-error.md — honor
   `retryable` as the transient/terminal top level, bless the code vocabulary
   (`not-available` / `forbidden` / `invalid` / `unreachable` / `failed`), give
   `toSourceError` a real seam.
-- [DATA-11 — default-on retry](issues/DATA-11-default-on-retry.md) — retry "just works":
+- issues/DATA-11-default-on-retry.md — retry "just works":
   no config, gated by error class, jittered backoff; absorbs backlog FND-02.
-- [DATA-12 — rename `Query.load()` → `prime()`](issues/DATA-12-prime-rename.md) — the
+- DATA-12 — rename `Query.load()` → `prime()` (issues/DATA-12-prime-rename.md) — the
   ensure keeps its semantics and loses its trap of a name.
-- [DATA-13 — `reconciled()` + collection as full facade](issues/DATA-13-reconciled-and-collection-facade.md)
+- DATA-13 — `reconciled()` + collection as full facade (issues/DATA-13-reconciled-and-collection-facade.md)
   — the reconciler split out of the fetch (composite payloads get identity-stable list
   halves); `.query` reach-through dies. No fold into `query` — clean extension.
-- [DATA-14 — `keyed()`](issues/DATA-14-keyed-factory.md) — the thin, primitive-agnostic
+- issues/DATA-14-keyed-factory.md — the thin, primitive-agnostic
   lazy per-key instance map.
-- [DATA-15 — brand the ready source](issues/DATA-15-ready-source-branding.md) —
+- DATA-15 — brand the ready source (issues/DATA-15-ready-source-branding.md) —
   `Source<ReadyQuery<T>>`; type-level only.
-- [DATA-16 — data-layer test helpers](issues/DATA-16-data-testing-helpers.md) —
+- DATA-16 — data-layer test helpers (issues/DATA-16-data-testing-helpers.md) —
   `controllableQuery` + `controllableProducer` in `rati/testing`.
-- [DATA-17 — the "choosing a shape" page](issues/DATA-17-choosing-a-shape-page.md) — the
+- DATA-17 — the "choosing a shape" page (issues/DATA-17-choosing-a-shape-page.md) — the
   doc gap both waves ranked first.
-- [DATA-18 — "with React Aria Components"](issues/DATA-18-react-aria-section.md) — the
+- DATA-18 — "with React Aria Components" (issues/DATA-18-react-aria-section.md) — the
   consumer-stack field notes, mined from jnana.
-- [DATA-19 — form success state](issues/DATA-19-form-success-state.md) — **deferred**:
+- issues/DATA-19-form-success-state.md — **deferred**:
   jnana latches app-side; the record parks the two-level-shape discussion.
 
 Related, outside this effort:
-[FND-03 — `is.class` under minification](docs/backlog/findings/issues/FND-03-is-class-minification.md)
+FND-03 — `is.class` under minification (docs/backlog/findings/issues/FND-03-is-class-minification.md)
 runs in this batch (the class-factory pattern DATA-13/14 bless must not be prod-broken).
 
 Batch structure: wave 1 runs four independent legs — A: DATA-10+11 (errors + retry) ·

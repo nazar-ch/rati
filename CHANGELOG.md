@@ -8,7 +8,7 @@ earlier releases are not reconstructed.
 **Write the entry when you make the change, not when you release it** — in the
 `## Unreleased` section below, in the same commit as the behavior. Releasing then only
 retitles that section (the step is in
-[docs/current/RELEASING.md](docs/current/RELEASING.md)); it is never the moment the notes
+docs/current/RELEASING.md); it is never the moment the notes
 get *written*. 0.7.0 is why: the release-time step was the whole convention, the first
 release after it shipped with no entry at all, and the consumer that adopted it read
 `git log v0.6.3..v0.7.0` instead. An empty `## Unreleased` at release time is a real

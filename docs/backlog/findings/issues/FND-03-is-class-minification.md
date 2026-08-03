@@ -71,6 +71,6 @@ break was client-only. Headless Chrome against the production server:
   `dc` is the bundle's `class{count=0;…}`;
 - after — the counter markup renders, no console error.
 
-[REV-03](docs/planned/production-review/issues/REV-03-packaging-and-production-build.md)
+REV-03
 step 1 ("the known bug first") is satisfied by this; the rest of that item — including
 its minification-robustness sweep for sibling string-shape assumptions — stands.

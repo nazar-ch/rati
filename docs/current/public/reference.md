@@ -1,7 +1,7 @@
 # rati — reference
 
 The complete public API, by entry point. For the concepts and worked examples, start with
-the [guide](guide.md).
+the guide.md.
 
 | Entry | Contents |
 | --- | --- |
@@ -165,16 +165,16 @@ island({ scope: feedScope, component: Feed, loading: FeedSkeleton, ssr: false })
 ```
 
 - **The whole island opts out**, loads and sources alike. A source marked
-  [`ssr: true`](#ssr-capable-sources--the-ssr-marker) inside an `ssr: false` island stays
+  §SSR-capable sources — the ssr marker inside an `ssr: false` island stays
   pending on the server: the island-level decision wins, and there is no per-load opt-out
   (resolution is all-or-nothing by design).
 - **Nothing reaches the payload**, so nothing reaches the server's error signal either —
   an opted-out island can't produce the 404/5xx a server-side load failure would (see
-  [response statuses](ssr.md#response-statuses-and-load-failures)).
+  response statuses (ssr.md §Response statuses, and load failures)).
 - **Client-only apps are unaffected** — with no server in the picture the option does
   nothing, and the island resolves on its first render as always.
 
-See the guide's [server rendering](guide.md#server-rendering) section for when to reach
+See the guide's server rendering (guide.md §Server rendering) section for when to reach
 for it.
 
 ### `keepStale` — keeping the previous content
@@ -188,7 +188,7 @@ island({ scope: stationScope, component: Board, loading: Skeleton, keepStale: tr
 ```
 
 - **`useScopeControls(scope).isStale`** is true for exactly that window, and `phase` stays
-  `'ready'` — see [useScopeControls](#usescopecontrolsscope).
+  `'ready'` — see §useScopeControls(scope).
 - **The kept content renders the previous params' props**, so the subtree can briefly
   show old data under a new URL. `isStale` is how it says so. The continuity is visual, not
   instance-level: the kept content is a fresh mount of the component and the swap mounts
@@ -291,9 +291,9 @@ island({
 - **The budget is per failure streak.** It is restored when the island commits content, and
   when its inputs change — which also cancels a countdown belonging to the old ones.
 - **Client-only.** A server render takes its one attempt per request and reports the failure
-  as always (see [response statuses](ssr.md#response-statuses-and-load-failures)); the
+  as always (see response statuses — ssr.md §Response statuses, and load failures); the
   client's own resolution then runs the policy — including over a failure the server
-  [dehydrated](#ssrerrors--the-error-slot-in-the-servers-html), since `retryable` crosses
+  §ssrErrors — the error slot in the server's HTML, since `retryable` crosses
   the wire.
 - **`count: 0` and `false` are identical** — both opt out. Types: `RetryOption`
   (`RetryOptions | false`).
@@ -328,16 +328,16 @@ island({
   say something else before rejecting.
 - **The response status is unchanged.** Every failure is recorded in either mode, and
   `renderApp` derives the status from it — a 500 with a rendered error slot is still a 500
-  (see [response statuses](ssr.md#response-statuses-and-load-failures)).
+  (see response statuses — ssr.md §Response statuses, and load failures).
 - **Without an `error` slot there is nothing to paint deterministically**, so the throw
   stands and the server degrades exactly as `'retry'` does. The failure still crosses the
   wire, so the client surfaces it through the nearest outer ErrorBoundary instead of
   silently re-running the load.
 - **It needs the payload.** Under a bare `prerender` with no `HydrationProvider` — and on a
   client-only render — the option does nothing, for the same reason the source-side
-  [`ssr` marker](#ssr-capable-sources--the-ssr-marker) is gated the same way: a first paint
+  §SSR-capable sources — the ssr marker is gated the same way: a first paint
   that hydration contradicts a moment later is worse than the degradation it replaces.
-- **With [`retry`](#retry--trying-again-automatically) configured, the policy picks a
+- **With §retry — trying again automatically configured, the policy picks a
   dehydrated failure up** like any other — it asks whether this is a `failed` it still has
   budget for, and where the failure came from is not part of that question. So the error
   slot the HTML shipped is replaced by the `loading` slot on the first client render, and
@@ -386,7 +386,7 @@ error slot's `retry`). `refresh(key)`:
   a failed re-fetch keeps the previous value, logs, and still resolves.
 
 **The status half.** `phase` is the island's *aggregate* phase — resolution is
-all-or-nothing, so there is no per-load phase to read. A [stale](#keepstale--keeping-the-previous-content)
+all-or-nothing, so there is no per-load phase to read. A §keepStale — keeping the previous content
 window reports `'ready'` with `isStale: true`: content is on screen, it just belongs to the
 previous resolution. Gate skeletons on `phase === 'loading'` and dimming on `isStale`, and
 the two compose without fighting. `isStale` is view-wide; a per-key `refresh(key)` reports
@@ -425,7 +425,7 @@ type SourceState<T> =
 | `isSource(x)` | type guard |
 | `toSourceError(reason)` | map a thrown value to a `SourceError` |
 | `NotAvailableError` | throw/reject with it → `error.code === 'not-available'` |
-| `SourceError` | the unified failure — see [the two levels](#sourceerror--the-two-levels) |
+| `SourceError` | the unified failure — see §SourceError — the two levels |
 | `SourceErrorCode` | the blessed `code` vocabulary (an open set) |
 | `SourceSSR` | the `ssr` marker type |
 | `SourceSymbol` | the brand symbol |
@@ -449,7 +449,7 @@ interface SourceError {
 ```
 
 - **`retryable` is the top level** — the transient/terminal axis, and the only thing the
-  automatic [`retry`](#retry--trying-again-automatically) policy consults. `true` = a blip
+  automatic §retry — trying again automatically policy consults. `true` = a blip
   worth another attempt; `false` = an answer, not a fault; **absent** = the app never
   classified it.
 - **`code` is the flavor** — what the error slot renders on. The blessed vocabulary, with
@@ -488,7 +488,7 @@ A load that classifies nothing still works: a plain `throw new Error(…)` is
 `{ code: 'not-available' }` as it always was.
 
 A source that changes value re-runs the loads that read it, by the same rules a
-[`refresh()`](#usescopecontrolsscope) cascade follows: the new value goes through the load's
+§useScopeControls(scope) cascade follows: the new value goes through the load's
 `equals` gate (deep by default), and a changed one re-runs exactly the downstream loads whose
 producers read the key. So deriving from live data in a dependent load works — it tracks:
 
@@ -583,7 +583,7 @@ route('/settings', 'settings', () => null, {
 ```
 
 A **string** target is an absolute path (it starts with `/`; a relative one is
-[refused](#routerstore)), used verbatim — so under a [`basename`](#routerstore) it must
+refused), used verbatim — so under a `basename` (§`createRouter(routes, options?)` → `Router`) it must
 include it: write what the URL bar should say (`to: '/admin/b'`, not `to: '/b'`). This is
 the same rule `getPath` follows for a string, and the reason to prefer an object target
 when the destination is a route in the table: that one is resolved through it, basename
@@ -705,7 +705,7 @@ before rendering — whether the component is mounted bare or folded into a rout
 `PreloadableLazyComponent`.
 
 It also carries a `.moduleId` — which module it imports, as the client manifest keys it.
-You never write it: [`rati/vite`](#rativite)'s transform appends it as a second argument
+You never write it: §rati/vite's transform appends it as a second argument
 at each call site, so a server render can name the route's chunk (`prepareRoute` surfaces
 it; `renderApp` turns it into a `modulepreload`). Without the plugin it is absent, and
 `lazy` behaves exactly as it always did.
@@ -737,7 +737,7 @@ deepest live declaration per slot wins (a page beats a layout default); on the c
 `HeadProvider` syncs `document.title` and the managed `<meta>` tags on hydration and
 every navigation; on the server the winners are read after prerender (`headTags` in
 `rati/ssr`, done for you by `renderApp`). Tags that don't need dedupe use native React
-19 hoisting or the HTML shell — see the [server rendering guide](ssr.md#titles-and-meta).
+19 hoisting or the HTML shell — see the server rendering guide (ssr.md §Titles and meta).
 
 | Export | Purpose |
 | --- | --- |
@@ -754,12 +754,12 @@ every navigation; on the server the winners are read after prerender (`headTags`
 
 The server-facing surface. (`HydrationProvider` and `readHydration` run on the client —
 mount the provider on both sides so the trees match.) The full flow with code:
-[server rendering guide](ssr.md).
+server rendering guide (ssr.md).
 
 | Export | Purpose |
 | --- | --- |
 | `renderApp({ url, createApp, assets?, onError? })` | the whole per-request loop: memory history → `createApp` → `prepareRoute` → prerender → dispose. Returns `{ kind: 'rendered', html, status, headTags, stateScript, hydration, errors, matchedCatchAll }` \| `{ kind: 'redirect', to, permanent, status }` \| `{ kind: 'no-match', status }` |
-| `RenderAssets` | `{ bootstrapModules?, styleTags?, preloadTagsFor? }` — what the built client needs from the page. Normally `virtual:rati/assets` from [`rati/vite`](#rativite); `bootstrapModules` reaches the prerender, the rest joins `headTags` |
+| `RenderAssets` | `{ bootstrapModules?, styleTags?, preloadTagsFor? }` — what the built client needs from the page. Normally `virtual:rati/assets` from §rati/vite; `bootstrapModules` reaches the prerender, the rest joins `headTags` |
 | `renderToHtml(node, { bootstrapModules?, onError? })` | drain `react-dom/static` `prerender` to a string (it awaits Suspense; `renderToString` cannot) |
 | `serializeHydration(state)` | the payload as an inert `application/json` script tag (CSP-friendly, placement-free); warns outside production about values that don't survive JSON |
 | `readHydration()` | client: parse the embedded payload; `null` → resolve from scratch |
@@ -771,10 +771,10 @@ mount the provider on both sides so the trees match.) The full flow with code:
 
 Async load results and `ssr: true` sources dehydrate as values; `ssr: { hydrate }` sources
 dehydrate as seeds; unmarked sources stay pending under SSR and come alive after hydration
-(see [Sources §SSR-capable sources](#ssr-capable-sources--the-ssr-marker)). A load that
+(see §SSR-capable sources — the ssr marker). A load that
 *rejects* is recorded in `errors` — statuses derive from it (`not-available` → 404); the
 HTML degrades to the loading slot and the client retries the load after hydration, unless
-the island set [`ssrErrors: 'dehydrate'`](#ssrerrors--the-error-slot-in-the-servers-html),
+the island set §ssrErrors — the error slot in the server's HTML,
 in which case the failure also lands in `dehydratedErrors` (the payload's third section)
 and the client hydrates onto the error slot instead. `errors` is the flat list either way —
 it never leaves the server, and it is what the status derives from.
@@ -785,7 +785,7 @@ it never leaves the server, and it is what the status derives from.
 
 Optional — requires the `vite` peer dependency. Build-time only: it runs in the Vite
 process and nothing from this entry reaches the browser. Walkthrough:
-[server rendering guide](ssr.md#the-vite-plugin).
+server rendering guide (ssr.md §The Vite plugin).
 
 | Export | Purpose |
 | --- | --- |
@@ -809,8 +809,8 @@ without the plugin.
 
 ## `rati/server`
 
-Production only — dev is the [plugin](#rativite)'s job, so there is no branch in here.
-Walkthrough: [server rendering guide](ssr.md#the-production-handler).
+Production only — dev is the §rati/vite's job, so there is no branch in here.
+Walkthrough: server rendering guide (ssr.md §The production handler).
 
 Nothing in here imports React — `react` is an optional peer, so a server-only workspace
 can install rati for `createRequestHandler` alone and never add it.
@@ -820,7 +820,7 @@ can install rati for `createRequestHandler` alone and never add it.
 | `createRequestHandler({ render, template?, assets?, placeholders?, onError? })` | → `(request: Request) => Promise<Response>`. The result kinds as HTTP: 30x with `Location`, the rendered page at its derived status, 404 for `no-match`, and a 500 CSR fallback if `render` throws |
 | `serve({ handler, staticDir?, port? })` | → `Promise<Server>`. A `node:http` listener for the handler, with minimal static serving. Dependency-free |
 
-`render` is the server entry's (the [Layer-1 contract](#ratissr)). `template` is your HTML
+`render` is the server entry's (the §rati/ssr). `template` is your HTML
 shell as a string — a whole-document app needs none. `placeholders` must match
 `ratiSsr({ placeholders })`. `onError` defaults to `console.error`.
 
@@ -849,10 +849,10 @@ MobX out of their bundle.
 
 | Export | Purpose |
 | --- | --- |
-| `observableSource(getState, attach?, { ssr }?)` | adapt a MobX derivation to a `Source` — the bridge between MobX state and scope loads; `ssr` forwards the [SSR marker](#ssr-capable-sources--the-ssr-marker) |
+| `observableSource(getState, attach?, { ssr }?)` | adapt a MobX derivation to a `Source` — the bridge between MobX state and scope loads; `ssr` forwards the §SSR-capable sources — the ssr marker |
 
 The MobX-shaped data primitives (`query`, `collection`, `mutation`, `form`) live in the
-[`rati/data`](#ratidata) entry, which builds on this bridge. (The former legacy exports —
+§rati/data entry, which builds on this bridge. (The former legacy exports —
 `ActiveData`, `remoteData`, `remoteDataKey`, `responseKey` — are gone; `rati/data` is
 their successor.)
 
@@ -861,7 +861,7 @@ their successor.)
 ## `rati/data`
 
 **Experimental.** Optional — requires the `mobx` peer dependency, like
-[`rati/mobx`](#ratimobx) (whose `observableSource` it builds on). The successor of the
+§rati/mobx (whose `observableSource` it builds on). The successor of the
 legacy data layer and of app-side `FetchStore` families; design record:
 `docs/archive/directions-2026-07/data-package.md`. The surface may still move; it is
 intended to eventually extract into a companion package.
@@ -882,11 +882,11 @@ topology and one for row identity:
 
 Instance-owned data: each primitive is an object living in your store graph; sharing
 happens by sharing the instance — no keyed cache, no normalized store. Everything that
-fails normalizes to [`SourceError`](#sources), so one `code` switch
+fails normalizes to §Sources, so one `code` switch
 works from island error slots to in-content badges.
 
 Not sure which one a given piece of data is? This entry documents each primitive; the
-guide's [choosing a shape](guide.md#choosing-a-shape) makes the calls between them —
+guide's choosing a shape (guide.md §Choosing a shape) makes the calls between them —
 composite payload vs list, store-owned vs per-mount, a bounded map vs a selection.
 
 **The scope seam.** Read-side primitives expose `source()`: pending until the first
@@ -938,7 +938,7 @@ failure. Under SSR the primitives stay pending (a `Source` attaches in effects) 
 entry is for the interactive app, not the SSR path.
 
 **`prime()` vs the scope's `.load({…})`** — same word, two surfaces, and only one of
-them is here. A scope's [`.load(level)`](#loadlevel) declares a waterfall level and is
+them is here. A scope's §.load(level) declares a waterfall level and is
 the framework's resolution machinery; a data primitive's `prime()` is the *ensure* on
 one instance: fetch if there is nothing (or an error), otherwise do nothing. Wiring
 `prime()` to a user gesture ("Reload") is the classic mistake — an already-ready query
@@ -975,7 +975,7 @@ the identity half: `items`, `getByKey`, `patchItem`, `upsert`, `insert`, `remove
 same contract as inside a collection, including the patch marking that lets the next
 reconcile restore server truth. `collection` is now literally this composition, pre-wired.
 (Which of the two a response wants:
-[choosing a shape](guide.md#choosing-a-shape).)
+choosing a shape (guide.md §Choosing a shape).)
 
 Two things follow from the derivation being **eager** (a MobX reaction established at
 construction, re-reconciling whenever the getter's output changes — precisely when a
@@ -1018,7 +1018,7 @@ The tracked window is the producer's **synchronous prefix only** — reads after
 `await` are outside MobX's tracking, so destructure every reactive dependency at the top.
 `pagedCollection`'s `reactive` is *reset*, not refresh: a tracked param change invalidates
 every cursor, so the list resets to the first page (the island drops to its loading slot).
-The rule for choosing between this and the scope's [selective refresh](#usescopecontrolsscope):
+The rule for choosing between this and the scope's §useScopeControls(scope):
 a value in the URL belongs to the scope (a route-param change re-resolves); a value in a
 store observable belongs to the reactive query.
 
@@ -1033,7 +1033,7 @@ That shape is action-compatible — but **don't wire it as a function `action=`*
 inputs are controlled by the fields. React resets a form once an action settles, and since
 a failed submit still *completes* the action, the reset erases the draft on exactly the
 submits the user needs to correct. Wire it through `onSubmit` + `preventDefault` instead;
-the guide's [with React Aria Components](guide.md#with-react-aria-components) has the
+the guide's with React Aria Components (guide.md §With React Aria Components) has the
 mechanism and the wrapper to put it in.
 
 ### `keyed` — one instance per id
@@ -1120,7 +1120,7 @@ export const spaceScope = scope({ spaceId: input<SpaceId>() })
 whose payloads mention the same entity hold two independent instances. An *unbounded*
 key space (a search result's every row) wants a **selection** — one instance whose
 parameters change, via `reactive: true` or a scope input — not a map that grows for the
-lifetime of the tab ([choosing a shape](guide.md#choosing-a-shape) draws the bounded /
+lifetime of the tab (choosing a shape — guide.md §Choosing a shape draws the bounded /
 unbounded line). The middle case — per-key instances the *caller* retires, like a detail
 dialog per id closed behind the user — is still a map: `delete(key)` on close is the
 caller knowing the key is spent, not a cache policy. And because `get` creates, call it from an action, an event
@@ -1225,7 +1225,7 @@ throw from it to model a store rejecting a stale seed; combines with `loads` for
 
 ### `rati/testing/data`
 
-The same hand-drive idea for the [`rati/data`](#ratidata) primitives, in its own subpath
+The same hand-drive idea for the §rati/data primitives, in its own subpath
 because it imports MobX — an app that never touches `rati/data` keeps the optional peer
 uninstalled and still gets everything above.
 
@@ -1412,7 +1412,7 @@ hydration collector/provider, then `hydrateRoot` the output and assert the clien
 re-run its loads. This kit is that flow, so nobody hand-rolls the reader loop and the
 container juggling again. **jsdom-environment only** (where SSR tests run); no streaming (the
 engine's non-goal), and no whole-`document` hydration or HTTP-level rendering — `renderApp`
-and the [`rati/server`](#ratiserver) handler keep their own setups.
+and the §rati/server handler keep their own setups.
 
 **`prerenderToString(node, options?)`** is the bare drain loop — `prerender` (not
 `renderToString`, which can't await Suspense) reduced to one HTML string, with every resolved
@@ -1447,7 +1447,7 @@ plus the dehydrated payload — with a `.hydrate()` for the **client half**.
 | `data` | dehydrated resolved values (promise loads, `ssr: true` loaders): `mandalaId → key → value` |
 | `seeds` | dehydrated live-source seeds (`ssr: { dehydrate, hydrate }`) |
 | `errors` | loads that rejected during the render — the server's 404/5xx signal |
-| `dehydratedErrors` | the payload's `errors` section: the failures [`ssrErrors: 'dehydrate'`](#ssrerrors--the-error-slot-in-the-servers-html) islands carry to the client, which `.hydrate()` feeds back. Empty in the default mode |
+| `dehydratedErrors` | the payload's `errors` section: the failures §ssrErrors — the error slot in the server's HTML islands carry to the client, which `.hydrate()` feeds back. Empty in the default mode |
 | `hydrate(clientNode?, options?)` | hydrate the HTML on the client, feeding the payload back. See below |
 
 **`.hydrate(clientNode?, options?)`** pre-fills a container with the server HTML, wraps
@@ -1500,7 +1500,7 @@ test('the page hydrates without refetching', async () => {
 **Route-level round-trips are a documented composition**, not a helper — the kit owns the
 prerender→collect→hydrate mechanics; the router-SSR wiring stays yours to assemble (so the
 entry doesn't freeze it). Build a memory-history router for the server and a browser-history
-one for the client seeded from [`prepareRoute`](#ratissr), and hand the two trees to
+one for the client seeded from §rati/ssr, and hand the two trees to
 `ssrRender` / `.hydrate`:
 
 ```ts

@@ -16,8 +16,8 @@ Standing rules for every task: run `vp run rati#typecheck` (or `website#typechec
 keep `docs/*.md` in sync with behavior changes; never publish.
 
 **Prerequisite (in execution, not a task here):** the stores/router redesign —
-[naming.md §6](docs/archive/directions-2026-07/naming.md) +
-[stores-and-router.md](docs/research/stores-and-router.md). **Landed 2026-07-26**, beyond
+docs/archive/directions-2026-07/naming.md §6 +
+docs/research/stores-and-router.md. **Landed 2026-07-26**, beyond
 Option A: the stores skeleton is gone from rati; the surface is `createRouter(routes,
 options?)` → `Router` + `RouterProvider` + `RouterOutlet` (no `StoresProvider` /
 `createStoresHook` — app stores are app code). DOC-2 and SITE-1 consume its result.
@@ -36,7 +36,7 @@ options?)` → `Router` + `RouterProvider` + `RouterOutlet` (no `StoresProvider`
 > ssr-baseline-remains effort (docs/planned/ssr-baseline-remains/).
 
 All grounded in
-[ssr-nazar-patterns.md](docs/archive/directions-2026-07/ssr-nazar-patterns.md); mutually
+docs/archive/directions-2026-07/ssr-nazar-patterns.md; mutually
 independent.
 
 - **CORE-1 — Hydration payload type + safe serialization.** In `rati/ssr`: a combined
@@ -69,14 +69,14 @@ independent.
 ## Batch B — documentation
 
 - **DOC-1 — Maintainer review of the public docs.** *(User.)* Review
-  [docs/current/public/guide.md](docs/current/public/guide.md) and [docs/current/public/reference.md](docs/current/public/reference.md) —
+  docs/current/public/guide.md and docs/current/public/reference.md —
   positioning wording, example tone, anything over- or under-promised.
 - **DOC-2 — Reconcile the stores surface.** After the stores/router redesign lands:
   verify/fix the guide's App-setup section and the reference's §Stores + `RouterStore`
   constructor signature against the real exports; remove the "being finalized" notes.
   Depends on: the prerequisite; blocks SITE-1's app wiring being final.
 - **DOC-3 — Public README.** Rewrite the repo/package README from the boilerplate copy in
-  [website-plan.md §2](website-plan.md): tagline, the before/after example, three
+  website-plan.md §2: tagline, the before/after example, three
   bullets, install + minimal setup, links to guide/reference. No "framework", no
   vocabulary meta-talk.
 - **DOC-4 — Package metadata.** `packages/rati/package.json`: `description` (the
@@ -90,12 +90,12 @@ independent.
 - **SITE-1 — Workspace scaffold.** `website/` yarn workspace (name `website`) consuming
   rati via `rati-dev`; `vp` scripts (`dev`, `build`, `typecheck`, `lint` green);
   routes table + app setup per the redesigned stores surface; placeholder pages for the
-  full site map in [website-plan.md §4](website-plan.md). Depends on: prerequisite
+  full site map in website-plan.md §4. Depends on: prerequisite
   (app wiring), nothing else.
 - **SITE-2 — Data layer + network panel.** The bundled Swiss-network dataset with
   now-relative schedule generation; the simulated API client; `NetworkConditionsStore`
   (latency, jitter, failure modes incl. `not-available`); the docked panel component with
-  replay/reset. Spec: [website-plan.md §3](website-plan.md). Depends on: SITE-1.
+  replay/reset. Spec: website-plan.md §3. Depends on: SITE-1.
 - **SITE-3 — SSR server.** Node server on the nazar.ch pattern (dev: Vite middleware;
   prod: static + rendered), using CORE-1/2/3 helpers (fall back to the nazar pattern
   inline if a helper hasn't landed, with a TODO). Titles via CORE-4 when available.
@@ -108,7 +108,7 @@ independent.
 ## Batch D — website pages
 
 All depend on SITE-1/2/4; SSR-dependent demos (SITE-28) also on SITE-3. Copy drafts and
-per-page specs: [website-plan.md §5](website-plan.md).
+per-page specs: website-plan.md §5.
 
 - **SITE-10 — Hero board** (split-flap + clock source + panel wiring).
 - **SITE-11 — Before/after code component** (side-by-side, shiki highlighting).
