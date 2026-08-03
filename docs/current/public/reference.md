@@ -165,7 +165,7 @@ island({ scope: feedScope, component: Feed, loading: FeedSkeleton, ssr: false })
 ```
 
 - **The whole island opts out**, loads and sources alike. A source marked
-  §SSR-capable sources — the ssr marker inside an `ssr: false` island stays
+  `ssr: true` (§SSR-capable sources — the ssr marker) inside an `ssr: false` island stays
   pending on the server: the island-level decision wins, and there is no per-load opt-out
   (resolution is all-or-nothing by design).
 - **Nothing reaches the payload**, so nothing reaches the server's error signal either —
@@ -238,8 +238,8 @@ island({ scope: stationScope, component: Board, loading: Skeleton, loadingDelayM
 
 A flaky backend makes every consumer write the same retry button, so the island writes it
 for you: **the policy is on by default**, with no `retry` option anywhere. An island whose
-resolution fails with a failure your app classified [`retryable:
-true`](#sourceerror--the-two-levels) takes two more attempts of its own before it shows the
+resolution fails with a failure your app classified `retryable: true` (§SourceError — the two levels)
+takes two more attempts of its own before it shows the
 `error` slot.
 
 ```ts
@@ -293,7 +293,7 @@ island({
 - **Client-only.** A server render takes its one attempt per request and reports the failure
   as always (see response statuses — ssr.md §Response statuses, and load failures); the
   client's own resolution then runs the policy — including over a failure the server
-  §ssrErrors — the error slot in the server's HTML, since `retryable` crosses
+  dehydrated (§ssrErrors — the error slot in the server's HTML), since `retryable` crosses
   the wire.
 - **`count: 0` and `false` are identical** — both opt out. Types: `RetryOption`
   (`RetryOptions | false`).
@@ -488,7 +488,7 @@ A load that classifies nothing still works: a plain `throw new Error(…)` is
 `{ code: 'not-available' }` as it always was.
 
 A source that changes value re-runs the loads that read it, by the same rules a
-§useScopeControls(scope) cascade follows: the new value goes through the load's
+`refresh()` (§useScopeControls(scope)) cascade follows: the new value goes through the load's
 `equals` gate (deep by default), and a changed one re-runs exactly the downstream loads whose
 producers read the key. So deriving from live data in a dependent load works — it tracks:
 
@@ -771,10 +771,10 @@ server rendering guide (ssr.md).
 
 Async load results and `ssr: true` sources dehydrate as values; `ssr: { hydrate }` sources
 dehydrate as seeds; unmarked sources stay pending under SSR and come alive after hydration
-(see §SSR-capable sources — the ssr marker). A load that
+(see Sources §SSR-capable sources — §SSR-capable sources — the ssr marker). A load that
 *rejects* is recorded in `errors` — statuses derive from it (`not-available` → 404); the
 HTML degrades to the loading slot and the client retries the load after hydration, unless
-the island set §ssrErrors — the error slot in the server's HTML,
+the island set `ssrErrors: 'dehydrate'` (§ssrErrors — the error slot in the server's HTML),
 in which case the failure also lands in `dehydratedErrors` (the payload's third section)
 and the client hydrates onto the error slot instead. `errors` is the flat list either way —
 it never leaves the server, and it is what the status derives from.
@@ -809,7 +809,7 @@ without the plugin.
 
 ## `rati/server`
 
-Production only — dev is the §rati/vite's job, so there is no branch in here.
+Production only — dev is the plugin (§rati/vite)'s job, so there is no branch in here.
 Walkthrough: server rendering guide (ssr.md §The production handler).
 
 Nothing in here imports React — `react` is an optional peer, so a server-only workspace
@@ -820,7 +820,7 @@ can install rati for `createRequestHandler` alone and never add it.
 | `createRequestHandler({ render, template?, assets?, placeholders?, onError? })` | → `(request: Request) => Promise<Response>`. The result kinds as HTTP: 30x with `Location`, the rendered page at its derived status, 404 for `no-match`, and a 500 CSR fallback if `render` throws |
 | `serve({ handler, staticDir?, port? })` | → `Promise<Server>`. A `node:http` listener for the handler, with minimal static serving. Dependency-free |
 
-`render` is the server entry's (the §rati/ssr). `template` is your HTML
+`render` is the server entry's (the Layer-1 contract — §rati/ssr). `template` is your HTML
 shell as a string — a whole-document app needs none. `placeholders` must match
 `ratiSsr({ placeholders })`. `onError` defaults to `console.error`.
 
@@ -882,7 +882,7 @@ topology and one for row identity:
 
 Instance-owned data: each primitive is an object living in your store graph; sharing
 happens by sharing the instance — no keyed cache, no normalized store. Everything that
-fails normalizes to §Sources, so one `code` switch
+fails normalizes to `SourceError` (§Sources), so one `code` switch
 works from island error slots to in-content badges.
 
 Not sure which one a given piece of data is? This entry documents each primitive; the
@@ -1018,7 +1018,7 @@ The tracked window is the producer's **synchronous prefix only** — reads after
 `await` are outside MobX's tracking, so destructure every reactive dependency at the top.
 `pagedCollection`'s `reactive` is *reset*, not refresh: a tracked param change invalidates
 every cursor, so the list resets to the first page (the island drops to its loading slot).
-The rule for choosing between this and the scope's §useScopeControls(scope):
+The rule for choosing between this and the scope's selective refresh (§useScopeControls(scope)):
 a value in the URL belongs to the scope (a route-param change re-resolves); a value in a
 store observable belongs to the reactive query.
 
@@ -1447,7 +1447,7 @@ plus the dehydrated payload — with a `.hydrate()` for the **client half**.
 | `data` | dehydrated resolved values (promise loads, `ssr: true` loaders): `mandalaId → key → value` |
 | `seeds` | dehydrated live-source seeds (`ssr: { dehydrate, hydrate }`) |
 | `errors` | loads that rejected during the render — the server's 404/5xx signal |
-| `dehydratedErrors` | the payload's `errors` section: the failures §ssrErrors — the error slot in the server's HTML islands carry to the client, which `.hydrate()` feeds back. Empty in the default mode |
+| `dehydratedErrors` | the payload's `errors` section: the failures `ssrErrors: 'dehydrate'` (§ssrErrors — the error slot in the server's HTML) islands carry to the client, which `.hydrate()` feeds back. Empty in the default mode |
 | `hydrate(clientNode?, options?)` | hydrate the HTML on the client, feeding the payload back. See below |
 
 **`.hydrate(clientNode?, options?)`** pre-fills a container with the server HTML, wraps
@@ -1500,7 +1500,7 @@ test('the page hydrates without refetching', async () => {
 **Route-level round-trips are a documented composition**, not a helper — the kit owns the
 prerender→collect→hydrate mechanics; the router-SSR wiring stays yours to assemble (so the
 entry doesn't freeze it). Build a memory-history router for the server and a browser-history
-one for the client seeded from §rati/ssr, and hand the two trees to
+one for the client seeded from `prepareRoute` (§rati/ssr), and hand the two trees to
 `ssrRender` / `.hydrate`:
 
 ```ts
