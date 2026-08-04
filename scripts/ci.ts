@@ -47,11 +47,36 @@ const runAll = async (selectors: string[]): Promise<number> => {
 
 const fuzzRuns = process.env.FUZZ_RUNS ?? '500';
 
+// Where the kit checkout is. Two consumers below want it for opposite reasons, so it is resolved
+// once: the `doc-links` stage RUNS a gate out of it and fails when it is not there, while
+// `stampGate` merely reports to it and stays silent when it is not.
+const kitHome = process.env.JNANA_KIT_HOME || path.join(os.homedir(), 'Sites', 'jnana-kit');
+
 type Stage = { name: string; what: string; run: () => Promise<number> };
 
 const stages: Stage[] = [
     { name: 'fmt', what: 'oxfmt, check only', run: () => exitOf(sh`vp fmt --check`) },
     { name: 'lint', what: 'oxlint, repo-wide', run: () => exitOf(sh`vp lint`) },
+    {
+        name: 'doc-links',
+        what: "the kit's doc-link and doc-style gate, over every tracked .md",
+        // The checker lives in the kit checkout, not here (jnana-kit:DS-28 graduated its doc-style
+        // half to a hard gate). A missing checkout FAILS this stage rather than skipping it: a
+        // consumer runs on an exported kit path by contract, and a gate that quietly measured
+        // nothing would read exactly like one that passed.
+        run: async (): Promise<number> => {
+            const runNode = path.join(kitHome, 'tools', 'run-node.sh');
+            const checker = path.join(kitHome, 'tools', 'check-doc-links.ts');
+            if (!existsSync(runNode) || !existsSync(checker)) {
+                console.error(
+                    `ci: no kit checkout at ${kitHome} — this gate lives there. Export ` +
+                        `JNANA_KIT_HOME (.claude/kit.json names the seam) and re-run.`,
+                );
+                return 1;
+            }
+            return exitOf(sh`sh ${runNode} ${checker} --gate`);
+        },
+    },
     {
         name: 'typecheck',
         what: 'tsc (native TS7) over every workspace, src and test trees',
@@ -111,16 +136,15 @@ const selected = requested.length ? requested.map((name) => byName.get(name)!) :
 // other three — a false green, which is worse than the silence being fixed. So this list is
 // the stage set `.claude/kit.json` `verify` names, and drift between the two can only cost a
 // stamp (silence), never buy a wrong one.
-const GATE_STAGES = ['fmt', 'lint', 'typecheck', 'test'];
+const GATE_STAGES = ['fmt', 'lint', 'doc-links', 'typecheck', 'test'];
 
 // Fire-and-forget by the seam's own contract: its exit status is not this gate's, and it
 // exits 0 for every reason it could not stamp. A machine with no kit checkout is simply not
 // a case the reminder serves, so it does not stamp and says nothing about it.
 const stampGate = async (ok: boolean): Promise<void> => {
     if (!GATE_STAGES.every((name) => selected.some((stage) => stage.name === name))) return;
-    const kit = process.env.JNANA_KIT_HOME || path.join(os.homedir(), 'Sites', 'jnana-kit');
-    const runNode = path.join(kit, 'tools', 'run-node.sh');
-    const seam = path.join(kit, 'tools', 'verify-stamp.ts');
+    const runNode = path.join(kitHome, 'tools', 'run-node.sh');
+    const seam = path.join(kitHome, 'tools', 'verify-stamp.ts');
     if (!existsSync(runNode) || !existsSync(seam)) return;
     await sh`sh ${runNode} ${seam} ${ok ? 'ok' : 'failed'}`;
 };
