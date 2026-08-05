@@ -30,6 +30,27 @@
         "missing": ["node_modules"],
     },
 
+    // The second half of "make this checkout runnable", and `bootstrap` cannot be it: `yarn install`
+    // links the workspaces but builds nothing, and `packages/rati/dist` is git-ignored. The ssr
+    // example's node-side config (examples/ssr/tsconfig.node.json) resolves `rati/server`,
+    // `rati/ssr` and `rati/vite` through the PUBLISHED entries — deliberately, so serve.ts
+    // type-checks against what a real consumer installs rather than through the `rati-dev`
+    // condition the two Vite-side configs use (the reasoning is in serve.ts's own header). Those
+    // entries are `dist/*.d.ts`, so in a checkout that has never built, `ssr-demo#typecheck` fails
+    // with three TS2307s and the whole `verify` gate is red before a worker touches anything. The
+    // main checkout only ever passed because a `dist/` from some earlier build was sitting in it —
+    // every fresh pool slot inherited the red.
+    //
+    // Runs where `bootstrap` runs (a tree that moved, or one that was never bootstrapped), so a
+    // steady-state session start pays nothing; a slot claim pays ~1s.
+    "prep": [
+        {
+            "id": "rati-build",
+            "label": "rati dist",
+            "command": "yarn workspace rati build && echo built",
+        },
+    ],
+
     // Host guardrail: the publish path stays user-run outside a sandbox VM, layered over the kit
     // baseline (`ansible`; `prisma` minus `prisma:generate` — neither used here). `scripts/release.sh`
     // bumps the version, git-tags, and runs `yarn npm publish` to npmjs with the token in this
