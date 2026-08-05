@@ -1,18 +1,24 @@
 {
-    // https://github.com/tsconfig/bases/blob/main/bases/
-    "extends": ["@tsconfig/strictest/tsconfig.json", "@tsconfig/vite-react/tsconfig.json"],
+    // The browser half of the SSR example — a Vite + React app, so the kit's `web` profile exactly.
+    // The `erasableSyntaxOnly: false` this file used to carry is the profile's now, for the same
+    // reason it gave: rati's source uses TC39 decorators, which `@tsconfig/vite-react` forbids.
+    "extends": "@jnana-app/kit/tsconfig/web.json",
     "compilerOptions": {
-        "lib": ["DOM", "DOM.Iterable", "ESNext"],
-        "forceConsistentCasingInFileNames": true,
-        "module": "ESNext",
-        "moduleResolution": "bundler",
-        "isolatedModules": true,
-        "noEmit": true,
+        // rati's own export condition, so the example type-checks against the workspace SOURCE
+        // instead of its published `dist/`. The node half beside this file deliberately does NOT
+        // set it — see tsconfig.node.json.
         "customConditions": ["rati-dev"],
-        // rati's source (resolved via the rati-dev condition) uses decorators, which
-        // erasableSyntaxOnly (inherited from @tsconfig/vite-react) forbids. Match the
-        // demo example and allow non-erasable syntax here.
-        "erasableSyntaxOnly": false
+        // The profile's engine-floor list plus ONE sub-lib, opted in the way that file prescribes:
+        // resolving rati through its source pulls the island disposal contract
+        // (`Symbol.dispose` / `Disposable`) into this program, and those are `ESNext.Disposable`.
+        "lib": [
+            "ES2024",
+            "ES2025.Collection",
+            "ESNext.TypedArrays",
+            "ESNext.Disposable",
+            "DOM",
+            "DOM.Iterable"
+        ]
     },
     "include": ["src"],
     "references": [{ "path": "./tsconfig.node.json" }]
