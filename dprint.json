@@ -1,0 +1,14 @@
+{
+    // "./node_modules/..." is not a guessed relative path: node_modules always sits beside this
+    // config at the repo root, in every checkout and every worktree slot, so the spelling is stable
+    // by construction. dprint's own docs also claim a package-name spelling
+    // ("@jnana-app/kit/dprint.json") resolves via extends; measured in the kit against the pinned
+    // dprint 0.55.2, it does not — dprint treats extends as a path, not a module specifier. The
+    // relative path below is the only spelling that resolves.
+    "extends": "./node_modules/@jnana-app/kit/dprint.json",
+    // "includes" must stay here rather than in the extended base: dprint 0.55.2 rejects it
+    // ("Unexpected non-string, boolean, or int property (includes)") when it appears in a config
+    // reached via extends, so every consumer repeats this line even though its value never varies.
+    "includes": ["**/*.md"],
+    "excludes": ["**/node_modules", "**/.git", "**/.yarn", "**/dist", "**/coverage"]
+}
