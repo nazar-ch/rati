@@ -623,13 +623,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tsconfig/vite-react@npm:^7.0.2":
-  version: 7.0.2
-  resolution: "@tsconfig/vite-react@npm:7.0.2"
-  checksum: 10/1cee6fb2baa94644d4824158ef1df1902d6f6a01c421921ee8b3b6105398483781f032d2e1e0f0a3adb1feba7307ec9bef74107434e8181848449e3434cbb2de
-  languageName: node
-  linkType: hard
-
 "@tsconfig/vite-react@npm:^8.1.1":
   version: 8.1.1
   resolution: "@tsconfig/vite-react@npm:8.1.1"
@@ -1507,8 +1500,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "demo@workspace:examples/demo"
   dependencies:
-    "@tsconfig/strictest": "npm:^2.0.8"
-    "@tsconfig/vite-react": "npm:^7.0.2"
     "@types/react": "npm:^19.2.17"
     "@types/react-dom": "npm:^19.2.3"
     "@vitejs/plugin-react": "npm:^6.0.1"
@@ -2600,7 +2591,6 @@ __metadata:
   dependencies:
     "@testing-library/dom": "npm:^10.4.1"
     "@testing-library/react": "npm:^16.3.2"
-    "@tsconfig/strictest": "npm:^2.0.8"
     "@types/node": "npm:^26.0.1"
     "@types/react": "npm:^19.2.17"
     "@types/react-dom": "npm:~19.2.3"
@@ -2815,8 +2805,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "ssr-demo@workspace:examples/ssr"
   dependencies:
-    "@tsconfig/strictest": "npm:^2.0.8"
-    "@tsconfig/vite-react": "npm:^7.0.2"
     "@types/node": "npm:^26.0.1"
     "@types/react": "npm:^19.2.17"
     "@types/react-dom": "npm:~19.2.3"
