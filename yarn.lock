@@ -165,6 +165,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@jnana-app/kit@nazar-ch/jnana-kit#workspace=@jnana-app/kit":
+  version: 0.0.0
+  resolution: "@jnana-app/kit@https://github.com/nazar-ch/jnana-kit.git#workspace=%40jnana-app%2Fkit&commit=2d5472d5952a26cb28973e75c2ae723afeffc1c0"
+  dependencies:
+    "@tsconfig/node26": "npm:^26.0.0"
+    "@tsconfig/strictest": "npm:^2.0.8"
+    "@tsconfig/vite-react": "npm:^8.1.1"
+    "@types/node": "npm:26.0.1"
+    zx: "npm:8.8.5"
+  peerDependencies:
+    vite-plus: "*"
+  checksum: 10/b063fe3c2ef0d04d075d760a633f97944f617a36c7b876771e0cb0bde11b2dac87ca2a8b03333cc29a5c8dd8fb23527d9eea0ebcb0ab4b16303563cc9a6818a5
+  languageName: node
+  linkType: hard
+
 "@jridgewell/sourcemap-codec@npm:^1.5.5":
   version: 1.5.5
   resolution: "@jridgewell/sourcemap-codec@npm:1.5.5"
@@ -594,6 +609,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tsconfig/node26@npm:^26.0.0":
+  version: 26.0.0
+  resolution: "@tsconfig/node26@npm:26.0.0"
+  checksum: 10/5e75e2783181c4786d1567baebbf09aadb8ab3cb2f1bee6466aa509223e9acf465aabf405075998b7d6deaee333e48e690b7eeb5e51104fae9c3d9c8cd9c8d5c
+  languageName: node
+  linkType: hard
+
 "@tsconfig/strictest@npm:^2.0.8":
   version: 2.0.8
   resolution: "@tsconfig/strictest@npm:2.0.8"
@@ -605,6 +627,13 @@ __metadata:
   version: 7.0.2
   resolution: "@tsconfig/vite-react@npm:7.0.2"
   checksum: 10/1cee6fb2baa94644d4824158ef1df1902d6f6a01c421921ee8b3b6105398483781f032d2e1e0f0a3adb1feba7307ec9bef74107434e8181848449e3434cbb2de
+  languageName: node
+  linkType: hard
+
+"@tsconfig/vite-react@npm:^8.1.1":
+  version: 8.1.1
+  resolution: "@tsconfig/vite-react@npm:8.1.1"
+  checksum: 10/5e7b357252d7fe7b2376d2c71c2519361ec3fac56ff9ed57547b7c38629d72ec1e8b0cf24416411cd8d9bef4ca07f0693e98f3dce267de703bf5ce5dcf5db9f2
   languageName: node
   linkType: hard
 
@@ -639,7 +668,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:^26.0.1":
+"@types/node@npm:26.0.1, @types/node@npm:^26.0.1":
   version: 26.0.1
   resolution: "@types/node@npm:26.0.1"
   dependencies:
@@ -2667,6 +2696,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "root-workspace-0b6124@workspace:."
   dependencies:
+    "@jnana-app/kit": "nazar-ch/jnana-kit#workspace=@jnana-app/kit"
     typescript: "npm:7.0.2"
     vite-plus: "catalog:"
     zx: "npm:^8.8.5"
@@ -3495,7 +3525,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"zx@npm:^8.8.5":
+"zx@npm:8.8.5, zx@npm:^8.8.5":
   version: 8.8.5
   resolution: "zx@npm:8.8.5"
   bin:
