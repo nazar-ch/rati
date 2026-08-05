@@ -47,9 +47,11 @@ const runAll = async (selectors: string[]): Promise<number> => {
 
 const fuzzRuns = process.env.FUZZ_RUNS ?? '500';
 
-// Where the kit checkout is. Two consumers below want it for opposite reasons, so it is resolved
-// once: the `doc-links` stage RUNS a gate out of it and fails when it is not there, while
-// `stampGate` merely reports to it and stays silent when it is not.
+// Where the kit checkout is, for the two seams below that still need a PATH into it — the
+// `control-char-scan` stage and `stampGate`, both of which reach tools the kit deliberately keeps
+// off its `bin/`. They want it for opposite reasons: the stage RUNS a gate out of it and fails
+// when it is not there, while `stampGate` merely reports to it and stays silent when it is not.
+// The `doc-links` stage no longer appears here — it calls its checker by plain name (below).
 const kitHome = process.env.JNANA_KIT_HOME || path.join(os.homedir(), 'Sites', 'jnana-kit');
 
 type Stage = { name: string; what: string; run: () => Promise<number> };
@@ -60,21 +62,27 @@ const stages: Stage[] = [
     {
         name: 'doc-links',
         what: "the kit's doc-link and doc-style gate, over every tracked .md",
-        // The checker lives in the kit checkout, not here (jnana-kit:DS-28 graduated its doc-style
-        // half to a hard gate). A missing checkout FAILS this stage rather than skipping it: a
-        // consumer runs on an exported kit path by contract, and a gate that quietly measured
-        // nothing would read exactly like one that passed.
+        // The checker lives in the kit, not here (jnana-kit:DS-28 graduated its doc-style half to
+        // a hard gate), and it is spawned BY PLAIN NAME: the kit publishes it on its `bin/`, which
+        // whoever installed the kit put on PATH (`install-host.ts` on a host, provisioning on a
+        // sandbox guest). A long-form `$JNANA_KIT_HOME/tools/…` spelling worked too, but a
+        // workaround written down often enough reads as the convention, and the next reader learns
+        // that the incantation IS how you run a kit tool (jnana-kit:FND-158).
+        //
+        // A kit that is not on PATH FAILS this stage rather than skipping it, as before: a gate
+        // that quietly measured nothing would read exactly like one that passed. Only the message
+        // changed, because there is no longer a path to stat before spawning — 127 is the signal,
+        // and it is the one exit status this stage translates.
         run: async (): Promise<number> => {
-            const runNode = path.join(kitHome, 'tools', 'run-node.sh');
-            const checker = path.join(kitHome, 'tools', 'check-doc-links.ts');
-            if (!existsSync(runNode) || !existsSync(checker)) {
+            const code = await exitOf(sh`check-doc-links.ts --gate`);
+            if (code === 127) {
                 console.error(
-                    `ci: no kit checkout at ${kitHome} — this gate lives there. Export ` +
-                        `JNANA_KIT_HOME (.claude/kit.json names the seam) and re-run.`,
+                    `ci: check-doc-links.ts did not resolve — the kit's bin/ is not on PATH ` +
+                        `(or its node shim found no runtime). Install the kit — its ` +
+                        `install-host.ts on a host, provisioning on a sandbox guest — and re-run.`,
                 );
-                return 1;
             }
-            return exitOf(sh`sh ${runNode} ${checker} --gate`);
+            return code;
         },
     },
     {
