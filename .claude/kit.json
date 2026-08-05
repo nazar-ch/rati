@@ -18,7 +18,7 @@
     //
     // This list and `GATE_STAGES` in `scripts/ci.ts` name the same set, and drift between them can
     // only cost a run stamp, never buy a wrong one — so they move together.
-    "verify": "yarn ci fmt lint doc-links typecheck test",
+    "verify": "yarn ci fmt lint doc-links control-char-scan typecheck test",
 
     // Idempotent "make this checkout runnable": install deps only (Node 26 + Yarn 4.17.1 via
     // corepack, `enableScripts: false`). No codegen; never git sync.
