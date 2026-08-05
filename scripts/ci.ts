@@ -78,6 +78,29 @@ const stages: Stage[] = [
         },
     },
     {
+        name: 'control-char-scan',
+        what: "the kit's raw-C0-byte gate, over the whole text corpus",
+        // Also wired as a staged task in `vite.config.ts`, which only ever sees what is being
+        // committed; this is the corpus half. Worth both: a NUL makes ripgrep skip a file
+        // SILENTLY, so one that predates the gate never surfaces from a commit-scoped check.
+        // This repo had four, in `hydrationDiagnostics.ts`, which also made git treat that file
+        // as binary — found by the first whole-corpus run.
+        //
+        // A missing kit checkout FAILS rather than skips, for the same reason `doc-links` above
+        // does: a gate that quietly measured nothing reads exactly like one that passed.
+        run: async (): Promise<number> => {
+            const scan = path.join(kitHome, 'tools', 'ci-control-char-scan.sh');
+            if (!existsSync(scan)) {
+                console.error(
+                    `ci: no kit checkout at ${kitHome} — this gate lives there. Export ` +
+                        `JNANA_KIT_HOME (.claude/kit.json names the seam) and re-run.`,
+                );
+                return 1;
+            }
+            return exitOf(sh`bash ${scan} --all`);
+        },
+    },
+    {
         name: 'typecheck',
         what: 'tsc (native TS7) over every workspace, src and test trees',
         run: () =>
@@ -136,7 +159,7 @@ const selected = requested.length ? requested.map((name) => byName.get(name)!) :
 // other three — a false green, which is worse than the silence being fixed. So this list is
 // the stage set `.claude/kit.json` `verify` names, and drift between the two can only cost a
 // stamp (silence), never buy a wrong one.
-const GATE_STAGES = ['fmt', 'lint', 'doc-links', 'typecheck', 'test'];
+const GATE_STAGES = ['fmt', 'lint', 'doc-links', 'control-char-scan', 'typecheck', 'test'];
 
 // Fire-and-forget by the seam's own contract: its exit status is not this gate's, and it
 // exits 0 for every reason it could not stamp. A machine with no kit checkout is simply not

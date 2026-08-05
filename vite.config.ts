@@ -341,22 +341,80 @@ export default defineConfig({
     staged: {
         // Pre-commit gate (run by `vp staged` from .vite-hooks/pre-commit). Type-aware lint
         // RULES run here (config `typeAware`), but type-CHECKING does not (`typeCheck: false`) —
-        // tsc owns that. A function (not a bare command) so the lint step can drop files oxlint
-        // ignores (`*.config.*`): handing `vp lint` only ignored paths makes it exit 1 with
-        // "No files found to lint", which would break config-only commits.
+        // tsc owns that.
+        //
+        // THE ORDER OF THESE ENTRIES IS LOAD-BEARING, and the kit's `tools/pre-commit-gate.sh`
+        // is what makes it hold: it spawns `vp staged --concurrent 1`, so the tasks run one at
+        // a time in the order written here (jnana-kit:FND-165). Left alone, lint-staged runs the
+        // tasks for DIFFERENT globs concurrently — `concurrent` defaults to `true` and becomes
+        // `Infinity` for the glob-level list, and the `concurrent: false` a reader finds nearby
+        // in its source governs only the sub-tasks WITHIN one glob, which is the trap. Two
+        // invariants ride it: the MUTATING fmt task precedes the `'*'` control-byte scan (so the
+        // scan measures the bytes actually being committed, not a pre-image fmt is midway
+        // through replacing), and `vp fmt` precedes `vp lint` over the same file. Reordering
+        // these keys silently reopens both.
+
+        // FORMAT — one task, one command, over everything oxfmt formats. `.md` is absent: oxfmt
+        // corrupts Markdown, so `fmt.ignorePatterns` excludes it.
+        //
+        // A BARE STRING, deliberately: lint-staged appends the staged paths itself as literal
+        // argv entries, which makes this space-safe BY CONSTRUCTION. As a function it was not —
+        // the returned string is re-parsed WHOLE (jnana-kit:FND-91), so a staged path containing
+        // a space became two operands and `vp fmt` silently matched 0 files.
+        //
+        // `--no-error-on-unmatched-pattern` replaces the hand-rolled `.claude/kit.json` filter
+        // this task used to carry. That manifest is JSONC and fmt-excluded (see
+        // `fmt.ignorePatterns`), and handing `vp fmt` only excluded files exits 2 — measured —
+        // which aborted the commit. The flag makes that a clean no-op for EVERY ignore entry
+        // rather than the one that had been noticed, so `fmt.ignorePatterns` stays the single
+        // source of truth and there is no second list here to drift from it.
+        '*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,json,html,css,scss,less,yml,yaml}':
+            'vp fmt --no-error-on-unmatched-pattern',
+
+        // LINT — the lintable subset only; oxlint has no rules for JSON/CSS/YAML, which is why
+        // the fmt glob above is the wider of the two. A function (not a bare command) so it can
+        // drop files oxlint ignores (`*.config.*`): handing `vp lint` only ignored paths makes it
+        // exit 1 with "No files found to lint", which would break config-only commits — so an
+        // all-ignored batch returns NO command rather than a no-op one.
+        //
+        // The interpolation is QUOTED, which the fmt task above does not need (jnana-kit:FND-91):
+        // a function task's returned string is re-parsed whole, so an unquoted path containing a
+        // space becomes two argv tokens and `vp lint` — which has no
+        // `--no-error-on-unmatched-pattern` — aborts the commit naming nothing an author would
+        // connect to a space in a filename.
         '*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}': (files) => {
-            const tasks = [`vp fmt ${files.join(' ')}`];
             const lintable = files.filter((file) => !/\.config\./.test(file));
-            if (lintable.length > 0) tasks.push(`vp lint ${lintable.join(' ')}`);
-            return tasks;
+            if (lintable.length === 0) return [];
+            return `vp lint ${lintable.map((file) => `"${file}"`).join(' ')}`;
         },
-        // fmt-only (oxlint doesn't lint these). `.md` is intentionally absent — oxfmt corrupts
-        // Markdown (see `fmt.ignorePatterns`). `.claude/kit.json` is JSONC and fmt-excluded there
-        // too; handing `vp fmt` only excluded files makes it exit 1, so drop it and skip when none
-        // remain.
-        '*.{json,html,css,scss,less,yml,yaml}': (files) => {
-            const fmtable = files.filter((file) => !file.endsWith('.claude/kit.json'));
-            return fmtable.length > 0 ? [`vp fmt ${fmtable.join(' ')}`] : [];
+
+        // Raw-control-byte gate. This repo is why it is not theoretical: four raw NULs sat in
+        // `hydrationDiagnostics.ts` as a composite-key separator, which made git treat the file
+        // as BINARY (diffs read `Bin 3467 bytes`, never content) and made ripgrep skip it
+        // outright — so it was invisible to every rg-based sweep here until this gate was added.
+        // `'*'` because the byte class is not a property of a language: a NUL in a `.json`
+        // fixture hides that file exactly as it would in a `.ts`. The script drops binary
+        // extensions itself and scans only what is staged.
+        //
+        // Unlike its neighbours it FAILS rather than fixes, and deliberately has no fixing mode:
+        // rewriting a byte inside a string literal is a semantic edit — a raw 0x00 and `\x00` are
+        // the same value in a TS template but NOT inside a regex class or a fixture asserting on
+        // bytes — so the one safe automatic action is to stop and name the file:line:column.
+        //
+        // The script is the kit's (jnana-kit:FND-132 taught it to root in the INVOKING repo, not
+        // its own checkout). `$JNANA_KIT_HOME` is the one carrier for that path and has no
+        // sanctioned default, and it is interpolated HERE rather than left in the string because
+        // lint-staged spawns a command without a shell — an unexpanded `$VAR` would reach bash as
+        // a literal path and read as "no such file", a broken gate wearing a broken-looking
+        // error. Unset is therefore its own named failure: no scan is not the same as a clean
+        // scan. Both interpolations are quoted, per the lint task above.
+        '*': (files) => {
+            const kit = process.env['JNANA_KIT_HOME'];
+            if (kit === undefined || kit === '') {
+                return 'sh -c "echo pre-commit: JNANA_KIT_HOME is unset, so the control-byte gate did not run >&2; exit 1"';
+            }
+            const scan = `"${kit}/tools/ci-control-char-scan.sh"`;
+            return `bash ${scan} ${files.map((file) => `"${file}"`).join(' ')}`;
         },
     },
 });
