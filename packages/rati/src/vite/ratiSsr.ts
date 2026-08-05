@@ -130,13 +130,13 @@ export function ratiSsr(options: RatiSsrOptions = {}): Plugin {
                             // The join between the builds: hashed file names on one
                             // side, the server naming them on the other.
                             manifest: true,
-                            rollupOptions: { input: fsPath(resolved.clientEntry) },
+                            rolldownOptions: { input: fsPath(resolved.clientEntry) },
                         },
                     },
                     ssr: {
                         build: {
                             outDir: resolved.serverOutDir,
-                            rollupOptions: { input: fsPath(resolved.entry) },
+                            rolldownOptions: { input: fsPath(resolved.entry) },
                         },
                     },
                 },

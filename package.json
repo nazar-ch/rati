@@ -24,8 +24,8 @@
         "zx": "^8.8.5"
     },
     "resolutions": {
-        "vite": "npm:@voidzero-dev/vite-plus-core@latest",
-        "vitest": "4.1.9"
+        "vite": "npm:@voidzero-dev/vite-plus-core@0.2.7",
+        "vitest": "4.1.10"
     },
     "devEngines": {
         "runtime": {
