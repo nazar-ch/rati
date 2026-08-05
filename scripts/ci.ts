@@ -109,6 +109,31 @@ const stages: Stage[] = [
         },
     },
     {
+        name: 'kit-package',
+        what: "the kit's `@jnana-app/kit` conformance gate, over this repo's configs and its pin",
+        // A stage here, and not a `verify:kit-package` script the way the family's other consumers
+        // wire this gate: their gate IS the kit's shared runner over `verify:*` scripts, and nothing
+        // in this repo runs one, so a script would be wiring no one calls. `doc-links` and
+        // `control-char-scan` above are the same species — a kit-owned tool named directly in the
+        // stage list — and a missing kit checkout FAILS here for the reason spelled out on those.
+        //
+        // Spawned by its long `$JNANA_KIT_HOME/tools/…` path rather than by plain name because the
+        // kit does not publish this tool on its `bin/`; the plain-name rule `doc-links` cites
+        // (jnana-kit:FND-158) is about the tools it does.
+        run: async (): Promise<number> => {
+            const check = path.join(kitHome, 'tools', 'check-kit-package.ts');
+            const runNode = path.join(kitHome, 'tools', 'run-node.sh');
+            if (!existsSync(check)) {
+                console.error(
+                    `ci: no ${path.basename(check)} at ${kitHome} — this gate lives in the kit. ` +
+                        `Export JNANA_KIT_HOME (.claude/kit.json names the seam) and re-run.`,
+                );
+                return 1;
+            }
+            return exitOf(sh`sh ${runNode} ${check}`);
+        },
+    },
+    {
         name: 'typecheck',
         what: 'tsc (native TS7) over every workspace, src and test trees',
         run: () =>
@@ -167,7 +192,15 @@ const selected = requested.length ? requested.map((name) => byName.get(name)!) :
 // other three — a false green, which is worse than the silence being fixed. So this list is
 // the stage set `.claude/kit.json` `verify` names, and drift between the two can only cost a
 // stamp (silence), never buy a wrong one.
-const GATE_STAGES = ['fmt', 'lint', 'doc-links', 'control-char-scan', 'typecheck', 'test'];
+const GATE_STAGES = [
+    'fmt',
+    'lint',
+    'doc-links',
+    'control-char-scan',
+    'kit-package',
+    'typecheck',
+    'test',
+];
 
 // Fire-and-forget by the seam's own contract: its exit status is not this gate's, and it
 // exits 0 for every reason it could not stamp. A machine with no kit checkout is simply not
