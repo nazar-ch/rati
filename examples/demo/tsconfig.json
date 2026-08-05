@@ -1,16 +1,25 @@
 {
-    // https://github.com/tsconfig/bases/blob/main/bases/
-    "extends": ["@tsconfig/strictest/tsconfig.json", "@tsconfig/vite-react/tsconfig.json"],
+    // A Vite + React app — the kit's `web` profile exactly, including the `erasableSyntaxOnly:
+    // false` this file used to carry for itself (rati's source uses TC39 decorators, which the
+    // `@tsconfig/vite-react` base forbids).
+    "extends": "@jnana-app/kit/tsconfig/web.json",
     "compilerOptions": {
-        "lib": ["DOM", "DOM.Iterable", "ESNext"],
-        "forceConsistentCasingInFileNames": true,
-        "module": "ESNext",
-        "moduleResolution": "bundler",
-        "isolatedModules": true,
-        "noEmit": true,
-        "jsx": "react-jsx",
+        // rati's own export condition, so the example type-checks against the workspace SOURCE
+        // instead of its published `dist/` — which is the point of an in-repo example. No profile
+        // can carry this: the condition is this repo's.
         "customConditions": ["rati-dev"],
-        "erasableSyntaxOnly": false
+        // The profile's engine-floor list plus ONE sub-lib, opted in the way that file prescribes:
+        // resolving rati through its source pulls the island disposal contract
+        // (`Symbol.dispose` / `Disposable`) into this program, and those are `ESNext.Disposable`.
+        // Without it the flip is two errors in packages/rati/src/mandala/resolver.tsx.
+        "lib": [
+            "ES2024",
+            "ES2025.Collection",
+            "ESNext.TypedArrays",
+            "ESNext.Disposable",
+            "DOM",
+            "DOM.Iterable"
+        ]
     },
     "include": ["src"]
 }

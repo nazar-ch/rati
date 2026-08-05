@@ -1,23 +1,28 @@
 {
-    // https://github.com/tsconfig/bases/blob/main/bases/strictest.json
-    "extends": ["@tsconfig/strictest/tsconfig.json"],
+    // rati's library source: platform-neutral (browser, worker, or Node under SSR), bundler-resolved
+    // and built by vite — the kit's `lib` profile exactly. Strictness, `bundler` resolution and the
+    // no-emit default are its now; only what is genuinely rati's stays below.
+    "extends": "@jnana-app/kit/tsconfig/lib.json",
     "compilerOptions": {
-        // ESNext lib for Symbol.dispose / Disposable (explicit resource management),
-        // used by the experimental island disposal contract
+        // `ESNext`, against the profile's engine-floor `lib` list: `Symbol.dispose` / `Disposable`
+        // (explicit resource management) live in `ESNext.Disposable`, which the floor does not
+        // carry, and the experimental island disposal contract uses them. Narrowing rati to the
+        // floor is a support-baseline decision this repo has not taken.
         "lib": ["ESNext", "DOM", "DOM.Iterable"],
-        "useDefineForClassFields": true,
-        "verbatimModuleSyntax": true,
-        "forceConsistentCasingInFileNames": true,
-        "module": "ESNext",
-        "moduleResolution": "bundler",
-        "rootDir": "./src",
+        // The profile is platform-neutral (`types: []`); this program is not. `node`: the
+        // `rati/vite` plugin runs in the Vite process and reads the app's template off disk. It
+        // buys Node globals for the whole src program, which the browser side has no use for —
+        // tolerated because the alternative is a second program for one directory.
+        "types": ["vite-plus/client", "node"],
+        // React components live in this program; the platform-neutral profile carries no JSX.
         "jsx": "react-jsx",
-        "noEmit": true,
-        // `node`: the `rati/vite` plugin runs in the Vite process and reads the app's
-        // template off disk. It buys Node globals for the whole src program, which the
-        // browser side has no use for — tolerated because the alternative is a second
-        // program for one directory.
-        "types": ["vite-plus/client", "node"]
+        // Not in the profile, and load-bearing here: rati's `.js` is emitted by vite and its
+        // `.d.ts` by tsconfig.build.json, two compilers that must agree on what an import erases
+        // to. `import type` saying so verbatim is what makes them agree.
+        "verbatimModuleSyntax": true,
+        // Anchors tsconfig.build.json's declaration emit, so `dist/` mirrors `src/` and every
+        // `exports` target in package.json keeps its path.
+        "rootDir": "./src"
     },
     "exclude": ["dist", "node_modules", "build", "src/__tests__"],
     "include": ["src"]

@@ -19,6 +19,8 @@
         "prepare": "vp config"
     },
     "devDependencies": {
+        "@jnana-app/kit": "nazar-ch/jnana-kit#workspace=@jnana-app/kit",
+        "dprint": "0.55.2",
         "typescript": "7.0.2",
         "vite-plus": "catalog:",
         "zx": "^8.8.5"
