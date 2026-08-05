@@ -1,11 +1,29 @@
 {
-    "extends": ["@tsconfig/strictest/tsconfig.json"],
+    // serve.ts and vite.config.ts: files that run natively under the pinned Node, which is the
+    // kit's `node` profile — `nodenext` resolution, erasable syntax only, no emit. It carries no
+    // `customConditions`, unlike the browser half beside it, and that is deliberate: plain Node
+    // resolves `rati/server` through the PUBLISHED entry, so this program type-checks what a real
+    // consumer installs (serve.ts's own header says so). That is why `packages/rati/dist` has to
+    // exist before this config type-checks, and why building it is a `prep` step in
+    // .claude/kit.json.
+    "extends": "@jnana-app/kit/tsconfig/node.json",
     "compilerOptions": {
+        // Not in the profile: this program is the referenced half of tsconfig.json beside it, and a
+        // project reference requires `composite`.
         "composite": true,
-        "module": "nodenext",
-        "moduleResolution": "nodenext",
-        "allowSyntheticDefaultImports": true,
-        "jsx": "react-jsx"
+        // `node.json` is a NO-EMIT profile, and a referenced project may not disable emit (TS6310).
+        // So both of its emit-blocking options are turned around here, which is also exactly the
+        // shape this file had before the flip. Nothing is actually written: the only thing that
+        // runs this config is `ssr-demo`'s `typecheck` script, which passes `--noEmit` on the
+        // command line — but the config must be VALID without that flag, because `vp lint`'s
+        // type-aware pass loads it as written (that is what catches TS5096 on the second option
+        // below, where `tsc --noEmit -p` cannot).
+        //
+        // `allowImportingTsExtensions` costs nothing here: the profile turns it on so that kit
+        // tools can import each other with `.ts` specifiers, and neither serve.ts nor
+        // vite.config.ts has one.
+        "noEmit": false,
+        "allowImportingTsExtensions": false
     },
     "include": ["serve.ts", "vite.config.ts"]
 }

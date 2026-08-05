@@ -1,7 +1,15 @@
 // tsconfig.build.json
 {
+    // Extends this package's own config rather than a kit profile: the build must compile exactly
+    // the program tsconfig.json describes — its `lib`, `types`, `jsx` and `rootDir` — and reaches
+    // `@jnana-app/kit/tsconfig/lib.json` through it.
     "extends": "./tsconfig.json",
     "compilerOptions": {
+        // Every kit profile is NO-EMIT, because everything else in the family either runs straight
+        // off Node or is built by vite. This is the one config in the repo that emits, so `noEmit`
+        // is turned around here and nowhere else. `emitDeclarationOnly` is also what keeps the
+        // profile's inherited `allowImportingTsExtensions` legal beside the emit — tsc rejects that
+        // pair only when JavaScript is written.
         "declaration": true,
         "emitDeclarationOnly": true,
         "outDir": "./dist",

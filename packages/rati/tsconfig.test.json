@@ -1,12 +1,17 @@
 {
-    "extends": ["@tsconfig/strictest/tsconfig.json"],
+    // The test tree. Vitest resolves through vite rather than through Node, which is what the kit's
+    // `vitest` profile is for — including its one test-ergonomics relaxation
+    // (`noUncheckedIndexedAccess: false`), which applies here and in no other rati program.
+    "extends": "@jnana-app/kit/tsconfig/vitest.json",
     "compilerOptions": {
-        // Keep in sync with tsconfig.json: Symbol.dispose / Disposable support
+        // The profile's `lib` is node-side `ESNext` alone; these suites render React into jsdom.
+        // Keep in sync with tsconfig.json: `Symbol.dispose` / `Disposable` support.
         "lib": ["ESNext", "DOM", "DOM.Iterable"],
+        // The profile sets `types: []` for suites that import their runner from `vite-plus/test`;
+        // rati's suites use Vitest's ambient globals instead.
         "types": ["vitest/globals"],
-        "jsx": "react-jsx",
-        "module": "ESNext",
-        "moduleResolution": "bundler"
+        // React components under test.
+        "jsx": "react-jsx"
     },
     "include": ["src/__tests__"],
     "exclude": ["dist", "node_modules", "build"]
