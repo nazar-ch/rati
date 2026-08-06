@@ -86,6 +86,41 @@ const stages: Stage[] = [
         },
     },
     {
+        name: 'markdown',
+        what: "the kit's Markdown width gate and mangle scan, over dprint's own corpus",
+        // Also wired as a staged task in `vite.config.ts`, and worth both for the same reason
+        // `control-char-scan` below is: that one runs `--fmt` and only ever sees what is being
+        // committed, so Markdown that predates the gate is never reached from a commit. This is the
+        // corpus half, and it is the ONLY half that can fail — `--fmt` restores and fails on a
+        // mangle but is otherwise a fixer, while `--check` is non-mutating and its whole output is
+        // a verdict.
+        //
+        // `--check`, never `--fmt`, and never a bare `dprint fmt`: a gate does not rewrite the tree
+        // it is judging. The failure prints its own remedy, which is this same tool's `--fmt` with
+        // the same scope selector — and prints, explicitly, NOT to follow dprint's own suggested
+        // `dprint fmt`, because a bare reflow bypasses the mangle scan and dprint cannot see its own
+        // damage (jnana-kit:FND-47, jnana-kit:FND-106).
+        //
+        // The corpus this measures is dprint's own resolution of `dprint.json`, not a glob of the
+        // tool's — a gate and its fix holding different opinions about the corpus is the defect that
+        // mode exists to remove. Since jnana-kit:FND-140 it is anchored to the repo root, so the
+        // answer does not depend on the cwd `yarn ci` happened to start in.
+        //
+        // Spawned BY PLAIN NAME off the kit's `bin/`, and a kit that is not on PATH FAILS rather
+        // than skips — both for the reasons spelled out on `doc-links` above (jnana-kit:FND-158).
+        run: async (): Promise<number> => {
+            const code = await exitOf(sh`dprint-mangle-scan.ts --check`);
+            if (code === 127) {
+                console.error(
+                    `ci: dprint-mangle-scan.ts did not resolve — the kit's bin/ is not on PATH ` +
+                        `(or its node shim found no runtime). Install the kit — its ` +
+                        `install-host.ts on a host, provisioning on a sandbox guest — and re-run.`,
+                );
+            }
+            return code;
+        },
+    },
+    {
         name: 'control-char-scan',
         what: "the kit's raw-C0-byte gate, over the whole text corpus",
         // Also wired as a staged task in `vite.config.ts`, which only ever sees what is being
@@ -196,6 +231,7 @@ const GATE_STAGES = [
     'fmt',
     'lint',
     'doc-links',
+    'markdown',
     'control-char-scan',
     'kit-package',
     'typecheck',

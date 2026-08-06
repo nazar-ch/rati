@@ -45,19 +45,19 @@ only the retrying branch is affected.
 
 The manual path is fine in both modes: from the error slot with a forced 500 and StrictMode on,
 `retry()` gave 3 attempts at gaps of 600 and 1058 ms and ended on the error slot — a fresh budget
-with real backoff, as the reference promises. **It is the mount path, and only under a double-invoked
-render.**
+with real backoff, as the reference promises. **It is the mount path, and only under a
+double-invoked render.**
 
 ## Where to look
 
 FND-07 moved the budget spend out of `accept()` (render) and into `arm()` (commit) so that "a
-discarded concurrent render spends nothing". StrictMode is precisely a double-invoked render with one
-discarded pass, so the interaction is in that seam rather than somewhere unrelated:
+discarded concurrent render spends nothing". StrictMode is precisely a double-invoked render with
+one discarded pass, so the interaction is in that seam rather than somewhere unrelated:
 
-- `accept()` memoises its ruling per generation via `ruledOn` and returns the *cached* `accepted` for
-  a repeat generation. Under a double render, is the second pass reading a ruling made by a pass whose
-  commit never happened — `accepted` true, `armedFor !== ruledOn`, and no commit arriving to call
-  `arm()`?
+- `accept()` memoises its ruling per generation via `ruledOn` and returns the *cached* `accepted`
+  for a repeat generation. Under a double render, is the second pass reading a ruling made by a pass
+  whose commit never happened — `accepted` true, `armedFor !== ruledOn`, and no commit arriving to
+  call `arm()`?
 - `arm()` no-ops unless `accepted && armedFor !== ruledOn`. If the discarded pass armed and the kept
   pass shares its generation, the kept pass's commit finds `armedFor === ruledOn`, starts no timer —
   no retry, and the boundary is left rendering `loading` with nothing pending.

@@ -9,17 +9,16 @@ disposition: —
 
 Spotted in passing by jnana-kit's findings-close-2 batch (jnana-kit PR #110), measured from a kit
 pool slot: `check-doc-links.ts` pointed at this checkout reported
-`docs/current/RELEASING.md:3 ../../CHANGELOG.md ✗ parent-relative`. Filed 2026-07-30 as the
-consumer follow-up that report named.
+`docs/current/RELEASING.md:3 ../../CHANGELOG.md ✗ parent-relative`. Filed 2026-07-30 as the consumer
+follow-up that report named.
 
 ## Problem
 
 `docs/current/RELEASING.md:3` links the changelog as `[CHANGELOG.md](../../CHANGELOG.md)`. The
 family doc-link convention (jnana-kit:///plugin/docs/planning.md §"Doc links") bans `../` chains:
-they re-encode their depth on every move and are ungreppable from the target side. The
-root-relative form (`CHANGELOG.md` from the repo root — here written as the root-relative path)
-survives the citing file's own move and keeps `rg CHANGELOG.md` able to find every inbound
-reference.
+they re-encode their depth on every move and are ungreppable from the target side. The root-relative
+form (`CHANGELOG.md` from the repo root — here written as the root-relative path) survives the
+citing file's own move and keeps `rg CHANGELOG.md` able to find every inbound reference.
 
 Second, structural half: rati's `verify` is `yarn ci fmt lint typecheck test` — **no doc-links
 gate** — so nothing in this repo would flag the next violation either. The kit's checker
