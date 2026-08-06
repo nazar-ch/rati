@@ -2847,7 +2847,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "root-workspace-0b6124@workspace:."
   dependencies:
-    "@jnana-app/kit": "nazar-ch/jnana-kit#workspace=@jnana-app/kit"
+    "@jnana-app/kit": "catalog:"
     dprint: "npm:0.55.2"
     typescript: "npm:7.0.2"
     vite-plus: "catalog:"
