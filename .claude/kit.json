@@ -13,14 +13,14 @@
     // (`scripts/ci.ts`), the hosted-CI stand-in — so `verify` points straight at it rather than a
     // rebuilt `verify:*` set — including the `@jnana-app/kit` conformance check, which is a stage
     // here rather than the `verify:kit-package` script the other consumers carry. The fast subset
-    // chosen for the pre-push gate: fmt + lint + doc-links + control-char-scan + kit-package +
-    // typecheck + the full Vitest suite (at its tiny default fuzz budget). It deliberately SKIPS
+    // chosen for the pre-push gate: fmt + lint + doc-links + markdown + control-char-scan +
+    // kit-package + typecheck + the full Vitest suite (at its tiny default fuzz budget). It SKIPS
     // the deep `fuzz` stage (500 runs) and the `build` stage — run `yarn ci` (all stages) yourself
     // before a release or when you touch the mandala engine or the packaging/build.
     //
     // This list and `GATE_STAGES` in `scripts/ci.ts` name the same set, and drift between them can
     // only cost a run stamp, never buy a wrong one — so they move together.
-    "verify": "yarn ci fmt lint doc-links control-char-scan kit-package typecheck test",
+    "verify": "yarn ci fmt lint doc-links markdown control-char-scan kit-package typecheck test",
 
     // Idempotent "make this checkout runnable": install deps only (Node 26 + Yarn 4.17.1 via
     // corepack, `enableScripts: false`). No codegen; never git sync.

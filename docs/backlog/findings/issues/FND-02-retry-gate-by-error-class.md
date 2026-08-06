@@ -7,12 +7,10 @@ disposition: adopted 2026-07-25 into docs/planned/data-package/issues/DATA-11-de
 
 # FND-02 — gate automatic retries by error class: spare terminal 4xx, be gentler with 5xx
 
-**Adopted 2026-07-25** into the data-package effort: options 1 + 4 (honor `retryable`,
-jittered backoff) ride
-DATA-11 — which goes
-further than this record asked: retry becomes default-on, gated by the class. Option 3's
-classification stays consumer-side per DATA-08's decision; option 2 (a `shouldRetry`
-predicate) was not taken. DATA-11's finishing commit flips this record to done.
+**Adopted 2026-07-25** into the data-package effort: options 1 + 4 (honor `retryable`, jittered
+backoff) ride DATA-11 — which goes further than this record asked: retry becomes default-on, gated
+by the class. Option 3's classification stays consumer-side per DATA-08's decision; option 2 (a
+`shouldRetry` predicate) was not taken. DATA-11's finishing commit flips this record to done.
 
 ## Problem
 
@@ -29,12 +27,12 @@ this.accepted = code === 'failed' && this.spent < this.count;
 only failure the policy declines is one a load explicitly threw as `NotAvailableError`; everything
 else is retried up to `count` times.
 
-rati core is transport-agnostic — it has no notion of HTTP status. A typical load fetches and
-throws on `!res.ok`, so a plain `throw new Error(...)` for a **400 / 401 / 403 / 404 / 422** lands
-as `code: 'failed'`, indistinguishable from a **500** or a network drop. The policy then hammers
-the request with `count` identical attempts on the terminal ones — a 403 will not become a 200 in
-500ms, and a 400 is deterministically wrong input. The error (and, for a route, the 404 or 403 the
-user is owed) is only delayed.
+rati core is transport-agnostic — it has no notion of HTTP status. A typical load fetches and throws
+on `!res.ok`, so a plain `throw new Error(...)` for a **400 / 401 / 403 / 404 / 422** lands as
+`code: 'failed'`, indistinguishable from a **500** or a network drop. The policy then hammers the
+request with `count` identical attempts on the terminal ones — a 403 will not become a 200 in 500ms,
+and a 400 is deterministically wrong input. The error (and, for a route, the 404 or 403 the user is
+owed) is only delayed.
 
 The 5xx / network case *is* worth retrying, but the backoff is bare exponential
 (`backoffMs * 2 ** (spent - 1)`, retryPolicy.ts:111) — no jitter, no cap, no `Retry-After` / 429 /
@@ -66,9 +64,10 @@ error slot with no extra attempts, while a transient one (5xx / network) still r
    code rule. No new public surface, and the flag already crosses the SSR wire — a dehydrated
    terminal error would stay terminal on the client.
 
-2. **A `shouldRetry` predicate on `RetryOptions`.** `retry: { count, backoffMs, shouldRetry?:
-   (error, attempt) => boolean }`, defaulting to the current `code === 'failed'`. Most flexible and
-   per-island, but pushes classification onto each call site.
+2. **A `shouldRetry` predicate on `RetryOptions`.**
+   `retry: { count, backoffMs, shouldRetry?: (error, attempt) => boolean }`, defaulting to the
+   current `code === 'failed'`. Most flexible and per-island, but pushes classification onto each
+   call site.
 
 3. **Classify at the transport edge.** Only `packages/rati/src/data` does real fetching — let it map
    HTTP status → code / `retryable` (4xx terminal; 5xx / 429 / network retryable) so the flag

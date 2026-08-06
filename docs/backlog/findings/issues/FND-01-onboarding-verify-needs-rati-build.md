@@ -55,8 +55,8 @@ build:
    resolves rati from `src` like the rest of the dev flow and needs no `dist/`.
 2. Make the `typecheck` stage depend on `rati#build` — self-contained, at the cost of a build in the
    fast pre-push subset.
-3. Document "run `vp run rati#build` once after bootstrap" in the workflow, and leave the gate as
-   it is.
+3. Document "run `vp run rati#build` once after bootstrap" in the workflow, and leave the gate as it
+   is.
 
 Worth checking whether the other tenants have the same published-vs-`rati-dev` resolution split in
 their SSR examples before picking.
