@@ -1,9 +1,11 @@
 import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
+
 import { act, cleanup, render } from '@testing-library/react';
-import { scope } from '../../scope/scope';
+
 import { island } from '../../island/island';
 import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
 import { createHydrationClaims } from '../../mandala/hydrationDiagnostics';
+import { scope } from '../../scope/scope';
 import {
     HYDRATION_SCRIPT_ID,
     readHydration,

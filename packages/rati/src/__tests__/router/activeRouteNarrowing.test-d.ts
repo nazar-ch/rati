@@ -1,6 +1,7 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
-import type { ActiveRoute, ActiveRouteOf, Router } from '../../router/router';
+
 import type { RatiUserTypes } from '../../router/route';
+import type { ActiveRoute, ActiveRouteOf, Router } from '../../router/router';
 
 /*
     FND-06 — the augmentation-typed surface must behave like the table-parameterized one.

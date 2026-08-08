@@ -1,7 +1,9 @@
 import { createContext, useContext, useSyncExternalStore, type Context } from 'react';
-import type { Scope, ScopeLoadKeys } from '../scope/scope';
+
 import { describeScope } from './channel';
 import type { IslandPhase, IslandStatus, RefreshController } from './refresh';
+
+import type { Scope, ScopeLoadKeys } from '../scope/scope';
 
 /*
     The controls channel — `useScopeControls`. A second scope-keyed channel next to the

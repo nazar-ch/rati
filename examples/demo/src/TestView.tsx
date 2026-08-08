@@ -1,5 +1,7 @@
 import { type FC } from 'react';
+
 import { input, scope, type ScopeComponent, useRouter } from 'rati';
+
 import { sleep } from './util';
 
 // A plain route component with no data of its own: it reads the router through

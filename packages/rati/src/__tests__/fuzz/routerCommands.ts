@@ -1,9 +1,10 @@
-import * as fc from 'fast-check';
 import { expect } from 'vite-plus/test';
+
 import { act } from '@testing-library/react';
+import * as fc from 'fast-check';
+
 import { byLevel } from './arbitraries';
 import { assertMounts, assertStep, type ErrorLog } from './routerAsserts';
-import type { RouterModel, RouteTable, Step } from './routerModel';
 import {
     HASH_VALUES,
     paramValues,
@@ -12,6 +13,8 @@ import {
     UNMATCHED_PATH,
     type Harness,
 } from './routerHarness';
+import type { RouterModel, RouteTable, Step } from './routerModel';
+
 import { flush } from '../../testing';
 
 /*

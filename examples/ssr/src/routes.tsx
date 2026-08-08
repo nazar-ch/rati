@@ -1,7 +1,6 @@
 import { input, lazy, route, scope } from 'rati';
 import type { GenericRouteType } from 'rati';
-import { fetchProfile } from './data';
-import { productScope } from './scopes';
+
 import { About } from './components/About';
 import { Broken } from './components/Broken';
 import { Counter } from './components/Counter';
@@ -13,6 +12,8 @@ import { Live } from './components/Live';
 import { NotFound } from './components/NotFound';
 import { ProductError, ProductPage } from './components/Product';
 import { ProfilePage } from './components/Profile';
+import { fetchProfile } from './data';
+import { productScope } from './scopes';
 
 declare module 'rati' {
     interface RatiUserTypes {

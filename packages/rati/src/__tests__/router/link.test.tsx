@@ -1,10 +1,13 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
+
 import { type FC } from 'react';
+
 import { act, render, fireEvent, cleanup } from '@testing-library/react';
-import { RouterStore } from '../../router/store';
-import { route } from '../../router/route';
+
 import { Link } from '../../router/Link';
+import { route } from '../../router/route';
 import { RouterProvider } from '../../router/RouterProvider';
+import { RouterStore } from '../../router/store';
 
 /**
  * RF-07's pins: `<Link>` navigates to the URL the *anchor* resolved, and decides active

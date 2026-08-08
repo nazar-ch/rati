@@ -1,8 +1,10 @@
 import { Component } from 'react';
 import type { ComponentType, ErrorInfo, ReactNode } from 'react';
-import { asSourceError, type SourceError } from '../scope/source';
+
 import type { RefreshController } from './refresh';
 import type { RetryPolicy } from './retryPolicy';
+
+import { asSourceError, type SourceError } from '../scope/source';
 
 // Catches a rejected promise (`use()`) or a thrown source error and renders the mandala's
 // error slot — or rethrows to the nearest outer boundary when there's no slot. `resetKey`

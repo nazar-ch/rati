@@ -1,9 +1,12 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
-import { render, screen, cleanup, act } from '@testing-library/react';
+
 import type { FC } from 'react';
-import { scope } from '../../scope/scope';
+
+import { render, screen, cleanup, act } from '@testing-library/react';
+
 import { island } from '../../island/island';
 import { useScopeControls, type ScopeControls } from '../../mandala/controls';
+import { scope } from '../../scope/scope';
 import { controllableSource, flush } from '../../testing';
 
 /*

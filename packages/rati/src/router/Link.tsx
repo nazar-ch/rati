@@ -1,8 +1,9 @@
 import { createContext, memo, type PropsWithChildren, useCallback, useContext } from 'react';
 
 import { type NameToRoute, type GenericRouteType, type UserRoutes } from './route';
-import { type RouterStore } from './store';
 import { useRouterStore } from './RouterProvider';
+import { type RouterStore } from './store';
+
 import { navTraceStart } from '../util/navTrace';
 
 type GenericAnchorProps = Omit<

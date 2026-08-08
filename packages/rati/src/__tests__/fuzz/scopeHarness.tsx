@@ -1,9 +1,7 @@
-import * as fc from 'fast-check';
 import { useSyncExternalStore, type FC } from 'react';
-import { scope, input, type Scope } from '../../scope/scope';
-import { island } from '../../island/island';
-import { useScopeControls, type ScopeControls } from '../../mandala/controls';
-import { controllableSource, type ControllableSource } from '../../testing';
+
+import * as fc from 'fast-check';
+
 import { byLevel } from './arbitraries';
 import {
     formatValue,
@@ -15,6 +13,11 @@ import {
     type KeySpec,
     type ScopeSpec,
 } from './model';
+
+import { island } from '../../island/island';
+import { useScopeControls, type ScopeControls } from '../../mandala/controls';
+import { scope, input, type Scope } from '../../scope/scope';
+import { controllableSource, type ControllableSource } from '../../testing';
 
 /*
     The generated-scope harness: a fast-check arbitrary over scope *specs*, and a builder

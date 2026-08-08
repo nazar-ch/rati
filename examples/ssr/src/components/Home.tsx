@@ -1,4 +1,5 @@
 import { Link } from 'rati';
+
 import { StatsIsland } from './StatsIsland';
 
 // One card per demo route. `to` is checked against the route table.

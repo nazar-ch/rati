@@ -1,4 +1,5 @@
 import { island, scope } from 'rati';
+
 import { sleep } from '../util';
 
 // A backend that is down for the server and up for the browser — the shape of a page

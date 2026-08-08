@@ -1,6 +1,7 @@
 import { type ItemMapOptions } from './itemMap';
 import { createQuery, instanceSource, type QueryOptions, type QueryPhase } from './query';
 import { reconciled } from './reconciled';
+
 import { type Source, type SourceError } from '../scope/source';
 
 /*

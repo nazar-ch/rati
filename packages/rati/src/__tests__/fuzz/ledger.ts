@@ -1,4 +1,5 @@
 import { expect } from 'vite-plus/test';
+
 import type { Slot } from './model';
 import type { BuiltHarness } from './scopeHarness';
 

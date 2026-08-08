@@ -1,10 +1,11 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vite-plus/test';
-import { RouterStore } from '../../router/store';
-import { route, type GenericRouteType } from '../../router/route';
-import { RouterProvider } from '../../router/RouterProvider';
-import { RouterOutlet } from '../../router/RouterOutlet';
+
 import { createBrowserHistory, createMemoryHistory } from '../../router/history';
 import { prepareRoute } from '../../router/prepareRoute';
+import { route, type GenericRouteType } from '../../router/route';
+import { RouterOutlet } from '../../router/RouterOutlet';
+import { RouterProvider } from '../../router/RouterProvider';
+import { RouterStore } from '../../router/store';
 import { scope, type ScopeComponent } from '../../scope/scope';
 import { ssrRender, cleanup } from '../../testing';
 

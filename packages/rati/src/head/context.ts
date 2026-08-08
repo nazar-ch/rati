@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react';
+
 import type { HeadStore } from './store';
 
 // Null default on purpose: falling back to a module-global store would mean concurrent

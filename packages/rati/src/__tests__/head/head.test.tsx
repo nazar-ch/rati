@@ -1,11 +1,14 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
-import { act, cleanup, render, screen } from '@testing-library/react';
+
 import { StrictMode, useState } from 'react';
-import { createHeadStore } from '../../head/store';
+
+import { act, cleanup, render, screen } from '@testing-library/react';
+
 import { HeadProvider } from '../../head/HeadProvider';
+import { Meta } from '../../head/Meta';
+import { createHeadStore } from '../../head/store';
 import { Title } from '../../head/Title';
 import { useTitle } from '../../head/useTitle';
-import { Meta } from '../../head/Meta';
 import { island } from '../../island/island';
 import { scope } from '../../scope/scope';
 import { headTags } from '../../ssr/headTags';

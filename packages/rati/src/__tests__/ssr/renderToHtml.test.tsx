@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vite-plus/test';
-import { scope, input } from '../../scope/scope';
+
 import { island } from '../../island/island';
+import { scope, input } from '../../scope/scope';
 import { renderToHtml } from '../../ssr/renderToHtml';
 
 /*

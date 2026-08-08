@@ -1,8 +1,10 @@
 import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
+
 import { act } from 'react';
+
+import { island } from '../../island/island';
 import { scope, input } from '../../scope/scope';
 import type { SourceError } from '../../scope/source';
-import { island } from '../../island/island';
 import { controllableSource, prerenderToString, ssrRender, cleanup } from '../../testing';
 
 afterEach(cleanup);

@@ -1,10 +1,12 @@
 import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
+
 import { act, type FC } from 'react';
-import { scope, input } from '../../scope/scope';
-import { NotAvailableError } from '../../scope/source';
+
+import { dataTrace } from '../../debug';
 import { island } from '../../island/island';
 import { useScopeControls, type ScopeControls } from '../../mandala/controls';
-import { dataTrace } from '../../debug';
+import { scope, input } from '../../scope/scope';
+import { NotAvailableError } from '../../scope/source';
 import { controllableSource, deferred, flush, renderIsland, cleanup } from '../../testing';
 
 /*

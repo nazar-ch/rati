@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from 'vite-plus/test';
+
 import { collection } from '../../data/collection';
 import { mutation } from '../../data/mutation';
 import { query } from '../../data/query';

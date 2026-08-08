@@ -1,7 +1,9 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
+
 import { render, screen, cleanup, act } from '@testing-library/react';
-import { scope, input } from '../../scope/scope';
+
 import { island } from '../../island/island';
+import { scope, input } from '../../scope/scope';
 import { controllableSource, flush } from '../../testing';
 
 /*

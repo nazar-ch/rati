@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+
 import { Link, useRouter } from 'rati';
 
 // Each entry's `to` is typed against the route table (the RatiUserTypes['routes']

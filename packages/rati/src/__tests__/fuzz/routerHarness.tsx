@@ -1,11 +1,8 @@
-import * as fc from 'fast-check';
 import { useEffect } from 'react';
+
 import { render } from '@testing-library/react';
-import { route, type GenericRouteType, type RouteRedirect } from '../../router/route';
-import { RouterStore } from '../../router/store';
-import { createMemoryHistory } from '../../router/history';
-import { RouterOutlet } from '../../router/RouterOutlet';
-import { RouterProvider, useRouter } from '../../router/RouterProvider';
+import * as fc from 'fast-check';
+
 import { byLevel } from './arbitraries';
 import {
     buildPath,
@@ -15,6 +12,12 @@ import {
     type RouteSpec,
     type RouteTable,
 } from './routerModel';
+
+import { createMemoryHistory } from '../../router/history';
+import { route, type GenericRouteType, type RouteRedirect } from '../../router/route';
+import { RouterOutlet } from '../../router/RouterOutlet';
+import { RouterProvider, useRouter } from '../../router/RouterProvider';
+import { RouterStore } from '../../router/store';
 
 /*
     The router fuzz harness: an arbitrary over route *tables*, and the builder that turns

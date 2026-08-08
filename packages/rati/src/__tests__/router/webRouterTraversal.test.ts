@@ -1,7 +1,8 @@
 import { describe, test, expect } from 'vite-plus/test';
-import { RouterStore } from '../../router/store';
-import { route } from '../../router/route';
+
 import { createMemoryHistory } from '../../router/history';
+import { route } from '../../router/route';
+import { RouterStore } from '../../router/store';
 
 // Arrival at an entry that already exists — the half of setPath the push-side suites
 // never reach. Each pin's kill is named at the test and was executed once, red, then

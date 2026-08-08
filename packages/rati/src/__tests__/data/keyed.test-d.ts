@@ -1,4 +1,5 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
+
 import { keyed, type Keyed } from '../../data/keyed';
 import { query, type Query } from '../../data/query';
 

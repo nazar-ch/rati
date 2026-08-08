@@ -1,6 +1,7 @@
 import { expect, vi } from 'vite-plus/test';
-import type { RouterModel, Step } from './routerModel';
+
 import type { Harness } from './routerHarness';
+import type { RouterModel, Step } from './routerModel';
 
 /*
     The invariants both router fuzz properties check, in one place: the smoke property

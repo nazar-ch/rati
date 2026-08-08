@@ -1,4 +1,5 @@
 import { Link } from 'rati';
+
 import { sleep } from './util';
 
 export function Index() {

@@ -1,8 +1,9 @@
-import * as fc from 'fast-check';
 import { describe, test, expect, afterEach, beforeEach, vi } from 'vite-plus/test';
+
 import { cleanup, act } from '@testing-library/react';
+import * as fc from 'fast-check';
+
 import { fuzz, fuzzTimeout } from './arbitraries';
-import { RouterModel, type Step } from './routerModel';
 import {
     assertMounts,
     assertRenderedState,
@@ -18,6 +19,7 @@ import {
     type Harness,
     type Nav,
 } from './routerHarness';
+import { RouterModel, type Step } from './routerModel';
 
 /*
     The RF-02 smoke property: a generated route table mounts, a generated sequence of

@@ -1,12 +1,15 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
+
+import { act, createContext, StrictMode, useContext, type FC } from 'react';
+
 // RTL is kept for the two mounts that are *not* a single island (a bare reader with no
 // island above; two sibling islands sharing a scope) — renderIsland covers everything else.
 import { render, screen, cleanup as rtlCleanup } from '@testing-library/react';
-import { act, createContext, StrictMode, useContext, type FC } from 'react';
-import { scope, input, hook } from '../../scope/scope';
-import { NotAvailableError } from '../../scope/source';
+
 import { island } from '../../island/island';
 import { useScope, useOptionalScope } from '../../mandala/channel';
+import { scope, input, hook } from '../../scope/scope';
+import { NotAvailableError } from '../../scope/source';
 import {
     controllableSource,
     deferred,

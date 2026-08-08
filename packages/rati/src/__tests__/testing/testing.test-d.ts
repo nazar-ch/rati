@@ -1,6 +1,7 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
-import type { Source, SourceState } from '../../scope/source';
+
 import { scope, input } from '../../scope/scope';
+import type { Source, SourceState } from '../../scope/source';
 import { controllableSource, type ControllableSource } from '../../testing/controllableSource';
 import { deferred } from '../../testing/deferred';
 import { renderIsland } from '../../testing/renderIsland';

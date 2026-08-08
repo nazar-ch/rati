@@ -1,7 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
+
 import { type FC } from 'react';
-import { act, render, screen, cleanup } from '@testing-library/react';
 import { Suspense } from 'react';
+
+import { act, render, screen, cleanup } from '@testing-library/react';
+
 import { lazy } from '../../router/lazy';
 
 beforeEach(() => {

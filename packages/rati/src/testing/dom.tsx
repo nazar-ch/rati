@@ -1,6 +1,7 @@
 import { act } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
+
 import { withActEnvironment, withActEnvironmentSync } from './actEnvironment';
 
 /*

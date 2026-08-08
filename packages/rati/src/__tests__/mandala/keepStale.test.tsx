@@ -1,7 +1,8 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
-import { scope, input } from '../../scope/scope';
+
 import { island } from '../../island/island';
 import { useScope } from '../../mandala/channel';
+import { scope, input } from '../../scope/scope';
 import {
     controllableSource,
     deferred,

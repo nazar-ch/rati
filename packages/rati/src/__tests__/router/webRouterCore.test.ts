@@ -1,7 +1,8 @@
 import { describe, test, expect, beforeEach, vi } from 'vite-plus/test';
-import { RouterStore } from '../../router/store';
-import { route } from '../../router/route';
+
 import { createMemoryHistory } from '../../router/history';
+import { route } from '../../router/route';
+import { RouterStore } from '../../router/store';
 
 const NoopComponent = () => null;
 

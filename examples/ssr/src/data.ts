@@ -1,4 +1,5 @@
 import { NotAvailableError } from 'rati';
+
 import { sleep } from './util';
 
 // Fake "backend" calls — deterministic (same inputs → same output) so the SSR

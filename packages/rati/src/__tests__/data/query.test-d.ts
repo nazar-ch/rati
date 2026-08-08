@@ -1,4 +1,5 @@
 import { describe, expectTypeOf, test } from 'vite-plus/test';
+
 import { collection, type Collection } from '../../data/collection';
 import { query, type Query, type ReadyQuery } from '../../data/query';
 import { scope, type ScopeProps } from '../../scope/scope';

@@ -6,7 +6,6 @@ import {
     type Assembler,
     type Placeholders,
 } from '../ssr/html';
-
 import type { RenderAppResult, RenderAssets } from '../ssr/renderApp';
 
 /*

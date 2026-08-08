@@ -1,4 +1,5 @@
 import { useEffect, type FC } from 'react';
+
 import { useRouterStore } from './RouterProvider';
 
 /**

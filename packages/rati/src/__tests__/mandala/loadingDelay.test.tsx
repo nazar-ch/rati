@@ -1,7 +1,9 @@
 import { describe, test, expect, afterEach, beforeEach, vi } from 'vite-plus/test';
+
 import { act } from 'react';
-import { scope, input } from '../../scope/scope';
+
 import { island } from '../../island/island';
+import { scope, input } from '../../scope/scope';
 import {
     controllableSource,
     deferred,

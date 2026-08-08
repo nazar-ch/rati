@@ -1,7 +1,9 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
+
 import { act, type FC } from 'react';
-import { scope, input, data, type LoadContext } from '../../scope/scope';
+
 import { island } from '../../island/island';
+import { scope, input, data, type LoadContext } from '../../scope/scope';
 import {
     cleanup,
     controllableSource,

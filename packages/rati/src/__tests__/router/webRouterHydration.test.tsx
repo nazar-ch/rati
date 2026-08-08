@@ -1,7 +1,8 @@
 import { describe, test, expect } from 'vite-plus/test';
-import { RouterStore, type RouterHydratedState } from '../../router/store';
-import { route } from '../../router/route';
+
 import { createMemoryHistory } from '../../router/history';
+import { route } from '../../router/route';
+import { RouterStore, type RouterHydratedState } from '../../router/store';
 
 const NoopComponent = () => null;
 const HomeComponent = () => <div>home</div>;

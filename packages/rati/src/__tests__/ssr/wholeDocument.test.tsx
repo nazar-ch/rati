@@ -1,15 +1,18 @@
 import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
+
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
+
 import { act } from '@testing-library/react';
-import { createRequestHandler } from '../../server/requestHandler';
-import type { Hydration } from '../../mandala/hydration';
-import { createHeadStore, type HeadStore } from '../../head/store';
+
 import { HeadProvider } from '../../head/HeadProvider';
-import { Title } from '../../head/Title';
 import { Meta } from '../../head/Meta';
+import { createHeadStore, type HeadStore } from '../../head/store';
+import { Title } from '../../head/Title';
 import { island } from '../../island/island';
-import { scope } from '../../scope/scope';
+import type { Hydration } from '../../mandala/hydration';
 import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
+import { scope } from '../../scope/scope';
+import { createRequestHandler } from '../../server/requestHandler';
 import { headTags } from '../../ssr/headTags';
 import { isWholeDocument, spliceDocument } from '../../ssr/html';
 import { HYDRATION_SCRIPT_ID, readHydration, serializeHydration } from '../../ssr/payload';

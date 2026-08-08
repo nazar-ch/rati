@@ -1,6 +1,7 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
-import { scope, input } from '../../scope/scope';
+
 import { island } from '../../island/island';
+import { scope, input } from '../../scope/scope';
 import { prerenderToString, ssrRender, controllableSource, cleanup } from '../../testing';
 
 afterEach(cleanup);
