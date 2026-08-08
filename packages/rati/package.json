@@ -76,7 +76,7 @@
     "scripts": {
         "build": "vp build && yarn run -T tsc -p tsconfig.build.json && cp src/vite/client.d.ts dist/vite/client.d.ts",
         "watch": "yarn run -T tsc --watch",
-        "typecheck": "yarn run -T tsc --noEmit",
+        "typecheck": "yarn run -T tsc --noEmit && yarn run typecheck:test",
         "typecheck:test": "yarn run -T tsc --noEmit -p tsconfig.test.json",
         "test": "vp test run --typecheck",
         "test:watch": "vp test --typecheck"
