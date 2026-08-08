@@ -9,7 +9,7 @@
         "lint": "vp lint",
         "lint:types": "vp lint --type-aware",
         "fmt": "vp fmt",
-        "typecheck": "yarn workspaces foreach -Ap run typecheck",
+        "typecheck": "tsc --noEmit -p tsconfig.node.json",
         "test": "yarn workspaces foreach -Ap run test",
         "upgrade": "yarn upgrade-interactive",
         "upgrade-yarn": "corepack use yarn@stable",
