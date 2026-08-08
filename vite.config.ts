@@ -102,13 +102,26 @@ export default defineConfig({
         ],
     }),
     fmt: fmt({
-        importOrder: {
+        // GLOBS, not regexes — oxfmt matches `elementNamePattern` glob-wise and `*` does not cross
+        // a `/`, so `react*` reaches `react-dom` while `react*/**` is what reaches `react-dom/client`.
+        // This block was spelled in prettier-plugin-sort-imports's anchored-regex keys under the old
+        // `importOrder` name (`^react`), which oxfmt read as globs matching nothing — inert config
+        // that looked configured (jnana-kit:FND-170 §A2). The kit renamed the field so a stale
+        // declaration becomes a type error at the pin bump instead of staying silent, and the
+        // patterns below are the re-spelling that follows; the import diff `vp fmt` produced is in
+        // the same commit, and it is the first sorting this repo has ever actually had.
+        sortImports: {
             // rati's suites import from `vite-plus/test` beside `vitest` itself.
-            testRunners: ['^vite-plus/test'],
-            // The framework tier, in dependency order: React first, then MobX.
-            frameworks: [['^react'], ['^mobx']],
+            testRunners: ['vite-plus/test'],
+            // The framework tier, in dependency order: React first, then MobX. Each group carries
+            // the bare-name glob and the subpath one — `react-dom/client`, `mobx-react-lite` and
+            // friends all have to land in the tier they belong to.
+            frameworks: [
+                ['react*', 'react*/**'],
+                ['mobx*', 'mobx*/**'],
+            ],
             // rati uses neither a package.json `imports` subpath nor a tsconfig `paths` alias
-            // (measured: no `from '#…'` or `from '~…'` anywhere), so the canonical `^#`/`^~` groups
+            // (measured: no `from '#…'` or `from '~…'` anywhere), so the canonical `#`/`~` groups
             // would claim an alias scheme this repo does not have.
             aliases: [],
         },

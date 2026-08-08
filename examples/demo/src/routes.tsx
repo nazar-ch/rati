@@ -1,4 +1,5 @@
 import { route, type GenericRouteType } from 'rati';
+
 import { Index } from './Index';
 import { NotFound } from './NotFound';
 import {

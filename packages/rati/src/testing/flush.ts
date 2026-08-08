@@ -1,4 +1,5 @@
 import { act } from 'react';
+
 import { withActEnvironment } from './actEnvironment';
 
 /*

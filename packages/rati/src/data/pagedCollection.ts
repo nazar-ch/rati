@@ -1,6 +1,8 @@
 import { observable, runInAction } from 'mobx';
+
 import { itemMap, type ItemMapOptions } from './itemMap';
 import { createQuery, instanceSource, type Query } from './query';
+
 import { type Source } from '../scope/source';
 
 /*

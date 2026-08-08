@@ -1,7 +1,8 @@
 import { describe, test, expect } from 'vite-plus/test';
+
+import { island } from '../../island/island';
 import { scope, input } from '../../scope/scope';
 import { NotAvailableError } from '../../scope/source';
-import { island } from '../../island/island';
 import { deferred, ssrRender } from '../../testing';
 
 /*

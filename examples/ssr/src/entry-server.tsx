@@ -4,6 +4,7 @@ import { renderApp, type RenderAppResult } from 'rati/ssr';
 // the client build it just ran, so these are values, not a manifest to find at runtime:
 // in dev the same import is the source entry and no links.
 import * as assets from 'virtual:rati/assets';
+
 import { createApp } from './createApp';
 
 export type { RenderAppResult };

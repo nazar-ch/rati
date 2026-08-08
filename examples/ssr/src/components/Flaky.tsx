@@ -1,4 +1,5 @@
 import { island, scope } from 'rati';
+
 import { flakyService } from '../sources/flaky';
 
 const flakyScope = scope().load({ status: () => flakyService() });

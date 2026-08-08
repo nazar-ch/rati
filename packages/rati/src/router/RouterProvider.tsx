@@ -1,4 +1,5 @@
 import React, { useContext, useSyncExternalStore } from 'react';
+
 import type { Router } from './router';
 import { RouterStore, type AnyRouter } from './store';
 

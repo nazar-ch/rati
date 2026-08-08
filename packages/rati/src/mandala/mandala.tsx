@@ -9,20 +9,22 @@ import {
     useSyncExternalStore,
 } from 'react';
 import type { ComponentType, Context, FC } from 'react';
-import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope';
-import type { SourceError } from '../scope/source';
-import { deepEqual } from '../util/utils';
-import { startDataTrace, type DataTrace, type DataTraceCause } from '../util/dataTrace';
-import { buildTree, flattenLevels, type Bucket, type Shared } from './resolver';
+
+import { AfterHydration } from './afterHydration';
+import { MandalaErrorBoundary } from './boundary';
 import { registerScopeChannel, setScopeLabel } from './channel';
 import { registerScopeControlsChannel } from './controls';
-import { discardRun, RefreshController } from './refresh';
+import { HydrationContext } from './hydration';
 import { LoadingDelay, noDelaySubscribe, notHeld } from './loadingDelay';
+import { discardRun, RefreshController } from './refresh';
+import { buildTree, flattenLevels, type Bucket, type Shared } from './resolver';
 import { RetryPolicy, resolveRetry, type RetryOption } from './retryPolicy';
 import { createRejectionGuard } from './ssrErrors';
-import { MandalaErrorBoundary } from './boundary';
-import { HydrationContext } from './hydration';
-import { AfterHydration } from './afterHydration';
+
+import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope';
+import type { SourceError } from '../scope/source';
+import { startDataTrace, type DataTrace, type DataTraceCause } from '../util/dataTrace';
+import { deepEqual } from '../util/utils';
 
 /*
     The mandala — rati's core renderable unit, the shared abstraction under `island()`

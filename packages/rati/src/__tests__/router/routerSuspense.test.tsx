@@ -1,6 +1,9 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
+
 import { act, lazy, type FC } from 'react';
+
 import { screen } from '@testing-library/react';
+
 import { route } from '../../router/route';
 import { RouterOutlet } from '../../router/RouterOutlet';
 import { createTestRouter, cleanup } from '../../testing';

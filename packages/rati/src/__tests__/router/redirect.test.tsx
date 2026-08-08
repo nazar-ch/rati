@@ -1,9 +1,10 @@
 import { describe, test, expect, vi, afterEach } from 'vite-plus/test';
-import { route } from '../../router/route';
-import { RouterStore } from '../../router/store';
+
 import { createMemoryHistory } from '../../router/history';
 import { prepareRoute } from '../../router/prepareRoute';
+import { route } from '../../router/route';
 import type { GenericRouteType } from '../../router/route';
+import { RouterStore } from '../../router/store';
 import { createTestRouter, cleanup } from '../../testing';
 
 afterEach(cleanup);

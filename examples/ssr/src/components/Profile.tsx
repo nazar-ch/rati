@@ -1,4 +1,5 @@
 import { Link, useRouteContext } from 'rati';
+
 import type { Profile } from '../data';
 
 // Matches the resolved shape of `profileScope` (routes.tsx).

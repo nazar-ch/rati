@@ -1,12 +1,15 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vite-plus/test';
+
 import { StrictMode, type FC } from 'react';
+
 import { act, render, screen, cleanup } from '@testing-library/react';
-import { RouterStore } from '../../router/store';
+
+import { createBrowserHistory } from '../../router/history';
+import { Navigate } from '../../router/Navigate';
 import { route } from '../../router/route';
 import { RouterOutlet } from '../../router/RouterOutlet';
-import { Navigate } from '../../router/Navigate';
 import { RouterProvider } from '../../router/RouterProvider';
-import { createBrowserHistory } from '../../router/history';
+import { RouterStore } from '../../router/store';
 
 const Home: FC = () => <Navigate to="/dashboard" />;
 const Dashboard: FC = () => <div data-testid="dashboard">dashboard</div>;

@@ -1,4 +1,9 @@
 import type { ComponentType } from 'react';
+
+import { headTags } from './headTags';
+import { serializeHydration, type HydrationState } from './payload';
+import { renderToHtml } from './renderToHtml';
+
 import type { HeadStore } from '../head/store';
 import {
     createHydrationCollector,
@@ -8,9 +13,6 @@ import {
 import { createMemoryHistory, type History } from '../router/history';
 import { prepareRoute, redirectFromHops } from '../router/prepareRoute';
 import { toRouterStore, type AnyRouter } from '../router/store';
-import { headTags } from './headTags';
-import { serializeHydration, type HydrationState } from './payload';
-import { renderToHtml } from './renderToHtml';
 
 /*
     renderApp — the whole per-request loop in one call: memory history → the app

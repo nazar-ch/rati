@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react';
 import { prerender } from 'react-dom/static';
 import type { PrerenderOptions } from 'react-dom/static';
+
+import { hydrateTree, visibleText, type MountedTree } from './dom';
+
 import {
     createHydrationCollector,
     HydrationProvider,
@@ -8,7 +11,6 @@ import {
     type HydrationError,
     type HydrationErrors,
 } from '../mandala/hydration';
-import { hydrateTree, visibleText, type MountedTree } from './dom';
 
 /*
     The SSR round-trip kit — the drain-loop + collector/provider + hydrateRoot dance

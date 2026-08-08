@@ -1,11 +1,13 @@
 import { describe, test, expect } from 'vite-plus/test';
+
 import { renderToString } from 'react-dom/server';
-import { RouterStore } from '../../router/store';
-import { route, type GenericRouteType } from '../../router/route';
-import { RouterProvider } from '../../router/RouterProvider';
-import { RouterOutlet } from '../../router/RouterOutlet';
+
 import { createMemoryHistory } from '../../router/history';
 import { prepareRoute } from '../../router/prepareRoute';
+import { route, type GenericRouteType } from '../../router/route';
+import { RouterOutlet } from '../../router/RouterOutlet';
+import { RouterProvider } from '../../router/RouterProvider';
+import { RouterStore } from '../../router/store';
 import { scope, type ScopeComponent } from '../../scope/scope';
 // The island route below resolves its scope through `react-dom/static` `prerender`
 // (renderToString, which the contrast tests use, does not await Suspense) — the drain loop

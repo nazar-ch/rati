@@ -1,10 +1,13 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
+
 import { type FC } from 'react';
+
 import { act, fireEvent } from '@testing-library/react';
-import { RouterStore } from '../../router/store';
-import { route } from '../../router/route';
+
 import { lazy } from '../../router/lazy';
 import { Link } from '../../router/Link';
+import { route } from '../../router/route';
+import { RouterStore } from '../../router/store';
 import { createTestRouter, cleanup } from '../../testing';
 
 const NoopComponent: FC = () => null;

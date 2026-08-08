@@ -1,4 +1,5 @@
 import { island, scope } from 'rati';
+
 import { clockSource } from '../sources/clock';
 
 // A source-backed scope. `time` unwraps the Source<string> to its ready value.

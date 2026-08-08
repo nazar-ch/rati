@@ -1,7 +1,8 @@
 import { describe, test, expect, beforeEach, vi } from 'vite-plus/test';
-import { RouterStore } from '../../router/store';
-import { route } from '../../router/route';
+
 import { createMemoryHistory } from '../../router/history';
+import { route } from '../../router/route';
+import { RouterStore } from '../../router/store';
 
 // Every pin below was run once against the unfixed engine and observed red: raw
 // interpolation put `hello world` and `a/b` into the URL unencoded and handed the

@@ -1,4 +1,5 @@
 import { describe, test, expect } from 'vite-plus/test';
+
 import { is } from '../../util/utils';
 
 // `is.class` decides whether the resolver constructs a load entry (`new Entry(props)`)

@@ -1,4 +1,5 @@
 import { createContext, useContext, type Context } from 'react';
+
 import type { Scope, ScopeProvidesOf } from '../scope/scope';
 import { is } from '../util/utils';
 

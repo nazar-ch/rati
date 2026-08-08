@@ -1,5 +1,7 @@
 import { observer } from 'mobx-react-lite';
+
 import { island, scope } from 'rati';
+
 import { CounterStore } from '../stores/CounterStore';
 
 // The scope resolves a single class load: the island does `new CounterStore(...)`

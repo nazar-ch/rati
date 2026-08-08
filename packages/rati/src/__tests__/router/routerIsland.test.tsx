@@ -1,13 +1,16 @@
 import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
+
 import { act, Component, type FC, type ReactNode } from 'react';
+
 // RTL is kept for the island-auto-context block below — those render an island (or a bare
 // reader) directly, not a router. The router tests use createTestRouter.
 import { render, screen, cleanup as rtlCleanup } from '@testing-library/react';
-import { route } from '../../router/route';
-import { scope, input, type ScopeComponent } from '../../scope/scope';
+
 import { island } from '../../island/island';
 import { useScope } from '../../mandala/channel';
+import { route } from '../../router/route';
 import { useRouteContext } from '../../router/useRouteContext';
+import { scope, input, type ScopeComponent } from '../../scope/scope';
 import { controllableSource, createTestRouter, deferred, cleanup } from '../../testing';
 
 // The 'product' route's context type is registered globally via the app-routes

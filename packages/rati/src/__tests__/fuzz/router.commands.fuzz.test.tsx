@@ -1,8 +1,9 @@
-import * as fc from 'fast-check';
 import { describe, test, expect, afterEach, beforeEach, vi } from 'vite-plus/test';
+
 import { cleanup, act } from '@testing-library/react';
+import * as fc from 'fast-check';
+
 import { atDeepFuzzBudget, fuzz, fuzzTimeout } from './arbitraries';
-import { RouterModel } from './routerModel';
 import {
     assertMounts,
     assertRenderedState,
@@ -10,8 +11,9 @@ import {
     installErrorLog,
     type ErrorLog,
 } from './routerAsserts';
-import { awayUrl, buildHarness, commandCaseArb, type Harness } from './routerHarness';
 import { exercised, routerCommandsArb, type Real } from './routerCommands';
+import { awayUrl, buildHarness, commandCaseArb, type Harness } from './routerHarness';
+import { RouterModel } from './routerModel';
 
 /*
     The RF-03 model-based property: a generated route table meets a generated *command

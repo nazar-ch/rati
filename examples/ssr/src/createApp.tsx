@@ -10,6 +10,7 @@ import {
     type RouterHydratedState,
 } from 'rati';
 import { type Hydration, HydrationProvider } from 'rati/ssr';
+
 import { RegionContext } from './appContext';
 import { Layout } from './components/Layout';
 import { routes } from './routes';

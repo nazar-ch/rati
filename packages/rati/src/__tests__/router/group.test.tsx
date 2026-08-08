@@ -1,7 +1,9 @@
 import { describe, test, expect } from 'vite-plus/test';
+
 import type { FC, ReactNode } from 'react';
-import { route } from '../../router/route';
+
 import { group } from '../../router/group';
+import { route } from '../../router/route';
 import { scope, input } from '../../scope/scope';
 import { prerenderToString, ssrRender } from '../../testing';
 

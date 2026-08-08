@@ -1,7 +1,10 @@
-import type { Simplify } from 'type-fest';
 import type { Context, FC } from 'react';
-import type { ExcludeNever } from '../types/generic';
+
+import type { Simplify } from 'type-fest';
+
 import type { Source } from './source';
+
+import type { ExcludeNever } from '../types/generic';
 
 export const ScopeSymbol = Symbol();
 

@@ -1,5 +1,7 @@
 import { useContext } from 'react';
+
 import { hook, input, scope } from 'rati';
+
 import { RegionContext } from './appContext';
 import { fetchProduct, fetchReviews } from './data';
 

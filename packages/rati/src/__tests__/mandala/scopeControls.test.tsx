@@ -1,11 +1,14 @@
 import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
-import { render, screen, cleanup, act } from '@testing-library/react';
-import { hydrateRoot } from 'react-dom/client';
+
 import type { FC, ReactElement } from 'react';
-import { scope, data, input } from '../../scope/scope';
+import { hydrateRoot } from 'react-dom/client';
+
+import { render, screen, cleanup, act } from '@testing-library/react';
+
 import { island } from '../../island/island';
-import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
 import { useScopeControls, type ScopeControls } from '../../mandala/controls';
+import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
+import { scope, data, input } from '../../scope/scope';
 import {
     controllableSource,
     deferred,

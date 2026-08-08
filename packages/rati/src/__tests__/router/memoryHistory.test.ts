@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from 'vite-plus/test';
+
 import { createMemoryHistory } from '../../router/history';
 
 describe('createMemoryHistory', () => {

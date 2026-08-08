@@ -1,6 +1,8 @@
 import { observable, runInAction } from 'mobx';
-import { toSourceError, type SourceError } from '../scope/source';
+
 import { FieldExternalErrors, type Field, type FieldInternal } from './field';
+
+import { toSourceError, type SourceError } from '../scope/source';
 
 /*
     `form` — an aggregate over fields: staged edits with one submit seam. Design

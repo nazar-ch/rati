@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vite-plus/test';
+
 import { observable, runInAction } from 'mobx';
+
 import { collection } from '../../data/collection';
 import { pagedCollection, type PageResult } from '../../data/pagedCollection';
 import { query, type Query } from '../../data/query';

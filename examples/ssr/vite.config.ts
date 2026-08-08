@@ -1,6 +1,6 @@
-import { defineConfig, lazyPlugins } from 'vite-plus';
 import react from '@vitejs/plugin-react';
 import { ratiSsr } from 'rati/vite';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 
 const conditions = ['rati-dev', 'import', 'module', 'browser', 'default'];
 

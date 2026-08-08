@@ -1,10 +1,13 @@
-import * as fc from 'fast-check';
 import { expect } from 'vite-plus/test';
+
 import { act } from '@testing-library/react';
+import * as fc from 'fast-check';
+
 import { byLevel } from './arbitraries';
 import { assertLedgerBounds } from './ledger';
 import { allKeys, type DeclaredState, type ReferenceModel, type ScopeSpec } from './model';
 import { readContent, readSlot, type BuiltHarness } from './scopeHarness';
+
 import { flush } from '../../testing';
 
 /*

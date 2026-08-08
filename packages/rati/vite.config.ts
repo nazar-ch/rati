@@ -1,6 +1,6 @@
-import { defineConfig, lazyPlugins } from 'vite-plus';
 import react from '@vitejs/plugin-react';
 import { analyzer } from 'vite-bundle-analyzer';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 
 const debugBundleContent = false;
 const debugBundlePreserveModules = false;

@@ -1,5 +1,7 @@
 import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
+
 import { autorun, observable, runInAction } from 'mobx';
+
 import { query } from '../../data/query';
 // A deferred fake walks a query through every phase without module mocking — the
 // "testability by construction" ground rule (data-package.md), now `rati/testing`'s.

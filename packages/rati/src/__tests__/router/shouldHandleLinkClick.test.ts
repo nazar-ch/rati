@@ -1,5 +1,7 @@
 import { describe, test, expect, beforeEach } from 'vite-plus/test';
+
 import type React from 'react';
+
 import { shouldHandleLinkClick } from '../../router/Link';
 
 beforeEach(() => {

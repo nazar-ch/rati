@@ -1,4 +1,5 @@
 import { Link, Meta, Title, useScopeControls, type SourceError } from 'rati';
+
 import type { Product, Review } from '../data';
 import { productScope } from '../scopes';
 

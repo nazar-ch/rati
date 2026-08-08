@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
+
 import { createBrowserHistory, createMemoryHistory } from '../../router/history';
 import { installScrollRestoration } from '../../router/scrollRestoration';
 

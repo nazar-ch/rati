@@ -1,6 +1,8 @@
 import { createRoot, hydrateRoot } from 'react-dom/client';
+
 import { createBrowserHistory } from 'rati';
 import { readHydration } from 'rati/ssr';
+
 import { createApp } from './createApp';
 // The app's CSS enters through its entry, the ordinary Vite way: the build hashes it
 // alongside this module and the manifest lists it, which is how the server knows to

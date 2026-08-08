@@ -1,7 +1,8 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
+
+import { island } from '../../island/island';
 import { scope, input } from '../../scope/scope';
 import { NotAvailableError, toSourceError, type SourceError } from '../../scope/source';
-import { island } from '../../island/island';
 import { cleanup, renderIsland, ssrRender } from '../../testing';
 
 afterEach(cleanup);

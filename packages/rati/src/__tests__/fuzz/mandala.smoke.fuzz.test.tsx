@@ -1,7 +1,10 @@
-import * as fc from 'fast-check';
-import { StrictMode } from 'react';
 import { describe, test, expect, afterEach } from 'vite-plus/test';
+
+import { StrictMode } from 'react';
+
 import { render, cleanup, act } from '@testing-library/react';
+import * as fc from 'fast-check';
+
 import { fuzz, fuzzTimeout } from './arbitraries';
 import { assertLedgerBalanced, assertLedgerBounds } from './ledger';
 import { allKeys, createDeclaredState, createModel, type ScopeSpec } from './model';

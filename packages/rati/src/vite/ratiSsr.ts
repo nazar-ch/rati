@@ -3,6 +3,9 @@ import { relative, resolve } from 'node:path';
 
 import { normalizePath, type Manifest, type Plugin, type ViteDevServer } from 'vite';
 
+import { ASSETS_MODULE, RESOLVED_ASSETS_MODULE, buildAssets, devAssets } from './assets';
+import { findLazyCalls, recordModuleIds } from './lazyModules';
+
 import {
     DEFAULT_PLACEHOLDERS,
     fillTemplate,
@@ -12,9 +15,6 @@ import {
     type Placeholders,
     type RenderedParts,
 } from '../ssr/html';
-import { ASSETS_MODULE, RESOLVED_ASSETS_MODULE, buildAssets, devAssets } from './assets';
-import { findLazyCalls, recordModuleIds } from './lazyModules';
-
 import type { RenderAppResult } from '../ssr/renderApp';
 
 /*

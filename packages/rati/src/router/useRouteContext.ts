@@ -1,6 +1,7 @@
-import { useScopeRead } from '../mandala/channel';
-import { useRouterStore } from './RouterProvider';
 import type { UserRoutes, GenericRouteType, RouteContextNames, RouteContextValueOf } from './route';
+import { useRouterStore } from './RouterProvider';
+
+import { useScopeRead } from '../mandala/channel';
 
 // Context-bearing route names, derived from the app's routes table
 // (`RatiUserTypes['routes']`) — the same source `Link`'s `to` reads, so the context

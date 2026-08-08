@@ -1,4 +1,5 @@
 import { island, scope } from 'rati';
+
 import { sleep } from '../util';
 
 // Where the load actually ran. The one-word, honest answer to "did this gate the

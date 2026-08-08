@@ -9,27 +9,7 @@ import {
     useSyncExternalStore,
 } from 'react';
 import type { ComponentType, Context, ReactNode } from 'react';
-import {
-    isDataLoad,
-    isHookLoad,
-    InputSymbol,
-    type HookLoad,
-    type LoadContext,
-    type Scope,
-    type ScopeProvideDef,
-} from '../scope/scope';
-import { asSourceError, isSource, type SourceError, type SourceState } from '../scope/source';
-import { is, deepEqual } from '../util/utils';
-import { navTrace, navTraceEnabled } from '../util/navTrace';
-import {
-    errorLabel,
-    traceCellPromise,
-    traceCellRefresh,
-    traceCellStatus,
-    traceLevelStart,
-    traceResolved,
-    type DataTrace,
-} from '../util/dataTrace';
+
 import {
     bucketSignal,
     makeProducedCell,
@@ -43,8 +23,30 @@ import {
     type ProducedCell,
     type RefreshController,
 } from './refresh';
-import { firstSettle } from './ssrSource';
 import { SsrRejection } from './ssrErrors';
+import { firstSettle } from './ssrSource';
+
+import {
+    isDataLoad,
+    isHookLoad,
+    InputSymbol,
+    type HookLoad,
+    type LoadContext,
+    type Scope,
+    type ScopeProvideDef,
+} from '../scope/scope';
+import { asSourceError, isSource, type SourceError, type SourceState } from '../scope/source';
+import {
+    errorLabel,
+    traceCellPromise,
+    traceCellRefresh,
+    traceCellStatus,
+    traceLevelStart,
+    traceResolved,
+    type DataTrace,
+} from '../util/dataTrace';
+import { navTrace, navTraceEnabled } from '../util/navTrace';
+import { is, deepEqual } from '../util/utils';
 
 /*
     The mandala's resolution mechanics: compile a scope's levels into a nested tree of
