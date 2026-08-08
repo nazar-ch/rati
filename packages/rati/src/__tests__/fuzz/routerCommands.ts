@@ -36,7 +36,7 @@ import { flush } from '../../testing';
         anything is read. Never poll-until-green: a fixed flush is what makes a failure mean
         something.
 
-    The invariants are the six of docs/planned/router-fuzz/issues/RF-03-commands-model.md;
+    The invariants are the six of docs/archive/efforts/router-fuzz/issues/RF-03-commands-model.md;
     the shared five live in routerAsserts.ts (both properties hold the router to them), and
     the sixth — notification coherence — is here, since it is a fact about a *command*
     rather than about a state.

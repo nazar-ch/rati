@@ -3,7 +3,8 @@
 # node_modules) exists, so it cannot be anything that needs them.
 #
 # rati's provision hook: the project-owned layer of a shared sandbox VM (jnana-kit registry
-# `provisionHook`; docs/design.md §3). The kit base clones this repo and calls this. rati needs
+# `provisionHook`; jnana-kit:///docs/design.md §3 — the kit's tree, not this one). The kit base
+# clones this repo and calls this. rati needs
 # nothing beyond the base — no database, no services, no seed, no credentials — so this is just
 # "install deps": the packages/rati bundle and the examples/{demo,ssr} Vite dev servers all run
 # from one Yarn-workspaces install. Node 26, git auth, the kit checkout, and the skills are the

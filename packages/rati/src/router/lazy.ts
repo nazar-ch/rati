@@ -26,7 +26,7 @@ export type PreloadableLazyComponent<T extends ComponentType<any>> = LazyExoticC
  * import before the user actually navigates.
  *
  * ```ts
- * const ProductPage = lazy(() => import('./ProductPage'));
+ * const ProductPage = lazy(() => import(`./ProductPage`));
  * route('/products/:id', 'product', ProductPage);
  *
  * // Elsewhere:

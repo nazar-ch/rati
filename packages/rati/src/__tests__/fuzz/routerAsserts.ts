@@ -9,7 +9,7 @@ import type { RouterModel, Step } from './routerModel';
     traversal interleavings, and neither may hold the router to a different bar than the
     other.
 
-    Every assert here sits at the contract altitude (docs/planned/router-fuzz/README.md
+    Every assert here sits at the contract altitude (docs/archive/efforts/router-fuzz/README.md
     §"Decisions taken"): the rendered route, `history.location`, the public getters, remount
     discipline through mount effects, the redirect trail. Never `pathCounter`, the skip
     marker's spelling, or a listener count.

@@ -18,7 +18,7 @@ import type { BuiltHarness } from './scopeHarness';
         the sources it was built over. It never asserts churn-freedom — when a mid-tree
         source drops to pending the levels below unmount, and whether their sources ride
         that window out attached is the engine's choice, not a promise
-        (../suspense-situations.md S8).
+        (packages/rati/src/__tests__/suspense-situations.md S8).
       - `assertLedgerBalanced` at final unmount: every attach matched by a detach, every
         provided value disposed. A leak fails the run even when every mid-run assert passed,
         and a never-attached source (its level never committed — the S5 unmount-while-

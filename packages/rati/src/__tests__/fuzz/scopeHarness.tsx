@@ -207,7 +207,7 @@ export const ERROR_TESTID = 'fuzz-error';
  * mounted and hides it (`display: none`, Offscreen semantics) while rendering the fallback
  * next to it — so mid-remount both the stale content and the loading slot are in the DOM.
  * Reading the contract off `querySelector` alone would call that "content" and quietly
- * excuse every loading-slot flash. See ../suspense-situations.md S11.
+ * excuse every loading-slot flash. See packages/rati/src/__tests__/suspense-situations.md S11.
  */
 function visibleNode(container: HTMLElement, testid: string): Element | null {
     const node = container.querySelector(`[data-testid="${testid}"]`);

@@ -2,7 +2,7 @@ import type { Parameters } from 'fast-check';
 
 /*
     Fuzz conventions for rati's randomized suites (ported from jnana's fuzz playbook —
-    ~/Sites/jnana/.claude/fuzz-testing.md). Effort record: docs/planned/mandala-fuzz/.
+    ~/Sites/jnana/.claude/fuzz-testing.md). Effort record: docs/archive/efforts/mandala-fuzz/.
 
       - `fuzz(n)` builds the fast-check `Parameters` for one property. `numRuns` defaults to
         the small per-property `n`, so the default `vp run rati#test` stays fast; the knobs:

@@ -669,7 +669,7 @@ describe('selective refresh — races', () => {
     // would — an error is a settled state, not an in-flight one, so the key leaves
     // `pending` before the boundary shows the error slot. It used to sit there until a
     // retry's `treeCommitted`, so the error slot read a `pending` with nothing actually
-    // fetching. Effort record: docs/planned/mandala-fuzz/README.md §Findings.
+    // fetching. Effort record: docs/archive/efforts/mandala-fuzz/README.md §Findings.
     //
     // Kill: resolver.tsx, the source error branch — drop the `sourceErrored` call → 'live'
     // stays in `pending` for the error slot's whole life.

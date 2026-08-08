@@ -8,7 +8,7 @@
 #   [bump]   patch (default) | minor | major | prepatch | preminor | premajor
 #            | prerelease, or an explicit version like 0.5.0
 #
-# One-time setup: see docs/RELEASING.md.
+# One-time setup: see docs/current/RELEASING.md.
 
 set -euo pipefail
 
@@ -66,7 +66,7 @@ fi
 # --- token from Keychain --------------------------------------------------
 info "Reading npm token from Keychain (service: $KEYCHAIN_SERVICE)…"
 NPM_TOKEN="$(security find-generic-password -a "$USER" -s "$KEYCHAIN_SERVICE" -w 2>/dev/null || true)"
-[[ -n "$NPM_TOKEN" ]] || die "No token in Keychain. Run the one-time setup in docs/RELEASING.md."
+[[ -n "$NPM_TOKEN" ]] || die "No token in Keychain. Run the one-time setup in docs/current/RELEASING.md."
 
 # Hand the token + publish target to `yarn npm …` via env (yarn reads these as
 # the npmAuthToken / npmPublishRegistry config). Passing them through the
@@ -80,7 +80,7 @@ yarn_pkg() { yarn workspace "$PACKAGE" "$@"; }
 # Gate on the exit code, not the output: `yarn npm whoami` prints its error to
 # stdout (not stderr) and would otherwise masquerade as a username.
 if ! WHO="$(yarn npm whoami --publish 2>/dev/null)"; then
-  die "Token failed to authenticate (expired?). Rotate it — see docs/RELEASING.md."
+  die "Token failed to authenticate (expired?). Rotate it — see docs/current/RELEASING.md."
 fi
 WHO="${WHO##*: }"   # strip yarn's "➤ YN0000: " report prefix, leaving the username
 info "Authenticated as: $WHO"

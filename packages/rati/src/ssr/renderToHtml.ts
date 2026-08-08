@@ -13,7 +13,7 @@ import { prerender } from 'react-dom/static';
     costs: a no-JS reader (a crawler) gets the loading slot, and the reveal is JS- and
     rAF-gated, so a backgrounded tab doesn't run it either. A budget nothing can reach
     keeps every completed boundary inline. Streaming is a different contract rather than
-    a knob here — docs/research/ssr-streaming.md.
+    a knob here — docs/research/undecided/ssr-streaming.md.
 
     Two things React still decides for itself: a boundary carrying suspensey content
     (hoisted stylesheets, suspensey images) outlines regardless of the budget, and a

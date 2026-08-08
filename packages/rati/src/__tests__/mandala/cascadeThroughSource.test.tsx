@@ -12,7 +12,8 @@ import { controllableSource, flush } from '../../testing';
 /*
     A source key's value must reach the loads that read it — found while deciding whether the
     MF-02 command model's expected-value fixpoint could hold through a source key (it could
-    not), and fixed. Effort record: docs/planned/mandala-fuzz/README.md §Findings 2026-07-15.
+    not), and fixed. Effort record: docs/archive/efforts/mandala-fuzz/README.md
+    §Findings 2026-07-15.
 
     What was wrong: a source key's value reached its dependents through
     `RefreshController.sourceReady()`, which emitted changed (so a `.provide()` factory
