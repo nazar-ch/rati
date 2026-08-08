@@ -8,11 +8,11 @@ import { defineConfig } from 'vite-plus';
 // against the `.ts` it was compiled from, and linting the emit would redden the gate on generated
 // code nobody edits.
 //
-// NO `*.config.*` entry, deliberately (jnana-kit:FND-122). The five files that pattern matched here
-// — the root `vite.config.ts`, `packages/rati/{vite,vitest}.config.ts` and the two examples' —
-// are all this repo's OWN source, and none of them sits in any tsc program, so ignoring them left
-// them unchecked by BOTH halves of the gate at once. Linting them is the half this repo can have
-// today; the typecheck half wants a root program this item does not add (see the PR body).
+// NO `*.config.*` entry, deliberately (jnana-kit:FND-122). The six files that pattern matched here
+// — this file, `vitest.config.ts` beside it, `packages/rati/{vite,vitest}.config.ts` and the two
+// examples' — are all this repo's OWN source, and ignoring them left them unchecked by BOTH halves
+// of the gate at once. Both halves reach them now: lint from here, and tsc through the root
+// `tsconfig.node.json`, the config program jnana-kit:KC-13 added.
 //
 // A named constant because it has TWO readers — the lint config below and the pre-commit lint task's
 // filter, which drops what oxlint would ignore. Those were two hand-maintained lists until
