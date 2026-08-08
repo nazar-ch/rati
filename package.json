@@ -10,7 +10,7 @@
         "lint:types": "vp lint --type-aware",
         "fmt": "vp fmt",
         "typecheck": "tsc --noEmit -p tsconfig.node.json",
-        "test": "yarn workspaces foreach -Ap run test",
+        "test": "JNANA_REQUIRE_ALL_PROJECTS=1 vp test run",
         "upgrade": "yarn upgrade-interactive",
         "upgrade-yarn": "corepack use yarn@stable",
         "upgrade-node": "vp env install",
