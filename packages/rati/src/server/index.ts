@@ -3,8 +3,8 @@
 
     ```ts
     import { createRequestHandler, serve } from 'rati/server';
-    // The built server entry: `render`, plus the assets it was built with.
-    import { render, assets } from './dist/server/entry-server.js';
+    // The app's built server entry: `render`, plus the assets it was built with.
+    const { render, assets } = await import(`./dist/server/entry-server.js`);
 
     const template = await readFile('index.html', 'utf-8');
     const handler = createRequestHandler({ render, assets, template });

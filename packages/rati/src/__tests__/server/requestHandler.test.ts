@@ -7,7 +7,7 @@ import type { RenderAppResult } from '../../ssr/renderApp';
 /*
     The fetch handler, driven directly: a `Request` in, a `Response` out, no listener
     and no app. `render` is the whole coupling — canned results are the contract — and
-    the assembly under it is covered in ../ssr/html.test.ts.
+    the assembly under it is covered in packages/rati/src/__tests__/ssr/html.test.ts.
 */
 
 const TEMPLATE = `<!doctype html><html><head><!--app-head--></head>

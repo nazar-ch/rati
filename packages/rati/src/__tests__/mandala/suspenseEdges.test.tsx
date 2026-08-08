@@ -8,9 +8,9 @@ import { controllableSource, deferred, flush, renderIsland, cleanup } from '../.
 /*
     The Suspense-produced situations React makes possible around a committed island —
     pins 10-12 of docs/archive/mandala-testing.md §"Deterministic pins", one per
-    situation in ../suspense-situations.md (S4, S5, S8). Each carries a *kill note*: the
-    one-line source mutation that must make it fail, executed once at authoring and
-    reverted.
+    situation in packages/rati/src/__tests__/suspense-situations.md (S4, S5, S8). Each
+    carries a *kill note*: the one-line source mutation that must make it fail, executed
+    once at authoring and reverted.
 
     They are grouped here rather than in scopeControls.test.tsx (the strategy doc's
     suggested home) because none of them involves the controls: what they share is the

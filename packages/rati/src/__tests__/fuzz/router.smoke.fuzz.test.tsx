@@ -31,7 +31,7 @@ import { RouterModel, type Step } from './routerModel';
     property is the foundation it grows from (the model already keeps the stack). Route
     components are plain — data resolution under navigation is the mandala suite's ground.
 
-    Every assert sits at the contract altitude (docs/planned/router-fuzz/README.md
+    Every assert sits at the contract altitude (docs/archive/efforts/router-fuzz/README.md
     §"Decisions taken"): the rendered route, `history.location`, the public getters,
     remount discipline through mount effects. Never `pathCounter`, the skip marker, or a
     listener count.

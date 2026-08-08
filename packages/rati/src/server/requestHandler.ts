@@ -25,8 +25,8 @@ import type { RenderAppResult, RenderAssets } from '../ssr/renderApp';
 export interface RequestHandlerOptions {
     /**
      * The server entry's `render(url)` — the Layer-1 contract (`renderApp`'s result).
-     * In production that is the built entry: `const { render } = await import(
-     * './dist/server/entry-server.js')`.
+     * In production that is the app's built entry —
+     * `await import('./dist/server/entry-server.js')`.
      */
     render: (url: string) => Promise<RenderAppResult>;
     /**
