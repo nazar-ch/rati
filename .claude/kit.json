@@ -92,8 +92,8 @@
     },
 
     // Repos whose work-item ids may be cited here in the qualified `<repo>:<ID>` form. Both are
-    // already cited: rati's findings track their downstream in jnana (`jnana:FND-237`), and
-    // `scripts/ci.ts` names the kit findings its run stamp closes (`jnana-kit:FND-32`). Undeclared,
+    // already cited: rati's findings track their downstream in jnana (`jnana:FND-237`), and this
+    // repo's configs name the kit records their shape comes from (`jnana-kit:FND-170`). Undeclared,
     // a qualified id reads as a typo'd local one and `issues.ts check` errors on it.
     "citableRepos": ["jnana", "jnana-kit"],
 
