@@ -1,10 +1,17 @@
 // kit.json — rati's jnana-kit manifest: the facts a kit tool would otherwise hard-code about this
 // repo. One kit serves many projects; this file is the seam. JSONC (comments + trailing commas,
-// like tsconfig). Contract: jnana-kit `docs/design.md` §2; schema `tools/kit.schema.json`. Every
-// field is optional; a malformed manifest is a hard error naming the field, because a typo'd
-// guardrail must never read as "no guardrail".
+// like tsconfig). Contract: jnana-kit `docs/design.md` §2. Every field is optional; a malformed
+// manifest is a hard error naming the field, because a typo'd guardrail must never read as "no
+// guardrail".
+//
+// The `$schema` pointer below names the copy the `@jnana-app/kit` INSTALL brings, not a path into
+// somebody's kit checkout — the pin in .yarnrc.yml then decides which schema version this file is
+// edited against, the same way it decides which gate runs (jnana-kit:ASK-04, ruled 2026-08-08). It
+// resolves to nothing until the kit republishes the package with the schema in its `files`, which
+// is the user's own action after jnana-kit's kit-consolidation R2; nothing in this repo reads the
+// pointer and no gate touches it, so the interval costs an editor hint and nothing else.
 {
-    "$schema": "../../jnana-kit/tools/kit.schema.json",
+    "$schema": "../node_modules/@jnana-app/kit/kit.schema.json",
 
     // Short name — pool slot dirs (`rati-wt-<n>`), central-feedback filenames, registry key.
     "project": "rati",
