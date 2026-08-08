@@ -718,11 +718,13 @@ forever. A healthy server-rendered page reads as a broken hydration, and any rea
 hides behind that. So before believing a hydration failure, check `document.hidden`; screenshot and
 step through SSR pages in a tab that is actually on screen.
 
-The whole gate runs as one command: `yarn ci` (`scripts/ci.ts`, plain Node over zx) — fmt, lint,
-typecheck (every workspace), the full test suite, the fuzz suites at a deep budget (default
-`FUZZ_RUNS=500`, override via env), and the builds. Every stage runs even when an earlier one fails;
-the summary aggregates. It stands in for hosted CI until a lane is worth wiring, at which point a
-job runs the same file unchanged.
+The gate runs as one command, and it is the kit's standard battery — `.claude/kit.json`'s `verify`
+field names it, and it covers fmt, lint, typecheck (every workspace plus the root config program),
+Markdown, doc- and comment-links, the control-byte scan, the `@jnana-app/kit` conformance checks,
+the record gate and the full test suite. `scripts/ci.ts` (plain Node over zx) keeps what the battery
+does not run: the fuzz suites at a deep budget (default `FUZZ_RUNS=500`, override via env) and the
+builds — `yarn ci`, before a release or after touching the engine or the packaging. Every stage runs
+even when an earlier one fails; both summaries aggregate.
 
 ## Toolchain
 
