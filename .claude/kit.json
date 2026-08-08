@@ -16,18 +16,25 @@
     // Short name — pool slot dirs (`rati-wt-<n>`), central-feedback filenames, registry key.
     "project": "rati",
 
-    // The one pre-push gate. rati already owns the cleanest gate in the family — `yarn ci`
-    // (`scripts/ci.ts`), the hosted-CI stand-in — so `verify` points straight at it rather than a
-    // rebuilt `verify:*` set — including the `@jnana-app/kit` conformance check, which is a stage
-    // here rather than the `verify:kit-package` script the other consumers carry. The fast subset
-    // chosen for the pre-push gate: fmt + lint + doc-links + markdown + control-char-scan +
-    // kit-package + typecheck + the full Vitest suite (at its tiny default fuzz budget). It SKIPS
-    // the deep `fuzz` stage (500 runs) and the `build` stage — run `yarn ci` (all stages) yourself
-    // before a release or when you touch the mandala engine or the packaging/build.
+    // The one pre-push gate, and it is now the kit's STANDARD BATTERY rather than a list this repo
+    // maintains (jnana-kit:KC-13). What runs is `node_modules/.bin/kit-verify` out of the
+    // `@jnana-app/kit` pin above — every step the battery declares, at the version .yarnrc.yml
+    // names, with no `verify:*` script here and nothing for a reader to keep in step by hand. The
+    // list this field used to carry, and its twin `GATE_STAGES` in `scripts/ci.ts`, are both gone:
+    // "they move together" was an admission that two hand-written lists existed at all, and the
+    // battery is what removes the second one.
     //
-    // This list and `GATE_STAGES` in `scripts/ci.ts` name the same set, and drift between them can
-    // only cost a run stamp, never buy a wrong one — so they move together.
-    "verify": "yarn ci fmt lint doc-links markdown control-char-scan kit-package typecheck test",
+    // NOT the bare `node_modules/.bin/kit-verify`, which is the thing the wrapper wraps. The bin
+    // cannot leave a run stamp — the stamp is read by a session hook that must load when
+    // `node_modules` is broken, so its writer stays kit-level — and with no stamp ever written the
+    // "this session pushed without running the gate" reminder silently stops reaching this repo.
+    // That reminder was cut against a rati session (jnana-kit:FND-03); `consumer-verify.ts` stamps
+    // around the bin so it reaches rati again. `$JNANA_KIT_HOME` is why this is a shell string: it
+    // is the one carrier that can hold the variable.
+    //
+    // What is NOT in the battery stays in `scripts/ci.ts` and is run by hand before a release: the
+    // deep `fuzz` stage (500 runs) and `build`. `yarn ci` with no arguments runs both.
+    "verify": "sh \"$JNANA_KIT_HOME/tools/run-node.sh\" \"$JNANA_KIT_HOME/tools/consumer-verify.ts\"",
 
     // Idempotent "make this checkout runnable": install deps only (Node 26 + Yarn 4.17.1 via
     // corepack, `enableScripts: false`). No codegen; never git sync.

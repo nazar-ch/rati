@@ -1,28 +1,36 @@
-// scripts/ci.ts — the whole verification gate in one command (`yarn ci`, or
-// `node scripts/ci.ts` directly — Node 26 runs TS as-is). Every stage runs even when an
-// earlier one fails; the summary names the failures and the exit code is theirs. Today
-// this is the manual "CI" — run it before handing work over, or as the nightly-style
-// deep pass; when a hosted CI lane is worth wiring, a job runs this file unchanged.
+// scripts/ci.ts — the release ritual: the two checks the kit's standard battery does NOT run
+// (`yarn ci`, or `node scripts/ci.ts` directly — Node 26 runs TS as-is). Every stage runs even when
+// an earlier one fails; the summary names the failures and the exit code is theirs.
 //
-//   node scripts/ci.ts                        # every stage
-//   node scripts/ci.ts lint test              # a subset, by name
+//   node scripts/ci.ts                        # both stages
+//   node scripts/ci.ts build                  # one, by name
 //   FUZZ_RUNS=2000 node scripts/ci.ts fuzz    # deepen the randomized stage
 //   FUZZ_SEED=7 node scripts/ci.ts fuzz       # pin the seed (reproduce a failure)
 //
-// The `test` stage is the day-to-day suite at its deliberately tiny fuzz budget (seconds);
-// the `fuzz` stage re-runs only the randomized suites at a raised budget (default 500 —
-// the mandala-fuzz effort's deep-run bar). The distinction is MF-04's finding: an unpinned
-// default-budget green is weak evidence for the fuzz invariants — the deep budget is what
-// makes a green mean something (docs/planned/mandala-fuzz/README.md §Findings).
+// THIS IS NOT THE PRE-PUSH GATE, and until jnana-kit:KC-13 it was. `.claude/kit.json`'s `verify`
+// now names the kit's standard battery, which runs fmt, lint, typecheck, the Markdown and doc-link
+// gates, the control-byte scan, the `@jnana-app/kit` conformance checks and the full Vitest suite —
+// every stage this file used to carry except the two below. The `GATE_STAGES` list that used to sit
+// at the bottom of this file, and the identical list in `.claude/kit.json`, went with them: two
+// hand-written lists that "move together" is the coupling the battery exists to delete, and the run
+// stamp they existed to guard is written by the battery's own wrapper now.
 //
-// A run that covers the pre-push gate also leaves jnana-kit's run stamp — see the last
-// section of this file.
+// So what is left is the deliberate residue — the two things a gate should not pay for on every
+// push, run before a release or when you touch the mandala engine or the packaging:
+//
+//   - `fuzz` re-runs only the randomized suites at a raised budget (default 500 — the mandala-fuzz
+//     effort's deep-run bar). The battery's `test` step runs the same suites at their deliberately
+//     tiny default budget, which is seconds; the distinction is MF-04's finding, that an unpinned
+//     default-budget green is weak evidence for the fuzz invariants and the deep budget is what
+//     makes a green mean something (docs/archive/efforts/mandala-fuzz/README.md §Findings — the
+//     effort archived, and this pointer had been left at its planned/ path).
+//   - `build` produces the library bundle + d.ts and both example apps. Nothing type-checks the
+//     emit, and a bundle that fails to build is a release-time fact, not a per-push one.
 
-import { existsSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+
 import { $ } from 'zx';
 import type { ProcessPromise } from 'zx';
 
@@ -47,143 +55,9 @@ const runAll = async (selectors: string[]): Promise<number> => {
 
 const fuzzRuns = process.env.FUZZ_RUNS ?? '500';
 
-// Where the kit checkout is, for the two seams below that still need a PATH into it — the
-// `control-char-scan` stage and `stampGate`, both of which reach tools the kit deliberately keeps
-// off its `bin/`. They want it for opposite reasons: the stage RUNS a gate out of it and fails
-// when it is not there, while `stampGate` merely reports to it and stays silent when it is not.
-// The `doc-links` stage no longer appears here — it calls its checker by plain name (below).
-const kitHome = process.env.JNANA_KIT_HOME || path.join(os.homedir(), 'Sites', 'jnana-kit');
-
 type Stage = { name: string; what: string; run: () => Promise<number> };
 
 const stages: Stage[] = [
-    { name: 'fmt', what: 'oxfmt, check only', run: () => exitOf(sh`vp fmt --check`) },
-    { name: 'lint', what: 'oxlint, repo-wide', run: () => exitOf(sh`vp lint`) },
-    {
-        name: 'doc-links',
-        what: "the kit's doc-link and doc-style gate, over every tracked .md",
-        // The checker lives in the kit, not here (jnana-kit:DS-28 graduated its doc-style half to
-        // a hard gate), and it is spawned BY PLAIN NAME: the kit publishes it on its `bin/`, which
-        // whoever installed the kit put on PATH (`install-host.ts` on a host, provisioning on a
-        // sandbox guest). A long-form `$JNANA_KIT_HOME/tools/…` spelling worked too, but a
-        // workaround written down often enough reads as the convention, and the next reader learns
-        // that the incantation IS how you run a kit tool (jnana-kit:FND-158).
-        //
-        // A kit that is not on PATH FAILS this stage rather than skipping it, as before: a gate
-        // that quietly measured nothing would read exactly like one that passed. Only the message
-        // changed, because there is no longer a path to stat before spawning — 127 is the signal,
-        // and it is the one exit status this stage translates.
-        run: async (): Promise<number> => {
-            const code = await exitOf(sh`check-doc-links.ts --gate`);
-            if (code === 127) {
-                console.error(
-                    `ci: check-doc-links.ts did not resolve — the kit's bin/ is not on PATH ` +
-                        `(or its node shim found no runtime). Install the kit — its ` +
-                        `install-host.ts on a host, provisioning on a sandbox guest — and re-run.`,
-                );
-            }
-            return code;
-        },
-    },
-    {
-        name: 'markdown',
-        what: "the kit's Markdown width gate and mangle scan, over dprint's own corpus",
-        // Also wired as a staged task in `vite.config.ts`, and worth both for the same reason
-        // `control-char-scan` below is: that one runs `--fmt` and only ever sees what is being
-        // committed, so Markdown that predates the gate is never reached from a commit. This is the
-        // corpus half, and it is the ONLY half that can fail — `--fmt` restores and fails on a
-        // mangle but is otherwise a fixer, while `--check` is non-mutating and its whole output is
-        // a verdict.
-        //
-        // `--check`, never `--fmt`, and never a bare `dprint fmt`: a gate does not rewrite the tree
-        // it is judging. The failure prints its own remedy, which is this same tool's `--fmt` with
-        // the same scope selector — and prints, explicitly, NOT to follow dprint's own suggested
-        // `dprint fmt`, because a bare reflow bypasses the mangle scan and dprint cannot see its own
-        // damage (jnana-kit:FND-47, jnana-kit:FND-106).
-        //
-        // The corpus this measures is dprint's own resolution of `dprint.json`, not a glob of the
-        // tool's — a gate and its fix holding different opinions about the corpus is the defect that
-        // mode exists to remove. Since jnana-kit:FND-140 it is anchored to the repo root, so the
-        // answer does not depend on the cwd `yarn ci` happened to start in.
-        //
-        // Spawned BY PLAIN NAME off the kit's `bin/`, and a kit that is not on PATH FAILS rather
-        // than skips — both for the reasons spelled out on `doc-links` above (jnana-kit:FND-158).
-        run: async (): Promise<number> => {
-            const code = await exitOf(sh`dprint-mangle-scan.ts --check`);
-            if (code === 127) {
-                console.error(
-                    `ci: dprint-mangle-scan.ts did not resolve — the kit's bin/ is not on PATH ` +
-                        `(or its node shim found no runtime). Install the kit — its ` +
-                        `install-host.ts on a host, provisioning on a sandbox guest — and re-run.`,
-                );
-            }
-            return code;
-        },
-    },
-    {
-        name: 'control-char-scan',
-        what: "the kit's raw-C0-byte gate, over the whole text corpus",
-        // Also wired as a staged task in `vite.config.ts`, which only ever sees what is being
-        // committed; this is the corpus half. Worth both: a NUL makes ripgrep skip a file
-        // SILENTLY, so one that predates the gate never surfaces from a commit-scoped check.
-        // This repo had four, in `hydrationDiagnostics.ts`, which also made git treat that file
-        // as binary — found by the first whole-corpus run.
-        //
-        // A missing kit checkout FAILS rather than skips, for the same reason `doc-links` above
-        // does: a gate that quietly measured nothing reads exactly like one that passed.
-        run: async (): Promise<number> => {
-            const scan = path.join(kitHome, 'tools', 'ci-control-char-scan.sh');
-            if (!existsSync(scan)) {
-                console.error(
-                    `ci: no kit checkout at ${kitHome} — this gate lives there. Export ` +
-                        `JNANA_KIT_HOME (.claude/kit.json names the seam) and re-run.`,
-                );
-                return 1;
-            }
-            return exitOf(sh`bash ${scan} --all`);
-        },
-    },
-    {
-        name: 'kit-package',
-        what: "the kit's `@jnana-app/kit` conformance gate, over this repo's configs and its pin",
-        // A stage here, and not a `verify:kit-package` script the way the family's other consumers
-        // wire this gate: their gate IS the kit's shared runner over `verify:*` scripts, and nothing
-        // in this repo runs one, so a script would be wiring no one calls. `doc-links` and
-        // `control-char-scan` above are the same species — a kit-owned tool named directly in the
-        // stage list — and a missing kit checkout FAILS here for the reason spelled out on those.
-        //
-        // Spawned by its long `$JNANA_KIT_HOME/tools/…` path rather than by plain name because the
-        // kit does not publish this tool on its `bin/`; the plain-name rule `doc-links` cites
-        // (jnana-kit:FND-158) is about the tools it does.
-        run: async (): Promise<number> => {
-            const check = path.join(kitHome, 'tools', 'check-kit-package.ts');
-            const runNode = path.join(kitHome, 'tools', 'run-node.sh');
-            if (!existsSync(check)) {
-                console.error(
-                    `ci: no ${path.basename(check)} at ${kitHome} — this gate lives in the kit. ` +
-                        `Export JNANA_KIT_HOME (.claude/kit.json names the seam) and re-run.`,
-                );
-                return 1;
-            }
-            return exitOf(sh`sh ${runNode} ${check}`);
-        },
-    },
-    {
-        name: 'typecheck',
-        what: 'tsc (native TS7) over every workspace, src and test trees',
-        run: () =>
-            runAll([
-                'rati#typecheck',
-                'rati#typecheck:test',
-                'demo#typecheck',
-                'ssr-demo#typecheck',
-            ]),
-    },
-    {
-        name: 'test',
-        what: 'the full Vitest suite (+ type tests), default fuzz budget',
-        run: () => runAll(['rati#test']),
-    },
     {
         name: 'fuzz',
         what: `the randomized suites at FUZZ_RUNS=${fuzzRuns}`,
@@ -207,47 +81,13 @@ const byName = new Map(stages.map((stage) => [stage.name, stage]));
 const unknown = requested.filter((name) => !byName.has(name));
 if (unknown.length) {
     console.error(
-        `unknown stage(s): ${unknown.join(', ')} (want: ${stages.map((stage) => stage.name).join(' | ')})`,
+        `unknown stage(s): ${unknown.join(', ')} (want: ${stages.map((stage) => stage.name).join(' | ')}).\n` +
+            `The pre-push gate moved to the kit's standard battery — .claude/kit.json's \`verify\` ` +
+            `names it, and it carries every stage this file used to.`,
     );
     process.exit(2);
 }
 const selected = requested.length ? requested.map((name) => byName.get(name)!) : stages;
-
-// --- the jnana-kit run stamp -----------------------------------------------------------
-//
-// jnana-kit's Stop hook nudges a session that pushes a branch without running its gate, and
-// it knows a gate ran because the gate SAID so: `verify-stamp.ts`, called as the gate's last
-// step with the verdict. Until that seam existed the hook could only see gates that ARE the
-// kit's shared runner over `verify:*` scripts; ours is `yarn ci`, so a rati session could
-// skip the gate and push in silence — which is literally the session that produced the
-// finding (jnana-kit:FND-03, closed for rati by jnana-kit:FND-32).
-//
-// ONLY A RUN THAT COVERS THE PRE-PUSH GATE STAMPS. `yarn ci fmt` is a spot-check, not the
-// gate, and a green stamp from one would silence the hook for a session that never ran the
-// other three — a false green, which is worse than the silence being fixed. So this list is
-// the stage set `.claude/kit.json` `verify` names, and drift between the two can only cost a
-// stamp (silence), never buy a wrong one.
-const GATE_STAGES = [
-    'fmt',
-    'lint',
-    'doc-links',
-    'markdown',
-    'control-char-scan',
-    'kit-package',
-    'typecheck',
-    'test',
-];
-
-// Fire-and-forget by the seam's own contract: its exit status is not this gate's, and it
-// exits 0 for every reason it could not stamp. A machine with no kit checkout is simply not
-// a case the reminder serves, so it does not stamp and says nothing about it.
-const stampGate = async (ok: boolean): Promise<void> => {
-    if (!GATE_STAGES.every((name) => selected.some((stage) => stage.name === name))) return;
-    const runNode = path.join(kitHome, 'tools', 'run-node.sh');
-    const seam = path.join(kitHome, 'tools', 'verify-stamp.ts');
-    if (!existsSync(runNode) || !existsSync(seam)) return;
-    await sh`sh ${runNode} ${seam} ${ok ? 'ok' : 'failed'}`;
-};
 
 const results: { stage: Stage; code: number; seconds: number }[] = [];
 for (const stage of selected) {
@@ -262,9 +102,6 @@ for (const { stage, code, seconds } of results) {
     console.log(`  ${code === 0 ? 'PASS' : `FAIL rc=${code}`}  ${stage.name}  (${seconds}s)`);
 }
 const failures = results.filter(({ code }) => code !== 0).length;
-// Before the exit below, so a red gate stamps its red: "ran red, pushed anyway" is a state
-// the kit's hook can name, and only if this runs on both paths.
-await stampGate(failures === 0);
 if (failures) {
     console.log(`${failures} stage(s) failed.`);
     process.exit(1);

@@ -54,15 +54,14 @@ is the lone exception, and stays internal — callers only ever see `island`/`ro
 
 ## Workflow
 
-- **The gate is `yarn ci` (`scripts/ci.ts`), not the kit runner alone** — fmt / lint / typecheck /
-  test / deep fuzz / build, aggregated, standing in for hosted CI; a stage name runs a subset and
-  `FUZZ_RUNS=…` deepens the randomized stage.
-- **The pre-push gate is the fast subset `yarn ci fmt lint typecheck test`** (`.claude/kit.json`
-  `verify`), which skips the 500-run deep fuzz and the example builds.
-- **Before a release, and after touching the mandala engine or the packaging/build, run full
-  `yarn ci` yourself** — the pre-push subset skips the deep fuzz and the example builds.
-- A run covering the pre-push subset leaves the kit's run stamp, so the Stop hook nudges a session
-  that pushes without one; a narrower `yarn ci fmt` deliberately leaves none.
+- **The gate is the kit's standard battery**, named by `.claude/kit.json` `verify` and run from the
+  repo root as that field's command — fmt, lint, typecheck, Markdown, doc- and comment-links, the
+  control-byte scan, the `@jnana-app/kit` conformance checks, the record gate and the full Vitest
+  suite. rati declares **no** `verify:*` scripts and must not gain any: the battery is the list.
+- **`yarn ci` is no longer the gate** — it is the release ritual, and it now holds only the two
+  things the battery does not run: `fuzz` (the randomized suites at `FUZZ_RUNS=500`, default 2000
+  via the env) and `build` (library bundle + d.ts, then both examples). **Run `yarn ci` before a
+  release, and after touching the mandala engine or the packaging/build.**
 - **Match the existing plain-imperative commit history** when you write a subject.
 - Keep `docs/*.md` in sync with the behavior they describe.
 - **A consumer-visible change takes a CHANGELOG.md `## Unreleased` bullet in the same commit** —
