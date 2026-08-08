@@ -35,8 +35,9 @@ import { $ } from 'zx';
 import type { ProcessPromise } from 'zx';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-// `vp` lives in the workspace bin — a bare shell (cron, a future CI job) won't have it.
-process.env.PATH = `${path.join(root, 'node_modules', '.bin')}:${process.env.PATH}`;
+// `vp` lives in the workspace bin — a bare shell (cron, a future CI job) won't have it. Bracket
+// access throughout: `process.env` is an index signature, and this file is in a tsc program now.
+process.env['PATH'] = `${path.join(root, 'node_modules', '.bin')}:${process.env['PATH']}`;
 
 // Live output (a gate you watch), aggregated exits (a gate that always finishes).
 const sh = $({ stdio: 'inherit', nothrow: true, cwd: root });
@@ -53,7 +54,7 @@ const runAll = async (selectors: string[]): Promise<number> => {
     return 0;
 };
 
-const fuzzRuns = process.env.FUZZ_RUNS ?? '500';
+const fuzzRuns = process.env['FUZZ_RUNS'] ?? '500';
 
 type Stage = { name: string; what: string; run: () => Promise<number> };
 
