@@ -12,6 +12,10 @@ import { defineKitConfig } from '@jnana-app/kit/vitest';
 // forked worker — the two configs are peers, not a base and an override.
 export default defineKitConfig({
     test: {
-        projects: ['packages/rati'],
+        // The config FILE, not its directory: vitest resolves either, but the kit's
+        // check-vitest-configs step matches a listed project against the tracked config paths it
+        // loaded, so a directory entry reads to it as an aggregator naming a project that is not
+        // there — the exact stale-leaf case that check exists to catch.
+        projects: ['packages/rati/vitest.config.ts'],
     },
 });
