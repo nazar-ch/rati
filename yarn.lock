@@ -270,18 +270,25 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jnana-app/kit@nazar-ch/jnana-kit#workspace=@jnana-app/kit":
+"@jnana-app/kit@https://app-updates.r2.jnana.app/packages/jnana-app-kit-0.0.0-d64a3f90d0e8bcafb6cd40d3b7b0cb76.tgz":
   version: 0.0.0
-  resolution: "@jnana-app/kit@https://github.com/nazar-ch/jnana-kit.git#workspace=%40jnana-app%2Fkit&commit=2d5472d5952a26cb28973e75c2ae723afeffc1c0"
+  resolution: "@jnana-app/kit@https://app-updates.r2.jnana.app/packages/jnana-app-kit-0.0.0-d64a3f90d0e8bcafb6cd40d3b7b0cb76.tgz"
   dependencies:
     "@tsconfig/node26": "npm:^26.0.0"
     "@tsconfig/strictest": "npm:^2.0.8"
     "@tsconfig/vite-react": "npm:^8.1.1"
-    "@types/node": "npm:26.0.1"
     zx: "npm:8.8.5"
   peerDependencies:
+    "@types/node": "*"
     vite-plus: "*"
-  checksum: 10/b063fe3c2ef0d04d075d760a633f97944f617a36c7b876771e0cb0bde11b2dac87ca2a8b03333cc29a5c8dd8fb23527d9eea0ebcb0ab4b16303563cc9a6818a5
+  peerDependenciesMeta:
+    "@types/node":
+      optional: true
+    vite-plus:
+      optional: true
+  bin:
+    kit-verify: ./dist/bin/kit-verify.js
+  checksum: 10/da81a277d57da828c2acee5a40cb635128f169021d1b9131300b29394898fbaa58618a944591b90b38ea147f44ee70b570c0bc128890528ef35ef218f98631e7
   languageName: node
   linkType: hard
 
@@ -766,7 +773,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:26.0.1, @types/node@npm:^26.0.1":
+"@types/node@npm:^26.0.1":
   version: 26.0.1
   resolution: "@types/node@npm:26.0.1"
   dependencies:
