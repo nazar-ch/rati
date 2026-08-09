@@ -1,4 +1,9 @@
-import { toRouterStore, type AnyRouter, type RouterStore, type RouterHydratedState } from './store';
+import {
+    toRouterStore,
+    type AnyRouter,
+    type RouterStore,
+    type RouterHydratedState,
+} from './store.js';
 
 /**
  * The server's routing decision object. {@link hydratedState} is embedded in the SSR

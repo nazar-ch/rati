@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vite-plus/test';
 
-import { is } from '../../util/utils';
+import { is } from '../../util/utils.js';
 
 // `is.class` decides whether the resolver constructs a load entry (`new Entry(props)`)
 // or calls it (`Entry(props)`), so getting it wrong on a real build is fatal: a class

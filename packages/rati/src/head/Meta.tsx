@@ -1,4 +1,4 @@
-import { useHeadTag } from './useHeadTag';
+import { useHeadTag } from './useHeadTag.js';
 
 // Exactly one of `name` (standard metadata) or `property` (Open Graph / RDFa) — the
 // union makes passing both or neither a type error.

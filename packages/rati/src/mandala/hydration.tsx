@@ -1,8 +1,8 @@
 import { createContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { createHydrationClaims } from './hydrationDiagnostics';
+import { createHydrationClaims } from './hydrationDiagnostics.js';
 
-import type { SourceError } from '../scope/source';
+import type { SourceError } from '../scope/source.js';
 
 /*
     SSR data hydration for mandalas (islands and routes).

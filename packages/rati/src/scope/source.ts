@@ -1,4 +1,4 @@
-import { is } from '../util/utils';
+import { is } from '../util/utils.js';
 
 /*
     Sources — the reactive data primitive an island observes. A source is a live `pending | ready | error`

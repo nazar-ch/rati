@@ -1,4 +1,4 @@
-import type { HeadStore, MetaTag } from './store';
+import type { HeadStore, MetaTag } from './store.js';
 
 /**
  * Marks the tags rati manages — both the ones `headTags` (rati/ssr) emits and the ones

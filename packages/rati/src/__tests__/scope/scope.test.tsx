@@ -2,8 +2,8 @@ import { describe, test, expect, afterEach } from 'vite-plus/test';
 
 import { render, screen, cleanup, act } from '@testing-library/react';
 
-import { island } from '../../island/island';
-import { scope, input, type Scope } from '../../scope/scope';
+import { island } from '../../island/island.js';
+import { scope, input, type Scope } from '../../scope/scope.js';
 
 afterEach(cleanup);
 

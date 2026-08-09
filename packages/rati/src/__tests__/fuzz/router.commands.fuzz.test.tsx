@@ -3,17 +3,17 @@ import { describe, test, expect, afterEach, beforeEach, vi } from 'vite-plus/tes
 import { cleanup, act } from '@testing-library/react';
 import * as fc from 'fast-check';
 
-import { atDeepFuzzBudget, fuzz, fuzzTimeout } from './arbitraries';
+import { atDeepFuzzBudget, fuzz, fuzzTimeout } from './arbitraries.js';
 import {
     assertMounts,
     assertRenderedState,
     assertStep,
     installErrorLog,
     type ErrorLog,
-} from './routerAsserts';
-import { exercised, routerCommandsArb, type Real } from './routerCommands';
-import { awayUrl, buildHarness, commandCaseArb, type Harness } from './routerHarness';
-import { RouterModel } from './routerModel';
+} from './routerAsserts.js';
+import { exercised, routerCommandsArb, type Real } from './routerCommands.js';
+import { awayUrl, buildHarness, commandCaseArb, type Harness } from './routerHarness.js';
+import { RouterModel } from './routerModel.js';
 
 /*
     The RF-03 model-based property: a generated route table meets a generated *command

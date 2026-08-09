@@ -1,6 +1,6 @@
 import { useEffect, type FC } from 'react';
 
-import { useRouterStore } from './RouterProvider';
+import { useRouterStore } from './RouterProvider.js';
 
 /**
  * Calls `router.replace(to)` on mount. Render this when a component decides

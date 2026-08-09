@@ -2,8 +2,8 @@ import { describe, test, expect, afterEach, beforeEach, vi } from 'vite-plus/tes
 
 import { act } from 'react';
 
-import { island } from '../../island/island';
-import { scope, input } from '../../scope/scope';
+import { island } from '../../island/island.js';
+import { scope, input } from '../../scope/scope.js';
 import {
     controllableSource,
     deferred,
@@ -11,7 +11,7 @@ import {
     renderIsland,
     ssrRender,
     cleanup,
-} from '../../testing';
+} from '../../testing/index.js';
 
 /*
     `loadingDelayMs` — the island holds its loading slot back, so a resolution that settles

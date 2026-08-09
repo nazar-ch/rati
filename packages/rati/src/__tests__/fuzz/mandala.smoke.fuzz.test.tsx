@@ -5,10 +5,10 @@ import { StrictMode } from 'react';
 import { render, cleanup, act } from '@testing-library/react';
 import * as fc from 'fast-check';
 
-import { fuzz, fuzzTimeout } from './arbitraries';
-import { assertLedgerBalanced, assertLedgerBounds } from './ledger';
-import { allKeys, createDeclaredState, createModel, type ScopeSpec } from './model';
-import { buildHarness, readContent, readSlot, scopeSpecArb } from './scopeHarness';
+import { fuzz, fuzzTimeout } from './arbitraries.js';
+import { assertLedgerBalanced, assertLedgerBounds } from './ledger.js';
+import { allKeys, createDeclaredState, createModel, type ScopeSpec } from './model.js';
+import { buildHarness, readContent, readSlot, scopeSpecArb } from './scopeHarness.js';
 
 /*
     The MF-01 smoke property: a generated scope mounts, its held loads settle one by one in a

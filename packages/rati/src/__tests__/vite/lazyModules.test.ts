@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, test, expect } from 'vite-plus/test';
 
-import { findLazyCalls, recordModuleIds } from '../../vite/lazyModules';
+import { findLazyCalls, recordModuleIds } from '../../vite/lazyModules.js';
 
 /*
     The transform's two halves, driven directly: which call sites carry a recordable

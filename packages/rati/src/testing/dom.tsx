@@ -2,7 +2,7 @@ import { act } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
 
-import { withActEnvironment, withActEnvironmentSync } from './actEnvironment';
+import { withActEnvironment, withActEnvironmentSync } from './actEnvironment.js';
 
 /*
     The shared mount plumbing behind renderIsland / createTestRouter / renderWithStores / the

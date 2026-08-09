@@ -10,21 +10,21 @@ import {
 } from 'react';
 import type { ComponentType, Context, FC } from 'react';
 
-import { AfterHydration } from './afterHydration';
-import { MandalaErrorBoundary } from './boundary';
-import { registerScopeChannel, setScopeLabel } from './channel';
-import { registerScopeControlsChannel } from './controls';
-import { HydrationContext } from './hydration';
-import { LoadingDelay, noDelaySubscribe, notHeld } from './loadingDelay';
-import { discardRun, RefreshController } from './refresh';
-import { buildTree, flattenLevels, type Bucket, type Shared } from './resolver';
-import { RetryPolicy, resolveRetry, type RetryOption } from './retryPolicy';
-import { createRejectionGuard } from './ssrErrors';
+import { AfterHydration } from './afterHydration.js';
+import { MandalaErrorBoundary } from './boundary.js';
+import { registerScopeChannel, setScopeLabel } from './channel.js';
+import { registerScopeControlsChannel } from './controls.js';
+import { HydrationContext } from './hydration.js';
+import { LoadingDelay, noDelaySubscribe, notHeld } from './loadingDelay.js';
+import { discardRun, RefreshController } from './refresh.js';
+import { buildTree, flattenLevels, type Bucket, type Shared } from './resolver.js';
+import { RetryPolicy, resolveRetry, type RetryOption } from './retryPolicy.js';
+import { createRejectionGuard } from './ssrErrors.js';
 
-import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope';
-import type { SourceError } from '../scope/source';
-import { startDataTrace, type DataTrace, type DataTraceCause } from '../util/dataTrace';
-import { deepEqual } from '../util/utils';
+import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope.js';
+import type { SourceError } from '../scope/source.js';
+import { startDataTrace, type DataTrace, type DataTraceCause } from '../util/dataTrace.js';
+import { deepEqual } from '../util/utils.js';
 
 /*
     The mandala — rati's core renderable unit, the shared abstraction under `island()`

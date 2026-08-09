@@ -2,9 +2,9 @@ import { describe, test, expectTypeOf } from 'vite-plus/test';
 
 import { type ComponentType, type FC } from 'react';
 
-import { island } from '../../island/island';
-import { route } from '../../router/route';
-import { scope, input, type ScopeComponent } from '../../scope/scope';
+import { island } from '../../island/island.js';
+import { route } from '../../router/route.js';
+import { scope, input, type ScopeComponent } from '../../scope/scope.js';
 
 const TestFC: FC = () => null;
 

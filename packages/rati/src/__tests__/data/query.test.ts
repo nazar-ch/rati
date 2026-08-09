@@ -2,13 +2,13 @@ import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
 
 import { autorun, observable, runInAction } from 'mobx';
 
-import { query } from '../../data/query';
+import { query } from '../../data/query.js';
+import { controllableProducer } from '../../testing/data/index.js';
 // A deferred fake walks a query through every phase without module mocking — the
 // "testability by construction" ground rule (data-package.md), now `rati/testing`'s.
 // `controllableProducer` is the same idea for a *sequence* of fetches: the gate array
 // plus call counter this file used to spell out by hand, with each call's signal on it.
-import { deferred } from '../../testing';
-import { controllableProducer } from '../../testing/data';
+import { deferred } from '../../testing/index.js';
 
 afterEach(() => {
     vi.useRealTimers();

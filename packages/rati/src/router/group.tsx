@@ -1,8 +1,8 @@
 import type { ComponentType, ReactNode } from 'react';
 
-import { buildRouteComponent, type GenericRouteType } from './route';
+import { buildRouteComponent, type GenericRouteType } from './route.js';
 
-import type { Scope } from '../scope/scope';
+import type { Scope } from '../scope/scope.js';
 
 /**
  * Defaults a {@link group} applies to each of its child routes. Children override the

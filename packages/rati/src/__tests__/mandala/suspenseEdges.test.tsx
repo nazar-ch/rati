@@ -2,8 +2,8 @@ import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
 
 import { act, useSyncExternalStore, type FC } from 'react';
 
-import { scope, hook } from '../../scope/scope';
-import { controllableSource, deferred, flush, renderIsland, cleanup } from '../../testing';
+import { scope, hook } from '../../scope/scope.js';
+import { controllableSource, deferred, flush, renderIsland, cleanup } from '../../testing/index.js';
 
 /*
     The Suspense-produced situations React makes possible around a committed island —

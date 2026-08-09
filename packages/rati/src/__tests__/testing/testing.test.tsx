@@ -1,9 +1,9 @@
 import { describe, test, expect } from 'vite-plus/test';
 
-import { isSource, type SourceState } from '../../scope/source';
-import { controllableSource } from '../../testing/controllableSource';
-import { deferred } from '../../testing/deferred';
-import { flush } from '../../testing/flush';
+import { isSource, type SourceState } from '../../scope/source.js';
+import { controllableSource } from '../../testing/controllableSource.js';
+import { deferred } from '../../testing/deferred.js';
+import { flush } from '../../testing/flush.js';
 
 describe('deferred', () => {
     test('resolves by hand', async () => {

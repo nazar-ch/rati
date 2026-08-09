@@ -1,8 +1,8 @@
 import { describe, test, expect } from 'vite-plus/test';
 
-import { createMemoryHistory } from '../../router/history';
-import { route } from '../../router/route';
-import { RouterStore } from '../../router/store';
+import { createMemoryHistory } from '../../router/history.js';
+import { route } from '../../router/route.js';
+import { RouterStore } from '../../router/store.js';
 
 const NoopComponent = () => null;
 

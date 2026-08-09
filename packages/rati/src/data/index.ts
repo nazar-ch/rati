@@ -29,17 +29,17 @@
     provides the underlying `observableSource` bridge).
 */
 
-export { query, type Query, type QueryOptions, type QueryPhase, type ReadyQuery } from './query';
-export { collection, type Collection, type CollectionOptions } from './collection';
-export { reconciled, type Reconciled, type ReconciledOptions } from './reconciled';
+export { query, type Query, type QueryOptions, type QueryPhase, type ReadyQuery } from './query.js';
+export { collection, type Collection, type CollectionOptions } from './collection.js';
+export { reconciled, type Reconciled, type ReconciledOptions } from './reconciled.js';
 export {
     pagedCollection,
     type PagedCollection,
     type PagedCollectionOptions,
     type PageResult,
-} from './pagedCollection';
-export { mutation, type Mutation, type MutationOptions } from './mutation';
-export { keyed, type Keyed, type KeyedKey } from './keyed';
-export { field, type Field, type FieldOptions, type FieldProps, type Validator } from './field';
-export { form, FormError, type Form, type FormValues } from './form';
-export { max, maxLength, min, minLength, pattern, required } from './validators';
+} from './pagedCollection.js';
+export { mutation, type Mutation, type MutationOptions } from './mutation.js';
+export { keyed, type Keyed, type KeyedKey } from './keyed.js';
+export { field, type Field, type FieldOptions, type FieldProps, type Validator } from './field.js';
+export { form, FormError, type Form, type FormValues } from './form.js';
+export { max, maxLength, min, minLength, pattern, required } from './validators.js';

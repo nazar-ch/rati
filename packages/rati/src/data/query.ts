@@ -1,7 +1,7 @@
 import { observable, Reaction, runInAction } from 'mobx';
 
-import { observableSource } from '../mobx/observableSource';
-import { toSourceError, type Source, type SourceError } from '../scope/source';
+import { observableSource } from '../mobx/observableSource.js';
+import { toSourceError, type Source, type SourceError } from '../scope/source.js';
 
 /*
     `query` — the refreshable unit (the rati/data atom): one async producer, one

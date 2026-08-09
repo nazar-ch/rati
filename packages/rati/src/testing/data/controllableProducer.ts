@@ -1,4 +1,4 @@
-import { deferred } from '../deferred';
+import { deferred } from '../deferred.js';
 
 /*
     The `rati/data` half of the hand-drive kit: a producer whose every call the test

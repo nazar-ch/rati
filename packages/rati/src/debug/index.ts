@@ -9,5 +9,5 @@
       - `dataTrace` — data resolution per island run (level starts, per-cell settles with
         durations), `globalThis.__DEBUG__.data`. See util/dataTrace.ts.
 */
-export { navTrace, navTraceStart, navTraceEnabled } from '../util/navTrace';
-export { dataTrace, dataTraceEnabled } from '../util/dataTrace';
+export { navTrace, navTraceStart, navTraceEnabled } from '../util/navTrace.js';
+export { dataTrace, dataTraceEnabled } from '../util/dataTrace.js';

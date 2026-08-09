@@ -3,11 +3,11 @@ import { describe, test, expect, afterEach, beforeEach, vi } from 'vite-plus/tes
 import { render, cleanup, act } from '@testing-library/react';
 import * as fc from 'fast-check';
 
-import { fuzz, fuzzTimeout } from './arbitraries';
-import { commandsArb, observed, type Model, type Real } from './commands';
-import { assertLedgerBalanced } from './ledger';
-import { createDeclaredState, createModel } from './model';
-import { buildHarness, readContent, readSlot, scopeSpecArb } from './scopeHarness';
+import { fuzz, fuzzTimeout } from './arbitraries.js';
+import { commandsArb, observed, type Model, type Real } from './commands.js';
+import { assertLedgerBalanced } from './ledger.js';
+import { createDeclaredState, createModel } from './model.js';
+import { buildHarness, readContent, readSlot, scopeSpecArb } from './scopeHarness.js';
 
 /*
     The MF-02 model-based property: a generated scope meets a generated *event sequence* —

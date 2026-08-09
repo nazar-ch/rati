@@ -1,5 +1,5 @@
-import { createMandala, type MandalaComponent, type MandalaConfig } from '../mandala/mandala';
-import type { Scope } from '../scope/scope';
+import { createMandala, type MandalaComponent, type MandalaConfig } from '../mandala/mandala.js';
+import type { Scope } from '../scope/scope.js';
 
 /**
  * An island component: a self-contained UI unit that resolves its own data from a scope

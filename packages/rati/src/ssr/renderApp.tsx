@@ -1,18 +1,18 @@
 import type { ComponentType } from 'react';
 
-import { headTags } from './headTags';
-import { serializeHydration, type HydrationState } from './payload';
-import { renderToHtml } from './renderToHtml';
+import { headTags } from './headTags.js';
+import { serializeHydration, type HydrationState } from './payload.js';
+import { renderToHtml } from './renderToHtml.js';
 
-import type { HeadStore } from '../head/store';
+import type { HeadStore } from '../head/store.js';
 import {
     createHydrationCollector,
     type Hydration,
     type HydrationError,
-} from '../mandala/hydration';
-import { createMemoryHistory, type History } from '../router/history';
-import { prepareRoute, redirectFromHops } from '../router/prepareRoute';
-import { toRouterStore, type AnyRouter } from '../router/store';
+} from '../mandala/hydration.js';
+import { createMemoryHistory, type History } from '../router/history.js';
+import { prepareRoute, redirectFromHops } from '../router/prepareRoute.js';
+import { toRouterStore, type AnyRouter } from '../router/store.js';
 
 /*
     renderApp — the whole per-request loop in one call: memory history → the app

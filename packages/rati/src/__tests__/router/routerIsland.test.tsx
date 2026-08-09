@@ -6,12 +6,12 @@ import { act, Component, type FC, type ReactNode } from 'react';
 // reader) directly, not a router. The router tests use createTestRouter.
 import { render, screen, cleanup as rtlCleanup } from '@testing-library/react';
 
-import { island } from '../../island/island';
-import { useScope } from '../../mandala/channel';
-import { route } from '../../router/route';
-import { useRouteContext } from '../../router/useRouteContext';
-import { scope, input, type ScopeComponent } from '../../scope/scope';
-import { controllableSource, createTestRouter, deferred, cleanup } from '../../testing';
+import { island } from '../../island/island.js';
+import { useScope } from '../../mandala/channel.js';
+import { route } from '../../router/route.js';
+import { useRouteContext } from '../../router/useRouteContext.js';
+import { scope, input, type ScopeComponent } from '../../scope/scope.js';
+import { controllableSource, createTestRouter, deferred, cleanup } from '../../testing/index.js';
 
 // The 'product' route's context type is registered globally via the app-routes
 // augmentation in `routeContext.test-d.ts` (`RatiUserTypes['routes']`), so the

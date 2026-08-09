@@ -3,12 +3,12 @@ import { expect } from 'vite-plus/test';
 import { act } from '@testing-library/react';
 import * as fc from 'fast-check';
 
-import { byLevel } from './arbitraries';
-import { assertLedgerBounds } from './ledger';
-import { allKeys, type DeclaredState, type ReferenceModel, type ScopeSpec } from './model';
-import { readContent, readSlot, type BuiltHarness } from './scopeHarness';
+import { byLevel } from './arbitraries.js';
+import { assertLedgerBounds } from './ledger.js';
+import { allKeys, type DeclaredState, type ReferenceModel, type ScopeSpec } from './model.js';
+import { readContent, readSlot, type BuiltHarness } from './scopeHarness.js';
 
-import { flush } from '../../testing';
+import { flush } from '../../testing/index.js';
 
 /*
     The MF-02 command alphabet: the events an island actually meets, driven against the real

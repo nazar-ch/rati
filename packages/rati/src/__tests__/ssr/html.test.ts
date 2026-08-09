@@ -7,7 +7,7 @@ import {
     spliceDocument,
     type Assembler,
     type RenderedParts,
-} from '../../ssr/html';
+} from '../../ssr/html.js';
 
 /*
     The HTML assembly both servers share. Pure string work, so it is tested here rather

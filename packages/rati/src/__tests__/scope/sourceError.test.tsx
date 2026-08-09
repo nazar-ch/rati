@@ -1,9 +1,9 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
 
-import { island } from '../../island/island';
-import { scope, input } from '../../scope/scope';
-import { NotAvailableError, toSourceError, type SourceError } from '../../scope/source';
-import { cleanup, renderIsland, ssrRender } from '../../testing';
+import { island } from '../../island/island.js';
+import { scope, input } from '../../scope/scope.js';
+import { NotAvailableError, toSourceError, type SourceError } from '../../scope/source.js';
+import { cleanup, renderIsland, ssrRender } from '../../testing/index.js';
 
 afterEach(cleanup);
 

@@ -1,6 +1,6 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
 
-import type { SourceError, SourceErrorCode } from '../../scope/source';
+import type { SourceError, SourceErrorCode } from '../../scope/source.js';
 
 /*
     The `code` vocabulary is an *open* set — the five blessed values for completion, the

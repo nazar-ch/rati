@@ -1,6 +1,6 @@
 import { describe, test, expect, vi } from 'vite-plus/test';
 
-import { createMemoryHistory } from '../../router/history';
+import { createMemoryHistory } from '../../router/history.js';
 
 describe('createMemoryHistory', () => {
     test('defaults to "/" when no initial URL is provided', () => {

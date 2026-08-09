@@ -1,4 +1,4 @@
-import { deepEqual } from '../util/utils';
+import { deepEqual } from '../util/utils.js';
 
 /*
     Document-head management: the store.

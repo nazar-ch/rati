@@ -5,8 +5,8 @@ import {
     spliceDocument,
     type Assembler,
     type Placeholders,
-} from '../ssr/html';
-import type { RenderAppResult, RenderAssets } from '../ssr/renderApp';
+} from '../ssr/html.js';
+import type { RenderAppResult, RenderAssets } from '../ssr/renderApp.js';
 
 /*
     The production request handler: `render`'s result kinds become HTTP, for good.

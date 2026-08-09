@@ -1,9 +1,9 @@
 import { describe, test, expect, vi } from 'vite-plus/test';
 
-import { collection } from '../../data/collection';
-import { mutation } from '../../data/mutation';
-import { query } from '../../data/query';
-import { deferred } from '../../testing';
+import { collection } from '../../data/collection.js';
+import { mutation } from '../../data/mutation.js';
+import { query } from '../../data/query.js';
+import { deferred } from '../../testing/index.js';
 
 describe('mutation state', () => {
     test('isPending spans the call; the result comes back; error stays null', async () => {

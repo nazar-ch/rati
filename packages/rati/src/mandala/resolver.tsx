@@ -22,9 +22,9 @@ import {
     type ProducedBody,
     type ProducedCell,
     type RefreshController,
-} from './refresh';
-import { SsrRejection } from './ssrErrors';
-import { firstSettle } from './ssrSource';
+} from './refresh.js';
+import { SsrRejection } from './ssrErrors.js';
+import { firstSettle } from './ssrSource.js';
 
 import {
     isDataLoad,
@@ -34,8 +34,8 @@ import {
     type LoadContext,
     type Scope,
     type ScopeProvideDef,
-} from '../scope/scope';
-import { asSourceError, isSource, type SourceError, type SourceState } from '../scope/source';
+} from '../scope/scope.js';
+import { asSourceError, isSource, type SourceError, type SourceState } from '../scope/source.js';
 import {
     errorLabel,
     traceCellPromise,
@@ -44,9 +44,9 @@ import {
     traceLevelStart,
     traceResolved,
     type DataTrace,
-} from '../util/dataTrace';
-import { navTrace, navTraceEnabled } from '../util/navTrace';
-import { is, deepEqual } from '../util/utils';
+} from '../util/dataTrace.js';
+import { navTrace, navTraceEnabled } from '../util/navTrace.js';
+import { is, deepEqual } from '../util/utils.js';
 
 /*
     The mandala's resolution mechanics: compile a scope's levels into a nested tree of
@@ -894,4 +894,4 @@ export function buildTree(
 
 // Bucket re-export: the model moved to refresh.ts with the controller; mandala.tsx and
 // the tests import it from here, the resolver's home turf.
-export type { Bucket } from './refresh';
+export type { Bucket } from './refresh.js';

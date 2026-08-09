@@ -1,16 +1,16 @@
 import { describe, test, expect } from 'vite-plus/test';
 
-import { HeadProvider } from '../../head/HeadProvider';
-import { createHeadStore } from '../../head/store';
-import { Title } from '../../head/Title';
-import { HydrationProvider } from '../../mandala/hydration';
-import { route, type GenericRouteType } from '../../router/route';
-import { RouterOutlet } from '../../router/RouterOutlet';
-import { RouterProvider } from '../../router/RouterProvider';
-import { RouterStore } from '../../router/store';
-import { scope, input } from '../../scope/scope';
-import { NotAvailableError } from '../../scope/source';
-import { renderApp, type RenderAppSetup } from '../../ssr/renderApp';
+import { HeadProvider } from '../../head/HeadProvider.js';
+import { createHeadStore } from '../../head/store.js';
+import { Title } from '../../head/Title.js';
+import { HydrationProvider } from '../../mandala/hydration.js';
+import { route, type GenericRouteType } from '../../router/route.js';
+import { RouterOutlet } from '../../router/RouterOutlet.js';
+import { RouterProvider } from '../../router/RouterProvider.js';
+import { RouterStore } from '../../router/store.js';
+import { scope, input } from '../../scope/scope.js';
+import { NotAvailableError } from '../../scope/source.js';
+import { renderApp, type RenderAppSetup } from '../../ssr/renderApp.js';
 
 const postScope = scope({ slug: input<string>() }).load({
     post: async ({ slug }) => {

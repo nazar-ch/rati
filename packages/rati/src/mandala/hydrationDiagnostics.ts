@@ -1,4 +1,4 @@
-import type { HydrationData, HydrationErrors, HydrationSection } from './hydration';
+import type { HydrationData, HydrationErrors, HydrationSection } from './hydration.js';
 
 /*
     Unclaimed-hydration-data diagnostic (client side).

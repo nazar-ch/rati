@@ -6,7 +6,7 @@ import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { serve, staticPath } from '../../server/node';
+import { serve, staticPath } from '../../server/node.js';
 
 /*
     The Node adapter over a real socket: the translation is the whole job, so a fake

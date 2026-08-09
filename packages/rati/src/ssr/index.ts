@@ -24,20 +24,20 @@ export {
     type HydrationData,
     type HydrationError,
     type HydrationErrors,
-} from '../mandala/hydration';
+} from '../mandala/hydration.js';
 
-export { prepareRoute, type PreparedRoute } from '../router/prepareRoute';
+export { prepareRoute, type PreparedRoute } from '../router/prepareRoute.js';
 
-export { headTags } from './headTags';
+export { headTags } from './headTags.js';
 
 export {
     serializeHydration,
     readHydration,
     HYDRATION_SCRIPT_ID,
     type HydrationState,
-} from './payload';
+} from './payload.js';
 
-export { renderToHtml, type RenderToHtmlOptions } from './renderToHtml';
+export { renderToHtml, type RenderToHtmlOptions } from './renderToHtml.js';
 export {
     renderApp,
     type RenderAppOptions,
@@ -45,4 +45,4 @@ export {
     type RenderAppInstance,
     type RenderAppResult,
     type RenderAssets,
-} from './renderApp';
+} from './renderApp.js';

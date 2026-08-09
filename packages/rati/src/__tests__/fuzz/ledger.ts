@@ -1,7 +1,7 @@
 import { expect } from 'vite-plus/test';
 
-import type { Slot } from './model';
-import type { BuiltHarness } from './scopeHarness';
+import type { Slot } from './model.js';
+import type { BuiltHarness } from './scopeHarness.js';
 
 /*
     MF-03 — invariant 6 of docs/archive/mandala-testing.md §"Invariants": the lifecycle

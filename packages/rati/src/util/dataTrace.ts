@@ -29,7 +29,7 @@
     resolve concurrently into one console: the label is what you scan by.
 */
 
-import { asSourceError } from '../scope/source';
+import { asSourceError } from '../scope/source.js';
 
 interface DataTraceGlobal {
     // The shared `__DEBUG__` bag — navTrace reads `.nav` off the same object.

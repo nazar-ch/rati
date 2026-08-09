@@ -1,4 +1,4 @@
-import { navTrace } from '../util/navTrace';
+import { navTrace } from '../util/navTrace.js';
 
 export type Action = 'PUSH' | 'REPLACE' | 'POP';
 

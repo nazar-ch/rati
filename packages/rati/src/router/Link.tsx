@@ -1,10 +1,10 @@
 import { createContext, memo, type PropsWithChildren, useCallback, useContext } from 'react';
 
-import { type NameToRoute, type GenericRouteType, type UserRoutes } from './route';
-import { useRouterStore } from './RouterProvider';
-import { type RouterStore } from './store';
+import { type NameToRoute, type GenericRouteType, type UserRoutes } from './route.js';
+import { useRouterStore } from './RouterProvider.js';
+import { type RouterStore } from './store.js';
 
-import { navTraceStart } from '../util/navTrace';
+import { navTraceStart } from '../util/navTrace.js';
 
 type GenericAnchorProps = Omit<
     React.DetailedHTMLProps<React.AnchorHTMLAttributes<HTMLAnchorElement>, HTMLAnchorElement>,

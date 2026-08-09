@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
-import { HeadContext } from './context';
-import { applyToDocument, RATI_HEAD_ATTRIBUTE, RATI_HEAD_SERVER } from './domSync';
-import { createHeadStore, type HeadStore } from './store';
+import { HeadContext } from './context.js';
+import { applyToDocument, RATI_HEAD_ATTRIBUTE, RATI_HEAD_SERVER } from './domSync.js';
+import { createHeadStore, type HeadStore } from './store.js';
 
 /**
  * Provides the head store and keeps the live document in sync on the client:

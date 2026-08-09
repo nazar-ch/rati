@@ -1,4 +1,4 @@
-import { useTitle } from './useTitle';
+import { useTitle } from './useTitle.js';
 
 /**
  * Declares the document title from anywhere in the tree (`<Title>{page.name}</Title>`).

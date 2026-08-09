@@ -122,7 +122,10 @@ internal, and the per-file map is docs/current/internals.md §Source layout.
   repo-wide through the `markdown` gate stage. Never run `dprint fmt` yourself — a bare reflow
   bypasses the mangle scan, and dprint cannot see its own damage (jnana-kit:FND-47). Use
   `dprint-mangle-scan.ts --fmt <file.md…>`, which the gate's own failure names.
-- rati uses **relative imports** (no `#` path alias), and no barrel beyond `main.ts`.
+- rati uses **relative imports** (no `#` path alias), and no barrel beyond `main.ts`. Every relative
+  specifier carries an explicit `.js` extension — `./scope/scope.js`, a directory as
+  `./data/index.js`. tsc copies the specifier into the emitted `.d.ts` verbatim, so an extensionless
+  one is unresolvable to a `nodenext` consumer (jnana-kit:KC-42).
 - Keep the *why* comments and the `console.*` you didn't write.
 
 ## Examples — current status

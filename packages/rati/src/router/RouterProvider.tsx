@@ -1,7 +1,7 @@
 import React, { useContext, useSyncExternalStore } from 'react';
 
-import type { Router } from './router';
-import { RouterStore, type AnyRouter } from './store';
+import type { Router } from './router.js';
+import { RouterStore, type AnyRouter } from './store.js';
 
 /*
     The router's own React plumbing: `RouterProvider` puts the app's router (built by

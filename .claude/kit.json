@@ -6,10 +6,8 @@
 //
 // The `$schema` pointer below names the copy the `@jnana-app/kit` INSTALL brings, not a path into
 // somebody's kit checkout — the pin in .yarnrc.yml then decides which schema version this file is
-// edited against, the same way it decides which gate runs (jnana-kit:ASK-04, ruled 2026-08-08). It
-// resolves to nothing until the kit republishes the package with the schema in its `files`, which
-// is the user's own action after jnana-kit's kit-consolidation R2; nothing in this repo reads the
-// pointer and no gate touches it, so the interval costs an editor hint and nothing else.
+// edited against, the same way it decides which gate runs (jnana-kit:ASK-04, ruled 2026-08-08).
+// Nothing in this repo reads the pointer and no gate touches it: it buys an editor hint.
 {
     "$schema": "../node_modules/@jnana-app/kit/kit.schema.json",
 
@@ -24,17 +22,15 @@
     // "they move together" was an admission that two hand-written lists existed at all, and the
     // battery is what removes the second one.
     //
-    // NOT the bare `node_modules/.bin/kit-verify`, which is the thing the wrapper wraps. The bin
-    // cannot leave a run stamp — the stamp is read by a session hook that must load when
-    // `node_modules` is broken, so its writer stays kit-level — and with no stamp ever written the
-    // "this session pushed without running the gate" reminder silently stops reaching this repo.
-    // That reminder was cut against a rati session (jnana-kit:FND-03); `consumer-verify.ts` stamps
-    // around the bin so it reaches rati again. `$JNANA_KIT_HOME` is why this is a shell string: it
-    // is the one carrier that can hold the variable.
+    // The BARE bin, with no `$JNANA_KIT_HOME` in it: the packaged entry writes the run stamp itself
+    // (jnana-kit:KC-30), so the gate needs no kit-side wrapper to carry the stamp for it. That stamp
+    // is what a session hook reads for the "pushed without running the gate" reminder, cut against a
+    // rati session (jnana-kit:FND-03). The hook keeps its own kit-level READER, which must load when
+    // `node_modules` is broken; a writer running behind this bin has an install by definition.
     //
     // What is NOT in the battery stays in `scripts/ci.ts` and is run by hand before a release: the
     // deep `fuzz` stage (500 runs) and `build`. `yarn ci` with no arguments runs both.
-    "verify": "sh \"$JNANA_KIT_HOME/tools/run-node.sh\" \"$JNANA_KIT_HOME/tools/consumer-verify.ts\"",
+    "verify": "node_modules/.bin/kit-verify",
 
     // Idempotent "make this checkout runnable": install deps only (Node 26 + Yarn 4.17.1 via
     // corepack, `enableScripts: false`). No codegen; never git sync.

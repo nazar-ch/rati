@@ -2,10 +2,10 @@ import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
 
 import { act } from 'react';
 
-import { island } from '../../island/island';
-import { scope, input } from '../../scope/scope';
-import type { SourceError } from '../../scope/source';
-import { controllableSource, prerenderToString, ssrRender, cleanup } from '../../testing';
+import { island } from '../../island/island.js';
+import { scope, input } from '../../scope/scope.js';
+import type { SourceError } from '../../scope/source.js';
+import { controllableSource, prerenderToString, ssrRender, cleanup } from '../../testing/index.js';
 
 afterEach(cleanup);
 

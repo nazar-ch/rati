@@ -4,15 +4,15 @@
 // SSR surface (`HydrationProvider`, `createHydrationCollector`, `prepareRoute`) in
 // `rati/ssr` — all kept out of the client-focused main barrel.
 
-export { createRouter } from './router/createRouter';
+export { createRouter } from './router/createRouter.js';
 export {
     type Router,
     type ActiveRoute,
     type ActiveRouteOf,
     type NavigateOptions,
-} from './router/router';
-export { RouterProvider, useRouter } from './router/RouterProvider';
-export { type RouterOptions, type RouterHydratedState } from './router/store';
+} from './router/router.js';
+export { RouterProvider, useRouter } from './router/RouterProvider.js';
+export { type RouterOptions, type RouterHydratedState } from './router/store.js';
 export {
     route,
     type RouteOptions,
@@ -24,9 +24,9 @@ export {
     type RatiUserTypes,
     type RouteContextValueOf,
     type RouteContextNames,
-} from './router/route';
-export { group, type GroupDefaults } from './router/group';
-export { RouterOutlet } from './router/RouterOutlet';
+} from './router/route.js';
+export { group, type GroupDefaults } from './router/group.js';
+export { RouterOutlet } from './router/RouterOutlet.js';
 export {
     createBrowserHistory,
     createMemoryHistory,
@@ -35,17 +35,17 @@ export {
     type HistoryListener,
     type HistoryUpdate,
     type Action as HistoryAction,
-} from './router/history';
+} from './router/history.js';
 export {
     installScrollRestoration,
     type ScrollRestorationOptions,
-} from './router/scrollRestoration';
+} from './router/scrollRestoration.js';
 
-export * from './types/generic';
+export * from './types/generic.js';
 
-export { Link, ContextualLink, LinkContextProvider, useLinkContext } from './router/Link';
-export { lazy, type PreloadableLazyComponent } from './router/lazy';
-export { Navigate } from './router/Navigate';
+export { Link, ContextualLink, LinkContextProvider, useLinkContext } from './router/Link.js';
+export { lazy, type PreloadableLazyComponent } from './router/lazy.js';
+export { Navigate } from './router/Navigate.js';
 
 export {
     type ChainableScope,
@@ -69,7 +69,7 @@ export {
     ScopeSymbol,
     ScopeDefinitionsSymbol,
     ScopeProvidesSymbol,
-} from './scope/scope';
+} from './scope/scope.js';
 
 export {
     NotAvailableError,
@@ -84,17 +84,17 @@ export {
     type SourceError,
     type SourceErrorCode,
     type SourceSSR,
-} from './scope/source';
+} from './scope/source.js';
 
-export { useScope, useOptionalScope } from './mandala/channel';
-export { useScopeControls, type ScopeControls } from './mandala/controls';
+export { useScope, useOptionalScope } from './mandala/channel.js';
+export { useScopeControls, type ScopeControls } from './mandala/controls.js';
 // The island's aggregate phase, for a component that stores or switches on one.
-export type { IslandPhase } from './mandala/refresh';
+export type { IslandPhase } from './mandala/refresh.js';
 // The `retry` option's shape, for a config assembled away from the island() call.
 // `RetryOption` is the whole option (`RetryOptions | false`) — the policy is on by default.
-export type { RetryOption, RetryOptions } from './mandala/retryPolicy';
+export type { RetryOption, RetryOptions } from './mandala/retryPolicy.js';
 
-export { island, type IslandComponent, type IslandConfig } from './island/island';
+export { island, type IslandComponent, type IslandConfig } from './island/island.js';
 
 export {
     createHeadStore,
@@ -103,13 +103,13 @@ export {
     type HeadSnapshot,
     type HeadPhase,
     type MetaTag,
-} from './head/store';
-export { HeadProvider } from './head/HeadProvider';
-export { Title } from './head/Title';
-export { useTitle } from './head/useTitle';
-export { Meta, type MetaProps } from './head/Meta';
+} from './head/store.js';
+export { HeadProvider } from './head/HeadProvider.js';
+export { Title } from './head/Title.js';
+export { useTitle } from './head/useTitle.js';
+export { Meta, type MetaProps } from './head/Meta.js';
 
-export { useRouteContext } from './router/useRouteContext';
+export { useRouteContext } from './router/useRouteContext.js';
 
 if (import.meta.env.DEV) {
     const pkg = await import('../package.json');

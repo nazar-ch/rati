@@ -15,16 +15,16 @@
     MobX-free so an app that never uses `rati/data` needn't install the optional peer.
 */
 
-export { deferred, type Deferred } from './deferred';
-export { flush } from './flush';
+export { deferred, type Deferred } from './deferred.js';
+export { flush } from './flush.js';
 export {
     controllableSource,
     type ControllableSource,
     type ControllableSourceOptions,
-} from './controllableSource';
-export { cleanup } from './dom';
-export { renderIsland, type IslandHandle, type RenderIslandOptions } from './renderIsland';
-export { createTestRouter, type TestRouter, type CreateTestRouterOptions } from './router';
+} from './controllableSource.js';
+export { cleanup } from './dom.js';
+export { renderIsland, type IslandHandle, type RenderIslandOptions } from './renderIsland.js';
+export { createTestRouter, type TestRouter, type CreateTestRouterOptions } from './router.js';
 export {
     prerenderToString,
     ssrRender,
@@ -33,4 +33,4 @@ export {
     type ServerRender,
     type HydratedTree,
     type HydrateOptions,
-} from './ssr';
+} from './ssr.js';

@@ -5,17 +5,17 @@ import { hydrateRoot } from 'react-dom/client';
 
 import { render, screen, cleanup, act } from '@testing-library/react';
 
-import { island } from '../../island/island';
-import { useScopeControls, type ScopeControls } from '../../mandala/controls';
-import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
-import { scope, data, input } from '../../scope/scope';
+import { island } from '../../island/island.js';
+import { useScopeControls, type ScopeControls } from '../../mandala/controls.js';
+import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration.js';
+import { scope, data, input } from '../../scope/scope.js';
 import {
     controllableSource,
     deferred,
     flush,
     prerenderToString,
     type ControllableSource,
-} from '../../testing';
+} from '../../testing/index.js';
 
 const Loading: FC = () => <div>loading...</div>;
 

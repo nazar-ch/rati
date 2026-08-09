@@ -6,9 +6,9 @@ import React, {
     useDeferredValue,
 } from 'react';
 
-import { useRouterStore } from './RouterProvider';
+import { useRouterStore } from './RouterProvider.js';
 
-import { navTrace } from '../util/navTrace';
+import { navTrace } from '../util/navTrace.js';
 
 /**
  * The outlet — renders the active route (its wrapper, then the route component under a

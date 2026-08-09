@@ -4,11 +4,11 @@ import { type FC } from 'react';
 
 import { act, fireEvent } from '@testing-library/react';
 
-import { lazy } from '../../router/lazy';
-import { Link } from '../../router/Link';
-import { route } from '../../router/route';
-import { RouterStore } from '../../router/store';
-import { createTestRouter, cleanup } from '../../testing';
+import { lazy } from '../../router/lazy.js';
+import { Link } from '../../router/Link.js';
+import { route } from '../../router/route.js';
+import { RouterStore } from '../../router/store.js';
+import { createTestRouter, cleanup } from '../../testing/index.js';
 
 const NoopComponent: FC = () => null;
 

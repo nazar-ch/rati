@@ -3,7 +3,7 @@ import { describe, test, expect } from 'vite-plus/test';
 
 import type { Manifest } from 'vite-plus';
 
-import { buildAssets, devAssets } from '../../vite/assets';
+import { buildAssets, devAssets } from '../../vite/assets.js';
 
 /*
     The generated `virtual:rati/assets`, read back by running it. The module is code the

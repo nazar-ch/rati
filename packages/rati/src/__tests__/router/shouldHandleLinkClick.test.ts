@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach } from 'vite-plus/test';
 
 import type React from 'react';
 
-import { shouldHandleLinkClick } from '../../router/Link';
+import { shouldHandleLinkClick } from '../../router/Link.js';
 
 beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');

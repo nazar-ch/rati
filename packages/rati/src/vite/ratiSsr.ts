@@ -3,8 +3,8 @@ import { relative, resolve } from 'node:path';
 
 import { normalizePath, type Manifest, type Plugin, type ViteDevServer } from 'vite';
 
-import { ASSETS_MODULE, RESOLVED_ASSETS_MODULE, buildAssets, devAssets } from './assets';
-import { findLazyCalls, recordModuleIds } from './lazyModules';
+import { ASSETS_MODULE, RESOLVED_ASSETS_MODULE, buildAssets, devAssets } from './assets.js';
+import { findLazyCalls, recordModuleIds } from './lazyModules.js';
 
 import {
     DEFAULT_PLACEHOLDERS,
@@ -14,8 +14,8 @@ import {
     type Assembler,
     type Placeholders,
     type RenderedParts,
-} from '../ssr/html';
-import type { RenderAppResult } from '../ssr/renderApp';
+} from '../ssr/html.js';
+import type { RenderAppResult } from '../ssr/renderApp.js';
 
 /*
     `rati/vite`: `vite dev` serves the app and `vite build` builds both sides of it, so

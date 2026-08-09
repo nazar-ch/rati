@@ -3,14 +3,14 @@ import { describe, test, expect, afterEach, beforeEach, vi } from 'vite-plus/tes
 import { cleanup, act } from '@testing-library/react';
 import * as fc from 'fast-check';
 
-import { fuzz, fuzzTimeout } from './arbitraries';
+import { fuzz, fuzzTimeout } from './arbitraries.js';
 import {
     assertMounts,
     assertRenderedState,
     assertStep,
     installErrorLog,
     type ErrorLog,
-} from './routerAsserts';
+} from './routerAsserts.js';
 import {
     applyNav,
     buildHarness,
@@ -18,8 +18,8 @@ import {
     urlFor,
     type Harness,
     type Nav,
-} from './routerHarness';
-import { RouterModel, type Step } from './routerModel';
+} from './routerHarness.js';
+import { RouterModel, type Step } from './routerModel.js';
 
 /*
     The RF-02 smoke property: a generated route table mounts, a generated sequence of

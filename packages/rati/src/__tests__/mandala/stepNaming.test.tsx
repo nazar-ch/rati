@@ -2,9 +2,9 @@ import { describe, test, expect, afterEach } from 'vite-plus/test';
 
 import { act, type FC } from 'react';
 
-import { island } from '../../island/island';
-import { scope, input } from '../../scope/scope';
-import { controllableSource, flush, renderIsland, cleanup } from '../../testing';
+import { island } from '../../island/island.js';
+import { scope, input } from '../../scope/scope.js';
+import { controllableSource, flush, renderIsland, cleanup } from '../../testing/index.js';
 
 /*
     The resolver names each level's `Step` for its keys (`Step(user,prefs)`), so the React

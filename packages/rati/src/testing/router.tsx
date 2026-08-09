@@ -1,12 +1,12 @@
 import { act, type ComponentType, type ReactNode } from 'react';
 
-import { mountTree, visibleText, type MountedTree } from './dom';
+import { mountTree, visibleText, type MountedTree } from './dom.js';
 
-import { createMemoryHistory, type History } from '../router/history';
-import type { GenericRouteType } from '../router/route';
-import { RouterOutlet } from '../router/RouterOutlet';
-import { RouterProvider } from '../router/RouterProvider';
-import { RouterStore, type RouterHydratedState } from '../router/store';
+import { createMemoryHistory, type History } from '../router/history.js';
+import type { GenericRouteType } from '../router/route.js';
+import { RouterOutlet } from '../router/RouterOutlet.js';
+import { RouterProvider } from '../router/RouterProvider.js';
+import { RouterStore, type RouterHydratedState } from '../router/store.js';
 
 /*
     createTestRouter — memory history + router + the RouterProvider wiring, rendered and

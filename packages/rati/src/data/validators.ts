@@ -1,4 +1,4 @@
-import { type Validator } from './field';
+import { type Validator } from './field.js';
 
 /*
     The shipped validator kit — deliberately tiny; a validator is just a

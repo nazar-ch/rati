@@ -2,17 +2,17 @@ import { describe, test, expect } from 'vite-plus/test';
 
 import { renderToString } from 'react-dom/server';
 
-import { createMemoryHistory } from '../../router/history';
-import { prepareRoute } from '../../router/prepareRoute';
-import { route, type GenericRouteType } from '../../router/route';
-import { RouterOutlet } from '../../router/RouterOutlet';
-import { RouterProvider } from '../../router/RouterProvider';
-import { RouterStore } from '../../router/store';
-import { scope, type ScopeComponent } from '../../scope/scope';
+import { createMemoryHistory } from '../../router/history.js';
+import { prepareRoute } from '../../router/prepareRoute.js';
+import { route, type GenericRouteType } from '../../router/route.js';
+import { RouterOutlet } from '../../router/RouterOutlet.js';
+import { RouterProvider } from '../../router/RouterProvider.js';
+import { RouterStore } from '../../router/store.js';
+import { scope, type ScopeComponent } from '../../scope/scope.js';
 // The island route below resolves its scope through `react-dom/static` `prerender`
 // (renderToString, which the contrast tests use, does not await Suspense) — the drain loop
 // is now rati/testing's `prerenderToString`.
-import { prerenderToString } from '../../testing';
+import { prerenderToString } from '../../testing/index.js';
 
 function Home() {
     return <div data-testid="home">welcome home</div>;

@@ -1,6 +1,6 @@
-import { isHookLoad, type Scope } from '../scope/scope';
-import type { Source, SourceError } from '../scope/source';
-import { deepEqual } from '../util/utils';
+import { isHookLoad, type Scope } from '../scope/scope.js';
+import type { Source, SourceError } from '../scope/source.js';
+import { deepEqual } from '../util/utils.js';
 
 /*
     Selective scope refresh — the cell model and the per-mandala controller behind

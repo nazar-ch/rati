@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 
 import { act, render, screen, cleanup } from '@testing-library/react';
 
-import { lazy } from '../../router/lazy';
+import { lazy } from '../../router/lazy.js';
 
 beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');

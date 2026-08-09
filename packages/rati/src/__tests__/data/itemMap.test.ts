@@ -1,6 +1,6 @@
 import { describe, test, expect, vi } from 'vite-plus/test';
 
-import { itemMap } from '../../data/itemMap';
+import { itemMap } from '../../data/itemMap.js';
 
 // The identity map under `collection`/`pagedCollection` (package-internal). The
 // collection suites drive it through the reconcile-on-refresh path; these pin the

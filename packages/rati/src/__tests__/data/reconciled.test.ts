@@ -2,8 +2,8 @@ import { describe, test, expect, vi } from 'vite-plus/test';
 
 import { autorun, observable, runInAction } from 'mobx';
 
-import { query } from '../../data/query';
-import { reconciled } from '../../data/reconciled';
+import { query } from '../../data/query.js';
+import { reconciled } from '../../data/reconciled.js';
 
 interface Row {
     id: string;

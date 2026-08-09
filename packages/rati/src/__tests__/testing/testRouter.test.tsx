@@ -2,9 +2,9 @@ import { describe, test, expect, afterEach } from 'vite-plus/test';
 
 import { act, createContext, useContext, type FC, type ReactNode } from 'react';
 
-import { Link } from '../../router/Link';
-import { route, type GenericRouteType } from '../../router/route';
-import { createTestRouter, cleanup } from '../../testing';
+import { Link } from '../../router/Link.js';
+import { route, type GenericRouteType } from '../../router/route.js';
+import { createTestRouter, cleanup } from '../../testing/index.js';
 
 afterEach(cleanup);
 
