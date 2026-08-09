@@ -16,7 +16,7 @@ the entry says so in one line.
 
 Nothing yet.
 
-## 0.8.0 — 2026-08-09
+## 0.7.1 — 2026-08-09
 
 Fixed:
 
