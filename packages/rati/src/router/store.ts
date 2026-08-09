@@ -1,11 +1,11 @@
 import type { ComponentType, ReactNode } from 'react';
 
-import { createBrowserHistory, type History, type Location } from './history';
-import { PARAM_RE, type GenericRouteType, type NameToRoute, type RouteRedirect } from './route';
-import type { ActiveRouteOf, NavigateOptions, Router } from './router';
-import { installScrollRestoration, type ScrollRestorationOptions } from './scrollRestoration';
+import { createBrowserHistory, type History, type Location } from './history.js';
+import { PARAM_RE, type GenericRouteType, type NameToRoute, type RouteRedirect } from './route.js';
+import type { ActiveRouteOf, NavigateOptions, Router } from './router.js';
+import { installScrollRestoration, type ScrollRestorationOptions } from './scrollRestoration.js';
 
-import { navTrace } from '../util/navTrace';
+import { navTrace } from '../util/navTrace.js';
 
 // Redirect chains longer than this are treated as a cycle (see setPath).
 const MAX_REDIRECT_DEPTH = 10;

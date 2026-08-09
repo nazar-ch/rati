@@ -4,19 +4,19 @@ import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
 
 import { act } from '@testing-library/react';
 
-import { HeadProvider } from '../../head/HeadProvider';
-import { Meta } from '../../head/Meta';
-import { createHeadStore, type HeadStore } from '../../head/store';
-import { Title } from '../../head/Title';
-import { island } from '../../island/island';
-import type { Hydration } from '../../mandala/hydration';
-import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
-import { scope } from '../../scope/scope';
-import { createRequestHandler } from '../../server/requestHandler';
-import { headTags } from '../../ssr/headTags';
-import { isWholeDocument, spliceDocument } from '../../ssr/html';
-import { HYDRATION_SCRIPT_ID, readHydration, serializeHydration } from '../../ssr/payload';
-import { renderToHtml } from '../../ssr/renderToHtml';
+import { HeadProvider } from '../../head/HeadProvider.js';
+import { Meta } from '../../head/Meta.js';
+import { createHeadStore, type HeadStore } from '../../head/store.js';
+import { Title } from '../../head/Title.js';
+import { island } from '../../island/island.js';
+import type { Hydration } from '../../mandala/hydration.js';
+import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration.js';
+import { scope } from '../../scope/scope.js';
+import { createRequestHandler } from '../../server/requestHandler.js';
+import { headTags } from '../../ssr/headTags.js';
+import { isWholeDocument, spliceDocument } from '../../ssr/html.js';
+import { HYDRATION_SCRIPT_ID, readHydration, serializeHydration } from '../../ssr/payload.js';
+import { renderToHtml } from '../../ssr/renderToHtml.js';
 
 /*
     The whole-document pattern end to end — the one docs/current/public/ssr.md describes but no

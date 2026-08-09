@@ -2,9 +2,9 @@ import { describe, test, expect, afterEach } from 'vite-plus/test';
 
 import { render, screen, cleanup, act } from '@testing-library/react';
 
-import { island } from '../../island/island';
-import { scope, input } from '../../scope/scope';
-import { controllableSource, flush } from '../../testing';
+import { island } from '../../island/island.js';
+import { scope, input } from '../../scope/scope.js';
+import { controllableSource, flush } from '../../testing/index.js';
 
 /*
     A source must not leak when an inner-tree teardown is followed by a new generation —

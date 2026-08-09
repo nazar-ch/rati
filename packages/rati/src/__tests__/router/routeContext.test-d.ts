@@ -1,8 +1,8 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
 
-import { route } from '../../router/route';
-import { useRouteContext } from '../../router/useRouteContext';
-import { scope, input, type ScopeComponent } from '../../scope/scope';
+import { route } from '../../router/route.js';
+import { useRouteContext } from '../../router/useRouteContext.js';
+import { scope, input, type ScopeComponent } from '../../scope/scope.js';
 
 // Register the app's route table the way an app does — `RatiUserTypes['routes'] =
 // typeof routes`, the same augmentation `Link`'s `to` reads. `useRouteContext(name)`

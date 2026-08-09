@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 
-import type { HeadStore } from './store';
+import type { HeadStore } from './store.js';
 
 // Null default on purpose: falling back to a module-global store would mean concurrent
 // server renders clobbering each other's heads. Requiring the provider keeps the

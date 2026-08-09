@@ -1,6 +1,6 @@
 import { autorun, runInAction } from 'mobx';
 
-import { itemMap, type ItemMapOptions } from './itemMap';
+import { itemMap, type ItemMapOptions } from './itemMap.js';
 
 /*
     `reconciled` — the identity-stable list view, standalone. Design record:

@@ -7,7 +7,7 @@ import {
     type LoadContext,
     type ScopeInputs,
     type ScopeProps,
-} from '../../scope/scope';
+} from '../../scope/scope.js';
 
 class TestStore {
     constructor(_params: { productName: string }) {}

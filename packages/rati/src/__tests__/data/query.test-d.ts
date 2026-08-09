@@ -1,9 +1,9 @@
 import { describe, expectTypeOf, test } from 'vite-plus/test';
 
-import { collection, type Collection } from '../../data/collection';
-import { query, type Query, type ReadyQuery } from '../../data/query';
-import { scope, type ScopeProps } from '../../scope/scope';
-import { type Source } from '../../scope/source';
+import { collection, type Collection } from '../../data/collection.js';
+import { query, type Query, type ReadyQuery } from '../../data/query.js';
+import { scope, type ScopeProps } from '../../scope/scope.js';
+import { type Source } from '../../scope/source.js';
 
 interface Row {
     id: string;

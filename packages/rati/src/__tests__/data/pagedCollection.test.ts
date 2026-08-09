@@ -2,7 +2,7 @@ import { describe, test, expect, vi } from 'vite-plus/test';
 
 import { observable, runInAction } from 'mobx';
 
-import { pagedCollection } from '../../data/pagedCollection';
+import { pagedCollection } from '../../data/pagedCollection.js';
 
 interface Row {
     id: string;

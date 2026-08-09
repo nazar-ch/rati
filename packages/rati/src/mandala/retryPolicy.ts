@@ -21,7 +21,7 @@
     request with no machinery, and a discarded concurrent render spends nothing.
 */
 
-import type { SourceError } from '../scope/source';
+import type { SourceError } from '../scope/source.js';
 
 /** The `retry` option's configured form — see {@link MandalaConfig.retry}. */
 export type RetryOptions = {

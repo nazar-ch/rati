@@ -1,6 +1,6 @@
 import { observable, runInAction } from 'mobx';
 
-import { toSourceError, type SourceError } from '../scope/source';
+import { toSourceError, type SourceError } from '../scope/source.js';
 
 /*
     `mutation` — an imperative operation with visible state. Design record:

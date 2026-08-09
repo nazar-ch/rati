@@ -4,7 +4,7 @@ import type {
     NameToRoute,
     RatiUserTypes,
     UserRoutes,
-} from './route';
+} from './route.js';
 
 /*
     The public face of the router. `Router` is table-blind: navigation targets and the

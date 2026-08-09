@@ -4,15 +4,15 @@ import { StrictMode, useState } from 'react';
 
 import { act, cleanup, render, screen } from '@testing-library/react';
 
-import { HeadProvider } from '../../head/HeadProvider';
-import { Meta } from '../../head/Meta';
-import { createHeadStore } from '../../head/store';
-import { Title } from '../../head/Title';
-import { useTitle } from '../../head/useTitle';
-import { island } from '../../island/island';
-import { scope } from '../../scope/scope';
-import { headTags } from '../../ssr/headTags';
-import { controllableSource, prerenderToString } from '../../testing';
+import { HeadProvider } from '../../head/HeadProvider.js';
+import { Meta } from '../../head/Meta.js';
+import { createHeadStore } from '../../head/store.js';
+import { Title } from '../../head/Title.js';
+import { useTitle } from '../../head/useTitle.js';
+import { island } from '../../island/island.js';
+import { scope } from '../../scope/scope.js';
+import { headTags } from '../../ssr/headTags.js';
+import { controllableSource, prerenderToString } from '../../testing/index.js';
 
 afterEach(() => {
     cleanup();
@@ -474,8 +474,8 @@ describe('server read-back (headTags after prerender)', () => {
     test('declarations inside a suspended island register by the time prerender drains', async () => {
         // The load resolves during prerender; the Title inside the resolved content
         // must be visible to a post-prerender read.
-        const { island } = await import('../../island/island');
-        const { scope } = await import('../../scope/scope');
+        const { island } = await import('../../island/island.js');
+        const { scope } = await import('../../scope/scope.js');
 
         const Island = island({
             scope: scope().load({ name: async () => 'Resolved page' }),

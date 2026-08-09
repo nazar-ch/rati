@@ -28,4 +28,4 @@
     exporting `render(url): Promise<RenderAppResult>`. Types for the generated module
     come from `rati/vite/client`. See docs/current/public/ssr.md.
 */
-export { ratiSsr, type RatiSsrOptions } from './ratiSsr';
+export { ratiSsr, type RatiSsrOptions } from './ratiSsr.js';

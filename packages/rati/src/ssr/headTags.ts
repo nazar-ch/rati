@@ -1,5 +1,5 @@
-import { RATI_HEAD_ATTRIBUTE, RATI_HEAD_SERVER } from '../head/domSync';
-import type { HeadStore } from '../head/store';
+import { RATI_HEAD_ATTRIBUTE, RATI_HEAD_SERVER } from '../head/domSync.js';
+import type { HeadStore } from '../head/store.js';
 
 function escapeText(value: string): string {
     return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');

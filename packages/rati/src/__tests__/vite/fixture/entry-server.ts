@@ -6,7 +6,7 @@
     so driving it directly tests exactly that, and keeps a dev-server test off React and
     off `renderApp` (which renderApp.test.tsx already covers).
 */
-import type { RenderAppResult } from '../../../ssr/renderApp';
+import type { RenderAppResult } from '../../../ssr/renderApp.js';
 
 type Rendered = Extract<RenderAppResult, { kind: 'rendered' }>;
 

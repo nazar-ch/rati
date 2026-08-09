@@ -1,8 +1,8 @@
 import { describe, test, expect, vi } from 'vite-plus/test';
 
-import { field } from '../../data/field';
-import { form, FormError } from '../../data/form';
-import { maxLength, min, minLength, pattern, required } from '../../data/validators';
+import { field } from '../../data/field.js';
+import { form, FormError } from '../../data/form.js';
+import { maxLength, min, minLength, pattern, required } from '../../data/validators.js';
 
 describe('field', () => {
     test('validates on demand, not on change — until it has errors, then every change re-checks', () => {

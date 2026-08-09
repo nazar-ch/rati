@@ -1,8 +1,8 @@
 import { describe, test, expect } from 'vite-plus/test';
 
-import { island } from '../../island/island';
-import { scope, input } from '../../scope/scope';
-import { renderToHtml } from '../../ssr/renderToHtml';
+import { island } from '../../island/island.js';
+import { scope, input } from '../../scope/scope.js';
+import { renderToHtml } from '../../ssr/renderToHtml.js';
 
 /*
     Every island (so every route) is a Suspense boundary, which is what gives React

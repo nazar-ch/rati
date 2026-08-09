@@ -1,6 +1,6 @@
-import type { HydrationData, HydrationErrors } from '../mandala/hydration';
-import type { RouterHydratedState } from '../router/store';
-import { deepEqual } from '../util/utils';
+import type { HydrationData, HydrationErrors } from '../mandala/hydration.js';
+import type { RouterHydratedState } from '../router/store.js';
+import { deepEqual } from '../util/utils.js';
 
 /*
     The hydration payload: one versioned state object carried from the server render to

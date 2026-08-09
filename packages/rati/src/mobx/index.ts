@@ -7,4 +7,4 @@
     by `rati/data`, which builds on it) — an app that never imports either entry
     keeps MobX out of its bundle, and rati core never references it.
 */
-export { observableSource } from './observableSource';
+export { observableSource } from './observableSource.js';

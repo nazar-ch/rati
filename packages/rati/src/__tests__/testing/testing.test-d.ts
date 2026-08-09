@@ -1,10 +1,10 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
 
-import { scope, input } from '../../scope/scope';
-import type { Source, SourceState } from '../../scope/source';
-import { controllableSource, type ControllableSource } from '../../testing/controllableSource';
-import { deferred } from '../../testing/deferred';
-import { renderIsland } from '../../testing/renderIsland';
+import { scope, input } from '../../scope/scope.js';
+import type { Source, SourceState } from '../../scope/source.js';
+import { controllableSource, type ControllableSource } from '../../testing/controllableSource.js';
+import { deferred } from '../../testing/deferred.js';
+import { renderIsland } from '../../testing/renderIsland.js';
 
 describe('deferred<T> infers T through resolve', () => {
     test('resolve takes T, promise yields T', () => {

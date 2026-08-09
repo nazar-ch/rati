@@ -1,8 +1,8 @@
 import { describe, test, expect, afterEach } from 'vite-plus/test';
 
-import { island } from '../../island/island';
-import { useScope } from '../../mandala/channel';
-import { scope, input } from '../../scope/scope';
+import { island } from '../../island/island.js';
+import { useScope } from '../../mandala/channel.js';
+import { scope, input } from '../../scope/scope.js';
 import {
     controllableSource,
     deferred,
@@ -10,7 +10,7 @@ import {
     renderIsland,
     ssrRender,
     cleanup,
-} from '../../testing';
+} from '../../testing/index.js';
 
 afterEach(cleanup);
 

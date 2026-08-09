@@ -2,10 +2,10 @@ import { afterEach, describe, expect, test, vi } from 'vite-plus/test';
 
 import { observable, runInAction } from 'mobx';
 
-import { collection } from '../../data/collection';
-import { pagedCollection, type PageResult } from '../../data/pagedCollection';
-import { query, type Query } from '../../data/query';
-import { controllableProducer, controllableQuery } from '../../testing/data';
+import { collection } from '../../data/collection.js';
+import { pagedCollection, type PageResult } from '../../data/pagedCollection.js';
+import { query, type Query } from '../../data/query.js';
+import { controllableProducer, controllableQuery } from '../../testing/data/index.js';
 
 interface Row {
     id: string;

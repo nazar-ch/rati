@@ -2,12 +2,12 @@ import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
 
 import { act, type FC } from 'react';
 
-import { dataTrace } from '../../debug';
-import { island } from '../../island/island';
-import { useScopeControls, type ScopeControls } from '../../mandala/controls';
-import { scope, input } from '../../scope/scope';
-import { NotAvailableError } from '../../scope/source';
-import { controllableSource, deferred, flush, renderIsland, cleanup } from '../../testing';
+import { dataTrace } from '../../debug/index.js';
+import { island } from '../../island/island.js';
+import { useScopeControls, type ScopeControls } from '../../mandala/controls.js';
+import { scope, input } from '../../scope/scope.js';
+import { NotAvailableError } from '../../scope/source.js';
+import { controllableSource, deferred, flush, renderIsland, cleanup } from '../../testing/index.js';
 
 /*
     `dataTrace` (the rati/debug entry) — the emitted lines' shape.

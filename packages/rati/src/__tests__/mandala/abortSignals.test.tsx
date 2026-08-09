@@ -2,8 +2,8 @@ import { describe, test, expect, afterEach } from 'vite-plus/test';
 
 import { act, type FC } from 'react';
 
-import { island } from '../../island/island';
-import { scope, input, data, type LoadContext } from '../../scope/scope';
+import { island } from '../../island/island.js';
+import { scope, input, data, type LoadContext } from '../../scope/scope.js';
 import {
     cleanup,
     controllableSource,
@@ -11,7 +11,7 @@ import {
     flush,
     prerenderToString,
     renderIsland,
-} from '../../testing';
+} from '../../testing/index.js';
 
 /*
     SI-01 — the abort signal a function load receives as its second argument.

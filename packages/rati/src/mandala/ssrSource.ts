@@ -1,4 +1,4 @@
-import type { Source } from '../scope/source';
+import type { Source } from '../scope/source.js';
 
 /**
  * Wrap an SSR-marked source's first settle into a promise, so the server resolves it

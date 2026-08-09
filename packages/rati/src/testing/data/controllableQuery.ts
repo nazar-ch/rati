@@ -1,6 +1,6 @@
-import { controllableProducer, type ControllableProducer } from './controllableProducer';
+import { controllableProducer, type ControllableProducer } from './controllableProducer.js';
 
-import { query, type Query, type QueryOptions } from '../../data/query';
+import { query, type Query, type QueryOptions } from '../../data/query.js';
 
 /*
     `controllableQuery` — `controllableSource`'s data analogue: a **real** `query`

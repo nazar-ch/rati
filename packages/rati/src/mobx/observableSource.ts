@@ -1,6 +1,6 @@
 import { _allowStateReadsEnd, _allowStateReadsStart, reaction } from 'mobx';
 
-import { SourceSymbol, type Source, type SourceSSR, type SourceState } from '../scope/source';
+import { SourceSymbol, type Source, type SourceSSR, type SourceState } from '../scope/source.js';
 
 /*
     Adapt a MobX observable derivation to a rati `Source` (the `rati/mobx` surface).

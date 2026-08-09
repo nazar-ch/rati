@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
 
-import { createBrowserHistory, createMemoryHistory } from '../../router/history';
-import { installScrollRestoration } from '../../router/scrollRestoration';
+import { createBrowserHistory, createMemoryHistory } from '../../router/history.js';
+import { installScrollRestoration } from '../../router/scrollRestoration.js';
 
 beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');

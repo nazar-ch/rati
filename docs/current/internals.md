@@ -736,9 +736,15 @@ Types: **tsc** — the released **TypeScript 7** native compiler (the `typescrip
 pinned ≥ 4.17.1 in `packageManager` for the berry#7190 gate, without which the first install
 crashes). `vp run typecheck` type-checks (`tsconfig.json` for src, `tsconfig.test.json` for the test
 tree), `vp run build` emits `.d.ts` via `tsc -p tsconfig.build.json`, and Vitest's `--typecheck`
-pass over `*.test-d.ts` uses tsc through `test.typecheck.checker`. The whole repo is decorator-free
-(the legacy `data/` layer that needed `@babel/plugin-proposal-decorators` is gone; `rati/data` uses
-plain observable objects from factories), so there is no Babel in the toolchain.
+pass over `*.test-d.ts` uses tsc through `test.typecheck.checker`. That emit is why every relative
+import in `src` ends in `.js` (a directory as `<dir>/index.js`): the declaration files copy the
+specifier verbatim, and an extensionless one is unresolvable to a consumer on
+`moduleResolution: nodenext` — `skipLibCheck` then degrades the whole imported surface to `any`
+instead of reporting it (jnana-kit:KC-42). `bundler` resolution here, and Vite's own resolver, both
+substitute the `.ts`/`.tsx` source for the `.js` specifier, so the source side is unaffected. The
+whole repo is decorator-free (the legacy `data/` layer that needed
+`@babel/plugin-proposal-decorators` is gone; `rati/data` uses plain observable objects from
+factories), so there is no Babel in the toolchain.
 
 Lint deviates from a stock config for a generics-heavy framework: the type-machinery rules
 (`no-explicit-any`, `no-non-null-assertion`, `no-empty-object-type`,

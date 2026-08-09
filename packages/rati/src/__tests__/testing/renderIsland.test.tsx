@@ -2,11 +2,11 @@ import { describe, test, expect, afterEach } from 'vite-plus/test';
 
 import { act, Component, createContext, useContext, type ReactNode } from 'react';
 
-import { island } from '../../island/island';
-import { useScope } from '../../mandala/channel';
-import { scope, input } from '../../scope/scope';
-import { NotAvailableError } from '../../scope/source';
-import { controllableSource, deferred, flush, renderIsland, cleanup } from '../../testing';
+import { island } from '../../island/island.js';
+import { useScope } from '../../mandala/channel.js';
+import { scope, input } from '../../scope/scope.js';
+import { NotAvailableError } from '../../scope/source.js';
+import { controllableSource, deferred, flush, renderIsland, cleanup } from '../../testing/index.js';
 
 afterEach(cleanup);
 

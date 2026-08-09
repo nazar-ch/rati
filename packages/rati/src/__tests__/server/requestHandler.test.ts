@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { describe, test, expect, vi } from 'vite-plus/test';
 
-import { createRequestHandler } from '../../server/requestHandler';
-import type { RenderAppResult } from '../../ssr/renderApp';
+import { createRequestHandler } from '../../server/requestHandler.js';
+import type { RenderAppResult } from '../../ssr/renderApp.js';
 
 /*
     The fetch handler, driven directly: a `Request` in, a `Response` out, no listener

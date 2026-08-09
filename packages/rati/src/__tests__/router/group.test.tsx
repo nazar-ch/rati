@@ -2,10 +2,10 @@ import { describe, test, expect } from 'vite-plus/test';
 
 import type { FC, ReactNode } from 'react';
 
-import { group } from '../../router/group';
-import { route } from '../../router/route';
-import { scope, input } from '../../scope/scope';
-import { prerenderToString, ssrRender } from '../../testing';
+import { group } from '../../router/group.js';
+import { route } from '../../router/route.js';
+import { scope, input } from '../../scope/scope.js';
+import { prerenderToString, ssrRender } from '../../testing/index.js';
 
 const Page: FC = () => null;
 const ScopedPage: FC<{ id: string }> = () => null;

@@ -1,4 +1,4 @@
-import { SourceSymbol, type Source, type SourceError, type SourceSSR } from '../scope/source';
+import { SourceSymbol, type Source, type SourceError, type SourceSSR } from '../scope/source.js';
 
 /*
     A real `Source` a test drives by hand — the ~8th-most-copied helper in rati's suites

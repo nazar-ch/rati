@@ -18,7 +18,7 @@
  *   across reloads.
  */
 
-import type { History } from './history';
+import type { History } from './history.js';
 
 export interface ScrollRestorationOptions {
     /**

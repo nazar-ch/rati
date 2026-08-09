@@ -1,6 +1,6 @@
-import type { GenericRouteType } from './route';
-import type { Router } from './router';
-import { RouterStore, type RouterOptions } from './store';
+import type { GenericRouteType } from './route.js';
+import type { Router } from './router.js';
+import { RouterStore, type RouterOptions } from './store.js';
 
 /**
  * Build the app's router over its route table. Construct one per app on the client, one

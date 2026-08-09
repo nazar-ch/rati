@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, vi } from 'vite-plus/test';
 
-import { createBrowserHistory } from '../../router/history';
+import { createBrowserHistory } from '../../router/history.js';
 
 beforeEach(() => {
     // jsdom persists URL state across tests; reset to a known starting point.

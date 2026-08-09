@@ -1,4 +1,4 @@
-import { useHeadTag } from './useHeadTag';
+import { useHeadTag } from './useHeadTag.js';
 
 /**
  * Hook form of `<Title>`: declare the document title from page content. The deepest

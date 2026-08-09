@@ -4,10 +4,10 @@ import { type FC } from 'react';
 
 import { act, render, fireEvent, cleanup } from '@testing-library/react';
 
-import { Link } from '../../router/Link';
-import { route } from '../../router/route';
-import { RouterProvider } from '../../router/RouterProvider';
-import { RouterStore } from '../../router/store';
+import { Link } from '../../router/Link.js';
+import { route } from '../../router/route.js';
+import { RouterProvider } from '../../router/RouterProvider.js';
+import { RouterStore } from '../../router/store.js';
 
 /**
  * RF-07's pins: `<Link>` navigates to the URL the *anchor* resolved, and decides active

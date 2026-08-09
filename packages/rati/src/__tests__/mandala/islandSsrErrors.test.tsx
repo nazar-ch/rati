@@ -1,9 +1,9 @@
 import { describe, test, expect } from 'vite-plus/test';
 
-import { island } from '../../island/island';
-import { scope, input } from '../../scope/scope';
-import { NotAvailableError } from '../../scope/source';
-import { deferred, ssrRender } from '../../testing';
+import { island } from '../../island/island.js';
+import { scope, input } from '../../scope/scope.js';
+import { NotAvailableError } from '../../scope/source.js';
+import { deferred, ssrRender } from '../../testing/index.js';
 
 /*
     What a rejecting promise load does under a collected server render — pinned by

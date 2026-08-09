@@ -1,4 +1,4 @@
-import { asSourceError, type SourceError } from '../scope/source';
+import { asSourceError, type SourceError } from '../scope/source.js';
 
 /*
     `ssrErrors: 'dehydrate'` — the server's half.

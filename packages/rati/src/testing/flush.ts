@@ -1,6 +1,6 @@
 import { act } from 'react';
 
-import { withActEnvironment } from './actEnvironment';
+import { withActEnvironment } from './actEnvironment.js';
 
 /*
     `act` is imported from `react` (not `react-dom/test-utils`, which is gone in React 19,

@@ -1,7 +1,7 @@
 import { useEffect, useId } from 'react';
 
-import { useHeadStore } from './context';
-import type { HeadTag } from './store';
+import { useHeadStore } from './context.js';
+import type { HeadTag } from './store.js';
 
 /**
  * The shared half of `useTitle` / `<Title>` / `<Meta>`: declare one head tag, keyed by

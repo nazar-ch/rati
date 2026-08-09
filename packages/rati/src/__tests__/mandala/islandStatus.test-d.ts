@@ -1,8 +1,8 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
 
-import { useScopeControls } from '../../mandala/controls';
-import type { IslandPhase } from '../../mandala/refresh';
-import { scope, input } from '../../scope/scope';
+import { useScopeControls } from '../../mandala/controls.js';
+import type { IslandPhase } from '../../mandala/refresh.js';
+import { scope, input } from '../../scope/scope.js';
 
 // The same shape the runtime pins use: two inputs and two loads, so `refresh`'s key union
 // has something to be wrong about.

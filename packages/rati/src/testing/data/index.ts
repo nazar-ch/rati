@@ -13,5 +13,5 @@ export {
     controllableProducer,
     type ControllableProducer,
     type ProducerCall,
-} from './controllableProducer';
-export { controllableQuery, type ControllableQuery } from './controllableQuery';
+} from './controllableProducer.js';
+export { controllableQuery, type ControllableQuery } from './controllableQuery.js';

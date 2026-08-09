@@ -2,9 +2,9 @@ import { describe, test, expect, vi } from 'vite-plus/test';
 
 import { autorun } from 'mobx';
 
-import { keyed } from '../../data/keyed';
-import { mutation } from '../../data/mutation';
-import { query } from '../../data/query';
+import { keyed } from '../../data/keyed.js';
+import { mutation } from '../../data/mutation.js';
+import { query } from '../../data/query.js';
 
 describe('get-or-create', () => {
     test('the same key returns the same instance; the factory runs once per key', () => {

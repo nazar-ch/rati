@@ -1,7 +1,7 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
 
-import { keyed, type Keyed } from '../../data/keyed';
-import { query, type Query } from '../../data/query';
+import { keyed, type Keyed } from '../../data/keyed.js';
+import { query, type Query } from '../../data/query.js';
 
 /** The app-side id shape the map has to accept: a branded string. */
 type SpaceId = string & { readonly __brand: 'SpaceId' };

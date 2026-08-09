@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import { createServer, type ViteDevServer } from 'vite-plus';
 
-import { ratiSsr } from '../../vite/ratiSsr';
+import { ratiSsr } from '../../vite/ratiSsr.js';
 
 /*
     The plugin against a real Vite dev server: every result kind mapped onto a real

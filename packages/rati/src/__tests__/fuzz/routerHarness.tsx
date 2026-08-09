@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { render } from '@testing-library/react';
 import * as fc from 'fast-check';
 
-import { byLevel } from './arbitraries';
+import { byLevel } from './arbitraries.js';
 import {
     buildPath,
     paramNamesOf,
@@ -11,13 +11,13 @@ import {
     type RedirectSpec,
     type RouteSpec,
     type RouteTable,
-} from './routerModel';
+} from './routerModel.js';
 
-import { createMemoryHistory } from '../../router/history';
-import { route, type GenericRouteType, type RouteRedirect } from '../../router/route';
-import { RouterOutlet } from '../../router/RouterOutlet';
-import { RouterProvider, useRouter } from '../../router/RouterProvider';
-import { RouterStore } from '../../router/store';
+import { createMemoryHistory } from '../../router/history.js';
+import { route, type GenericRouteType, type RouteRedirect } from '../../router/route.js';
+import { RouterOutlet } from '../../router/RouterOutlet.js';
+import { RouterProvider, useRouter } from '../../router/RouterProvider.js';
+import { RouterStore } from '../../router/store.js';
 
 /*
     The router fuzz harness: an arbitrary over route *tables*, and the builder that turns

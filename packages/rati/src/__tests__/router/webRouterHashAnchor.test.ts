@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vite-plus/test';
 
-import { route } from '../../router/route';
-import { RouterStore } from '../../router/store';
+import { route } from '../../router/route.js';
+import { RouterStore } from '../../router/store.js';
 
 const NoopComponent = () => null;
 

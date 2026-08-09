@@ -1,8 +1,8 @@
-import { type ItemMapOptions } from './itemMap';
-import { createQuery, instanceSource, type QueryOptions, type QueryPhase } from './query';
-import { reconciled } from './reconciled';
+import { type ItemMapOptions } from './itemMap.js';
+import { createQuery, instanceSource, type QueryOptions, type QueryPhase } from './query.js';
+import { reconciled } from './reconciled.js';
 
-import { type Source, type SourceError } from '../scope/source';
+import { type Source, type SourceError } from '../scope/source.js';
 
 /*
     `collection` — keyed items, reconciliation, nested reactivity. Design record:

@@ -4,10 +4,10 @@ import type { FC } from 'react';
 
 import { render, screen, cleanup, act } from '@testing-library/react';
 
-import { island } from '../../island/island';
-import { useScopeControls, type ScopeControls } from '../../mandala/controls';
-import { scope } from '../../scope/scope';
-import { controllableSource, flush } from '../../testing';
+import { island } from '../../island/island.js';
+import { useScopeControls, type ScopeControls } from '../../mandala/controls.js';
+import { scope } from '../../scope/scope.js';
+import { controllableSource, flush } from '../../testing/index.js';
 
 /*
     A source key's value must reach the loads that read it — found while deciding whether the

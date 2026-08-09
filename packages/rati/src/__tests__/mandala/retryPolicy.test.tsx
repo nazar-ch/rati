@@ -2,16 +2,16 @@ import { describe, test, expect, afterEach, beforeEach, vi } from 'vite-plus/tes
 
 import { act } from 'react';
 
-import { island } from '../../island/island';
+import { island } from '../../island/island.js';
 import {
     RetryPolicy,
     resolveRetry,
     DEFAULT_BACKOFF_MS,
     MAX_BACKOFF_MS,
-} from '../../mandala/retryPolicy';
-import { scope, input } from '../../scope/scope';
-import { NotAvailableError, type SourceError } from '../../scope/source';
-import { flush, renderIsland, ssrRender, cleanup } from '../../testing';
+} from '../../mandala/retryPolicy.js';
+import { scope, input } from '../../scope/scope.js';
+import { NotAvailableError, type SourceError } from '../../scope/source.js';
+import { flush, renderIsland, ssrRender, cleanup } from '../../testing/index.js';
 
 /*
     `retry` — the island takes another go at a failed resolution before it gives up.

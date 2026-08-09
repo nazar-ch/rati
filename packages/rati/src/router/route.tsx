@@ -1,9 +1,9 @@
 import type { ComponentType, ReactNode } from 'react';
 
-import { createMandala, type MandalaConfig } from '../mandala/mandala';
-import type { RetryOption } from '../mandala/retryPolicy';
-import type { Scope, ScopeComponent, ScopeProvidesOf } from '../scope/scope';
-import type { TupleToUnion } from '../types/generic';
+import { createMandala, type MandalaConfig } from '../mandala/mandala.js';
+import type { RetryOption } from '../mandala/retryPolicy.js';
+import type { Scope, ScopeComponent, ScopeProvidesOf } from '../scope/scope.js';
+import type { TupleToUnion } from '../types/generic.js';
 
 //--------------------------------------------
 

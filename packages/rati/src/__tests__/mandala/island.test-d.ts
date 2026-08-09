@@ -1,8 +1,8 @@
 import { describe, test, expectTypeOf } from 'vite-plus/test';
 
-import { useOptionalScope, useScope } from '../../mandala/channel';
-import { scope, input, hook, type ScopeInputs, type ScopeProps } from '../../scope/scope';
-import { type Source } from '../../scope/source';
+import { useOptionalScope, useScope } from '../../mandala/channel.js';
+import { scope, input, hook, type ScopeInputs, type ScopeProps } from '../../scope/scope.js';
+import { type Source } from '../../scope/source.js';
 
 class TitleStore {
     constructor(_params: { id: string }) {}

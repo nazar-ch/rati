@@ -4,9 +4,9 @@ import { act, lazy, type FC } from 'react';
 
 import { screen } from '@testing-library/react';
 
-import { route } from '../../router/route';
-import { RouterOutlet } from '../../router/RouterOutlet';
-import { createTestRouter, cleanup } from '../../testing';
+import { route } from '../../router/route.js';
+import { RouterOutlet } from '../../router/RouterOutlet.js';
+import { createTestRouter, cleanup } from '../../testing/index.js';
 
 const HomePage: FC = () => <div data-testid="home">home</div>;
 

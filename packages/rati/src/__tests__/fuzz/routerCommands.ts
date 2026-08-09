@@ -3,8 +3,8 @@ import { expect } from 'vite-plus/test';
 import { act } from '@testing-library/react';
 import * as fc from 'fast-check';
 
-import { byLevel } from './arbitraries';
-import { assertMounts, assertStep, type ErrorLog } from './routerAsserts';
+import { byLevel } from './arbitraries.js';
+import { assertMounts, assertStep, type ErrorLog } from './routerAsserts.js';
 import {
     HASH_VALUES,
     paramValues,
@@ -12,10 +12,10 @@ import {
     SEARCH_VALUES,
     UNMATCHED_PATH,
     type Harness,
-} from './routerHarness';
-import type { RouterModel, RouteTable, Step } from './routerModel';
+} from './routerHarness.js';
+import type { RouterModel, RouteTable, Step } from './routerModel.js';
 
-import { flush } from '../../testing';
+import { flush } from '../../testing/index.js';
 
 /*
     The RF-03 command alphabet: the navigations an app actually makes — pushes and replaces

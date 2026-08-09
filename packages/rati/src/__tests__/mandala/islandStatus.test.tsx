@@ -2,9 +2,9 @@ import { describe, test, expect, afterEach } from 'vite-plus/test';
 
 import { Component, type ReactNode } from 'react';
 
-import { useScopeControls } from '../../mandala/controls';
-import { scope, input } from '../../scope/scope';
-import { controllableSource, deferred, flush, renderIsland, cleanup } from '../../testing';
+import { useScopeControls } from '../../mandala/controls.js';
+import { scope, input } from '../../scope/scope.js';
+import { controllableSource, deferred, flush, renderIsland, cleanup } from '../../testing/index.js';
 
 afterEach(cleanup);
 

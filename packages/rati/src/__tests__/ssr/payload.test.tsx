@@ -2,16 +2,16 @@ import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
 
 import { act, cleanup, render } from '@testing-library/react';
 
-import { island } from '../../island/island';
-import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration';
-import { createHydrationClaims } from '../../mandala/hydrationDiagnostics';
-import { scope } from '../../scope/scope';
+import { island } from '../../island/island.js';
+import { createHydrationCollector, HydrationProvider } from '../../mandala/hydration.js';
+import { createHydrationClaims } from '../../mandala/hydrationDiagnostics.js';
+import { scope } from '../../scope/scope.js';
 import {
     HYDRATION_SCRIPT_ID,
     readHydration,
     serializeHydration,
     type HydrationState,
-} from '../../ssr/payload';
+} from '../../ssr/payload.js';
 
 const CUSTOM_ID = '__app-state';
 

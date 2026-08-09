@@ -2,11 +2,11 @@ import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
 
 import { act } from 'react';
 
-import { island } from '../../island/island';
-import { scope, input } from '../../scope/scope';
-import { NotAvailableError, type SourceError } from '../../scope/source';
-import { serializeHydration } from '../../ssr/payload';
-import { cleanup, flush, prerenderToString, ssrRender } from '../../testing';
+import { island } from '../../island/island.js';
+import { scope, input } from '../../scope/scope.js';
+import { NotAvailableError, type SourceError } from '../../scope/source.js';
+import { serializeHydration } from '../../ssr/payload.js';
+import { cleanup, flush, prerenderToString, ssrRender } from '../../testing/index.js';
 
 afterEach(cleanup);
 

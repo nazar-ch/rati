@@ -1,10 +1,10 @@
 import { createElement, type ComponentProps, type ComponentType, type ReactNode } from 'react';
 
-import { mountTree, type MountedTree } from './dom';
+import { mountTree, type MountedTree } from './dom.js';
 
-import { island, type IslandComponent, type IslandConfig } from '../island/island';
-import { useScopeControls, type ScopeControls } from '../mandala/controls';
-import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope';
+import { island, type IslandComponent, type IslandConfig } from '../island/island.js';
+import { useScopeControls, type ScopeControls } from '../mandala/controls.js';
+import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope.js';
 
 /*
     renderIsland — mount an island, drive it to resolution, and read which slot is showing.

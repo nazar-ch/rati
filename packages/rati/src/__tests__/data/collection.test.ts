@@ -2,8 +2,8 @@ import { describe, test, expect, vi } from 'vite-plus/test';
 
 import { autorun, observable, runInAction } from 'mobx';
 
-import { collection } from '../../data/collection';
-import { controllableProducer } from '../../testing/data';
+import { collection } from '../../data/collection.js';
+import { controllableProducer } from '../../testing/data/index.js';
 
 interface Row {
     id: string;

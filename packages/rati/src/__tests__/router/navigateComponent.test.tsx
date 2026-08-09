@@ -4,12 +4,12 @@ import { StrictMode, type FC } from 'react';
 
 import { act, render, screen, cleanup } from '@testing-library/react';
 
-import { createBrowserHistory } from '../../router/history';
-import { Navigate } from '../../router/Navigate';
-import { route } from '../../router/route';
-import { RouterOutlet } from '../../router/RouterOutlet';
-import { RouterProvider } from '../../router/RouterProvider';
-import { RouterStore } from '../../router/store';
+import { createBrowserHistory } from '../../router/history.js';
+import { Navigate } from '../../router/Navigate.js';
+import { route } from '../../router/route.js';
+import { RouterOutlet } from '../../router/RouterOutlet.js';
+import { RouterProvider } from '../../router/RouterProvider.js';
+import { RouterStore } from '../../router/store.js';
 
 const Home: FC = () => <Navigate to="/dashboard" />;
 const Dashboard: FC = () => <div data-testid="dashboard">dashboard</div>;
