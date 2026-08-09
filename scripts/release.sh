@@ -82,7 +82,13 @@ yarn_pkg() { yarn workspace "$PACKAGE" "$@"; }
 if ! WHO="$(yarn npm whoami --publish 2>/dev/null)"; then
   die "Token failed to authenticate (expired?). Rotate it — see docs/current/RELEASING.md."
 fi
-WHO="${WHO##*: }"   # strip yarn's "➤ YN0000: " report prefix, leaving the username
+# The username is on the FIRST line; `yarn npm whoami` then adds its own "Done in 0s
+# 273ms" report line, which also carries a "➤ YN0000: " prefix. Stripping to the LAST
+# such prefix across the whole capture therefore printed the timing line as the publisher
+# — a confirmation prompt naming nobody, on the one command that must not be run against
+# the wrong account. Take the first line, then strip.
+WHO="${WHO%%$'\n'*}"
+WHO="${WHO##*: }"
 info "Authenticated as: $WHO"
 
 # --- test + build (fail before bumping) -----------------------------------
@@ -139,7 +145,12 @@ fi
 # `yarn version` only wrote the new version into package.json; it does not
 # create the git commit/tag we rely on below, so we make them ourselves.
 # (The tag must be annotated: `git push --follow-tags` ignores lightweight ones.)
-info "Committing and tagging v$NEW_VERSION…"
+# Braces, because the `…` that follows is multibyte and bash 3.2 — what `#!/bin/bash`
+# selects on macOS, where this script runs — reads its bytes as part of the NAME:
+# `$NEW_VERSION…` looked up a variable nothing had set, and `set -u` killed the release
+# one line before the commit. The only such adjacency in the repo; bash 5 expands it fine,
+# so no Linux run and no shellcheck pass can see this.
+info "Committing and tagging v${NEW_VERSION}…"
 git -C "$REPO_ROOT" commit -q -m "release: $PACKAGE v$NEW_VERSION" -- "$PKG_DIR/package.json"
 git -C "$REPO_ROOT" tag -a "v$NEW_VERSION" -m "release: $PACKAGE v$NEW_VERSION"
 trap - EXIT
