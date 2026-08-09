@@ -14,6 +14,10 @@ the entry says so in one line.
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.8.0 — 2026-08-09
+
 Fixed:
 
 - **Published `.d.ts` re-exports resolve under `moduleResolution: nodenext`** (jnana-kit:KC-42).
