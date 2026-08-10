@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# why-shell: none of the kit's six shell licenses fits this file, and it claims none — it is a
+# batch of CLI calls with an exit-code roll-up (jnana-kit:KC-53's wording for what is NOT
+# `process-wrap`), which the family's rule calls a TypeScript program that happens to be written in
+# shell. It survives on the convert-on-change lane alone, so it converts the next time it changes
+# for a reason of its own rather than for a sweep.
 #
 # Release script for the `rati` package.
 #
@@ -20,7 +25,7 @@ RELEASE_BRANCH="main"
 # explicitly at npmjs (see the YARN_NPM_PUBLISH_REGISTRY export below).
 PUBLISH_REGISTRY="https://registry.npmjs.org"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PKG_DIR="$REPO_ROOT/packages/$PACKAGE"
+PKG_DIR="${REPO_ROOT}/packages/${PACKAGE}"
 
 die()  { echo "✗ $*" >&2; exit 1; }
 info() { echo "→ $*"; }
@@ -51,31 +56,31 @@ command -v node     >/dev/null || die "node not found"
 command -v yarn     >/dev/null || die "yarn not found"
 command -v security >/dev/null || die "macOS 'security' tool not found (Keychain unavailable)"
 
-cd "$REPO_ROOT"
+cd "${REPO_ROOT}"
 
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-[[ "$BRANCH" == "$RELEASE_BRANCH" ]] || die "On branch '$BRANCH', expected '$RELEASE_BRANCH'."
+[[ "${BRANCH}" == "${RELEASE_BRANCH}" ]] || die "On branch '${BRANCH}', expected '${RELEASE_BRANCH}'."
 [[ -z "$(git status --porcelain)" ]] || die "Working tree is dirty. Commit or stash first."
 
-git fetch --quiet origin "$RELEASE_BRANCH"
+git fetch --quiet origin "${RELEASE_BRANCH}"
 if UPSTREAM="$(git rev-parse --abbrev-ref '@{u}' 2>/dev/null)"; then
-  [[ "$(git rev-parse @)" == "$(git rev-parse "$UPSTREAM")" ]] \
-    || die "Local '$RELEASE_BRANCH' is not in sync with $UPSTREAM. Pull/push first."
+  [[ "$(git rev-parse @)" == "$(git rev-parse "${UPSTREAM}")" ]] \
+    || die "Local '${RELEASE_BRANCH}' is not in sync with ${UPSTREAM}. Pull/push first."
 fi
 
 # --- token from Keychain --------------------------------------------------
-info "Reading npm token from Keychain (service: $KEYCHAIN_SERVICE)…"
-NPM_TOKEN="$(security find-generic-password -a "$USER" -s "$KEYCHAIN_SERVICE" -w 2>/dev/null || true)"
-[[ -n "$NPM_TOKEN" ]] || die "No token in Keychain. Run the one-time setup in docs/current/RELEASING.md."
+info "Reading npm token from Keychain (service: ${KEYCHAIN_SERVICE})…"
+NPM_TOKEN="$(security find-generic-password -a "${USER}" -s "${KEYCHAIN_SERVICE}" -w 2>/dev/null || true)"
+[[ -n "${NPM_TOKEN}" ]] || die "No token in Keychain. Run the one-time setup in docs/current/RELEASING.md."
 
 # Hand the token + publish target to `yarn npm …` via env (yarn reads these as
 # the npmAuthToken / npmPublishRegistry config). Passing them through the
 # environment keeps the secret off disk, and scopes it to this process only.
-export YARN_NPM_AUTH_TOKEN="$NPM_TOKEN"
-export YARN_NPM_PUBLISH_REGISTRY="$PUBLISH_REGISTRY"
+export YARN_NPM_AUTH_TOKEN="${NPM_TOKEN}"
+export YARN_NPM_PUBLISH_REGISTRY="${PUBLISH_REGISTRY}"
 
 # Run a command in the $PACKAGE workspace from anywhere in the repo.
-yarn_pkg() { yarn workspace "$PACKAGE" "$@"; }
+yarn_pkg() { yarn workspace "${PACKAGE}" "$@"; }
 
 # Gate on the exit code, not the output: `yarn npm whoami` prints its error to
 # stdout (not stderr) and would otherwise masquerade as a username.
@@ -89,34 +94,34 @@ fi
 # the wrong account. Take the first line, then strip.
 WHO="${WHO%%$'\n'*}"
 WHO="${WHO##*: }"
-info "Authenticated as: $WHO"
+info "Authenticated as: ${WHO}"
 
 # --- test + build (fail before bumping) -----------------------------------
 info "Running tests…"
 yarn_pkg test
 info "Building…"
 yarn_pkg build
-[[ -d "$PKG_DIR/dist" ]] || die "Build produced no dist/."
+[[ -d "${PKG_DIR}/dist" ]] || die "Build produced no dist/."
 
-CURRENT="$(node -p "require('$PKG_DIR/package.json').version")"
+CURRENT="$(node -p "require('${PKG_DIR}/package.json').version")"
 
 derive_tag() { # $1 = version -> echoes dist-tag
   if [[ "$1" == *-* ]]; then
     local t; t="$(printf '%s' "$1" | sed -E 's/^[0-9]+\.[0-9]+\.[0-9]+-([A-Za-z][A-Za-z0-9]*).*/\1/')"
-    [[ "$t" == "$1" ]] && t="next"; echo "$t"
+    [[ "${t}" == "$1" ]] && t="next"; echo "${t}"
   else
     echo "latest"
   fi
 }
 
 # --- dry run: bump package.json only, publish --dry-run, then revert -------
-if [[ $DRY_RUN -eq 1 ]]; then
-  yarn_pkg version "$BUMP" >/dev/null
-  NEW_VERSION="$(node -p "require('$PKG_DIR/package.json').version")"
-  DIST_TAG="$(derive_tag "$NEW_VERSION")"
-  info "DRY RUN — would publish $PACKAGE@$NEW_VERSION (dist-tag: $DIST_TAG)"
-  yarn_pkg npm publish --tag "$DIST_TAG" --dry-run || true
-  git checkout -- "$PKG_DIR/package.json"
+if [[ ${DRY_RUN} -eq 1 ]]; then
+  yarn_pkg version "${BUMP}" >/dev/null
+  NEW_VERSION="$(node -p "require('${PKG_DIR}/package.json').version")"
+  DIST_TAG="$(derive_tag "${NEW_VERSION}")"
+  info "DRY RUN — would publish ${PACKAGE}@${NEW_VERSION} (dist-tag: ${DIST_TAG})"
+  yarn_pkg npm publish --tag "${DIST_TAG}" --dry-run || true
+  git checkout -- "${PKG_DIR}/package.json"
   info "Dry run complete — no commit, tag, publish, or push performed."
   exit 0
 fi
@@ -128,46 +133,53 @@ fi
 # commit, tag, publish and push all sit behind the prompt, and the trap puts
 # package.json back on any exit before the commit (an answer of no, but a Ctrl-C
 # just as much).
-restore_pkg_json() { git -C "$REPO_ROOT" checkout -- "$PKG_DIR/package.json" 2>/dev/null || true; }
-yarn_pkg version "$BUMP" >/dev/null
+restore_pkg_json() { git -C "${REPO_ROOT}" checkout -- "${PKG_DIR}/package.json" 2>/dev/null || true; }
+yarn_pkg version "${BUMP}" >/dev/null
 trap restore_pkg_json EXIT
-NEW_VERSION="$(node -p "require('$PKG_DIR/package.json').version")"
-DIST_TAG="$(derive_tag "$NEW_VERSION")"
+NEW_VERSION="$(node -p "require('${PKG_DIR}/package.json').version")"
+DIST_TAG="$(derive_tag "${NEW_VERSION}")"
 
-info "$PACKAGE $CURRENT → $NEW_VERSION (bump: $BUMP · dist-tag: $DIST_TAG · publisher: $WHO)"
-if [[ $ASSUME_YES -ne 1 ]]; then
-  read -r -n 1 -p "Publish and push v$NEW_VERSION? [y/N] " ans || ans=""
+info "${PACKAGE} ${CURRENT} → ${NEW_VERSION} (bump: ${BUMP} · dist-tag: ${DIST_TAG} · publisher: ${WHO})"
+if [[ ${ASSUME_YES} -ne 1 ]]; then
+  read -r -n 1 -p "Publish and push v${NEW_VERSION}? [y/N] " ans || ans=""
   echo
-  [[ "$ans" == "y" || "$ans" == "Y" ]] || die "Aborted."
+  [[ "${ans}" == "y" || "${ans}" == "Y" ]] || die "Aborted."
 fi
 
 # --- commit + tag ---------------------------------------------------------
 # `yarn version` only wrote the new version into package.json; it does not
 # create the git commit/tag we rely on below, so we make them ourselves.
 # (The tag must be annotated: `git push --follow-tags` ignores lightweight ones.)
-# Braces, because the `…` that follows is multibyte and bash 3.2 — what `#!/bin/bash`
-# selects on macOS, where this script runs — reads its bytes as part of the NAME:
-# `$NEW_VERSION…` looked up a variable nothing had set, and `set -u` killed the release
-# one line before the commit. The only such adjacency in the repo; bash 5 expands it fine,
-# so no Linux run and no shellcheck pass can see this.
+# Braces, because they are what keeps the multibyte `…` that follows out of the variable
+# NAME. Unbraced, `$NEW_VERSION…` was looked up as a name nothing had set and `set -u`
+# killed a release one line before the commit (jnana-kit:KC-42).
+#
+# What this comment used to claim — "bash 5 expands it fine, so no Linux run and no
+# lint pass can see this" — is wrong in its second half and unsettled in its first. A
+# linter is now exactly what sees it: `require-variable-braces` (SC2250) flags the whole
+# class and writes the repair itself, and jnana-kit:KC-52 turned it on. The
+# interpreter half is measured and the measurements disagree — jnana-kit:KC-52 read the
+# abort out of brew bash 5.3.15 on macOS under `LANG=en_US.UTF-8`, and re-measuring it for
+# jnana-kit:KC-54 on Linux bash 5.2.21 expanded it correctly in every locale that guest
+# has. So neither the version nor the platform is the invariant here. The braces are.
 info "Committing and tagging v${NEW_VERSION}…"
-git -C "$REPO_ROOT" commit -q -m "release: $PACKAGE v$NEW_VERSION" -- "$PKG_DIR/package.json"
-git -C "$REPO_ROOT" tag -a "v$NEW_VERSION" -m "release: $PACKAGE v$NEW_VERSION"
+git -C "${REPO_ROOT}" commit -q -m "release: ${PACKAGE} v${NEW_VERSION}" -- "${PKG_DIR}/package.json"
+git -C "${REPO_ROOT}" tag -a "v${NEW_VERSION}" -m "release: ${PACKAGE} v${NEW_VERSION}"
 trap - EXIT
 
 # --- publish --------------------------------------------------------------
-info "Publishing $PACKAGE@$NEW_VERSION (dist-tag: $DIST_TAG)…"
-PUB_ARGS=(npm publish --tag "$DIST_TAG")
-[[ -n "$OTP" ]] && PUB_ARGS+=(--otp "$OTP")
+info "Publishing ${PACKAGE}@${NEW_VERSION} (dist-tag: ${DIST_TAG})…"
+PUB_ARGS=(npm publish --tag "${DIST_TAG}")
+[[ -n "${OTP}" ]] && PUB_ARGS+=(--otp "${OTP}")
 if ! yarn_pkg "${PUB_ARGS[@]}"; then
   die "Publish failed. The version commit/tag exist locally but were NOT pushed.
-   Undo with:  git tag -d v$NEW_VERSION && git reset --hard HEAD~1"
+   Undo with:  git tag -d v${NEW_VERSION} && git reset --hard HEAD~1"
 fi
 
 # --- push -----------------------------------------------------------------
 info "Pushing commit + tag…"
-git push --follow-tags origin "$RELEASE_BRANCH"
+git push --follow-tags origin "${RELEASE_BRANCH}"
 
 echo
-echo "✓ Published $PACKAGE@$NEW_VERSION  (dist-tag: $DIST_TAG)"
-echo "  https://www.npmjs.com/package/$PACKAGE/v/$NEW_VERSION"
+echo "✓ Published ${PACKAGE}@${NEW_VERSION}  (dist-tag: ${DIST_TAG})"
+echo "  https://www.npmjs.com/package/${PACKAGE}/v/${NEW_VERSION}"

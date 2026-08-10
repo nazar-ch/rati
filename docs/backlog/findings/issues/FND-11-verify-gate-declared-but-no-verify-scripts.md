@@ -44,5 +44,5 @@ it.
 
 ## Verify
 
-- `verify.ts` from a clean checkout exits 0 and names the steps it ran.
+- `node_modules/.bin/kit-verify` from a clean checkout exits 0 and names the steps it ran.
 - A deliberate lint/type error makes it exit non-zero and names the failing step.

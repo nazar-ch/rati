@@ -121,7 +121,9 @@ internal, and the per-file map is docs/current/internals.md §Source layout.
   is excluded in the `fmt` block. dprint reflows it instead: on commit through the staged task, and
   repo-wide through the `markdown` gate stage. Never run `dprint fmt` yourself — a bare reflow
   bypasses the mangle scan, and dprint cannot see its own damage (jnana-kit:FND-47). Use
-  `dprint-mangle-scan.ts --fmt <file.md…>`, which the gate's own failure names.
+  `node node_modules/@jnana-app/kit/dist/checks/dprint-mangle-scan.js --fmt <file.md…>`, which the
+  gate's own failure names as an absolute path — the bare `dprint-mangle-scan.ts` left `PATH` with
+  jnana-kit:KC-14.
 - rati uses **relative imports** (no `#` path alias), and no barrel beyond `main.ts`. Every relative
   specifier carries an explicit `.js` extension — `./scope/scope.js`, a directory as
   `./data/index.js`. tsc copies the specifier into the emitted `.d.ts` verbatim, so an extensionless

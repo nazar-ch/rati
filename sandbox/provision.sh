@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# why-shell: guest provisioning — runs on a bare VM before this project's toolchain (or any
-# node_modules) exists, so it cannot be anything that needs them.
+# why-shell: provision-hook — the kit's provisioning contract spawns `bash <checkout>/<hook>` on a
+# guest it has just cloned into, so the entry point cannot be anything else, and it runs before this
+# project has a toolchain (any node_modules) of its own.
 #
 # rati's provision hook: the project-owned layer of a shared sandbox VM (jnana-kit registry
 # `provisionHook`; jnana-kit:///docs/design.md §3 — the kit's tree, not this one). The kit base
@@ -12,9 +13,9 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$REPO"
+cd "${REPO}"
 
-echo "==> provisioning rati at $REPO"
+echo "==> provisioning rati at ${REPO}"
 
 # Make the checkout runnable — the same command the manifest declares as `bootstrap`
 # (.claude/kit.json). Installs the monorepo (packages/rati + examples/{demo,ssr}) under Node 26 and
