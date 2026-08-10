@@ -1,7 +1,7 @@
 #!/bin/sh
-# why-shell: a git hook body, and the one script here that cannot move to the TS lane or into the
-# kit — git runs hooks from the repo whose commits they gate, so every consumer must carry this
-# file itself.
+# why-shell: hook-dispatch — a git hook body, and the one script here that cannot move to the TS
+# lane or into the kit: git runs hooks from the repo whose commits they gate, so every consumer
+# must carry this file itself.
 #
 # So it carries as little as possible. The gate is the kit's `tools/pre-commit-gate.sh`
 # (`vp staged --no-stash`, a per-worktree backup ref, the cross-worktree commit lock — `◊WTH-03`);
@@ -30,9 +30,13 @@
 # for every other. Unset now takes the same loud open arm below as a wrong path, which already
 # names the variable as the fix.
 KIT="${JNANA_KIT_HOME:-}"
-if [ -r "$KIT/tools/pre-commit-gate.sh" ]; then
-    . "$KIT/tools/pre-commit-gate.sh"
+if [ -r "${KIT}/tools/pre-commit-gate.sh" ]; then
+    # The gate body is the kit's own file, outside this repo's tree by construction, so a shell
+    # linter standing here has nothing to follow and says so once per run. The kit lints that file
+    # directly, in the corpus it belongs to.
+    # shellcheck disable=SC1091
+    . "${KIT}/tools/pre-commit-gate.sh"
 else
-    printf 'pre-commit: no jnana-kit gate at %s — running vp staged bare: no cross-worktree commit lock, and lint-staged backs its work up onto the repo-shared refs/stash. Set JNANA_KIT_HOME.\n' "$KIT" >&2
+    printf 'pre-commit: no jnana-kit gate at %s — running vp staged bare: no cross-worktree commit lock, and lint-staged backs its work up onto the repo-shared refs/stash. Set JNANA_KIT_HOME.\n' "${KIT}" >&2
     exec vp staged
 fi
