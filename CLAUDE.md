@@ -59,8 +59,8 @@ is the lone exception, and stays internal — callers only ever see `island`/`ro
   control-byte scan, the `@jnana-app/kit` conformance checks, the record gate and the full Vitest
   suite. rati declares **no** `verify:*` scripts and must not gain any: the battery is the list.
 - **`yarn ci` is no longer the gate** — it is the release ritual, and it now holds only the two
-  things the battery does not run: `fuzz` (the randomized suites at `FUZZ_RUNS=500`, default 2000
-  via the env) and `build` (library bundle + d.ts, then both examples). **Run `yarn ci` before a
+  things the battery does not run: `fuzz` (the randomized suites at `FUZZ_RUNS=500`, deepened
+  through the env) and `build` (library bundle + d.ts, then both examples). **Run `yarn ci` before a
   release, and after touching the mandala engine or the packaging/build.**
 - **Match the existing plain-imperative commit history** when you write a subject.
 - Keep `docs/*.md` in sync with the behavior they describe.
