@@ -55,13 +55,12 @@ is the lone exception, and stays internal — callers only ever see `island`/`ro
 ## Workflow
 
 - **The gate is the kit's standard battery**, named by `.claude/kit.json` `verify` and run from the
-  repo root as that field's command — fmt, lint, typecheck, Markdown, doc- and comment-links, the
-  control-byte scan, the `@jnana-app/kit` conformance checks, the record gate and the full Vitest
-  suite. rati declares **no** `verify:*` scripts and must not gain any: the battery is the list.
-- **`yarn ci` is no longer the gate** — it is the release ritual, and it now holds only the two
-  things the battery does not run: `fuzz` (the randomized suites at `FUZZ_RUNS=500`, default 2000
-  via the env) and `build` (library bundle + d.ts, then both examples). **Run `yarn ci` before a
-  release, and after touching the mandala engine or the packaging/build.**
+  repo root as that field's command.
+- **rati declares no `verify:*` scripts and must not gain any** — the battery is the list.
+- **`yarn ci` is the release ritual**, holding the two things the battery does not run: `fuzz` (the
+  randomized suites at `FUZZ_RUNS=500`, deepened through the env) and `build` (library bundle +
+  d.ts, then both examples).
+- **Run `yarn ci` before a release, and after touching the mandala engine or the packaging/build.**
 - **Match the existing plain-imperative commit history** when you write a subject.
 - Keep `docs/*.md` in sync with the behavior they describe.
 - **A consumer-visible change takes a CHANGELOG.md `## Unreleased` bullet in the same commit** —
@@ -118,9 +117,10 @@ internal, and the per-file map is docs/current/internals.md §Source layout.
   `RatiUserTypes {}` augmentation interface and `arr[i]!`. `no-unnecessary-type-assertion` is
   **off** (see Restricted actions); everything else is strict, and React rules apply repo-wide.
 - **Markdown is dprint's, not oxfmt's** — oxfmt corrupts snake_case next to emphasis, so `**/*.md`
-  is excluded in the `fmt` block. dprint reflows it instead: on commit through the staged task, and
-  repo-wide through the `markdown` gate stage. Never run `dprint fmt` yourself — a bare reflow
-  bypasses the mangle scan, and dprint cannot see its own damage (jnana-kit:FND-47). Use
+  is excluded in the `fmt` block. dprint reflows Markdown instead: on commit through the staged
+  task, and repo-wide through the `markdown` gate stage.
+- **Never run `dprint fmt` yourself** — a bare reflow bypasses the mangle scan, and dprint cannot
+  see its own damage (jnana-kit:FND-47). Use
   `node node_modules/@jnana-app/kit/dist/checks/dprint-mangle-scan.js --fmt <file.md…>`, which the
   gate's own failure names as an absolute path — the bare `dprint-mangle-scan.ts` left `PATH` with
   jnana-kit:KC-14.
