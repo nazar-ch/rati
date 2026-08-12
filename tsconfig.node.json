@@ -1,9 +1,9 @@
 {
-    // The repo-root config surface — the one program rati has never had. Until jnana-kit:KC-13 there
+    // The repo-root config surface — the one program rati has never had. Until kit◊KC-13 there
     // was no root tsconfig at all, so a type error in the root `vite.config.ts`, in either example's
     // `vite.config.ts` or in `packages/rati/vitest.config.ts` reached no gate: every tsconfig here
     // names a `src` tree, and a config file is by definition the thing no `src` glob names
-    // (jnana-kit:FND-170 §C5). The kit's `configs` profile carries the whole surface, and
+    // (kit◊FND-170 §C5). The kit's `configs` profile carries the whole surface, and
     // `check-config-coverage` — a step in the standard battery — reds while a config file sits
     // outside every program.
     //

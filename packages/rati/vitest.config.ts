@@ -3,7 +3,7 @@ import { defineKitConfig } from '@jnana-app/kit/vitest';
 // The framework package's suite — the one runnable vitest project in this repo, aggregated by the
 // root vitest.config.ts beside it.
 //
-// Through the kit's definer rather than a bare `defineConfig` (jnana-kit:KC-13): the enforced block
+// Through the kit's definer rather than a bare `defineConfig` (kit◊KC-13): the enforced block
 // it spreads last is family policy a suite does not get to hold an opinion about — the reporter pair
 // (verbose off a TTY, so a piped run prints each test's console), `maxWorkers: '50%'` so parallel
 // worktree slots do not oversubscribe the machine into timeouts, and `execArgv: ['--no-webstorage']`

@@ -1,6 +1,6 @@
 ---
 area: packages/rati/src/data — query.ts (+ reference.md)
-needs: nothing; jnana ◊FND-106 waits on it (with DATA-06) and on the next release
+needs: nothing; jnana◊FND-106 waits on it (with DATA-06) and on the next release
 status: done
 disposition: cut 2026-07-20 from the DATA-03 findings (gap 1)
 ---
@@ -14,7 +14,7 @@ disposition: cut 2026-07-20 from the DATA-03 findings (gap 1)
 through for a single-value read. This cost jnana a shipped behavior in the DATA-03 migration: the
 members payload is a composite object (so a `query`, not a `collection`), and
 `updateHistoryRetention` lost its optimistic hop — the retention Select now settles only when the
-refresh lands, and the HI-03 store test is `describe.skip`-ed (jnana ◊FND-106).
+refresh lands, and the HI-03 store test is `describe.skip`-ed (jnana◊FND-106).
 
 ## Scope
 
@@ -48,4 +48,4 @@ Semantics to pin in docs and tests:
   during an in-flight refresh loses to the settle.
 - reference.md's `rati/data` section documents the pair.
 - Downstream (not this item): jnana restores the optimistic hop via `mutation`'s `optimistic:` and
-  unskips HI-03 (◊FND-106) — needs DATA-06 for the keyed recovery refresh, and a rati release.
+  unskips HI-03 (jnana◊FND-106) — needs DATA-06 for the keyed recovery refresh, and a rati release.

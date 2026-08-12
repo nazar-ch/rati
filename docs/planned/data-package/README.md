@@ -99,10 +99,10 @@ Batch structure: wave 1 runs four independent legs — A: DATA-10+11 (errors + r
 (rename + reconciled/facade, one branch, that order) · C: DATA-14 · E: FND-03. Wave 2, on the landed
 surfaces — D: DATA-15+16 · F: DATA-17+18.
 
-DATA-05 and DATA-06 were coupled through jnana's ◊FND-106: restoring the optimistic retention hop
-needs the seam (05) *and* the on-error recovery refresh of a keyed query (06) — jnana can unskip
-HI-03 after the next rati release. DATA-04 stays last — it should extract the surface *after*
-DATA-08's answer lands, not before.
+DATA-05 and DATA-06 were coupled through jnana◊FND-106: restoring the optimistic retention hop needs
+the seam (05) *and* the on-error recovery refresh of a keyed query (06) — jnana can unskip HI-03
+after the next rati release. DATA-04 stays last — it should extract the surface *after* DATA-08's
+answer lands, not before.
 
 ## DATA-03 findings — the jnana migration (recorded 2026-07-20)
 
@@ -138,8 +138,8 @@ were out of scope; it dies with them.
 
 1. **`query` has no single-value write seam.** The members payload is a composite object, so it's a
    `query` — and `Query` exposes only readonly `data`, so `updateHistoryRetention` lost its
-   optimistic hop (a shipped behavior; the HI-03 store test is `describe.skip`-ed, jnana ◊FND-106).
-   → DATA-05.
+   optimistic hop (a shipped behavior; the HI-03 store test is `describe.skip`-ed, jnana◊FND-106). →
+   DATA-05.
 2. **`mutation.refreshes` can't see the call's arguments.** A dependent keyed by the call
    (`queryFor(spaceId)`) can't be declared, so all five member mutations `await …refresh()` by hand
    inside `perform`. Three consequences: the refresh rides the mutation's `isPending`, a refresh

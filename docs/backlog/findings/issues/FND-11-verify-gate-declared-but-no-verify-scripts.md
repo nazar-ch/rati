@@ -24,7 +24,7 @@ The pieces a gate would run all exist — `fmt`, `lint`, `lint:types`, `typechec
 script that presumably chains them. They are simply not named in the form the runner looks for.
 
 Measured 2026-08-01 on the `mac` guest, incidentally: a session touching only `.claude/kit.json`
-(jnana-kit:FND-108) tried to run this repo's declared gate before pushing and could not.
+(kit◊FND-108) tried to run this repo's declared gate before pushing and could not.
 
 ## Why it matters
 

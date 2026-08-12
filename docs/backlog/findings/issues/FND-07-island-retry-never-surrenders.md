@@ -2,7 +2,7 @@
 area: packages/rati/src/mandala — retryPolicy.ts + the boundary that calls accept/arm
 needs: nothing
 status: done
-disposition: fixed 2026-07-27 (boundary same-pass reset + commit-time budget spend); live re-verification in jnana tracked by jnana:FND-237
+disposition: fixed 2026-07-27 (boundary same-pass reset + commit-time budget spend); live re-verification in jnana tracked by jnana◊FND-237
 ---
 
 # FND-07 — a retryable island failure never reaches the error slot, and the backoff never waits
@@ -75,7 +75,7 @@ on every island) throws away the feature the error classification was adopted to
 its own half is correct in the running app (`okJson(500)` →
 `ApiError { code: 'failed', retryable: true }` → `toSourceError` →
 `{ code: 'failed', retryable: true }`) and recorded the defect rather than routing around it
-(`jnana:FND-237`). It is shipping the classification with this outstanding.
+(`jnana◊FND-237`). It is shipping the classification with this outstanding.
 
 ## Verify
 
@@ -106,5 +106,5 @@ ordering here ends at the error slot). Pinned in `retryPolicy.test.tsx` ("live-s
 pins fail on the pre-fix code.
 
 Remaining (needs Chrome, the macOS guest): verify in the live jnana app that the hang is gone and
-the manual-retry anomaly (1 attempt instead of a fresh budget) with it — `jnana:FND-237` is the
+the manual-retry anomaly (1 attempt instead of a fresh budget) with it — `jnana◊FND-237` is the
 downstream tracker.

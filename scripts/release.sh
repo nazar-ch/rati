@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # why-shell: none of the kit's six shell licenses fits this file, and it claims none — it is a
-# batch of CLI calls with an exit-code roll-up (jnana-kit:KC-53's wording for what is NOT
+# batch of CLI calls with an exit-code roll-up (kit◊KC-53's wording for what is NOT
 # `process-wrap`), which the family's rule calls a TypeScript program that happens to be written in
 # shell. It survives on the convert-on-change lane alone, so it converts the next time it changes
 # for a reason of its own rather than for a sweep.
@@ -152,15 +152,15 @@ fi
 # (The tag must be annotated: `git push --follow-tags` ignores lightweight ones.)
 # Braces, because they are what keeps the multibyte `…` that follows out of the variable
 # NAME. Unbraced, `$NEW_VERSION…` was looked up as a name nothing had set and `set -u`
-# killed a release one line before the commit (jnana-kit:KC-42).
+# killed a release one line before the commit (kit◊KC-42).
 #
 # What this comment used to claim — "bash 5 expands it fine, so no Linux run and no
 # lint pass can see this" — is wrong in its second half and unsettled in its first. A
 # linter is now exactly what sees it: `require-variable-braces` (SC2250) flags the whole
-# class and writes the repair itself, and jnana-kit:KC-52 turned it on. The
-# interpreter half is measured and the measurements disagree — jnana-kit:KC-52 read the
+# class and writes the repair itself, and kit◊KC-52 turned it on. The
+# interpreter half is measured and the measurements disagree — kit◊KC-52 read the
 # abort out of brew bash 5.3.15 on macOS under `LANG=en_US.UTF-8`, and re-measuring it for
-# jnana-kit:KC-54 on Linux bash 5.2.21 expanded it correctly in every locale that guest
+# kit◊KC-54 on Linux bash 5.2.21 expanded it correctly in every locale that guest
 # has. So neither the version nor the platform is the invariant here. The braces are.
 info "Committing and tagging v${NEW_VERSION}…"
 git -C "${REPO_ROOT}" commit -q -m "release: ${PACKAGE} v${NEW_VERSION}" -- "${PKG_DIR}/package.json"

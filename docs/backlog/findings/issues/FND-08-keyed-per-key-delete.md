@@ -2,7 +2,7 @@
 area: packages/rati/src/data/keyed.ts
 needs: a maintainer call — grow `delete`, or document the boundary
 status: done
-disposition: option 1 taken 2026-07-27 — delete(key): boolean under reset()'s contract; jnana:FND-236's second map can adopt on the next release
+disposition: option 1 taken 2026-07-27 — delete(key): boolean under reset()'s contract; jnana◊FND-236's second map can adopt on the next release
 ---
 
 # FND-08 — `keyed` has no per-key delete, so a bounded-but-shrinking map can't use it
@@ -13,7 +13,7 @@ disposition: option 1 taken 2026-07-27 — delete(key): boolean under reset()'s 
 sign-out case), so a caller that wants to drop **one** key has nowhere to go — and that is what
 stops an otherwise-perfect `keyed` candidate from adopting it.
 
-Found during jnana's DATA-14 adoption (`jnana:FND-236`), which swapped one hand-rolled
+Found during jnana's DATA-14 adoption (`jnana◊FND-236`), which swapped one hand-rolled
 `Map<key, Query>` onto `keyed` successfully and had to keep a second.
 
 ## The receipt

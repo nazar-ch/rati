@@ -8,15 +8,15 @@ import { defineConfig } from 'vite-plus';
 // against the `.ts` it was compiled from, and linting the emit would redden the gate on generated
 // code nobody edits.
 //
-// NO `*.config.*` entry, deliberately (jnana-kit:FND-122). The six files that pattern matched here
+// NO `*.config.*` entry, deliberately (kit◊FND-122). The six files that pattern matched here
 // — this file, `vitest.config.ts` beside it, `packages/rati/{vite,vitest}.config.ts` and the two
 // examples' — are all this repo's OWN source, and ignoring them left them unchecked by BOTH halves
 // of the gate at once. Both halves reach them now: lint from here, and tsc through the root
-// `tsconfig.node.json`, the config program jnana-kit:KC-13 added.
+// `tsconfig.node.json`, the config program kit◊KC-13 added.
 //
 // A named constant because it has TWO readers — the lint config below and the pre-commit lint task's
 // filter, which drops what oxlint would ignore. Those were two hand-maintained lists until
-// jnana-kit:FND-72, and one array is what keeps them from drifting apart again.
+// kit◊FND-72, and one array is what keeps them from drifting apart again.
 const lintIgnorePatterns = ['**/dist/**'];
 
 // Toolchain config for the rati monorepo (lint = oxlint, fmt = oxfmt), on the family's canonical
@@ -106,7 +106,7 @@ export default defineConfig({
         // a `/`, so `react*` reaches `react-dom` while `react*/**` is what reaches `react-dom/client`.
         // This block was spelled in prettier-plugin-sort-imports's anchored-regex keys under the old
         // `importOrder` name (`^react`), which oxfmt read as globs matching nothing — inert config
-        // that looked configured (jnana-kit:FND-170 §A2). The kit renamed the field so a stale
+        // that looked configured (kit◊FND-170 §A2). The kit renamed the field so a stale
         // declaration becomes a type error at the pin bump instead of staying silent, and the
         // patterns below are the re-spelling that follows; the import diff `vp fmt` produced is in
         // the same commit, and it is the first sorting this repo has ever actually had.
@@ -140,14 +140,14 @@ export default defineConfig({
     // The pre-commit task set (run by `vp staged` from `.vite-hooks/pre-commit`), canonical for the
     // family. Its two false-green invariants live with the code they constrain, in the package's
     // `vite/staged.ts`: the emitted key order that the kit's `tools/pre-commit-gate.sh` makes
-    // meaningful with `--concurrent 1` (jnana-kit:FND-165), and the quoting a function task needs
-    // because lint-staged re-parses its returned string whole (jnana-kit:FND-91). The package's
+    // meaningful with `--concurrent 1` (kit◊FND-165), and the quoting a function task needs
+    // because lint-staged re-parses its returned string whole (kit◊FND-91). The package's
     // `staged.test.ts` pins both against the factory's output, so this repo inherits the same pins
     // instead of re-deriving them here.
     staged: staged({
         // The directory this config sits in IS the repo root, and the lint filter relativizes against
         // it — lint-staged hands tasks absolute paths, so a root-anchored ignore entry tested against
-        // one can never match (jnana-kit:FND-72). `import.meta.dirname` rather than `process.cwd()`:
+        // one can never match (kit◊FND-72). `import.meta.dirname` rather than `process.cwd()`:
         // measured to survive the vite-plus config loader, and correct wherever a future caller's cwd
         // happens to be.
         root: import.meta.dirname,
@@ -155,7 +155,7 @@ export default defineConfig({
         // `$JNANA_KIT_HOME` rather than by a repo-relative path.
         kitScripts: 'kit-home',
         // The same array the lint config above is built from, not a second copy of it:
-        // jnana-kit:FND-72's defect was the copy, and passing the list is what makes the filter track
+        // kit◊FND-72's defect was the copy, and passing the list is what makes the filter track
         // it.
         lintIgnorePatterns,
     }),

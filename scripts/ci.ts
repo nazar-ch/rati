@@ -7,7 +7,7 @@
 //   FUZZ_RUNS=2000 node scripts/ci.ts fuzz    # deepen the randomized stage
 //   FUZZ_SEED=7 node scripts/ci.ts fuzz       # pin the seed (reproduce a failure)
 //
-// THIS IS NOT THE PRE-PUSH GATE, and until jnana-kit:KC-13 it was. `.claude/kit.json`'s `verify`
+// THIS IS NOT THE PRE-PUSH GATE, and until kit◊KC-13 it was. `.claude/kit.json`'s `verify`
 // now names the kit's standard battery, which runs fmt, lint, typecheck, the Markdown and doc-link
 // gates, the control-byte scan, the `@jnana-app/kit` conformance checks and the full Vitest suite —
 // every stage this file used to carry except the two below. The `GATE_STAGES` list that used to sit

@@ -1,7 +1,7 @@
 import { defineKitConfig } from '@jnana-app/kit/vitest';
 
 // The repo-root aggregator, and the reason the standard battery's `test` step means anything here
-// (jnana-kit:KC-13). That step is a plain `vp test --run` from the repo root, and without this file
+// (kit◊KC-13). That step is a plain `vp test --run` from the repo root, and without this file
 // vitest resolved no project config at all: it collected packages/rati's suites off its own default
 // glob and ran them with vitest's defaults — no jsdom environment, no setup file — which is 340 of
 // 687 tests failing on `document is not defined`. A red that loud is survivable; the same shape with

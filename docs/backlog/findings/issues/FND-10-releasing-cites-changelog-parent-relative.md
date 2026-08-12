@@ -23,7 +23,7 @@ citing file's own move and keeps `rg CHANGELOG.md` able to find every inbound re
 Second, structural half: rati's `verify` is `yarn ci fmt lint typecheck test` — **no doc-links
 gate** — so nothing in this repo would flag the next violation either. The kit's checker
 (`jnana-kit:///tools/check-doc-links.ts`) is what caught this one, from another repo's session, by
-accident of jnana-kit:FND-63's measurement.
+accident of kit◊FND-63's measurement.
 
 ## Scope
 
