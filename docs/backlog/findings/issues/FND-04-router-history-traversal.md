@@ -2,7 +2,7 @@
 area: packages/rati/src/router — router.ts (interface), store.ts
 needs: nothing
 status: done
-disposition: fixed 2026-07-27 — back/forward/go forwarded onto Router/RouterStore as thin pass-throughs (history stays unexposed); nazar.ch:FND-03 reverts to the router method on the next release
+disposition: fixed 2026-07-27 — back/forward/go forwarded onto Router/RouterStore as thin pass-throughs (history stays unexposed); nazar.ch◊FND-03 reverts to the router method on the next release
 ---
 
 # FND-04 — the Router surface lost history traversal (back/forward/go) with no replacement
@@ -20,7 +20,7 @@ entry with a public `history: History` field, so `router.history.back()` was san
 Found by the 0.6.3 consumer migrations (2026-07-27): nazar.ch's photo viewer closed itself with
 `router.history.back()` and the typecheck refused it —
 `Property 'history' does not exist on type 'Router'`. It now calls `window.history.back()` and
-tracks the revert as `nazar.ch:FND-03`.
+tracks the revert as `nazar.ch◊FND-03`.
 
 ## Why it matters
 

@@ -740,7 +740,7 @@ pass over `*.test-d.ts` uses tsc through `test.typecheck.checker`. That emit is 
 import in `src` ends in `.js` (a directory as `<dir>/index.js`): the declaration files copy the
 specifier verbatim, and an extensionless one is unresolvable to a consumer on
 `moduleResolution: nodenext` — `skipLibCheck` then degrades the whole imported surface to `any`
-instead of reporting it (jnana-kit:KC-42). `bundler` resolution here, and Vite's own resolver, both
+instead of reporting it (kit◊KC-42). `bundler` resolution here, and Vite's own resolver, both
 substitute the `.ts`/`.tsx` source for the `.js` specifier, so the source side is unaffected. The
 whole repo is decorator-free (the legacy `data/` layer that needed
 `@babel/plugin-proposal-decorators` is gone; `rati/data` uses plain observable objects from

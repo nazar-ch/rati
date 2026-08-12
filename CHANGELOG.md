@@ -20,8 +20,8 @@ Nothing yet.
 
 Fixed:
 
-- **Published `.d.ts` re-exports resolve under `moduleResolution: nodenext`** (jnana-kit:KC-42).
-  Every relative specifier in the emitted declarations was extensionless
+- **Published `.d.ts` re-exports resolve under `moduleResolution: nodenext`** (kit◊KC-42). Every
+  relative specifier in the emitted declarations was extensionless
   (`export … from './requestHandler'`), which `nodenext` cannot resolve. `skipLibCheck` hid the
   failure rather than reporting it, so a consumer on that resolution type-checked the whole
   `rati/server` surface against `any` — no errors, no completions, no protection. The declarations

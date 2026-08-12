@@ -10,7 +10,7 @@ const bundleWhitelist: string[] = [];
 export default defineConfig({
     // `?? []` for the same reason the examples carry it: `lazyPlugins` returns `undefined` for
     // non-Vite commands, and the root config program type-checks this file under
-    // `exactOptionalPropertyTypes` (jnana-kit:FND-170 §C5).
+    // `exactOptionalPropertyTypes` (kit◊FND-170 §C5).
     plugins: lazyPlugins(() => [react(), debugBundleContent && analyzer()]) ?? [],
     build: {
         emptyOutDir: true,

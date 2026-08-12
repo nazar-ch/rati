@@ -10,7 +10,7 @@ export default defineConfig({
     // `lazyPlugins` returns `undefined` for non-Vite commands (it skips instantiating the plugins
     // then); `?? []` keeps the type a plain `PluginOption[]` for the root config program's
     // `exactOptionalPropertyTypes`. The ssr example beside this one has carried the same spelling
-    // all along; this file only needed it once a program started reading it (jnana-kit:FND-170 §C5).
+    // all along; this file only needed it once a program started reading it (kit◊FND-170 §C5).
     plugins: lazyPlugins(() => [react()]) ?? [],
     resolve: {
         conditions,

@@ -6,7 +6,7 @@
 //
 // The `$schema` pointer below names the copy the `@jnana-app/kit` INSTALL brings, not a path into
 // somebody's kit checkout — the pin in .yarnrc.yml then decides which schema version this file is
-// edited against, the same way it decides which gate runs (jnana-kit:ASK-04, ruled 2026-08-08).
+// edited against, the same way it decides which gate runs (kit◊ASK-04, ruled 2026-08-08).
 // Nothing in this repo reads the pointer and no gate touches it: it buys an editor hint.
 {
     "$schema": "../node_modules/@jnana-app/kit/kit.schema.json",
@@ -15,7 +15,7 @@
     "project": "rati",
 
     // The one pre-push gate, and it is now the kit's STANDARD BATTERY rather than a list this repo
-    // maintains (jnana-kit:KC-13). What runs is `node_modules/.bin/kit-verify` out of the
+    // maintains (kit◊KC-13). What runs is `node_modules/.bin/kit-verify` out of the
     // `@jnana-app/kit` pin above — every step the battery declares, at the version .yarnrc.yml
     // names, with no `verify:*` script here and nothing for a reader to keep in step by hand. The
     // list this field used to carry, and its twin `GATE_STAGES` in `scripts/ci.ts`, are both gone:
@@ -23,9 +23,9 @@
     // battery is what removes the second one.
     //
     // The BARE bin, with no `$JNANA_KIT_HOME` in it: the packaged entry writes the run stamp itself
-    // (jnana-kit:KC-30), so the gate needs no kit-side wrapper to carry the stamp for it. That stamp
+    // (kit◊KC-30), so the gate needs no kit-side wrapper to carry the stamp for it. That stamp
     // is what a session hook reads for the "pushed without running the gate" reminder, cut against a
-    // rati session (jnana-kit:FND-03). The hook keeps its own kit-level READER, which must load when
+    // rati session (kit◊FND-03). The hook keeps its own kit-level READER, which must load when
     // `node_modules` is broken; a writer running behind this bin has an install by definition.
     //
     // What is NOT in the battery stays in `scripts/ci.ts` and is run by hand before a release: the
@@ -37,7 +37,7 @@
     "bootstrap": "yarn install",
     // Existence only, for preflight's report — never a gate on the bootstrap above, which now runs
     // unconditionally. A freshness pair here (yarn.lock vs the install stamp) could not be cleared
-    // by the very `yarn install` it prescribed (jnana-kit:FND-108).
+    // by the very `yarn install` it prescribed (kit◊FND-108).
     "bootstrapStale": {
         "missing": ["node_modules"],
     },
@@ -88,8 +88,8 @@
     },
 
     // Repos whose work-item ids may be cited here in the qualified `<repo>:<ID>` form. Both are
-    // already cited: rati's findings track their downstream in jnana (`jnana:FND-237`), and this
-    // repo's configs name the kit records their shape comes from (`jnana-kit:FND-170`). Undeclared,
+    // already cited: rati's findings track their downstream in jnana (`jnana◊FND-237`), and this
+    // repo's configs name the kit records their shape comes from (`kit◊FND-170`). Undeclared,
     // a qualified id reads as a typo'd local one and `issues.ts check` errors on it.
     "citableRepos": ["jnana", "jnana-kit"],
 

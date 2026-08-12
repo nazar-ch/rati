@@ -101,7 +101,7 @@ contract is unchanged, per Boundaries). That retraction is what jnana's FND-130 
    — constructor params are assigned after field initializers). Synchronous prefix: the same
    `JobsListStore` comment, plus `docs/current/data-fetching.md`.
 
-Deliberately not documented here: the per-call `isPending` gap (jnana ◊FND-127, held back by the
+Deliberately not documented here: the per-call `isPending` gap (jnana◊FND-127, held back by the
 2026-07-25 maintainer call), the missing settled-success signal and the `form.error`/`form.reset()`
 coupling (DATA-19 and the "what the primitives don't own" list in
 `jnana:///docs/current/data-fetching.md`) — those are gaps to close, not seams to teach. The stale

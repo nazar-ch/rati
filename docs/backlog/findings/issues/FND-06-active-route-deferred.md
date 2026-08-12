@@ -2,7 +2,7 @@
 area: packages/rati/src/router/router.ts — ActiveRoute; check NameToRoute/RouteContextValueOf for the same
 needs: nothing
 status: done
-disposition: fixed 2026-07-27 — ActiveRoute resolves via indexed access (single conditional); siblings audited clean and pinned; jnana:FND-235 deletes its seam on the next release
+disposition: fixed 2026-07-27 — ActiveRoute resolves via indexed access (single conditional); siblings audited clean and pinned; jnana◊FND-235 deletes its seam on the next release
 ---
 
 # FND-06 — `ActiveRoute` stays deferred, so `activeRoute.name === 'x'` narrows nothing
@@ -98,7 +98,7 @@ worse and silent.
 - `yarn ci` green, with the new `test-d` cases failing before the fix and passing after.
 - Downstream: jnana deletes `frontend/src/common/activeRoute.ts` — a seam that exists only for this,
   re-deriving the union off `RatiUserTypes['routes']` behind one cast — and inlines
-  `router.activeRoute` at its three call sites (`jnana:FND-235`).
+  `router.activeRoute` at its three call sites (`jnana◊FND-235`).
 
 ## Resolution (2026-07-27)
 
@@ -119,5 +119,5 @@ one). The name-guard probe fails on the pre-fix code; the `test-d` lives under `
 which the vitest typecheck gate compiles via `tsconfig.test.json` — the package-tsconfig exclusion
 that made the first probe inert does not apply there.
 
-Remaining: jnana:FND-235 (delete `frontend/src/common/activeRoute.ts`, inline `router.activeRoute`
+Remaining: jnana◊FND-235 (delete `frontend/src/common/activeRoute.ts`, inline `router.activeRoute`
 at its three call sites) rides the next rati release.

@@ -1,6 +1,6 @@
 ---
 area: packages/rati/src/data — mutation.ts (+ reference.md)
-needs: nothing; pairs with DATA-05 for jnana ◊FND-106's recovery path
+needs: nothing; pairs with DATA-05 for jnana◊FND-106's recovery path
 status: done
 disposition: cut 2026-07-20 from the DATA-03 findings (gap 2)
 ---
