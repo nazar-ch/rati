@@ -87,7 +87,7 @@
         ],
     },
 
-    // Repos whose work-item ids may be cited here in the qualified `<repo>:<ID>` form. Both are
+    // Repos whose work-item ids may be cited here in the qualified `<alias>◊<ID>` form. Both are
     // already cited: rati's findings track their downstream in jnana (`jnana◊FND-237`), and this
     // repo's configs name the kit records their shape comes from (`kit◊FND-170`). Undeclared,
     // a qualified id reads as a typo'd local one and `issues.ts check` errors on it.
