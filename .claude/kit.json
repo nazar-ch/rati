@@ -93,6 +93,17 @@
     // a qualified id reads as a typo'd local one and `issues.ts check` errors on it.
     "citableRepos": ["jnana", "jnana-kit"],
 
+    // This corpus is SWEPT: every reference outside docs/archive/ carries the standing
+    // `<alias>◊<ID>` form, so the id gate reads the whole tree instead of a diff's added lines
+    // (kit◊KF-02, 52 sites — 37 the sweep rewrote, 15 qualified by hand where a bare sigil wore
+    // another repo's id, a backtick hid a citation, or a `#` opened the line). A legacy bare
+    // `◊KC-71` or colon `jnana:FND-237` anywhere in the tree is an error naming the standing form.
+    //
+    // The four bare sigils in `.vite-hooks/pre-commit` are the one exception, and the gate never
+    // reads them: that file is byte-identical in five repos at once, so its ids resolve against
+    // whichever tracker reads the line, and its own header states why each one is backtick-quoted.
+    "referenceScope": "corpus",
+
     // rati files no LOCAL env-feedback — friction goes to the central jnana-kit-feedback repo.
     // Everything else in scanRoots takes jnana's default layout (docs/planned/<effort>/issues/,
     // which rati already uses).
