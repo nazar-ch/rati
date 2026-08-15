@@ -1,5 +1,5 @@
 ---
-area: packages/rati/src/mandala/resolver.tsx, src/scope/scope.ts (load types), docs
+area: packages/rati/src/mandala/resolver.tsx, packages/rati/src/scope/scope.ts (load types), docs
 needs: —
 status: done
 disposition: cut 2026-07-19 from scope-and-island-directions.md §1

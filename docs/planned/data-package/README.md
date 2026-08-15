@@ -198,7 +198,7 @@ they aren't re-derived:
 
 As in the sibling records: atomic commits on the current branch, subjects prefixed `DATA-NN:`, the
 record's `status: open` → `done` in the finishing commit, `vp run rati#typecheck` + `vp lint` +
-`vp run rati#test` green, reference.md/internals.md in sync. Findings out of an item's scope get a
+`vp run rati#test` green, `reference.md/internals.md` in sync. Findings out of an item's scope get a
 dated note appended here.
 
 ## Open questions (recorded, no items)

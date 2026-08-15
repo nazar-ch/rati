@@ -1,5 +1,5 @@
 ---
-area: packages/rati/src/mandala/{resolver.tsx,mandala.tsx,controls.ts,channel.ts}, src/island/island.ts, src/router/route.tsx, docs
+area: packages/rati/src/mandala/{resolver.tsx,mandala.tsx,controls.ts,channel.ts}, packages/rati/src/island/island.ts, packages/rati/src/router/route.tsx, docs
 needs: B1 merged (shares resolver files with SI-01/SI-04)
 status: done
 disposition: cut 2026-07-19 from scope-and-island-directions.md §2; Option A decided at cut (engine-owned kept props, not React transitions); status folds into `useScopeControls` (no new hook) — README §Decisions

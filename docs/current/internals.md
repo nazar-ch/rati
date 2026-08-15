@@ -196,12 +196,12 @@ Everything else follows from that:
 
 ### The delay window (`loadingDelayMs`)
 
-`LoadingDelay` (mandala/loadingDelay.ts) is one uSES store per island instance, read by
-`LoadingSlot` (render nothing) and by the mandala (keep the previous run on screen). It engages the
-kept-run machinery above — `keepsRun` is `keepStale || loadingDelayMs > 0` — and the only difference
-between the two options is when the kept run stops being shown: never, until the successor commits
-(`keepStale`), or at the deadline, after which a mandala effect runs the same `releaseKept` the swap
-does.
+`LoadingDelay` (packages/rati/src/mandala/loadingDelay.ts) is one uSES store per island instance,
+read by `LoadingSlot` (render nothing) and by the mandala (keep the previous run on screen). It
+engages the kept-run machinery above — `keepsRun` is `keepStale || loadingDelayMs > 0` — and the
+only difference between the two options is when the kept run stops being shown: never, until the
+successor commits (`keepStale`), or at the deadline, after which a mandala effect runs the same
+`releaseKept` the swap does.
 
 - **The window is a stretch without content, not a resolution.** `begin` (render, where the
   generation is built) opens one; `settled` (the leaf's commit) closes it and re-arms the next;
@@ -218,10 +218,11 @@ does.
 
 ### The retry policy (`retry`)
 
-`RetryPolicy` (mandala/retryPolicy.ts) is one budget per island instance, driving the retry counter
-`bumpRetry` already owned. The boundary asks it before it does anything with a caught error: an
-accepted failure returns the mandala's built `slot` (loading, or the kept run under `keepStale`) in
-place of the error slot, and a timer re-resolves from scratch once the backoff elapses.
+`RetryPolicy` (packages/rati/src/mandala/retryPolicy.ts) is one budget per island instance, driving
+the retry counter `bumpRetry` already owned. The boundary asks it before it does anything with a
+caught error: an accepted failure returns the mandala's built `slot` (loading, or the kept run under
+`keepStale`) in place of the error slot, and a timer re-resolves from scratch once the backoff
+elapses.
 
 - **On by default, with a reach.** `resolveRetry(config.retry)` turns the island's option into
   settings or `null`: absent ⇒ the default policy (`count: 2`, `backoffMs: 500`, reach
@@ -417,8 +418,8 @@ keyed `mandalaId (useId) → scopeKey → value`, in three wire sections:
   not stack a second handler on the same cell, while a later render reusing the same promise
   instance is a new report, not a duplicate (a module-global guard silently emptied the second
   render's `errors`); the collector's `errors` carries `{ mandalaId, key, error: SourceError }` —
-  the server's status input (`not-available` → 404). `asSourceError` (scope/source.ts) is the shared
-  normalization with the boundary.
+  the server's status input (`not-available` → 404). `asSourceError`
+  (packages/rati/src/scope/source.ts) is the shared normalization with the boundary.
 - **Error dehydration** (`mandala/ssrErrors.ts`): `ssrErrors: 'dehydrate'` is the other half of the
   bullet above — the island that wants its *error slot* in the HTML. The catch has to happen in the
   resolver because React runs no error boundary server-side, and it cannot be a `try` around `use()`

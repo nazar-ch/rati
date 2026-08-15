@@ -1,5 +1,5 @@
 ---
-area: packages/rati/src/mandala/resolver.tsx, src/testing/ssr.tsx
+area: packages/rati/src/mandala/resolver.tsx, packages/rati/src/testing/ssr.tsx
 needs: nothing (independent; found by the 2026-07-19 pre-DX-05 review)
 status: done
 disposition: cut 2026-07-19 from the review's engine finding
