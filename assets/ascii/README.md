@@ -1,8 +1,6 @@
 # ASCII art — drafts to try
 
-Raw material for the website, README, dev banner, CLI output, 404 pages, code comments — wherever a
-plain-text mark fits. All are drafts: keep what works, redraw or delete the rest. Pure ASCII unless
-noted; view in a monospace font.
+Raw material for the website, README, dev banner, CLI output, 404 pages, code comments — wherever a plain-text mark fits. All are drafts: keep what works, redraw or delete the rest. Pure ASCII unless noted; view in a monospace font.
 
 ## Marks & identity
 
