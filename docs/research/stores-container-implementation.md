@@ -43,7 +43,7 @@ export interface AppRouter {                    // NAME TBD — see naming.md §
 }
 ```
 
-- Match the surface against the **current public `RouterStore` methods** so `RouterStore<T> implements AppRouter` type-checks with no changes to method bodies (audit: `navigate`, `replace`, `getPath`, `setSearchParams`, `subscribe`/`getSnapshot`, `path`/`search`/`hash`/ `searchParams`/`state`, `isPath`, `preloadRoute`, `activeRoute`, `routes`, `dispose`, `pendingNavigation`). Decide which belong on the narrow interface vs stay `RouterStore`-only (SSR-only bits like `pendingNavigation` can stay off `AppRouter`).
+- Match the surface against the **current public `RouterStore` methods** so `RouterStore<T> implements AppRouter` type-checks with no changes to method bodies (audit: `navigate`, `replace`, `getPath`, `setSearchParams`, `subscribe`/`getSnapshot`, `path`/`search`/`hash`/`searchParams`/`state`, `isPath`, `preloadRoute`, `activeRoute`, `routes`, `dispose`, `pendingNavigation`). Decide which belong on the narrow interface vs stay `RouterStore`-only (SSR-only bits like `pendingNavigation` can stay off `AppRouter`).
 - `ActiveRouteOf<UserRoutes>` should be a **name-discriminated union** so a store *can* narrow by `activeRoute.name` (today `routeParams` is read defensively `?.routeParams['space']`, so nothing regresses, but the union is the right shape).
 - `NavigateOptions` = the existing `{ keepCurrentRoute?; state? }`.
 

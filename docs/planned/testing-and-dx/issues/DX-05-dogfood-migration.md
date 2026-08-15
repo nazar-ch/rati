@@ -13,7 +13,7 @@ The utilities exist (B2) but the duplicates still stand: ~6 `deferred` copies, ~
 
 ## Scope
 
-1. **The sweep**, suite by suite: replace local `deferred`/`testSource`/`makeSource`/ `loaderSource`/`renderWithRouter`/`renderApp`/`renderLinkAt`/`flush`/drain-loops with the `rati/testing` equivalents; delete the local definitions. The survey's file list is the starting inventory; re-grep at execution (`deferred<`, `testSource`, `makeSource`, `createMemoryHistory` in tests, `prerender(` in tests) — the tree has moved since the cut.
+1. **The sweep**, suite by suite: replace local `deferred`/`testSource`/`makeSource`/`loaderSource`/`renderWithRouter`/`renderApp`/`renderLinkAt`/`flush`/drain-loops with the `rati/testing` equivalents; delete the local definitions. The survey's file list is the starting inventory; re-grep at execution (`deferred<`, `testSource`, `makeSource`, `createMemoryHistory` in tests, `prerender(` in tests) — the tree has moved since the cut.
 2. **Hard rule: no lost pins.** Assertion counts and what each test observes stay equivalent — a migration that weakens an assertion or drops a kill-tested pin is a defect, not a simplification. Where a local helper does something the public one deliberately doesn't (fuzz-specific ledgers, model wiring), it stays local — file the judgment call as a README note rather than forcing the fit.
 3. **API friction found here fixes the entry in the same item** (small, decision-free) or files a finding (anything with a design smell) — the same fix-or-file line the review efforts use.
 4. **The fuzz harnesses** import the shared cores where DX-01/02/03 left seams for it; their fuzz-facing behavior must not move (seeds, budgets, assertions unchanged).

@@ -19,7 +19,7 @@ Two ways the SSR kit's error channel can go quiet without saying so:
 ## Scope
 
 1. Key the rejection record per collector (e.g. a `WeakMap<collector, WeakSet<promise>>`, with the current global WeakSet retained for the no-collector/client path), so each `ssrRender`'s collector sees every rejection once. The existing behavior *within* one render (no handler stacking across re-renders) is a pin — keep it tested.
-2. A `settleTimeout` (name at implementer's discretion; plain English) option on `prerenderToString`/`ssrRender` that fails the drain with a message naming the still- pending suspense (or at least the elapsed budget and the likely cause — an undriven marked source / a hung load). Off by default if a good default is contentious; the value is the *message*, not the enforcement.
+2. A `settleTimeout` (name at implementer's discretion; plain English) option on `prerenderToString`/`ssrRender` that fails the drain with a message naming the still-pending suspense (or at least the elapsed budget and the likely cause — an undriven marked source / a hung load). Off by default if a good default is contentious; the value is the *message*, not the enforcement.
 3. A regression test for each: two sequential `ssrRender`s sharing one rejected promise instance both report it in `errors`; a deliberately hung marked source fails with the named message instead of the runner timeout.
 
 ## Boundaries
