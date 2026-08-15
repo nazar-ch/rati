@@ -30,7 +30,7 @@ Independent; any order; best after the scope-and-island effort lands (so session
 - IMP-01 — gap analysis against the field (issues/IMP-01-field-gap-analysis.md)
 - IMP-02 — what the scope model uniquely enables (issues/IMP-02-model-native-capabilities.md)
 - IMP-03 — adoption & interop friction (issues/IMP-03-adoption-and-interop.md)
-- issues/IMP-04-fresh-eyes-ergonomics.md
+- IMP-04 — fresh-eyes ergonomics (issues/IMP-04-fresh-eyes-ergonomics.md)
 
 ## Plan
 
