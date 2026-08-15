@@ -187,7 +187,7 @@ Because the assets module names the entry, `index.html` is **not** a build input
 
 A `lazy()` route lives in its own chunk, which the browser can only discover after the entry runs and React resolves the component — one round trip after the HTML it could have started during. The plugin closes that: it records which module each `lazy()` call imports (a transform on the call site — you never write it), resolves it through the manifest, and the matched route's chunk is named in the page's `<head>`. Nothing about `lazy()` changes; without the plugin there is simply no id and no preload.
 
-Two behaviours worth knowing:
+Two behaviors worth knowing:
 
 - **Whole-document apps need no template.** If `render` returns a full `<html>` document, the plugin splices the head tags and payload into it (before `</head>` / `</body>`) instead of filling a template — no configuration, it just looks at what you rendered.
 - **It won't drop anything quietly.** A part with nowhere to go is an error, not a best-effort page: a template missing `<!--app-state-->` would serve, hydrate from scratch, and look fine while SSR stopped paying for itself.
@@ -235,7 +235,7 @@ All it needs is `assets` — a client entry it can name. Without them the answer
 
 **What the whole-document one rests on**, since it is worth knowing: `createRoot(document)`. React's docs describe the container as "a DOM element" and mention `document` only under `hydrateRoot` — but the types, the runtime and browsers all take it, and a client render into a document clears it *sparingly*, keeping scripts and stylesheets. That is what lets the synthesized shell hold the very entry that mounts it.
 
-rati pins the behaviour in its own suite, so a React release that narrowed the container fails there rather than in your 500 path; if that ever happens, the fallback becomes `hydrateRoot(document)` against the same shell — the same page via React's mismatch recovery, at the cost of a console error.
+rati pins the behavior in its own suite, so a React release that narrowed the container fails there rather than in your 500 path; if that ever happens, the fallback becomes `hydrateRoot(document)` against the same shell — the same page via React's mismatch recovery, at the cost of a console error.
 
 ### The Node adapter
 

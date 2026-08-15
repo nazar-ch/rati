@@ -21,8 +21,8 @@ Any order, any parallelism — the lenses are read-heavy and independent; overla
 - REV-02 — failure modes & messages (issues/REV-02-failure-modes-and-messages.md)
 - REV-03 — packaging & production build (issues/REV-03-packaging-and-production-build.md)
 - REV-04 — lifecycle, teardown & leaks (issues/REV-04-lifecycle-and-leaks.md)
-- issues/REV-05-security.md
-- issues/REV-06-performance.md
+- REV-05 — security (issues/REV-05-security.md)
+- REV-06 — performance (issues/REV-06-performance.md)
 - REV-07 — React compatibility & rendering modes (issues/REV-07-react-compatibility.md)
 
 ## Plan

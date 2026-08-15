@@ -8,7 +8,7 @@ Items live in docs/planned/testing-and-dx/issues; each record's `status:` field 
 
 - **Items:** DX-01.
 - **Entry:** none.
-- **Exit / checkpoint:** the `rati/testing` entry exists with `deferred`/`flush`/ `controllableSource`, documented; **the maintainer reviews the API style** (names, options shapes, what `controllableSource` exposes, docs placement) — every later item copies this style.
+- **Exit / checkpoint:** the `rati/testing` entry exists with `deferred`/`flush`/`controllableSource`, documented; **the maintainer reviews the API style** (names, options shapes, what `controllableSource` exposes, docs placement) — every later item copies this style.
 
 ### B2 — the three harnesses (execution; parallel lanes, one fence)
 
