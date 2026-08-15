@@ -1,5 +1,5 @@
 ---
-area: packages/rati/src/debug/index.ts, src/util/navTrace.ts (pattern), src/mandala/{resolver.tsx,mandala.tsx}, docs
+area: packages/rati/src/debug/index.ts, packages/rati/src/util/navTrace.ts (pattern), src/mandala/{resolver.tsx,mandala.tsx}, docs
 needs: — (independent; any time)
 status: done
 disposition: cut 2026-07-19 from dx-and-tooling.md §Resolution tracing + §DevTools naming

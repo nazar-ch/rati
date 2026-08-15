@@ -28,8 +28,9 @@ included). For most UI waterfalls that doesn't matter — which is why the chain
 graph is interesting for (a) wide fan-out where one slow branch shouldn't gate the rest, and (b) as
 the conceptual model the chain is a special case of.
 
-This doc assumes the source model (docs/current/internals.md §Sources (scope/source.ts)): every node
-is a `Source<T>` — a live `pending | ready | error` machine — and the island aggregates.
+This doc assumes the source model (docs/current/internals.md §Sources
+(packages/rati/src/scope/source.ts)): every node is a `Source<T>` — a live `pending | ready | error`
+machine — and the island aggregates.
 
 ## Two construction styles
 

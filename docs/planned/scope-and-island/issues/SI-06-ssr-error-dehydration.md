@@ -1,5 +1,5 @@
 ---
-area: packages/rati/src/mandala/{hydration.tsx,resolver.tsx,boundary.tsx}, src/ssr (payload/renderApp as needed), src/island/island.ts, src/router/route.tsx, examples/ssr, docs
+area: packages/rati/src/mandala/{hydration.tsx,resolver.tsx,boundary.tsx}, src/ssr (payload/renderApp as needed), packages/rati/src/island/island.ts, packages/rati/src/router/route.tsx, examples/ssr, docs
 needs: SI-05 (serial lane — shared boundary.tsx; a dehydrated error must respect the retry policy switch)
 status: done
 disposition: cut 2026-07-19 from scope-and-island-directions.md §2 (marked wait-for-need; cut anyway — README §Decisions). The shipped baseline it extends is recorded there: rejected loads → collector `errors` → status mapping; HTML degrades to the loading slot with React's client-retry marker; the client re-runs the load on hydration (pinned by `islandSsrErrors.test.tsx`).

@@ -1,5 +1,5 @@
 ---
-area: packages/rati/src/island/island.ts, src/router/route.tsx (RouteOptions), src/mandala/mandala.tsx + resolver.tsx, docs
+area: packages/rati/src/island/island.ts, packages/rati/src/router/route.tsx (RouteOptions), packages/rati/src/mandala/mandala.tsx + resolver.tsx, docs
 needs: SI-03 (the kept-committed-bucket mechanism; the re-resolve half of the delay shows previous content, which is that mechanism)
 status: done
 disposition: cut 2026-07-19 from scope-and-island-directions.md §2

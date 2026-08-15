@@ -1,5 +1,5 @@
 ---
-area: docs/public/guide.md (+ website nav if the guide grows a page)
+area: docs/current/public/guide.md (+ website nav if the guide grows a page)
 needs: — (independent)
 status: done
 disposition: cut 2026-07-18 at the implementation session
@@ -24,7 +24,7 @@ of thing the guide exists for, and it currently lives only in a research doc con
    and the island/instance division of labor.
 2. Mark the experimental status the same way reference.md does.
 3. If the website's nav is generated from the docs, check the new content renders
-   (docs/website-plan.md owns that surface).
+   (docs/planned/website/website-plan.md owns that surface).
 
 ## Boundaries
 

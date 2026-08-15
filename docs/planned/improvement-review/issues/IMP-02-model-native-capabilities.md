@@ -47,8 +47,8 @@ peer can do this", which is the interesting kind — cost, trigger). Rank top-3.
 - No code; proposals must respect the naming rules (plain English, no coined terms) and the
   "internal engine stays internal" line — a proposal that requires publicizing `mandala` internals
   must instead design the minimal public seam.
-- `src/data/` excluded; undecided/dependency-graphs.md and deferred-scope-features.md are engaged
-  (extended/argued-with), not duplicated.
+- `src/data/` excluded; docs/research/undecided/dependency-graphs.md and deferred-scope-features.md
+  are engaged (extended/argued-with), not duplicated.
 - Feasibility sketches may reference resolver internals as evidence, but no proposal may *depend* on
   implementation details staying fixed.
 
