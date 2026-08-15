@@ -1,5 +1,5 @@
 ---
-area: design — rati/data's transport stance (and/or jnana's API layer)
+area: design — rati/data's transport stance, jnana's API layer, or both
 needs: the maintainer's call; blocked on it
 status: done
 disposition: cut 2026-07-20 from the DATA-03 findings (gap 3)
