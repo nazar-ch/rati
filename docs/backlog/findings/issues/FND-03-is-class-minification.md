@@ -35,7 +35,7 @@ Fix the detection — **no explicit markers** (no `Symbol`/static-brand opt-in).
 
 ## Outcome (2026-07-25)
 
-The port's origin is **@sindresorhus/is** (named in the licence header above `is` in utils.ts), which closed this exact hole in **7.1.1** — "Fix `is.class` for minified class expression" (#217) — by testing `/^class(?:\s+|\{)/` rather than `startsWith('class ')`. rati now tests `/^class[\s{]/` (same shape; the port had frozen the pre-7.1.1 form). No marker was needed.
+The port's origin is **@sindresorhus/is** (named in the license header above `is` in utils.ts), which closed this exact hole in **7.1.1** — "Fix `is.class` for minified class expression" (#217) — by testing `/^class(?:\s+|\{)/` rather than `startsWith('class ')`. rati now tests `/^class[\s{]/` (same shape; the port had frozen the pre-7.1.1 form). No marker was needed.
 
 Worth recording for whoever reads the old note: **curl cannot see this bug.** Vite does not minify the SSR environment, so the server HTML was always correct — the break was client-only. Headless Chrome against the production server:
 

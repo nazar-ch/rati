@@ -2,7 +2,7 @@
 
 Status: planned 2026-07-19. Per-item status is each record's own `status:` field, flipped by the commit landing that session's proposal docs — never from this file.
 
-Four generative review directions over rati, each run as its **own session** (maintainer- launched, deliberately not orchestrated): where the framework should go next, what adopters will miss, what its own model uniquely enables, and what fresh eyes would change. The output is **proposals, not code**: new or extended records under `docs/research/`, plus a summary note here. This is the counterpart of the production-review effort — that one makes the existing surface sound; this one asks what surface is missing.
+Four generative review directions over rati, each run as its **own session** (maintainer-launched, deliberately not orchestrated): where the framework should go next, what adopters will miss, what its own model uniquely enables, and what fresh eyes would change. The output is **proposals, not code**: new or extended records under `docs/research/`, plus a summary note here. This is the counterpart of the production-review effort — that one makes the existing surface sound; this one asks what surface is missing.
 
 Out of scope for every direction: `src/data/` (not ready — its roadmap is the data-package effort's), documentation/website work (separate efforts), and anything already decided against (the research tree's rejected options stay rejected unless a session brings genuinely new evidence, and then the output is a "reopen?" note, not a re-proposal).
 
@@ -30,7 +30,7 @@ Independent; any order; best after the scope-and-island effort lands (so session
 - IMP-01 — gap analysis against the field (issues/IMP-01-field-gap-analysis.md)
 - IMP-02 — what the scope model uniquely enables (issues/IMP-02-model-native-capabilities.md)
 - IMP-03 — adoption & interop friction (issues/IMP-03-adoption-and-interop.md)
-- issues/IMP-04-fresh-eyes-ergonomics.md
+- IMP-04 — fresh-eyes ergonomics (issues/IMP-04-fresh-eyes-ergonomics.md)
 
 ## Plan
 

@@ -32,7 +32,7 @@ DX-01 is the calibration gate: it creates the entry and sets the API style (nami
 - DX-01 — the `rati/testing` entry: `deferred`, `flush`, `controllableSource` (issues/DX-01-testing-entry-foundation.md)
 - DX-02 — `renderIsland` harness + slot readers (issues/DX-02-island-harness.md)
 - DX-03 — `createTestRouter` + the stores-injection seam (issues/DX-03-router-and-stores-harness.md)
-- issues/DX-04-ssr-roundtrip-kit.md
+- DX-04 — SSR round-trip kit (issues/DX-04-ssr-roundtrip-kit.md)
 - DX-05 — dogfood: rati's suites adopt the entry (issues/DX-05-dogfood-migration.md)
 - DX-06 — Jnana adoption leg (the success test) (issues/DX-06-jnana-adoption.md)
 - DX-07 — `dataTrace` + `Step` displayName (issues/DX-07-observability.md)

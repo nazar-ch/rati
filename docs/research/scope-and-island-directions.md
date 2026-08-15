@@ -4,7 +4,7 @@
 
 Forward-looking options for scope resolution and the island's loading/error presentation. **None of these are implemented** — each waits for a real (Jnana- or consumer-driven) need so the shape is pinned by a concrete use case. Distilled from the July 2026 design review (`improvements.md` §1/§2/§5; the review's shipped items — selective refresh via `useScopeControls`, the `data()` marker, SSR-capable sources, the SSR-error baseline — landed and are recorded in docs/archive/directions-2026-07).
 
-Already-sketched neighbours that live in their own records: the undecided scope primitives `.live()` / `.extend()` and the bare-hook dev guard (undecided/deferred-scope-features.md), the cross-layer `derive()` escape hatch (undecided/dependency-graphs.md), and the router-side resolution work (router-extensions.md).
+Already-sketched neighbors that live in their own records: the undecided scope primitives `.live()` / `.extend()` and the bare-hook dev guard (undecided/deferred-scope-features.md), the cross-layer `derive()` escape hatch (undecided/dependency-graphs.md), and the router-side resolution work (router-extensions.md).
 
 ## 1. Scope & resolution
 

@@ -11,7 +11,7 @@ disposition: the honest value must type-check wherever the fake does
 
 The DX-06 migration's one rati-side friction, inverted from the item's expectation: a consumer that types its container's `router` against the app's exact route tuple (`RouterStore<typeof routes>`) makes `Partial<RouterStore<typeof routes>>` demand that tuple — so a *real* `RouterStore` built over a minimal local table is rejected, while a `{ navigate: vi.fn(), path, search, searchParams }` fake sails through (none of those fields is table-typed). The seam's whole point is that the honest value beats the imitation; here the type system enforces the opposite. Jnana's `anonymousShell.browser.test.tsx` kept its typed partial as a survivor because of exactly this.
 
-The only invariantly-checked member is the `routes: T` property — `navigate`/`replace`/ `getPath` are method-syntax (bivariant), so a `RouterStore<localTable>` is assignable to bare `RouterStore` (default `readonly GenericRouteType[]`). That makes the fix a type-level union arm, no runtime change.
+The only invariantly-checked member is the `routes: T` property — `navigate`/`replace`/`getPath` are method-syntax (bivariant), so a `RouterStore<localTable>` is assignable to bare `RouterStore` (default `readonly GenericRouteType[]`). That makes the fix a type-level union arm, no runtime change.
 
 ## Scope
 

@@ -16,7 +16,7 @@ Two seams, one item because they wire together:
 
 ## Scope
 
-1. **`createTestRouter(routes, { url, state? })`** — memory history + router + the provider wiring, returning `{ router, … }` plus render integration (compose with DX-02's harness shape for rendering `<Router>` trees). Traversal drivers (`back`/ `forward`) ride the RF-02 memory history's real entry stack. Dispose handled by the harness (the RF-01 lesson: histories leak listeners when nobody disposes).
+1. **`createTestRouter(routes, { url, state? })`** — memory history + router + the provider wiring, returning `{ router, … }` plus render integration (compose with DX-02's harness shape for rendering `<Router>` trees). Traversal drivers (`back`/`forward`) ride the RF-02 memory history's real entry stack. Dispose handled by the harness (the RF-01 lesson: histories leak listeners when nobody disposes).
 2. **The stores seam.** A public way to render a tree with a **partial** stores container — the shape Jnana's ten files build by hand, minus the cast. Design against the post-container surface (`StoresProvider` / `createStoresHook` / the table-blind router type): likely `renderWithStores(ui, { stores: Partial<…> })` or a provider component the test composes; decide in-item. The typed hole ("I only provide the two stores this component reads") is the point — the cast dies.
 3. **`Link` under test:** with a test router mounted, `Link` works — the two Jnana `vi.mock('rati')` files are the acceptance case; the documented example renders a component with `Link`s against `createTestRouter` and asserts navigation.
 4. **Prove it:** convert `router/routerIsland.test.tsx` and one `renderWithRouter` variant file in-item.
