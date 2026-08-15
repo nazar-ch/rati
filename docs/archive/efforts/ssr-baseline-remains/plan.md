@@ -1,7 +1,6 @@
 # ssr-baseline-remains — implementation plan
 
-Items live in [issues/](issues/); each record's `status:` field is the workflow state. No status
-here.
+Items live in [issues/](issues/); each record's `status:` field is the workflow state. No status here.
 
 ## Batches
 
@@ -14,46 +13,32 @@ here.
 ### B2 — the server kit (execution; sequential)
 
 - **Items:** SSR-01 → SSR-02 → SSR-03 (each builds on the previous; one agent may take the chain).
-- **Entry:** none (design is settled in
-  [ssr-server-kit.md](docs/archive/directions-2026-07/ssr-server-kit.md)).
-- **Exit / checkpoint:** `examples/ssr/server.ts` deleted — dev runs on `vite dev`, prod on
-  `rati/server`'s `serve()`; the example's behaviors re-verified (statuses 200/404/301, head tags,
-  payload, hydration console-clean). **User reviews the plugin's option surface before B3** — the
-  migrations will freeze it.
+- **Entry:** none (design is settled in [ssr-server-kit.md](docs/archive/directions-2026-07/ssr-server-kit.md)).
+- **Exit / checkpoint:** `examples/ssr/server.ts` deleted — dev runs on `vite dev`, prod on `rati/server`'s `serve()`; the example's behaviors re-verified (statuses 200/404/301, head tags, payload, hydration console-clean). **User reviews the plugin's option surface before B3** — the migrations will freeze it.
 
 ### B3 — consumer migrations (execution; parallel after B2)
 
 - **Items:** SSR-04 (nazar.ch), SSR-05 (jnana website). Different repos; fully parallel.
-- **Entry:** B2 merged + its option-surface review. If B2 stalls, a checkpoint may re-decide and
-  migrate straight onto the baseline surface instead (both records note the baseline-only variant).
-- **Exit:** both consumers on the released rati surface, hand-rolled SSR plumbing deleted,
-  smoke-verified in their own deployment shape. Effort ready to close.
+- **Entry:** B2 merged + its option-surface review. If B2 stalls, a checkpoint may re-decide and migrate straight onto the baseline surface instead (both records note the baseline-only variant).
+- **Exit:** both consumers on the released rati surface, hand-rolled SSR plumbing deleted, smoke-verified in their own deployment shape. Effort ready to close.
 
 ### B4 — findings round (execution; after B3, cut 2026-07-15)
 
-- **Items:** SSR-07, SSR-08, SSR-09, SSR-10, SSR-11 — independent, any order (SSR-11 decided
-  2026-07-15: inline output becomes the behavior; streaming went to research). SSR-12 (design-first)
-  is filed but not batched; it enters a later batch once its design pass runs.
+- **Items:** SSR-07, SSR-08, SSR-09, SSR-10, SSR-11 — independent, any order (SSR-11 decided 2026-07-15: inline output becomes the behavior; streaming went to research). SSR-12 (design-first) is filed but not batched; it enters a later batch once its design pass runs.
 - **Entry:** the findings review (this cut).
 - **Exit:** the five fixes landed with the gate green; SSR-12 dispositioned by the maintainer.
 
 ### B5 — the tail (execution; cut 2026-07-16)
 
-- **Items:** SSR-12 (implementation — the design pass ran and the maintainer confirmed both open
-  points, see the item's disposition), SSR-13. Independent, any order.
+- **Items:** SSR-12 (implementation — the design pass ran and the maintainer confirmed both open points, see the item's disposition), SSR-13. Independent, any order.
 - **Entry:** none — both gates are cleared.
-- **Exit:** the whole-document fallback lands with its canary pin and the throw→fallback walk; dev
-  answers the app's status on a malformed escape, with the pin red-before green-after. Effort ready
-  to close (the Vercel preview verification stays maintainer-blocked and is not an item).
+- **Exit:** the whole-document fallback lands with its canary pin and the throw→fallback walk; dev answers the app's status on a malformed escape, with the pin red-before green-after. Effort ready to close (the Vercel preview verification stays maintainer-blocked and is not an item).
 
 ### B6 — round-2 corrections (execution; cut 2026-07-16)
 
-- **Items:** SSR-14 (hydration-mismatch observability — may surface product findings), SSR-15 (the
-  fallback config-error guard). Independent, any order.
+- **Items:** SSR-14 (hydration-mismatch observability — may surface product findings), SSR-15 (the fallback config-error guard). Independent, any order.
 - **Entry:** none — both cut from verified round-2 review findings.
-- **Exit:** the injected-mismatch canary red-then-green; the fragment/no-template misconfiguration
-  answers plain-text 500 again. Effort ready to close (the Vercel preview verification stays
-  maintainer-blocked).
+- **Exit:** the injected-mismatch canary red-then-green; the fragment/no-template misconfiguration answers plain-text 500 again. Effort ready to close (the Vercel preview verification stays maintainer-blocked).
 
 ## Grading
 
