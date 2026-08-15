@@ -1,6 +1,8 @@
 # The stores container, the router, and the dependency cycles
 
-> **Resolved 2026-07-26 — superseded by a stronger cut than Option A.** The session that implemented this went further: rati **dropped the stores skeleton entirely** (`RootStore`, `RootStoreProvider`, `GlobalStore`, `GlobalStores`, `GenericStoresContext`, `createUseStoresHook` — all removed; app store graphs are app code), and the router got its own surface: `createRouter(routes, options): Router` (factory; the class is internal), the table-blind `Router` interface this doc sketched as `AppRouter`, `RouterProvider`, and the outlet renamed `Router` → `RouterOutlet`. The cycle analysis below still holds — the table-blind interface is exactly what shipped — but the container the "Verdict" defends is no longer rati's to keep; it lives on as an app-land pattern (Jnana's own context + container, see the migration finding filed in Jnana's tracker). Kept for the analysis.
+> **Resolved 2026-07-26 — superseded by a stronger cut than Option A.** The session that implemented this went further: rati **dropped the stores skeleton entirely** (`RootStore`, `RootStoreProvider`, `GlobalStore`, `GlobalStores`, `GenericStoresContext`, `createUseStoresHook` — all removed; app store graphs are app code), and the router got its own surface: `createRouter(routes, options): Router` (factory; the class is internal), the table-blind `Router` interface this doc sketched as `AppRouter`, `RouterProvider`, and the outlet renamed `Router` → `RouterOutlet`.
+>
+> The cycle analysis below still holds — the table-blind interface is exactly what shipped — but the container the "Verdict" defends is no longer rati's to keep; it lives on as an app-land pattern (Jnana's own context + container, see the migration finding filed in Jnana's tracker). Kept for the analysis.
 
 The pattern under review: a single container class whose fields are the app's stores, each store receiving the container so it can reach siblings without injection wiring — `this.stores.router.activeRoute`, and in nested graphs `this.stores.rootStores.router.activeRoute` (Jnana's `WorkspaceStores`). rati ships the skeleton (`RootStore`, `GlobalStore`, `GlobalStores`, `createUseStoresHook`); Jnana's `GlobalStoresContainer` is the real instance.
 
@@ -88,7 +90,9 @@ Today's state, made official: the hook lives in its own type-only module; every 
 
 ### Option C — dissolve the container; context-scoped graphs + explicit injection
 
-The direction Jnana's per-identity layer already took (`WorkspaceStores`/`AccountStores` behind `UserContext`/`AccountContext`, read via `hook()` loads in scopes): sub-graphs provided by React context, stores receiving exactly the dependencies they use as constructor arguments. Assessment: right for *scoped lifetimes* (per-identity, per-space — where a container-of-everything can't express "this half rebuilds on login"), and scopes' `hook()` DI makes consumption clean. But as a wholesale replacement it trades the composition root's readability for constructor plumbing, and reactive store-to-store edges (reactions over the router) still need the object graph, not a React context. Keep it as the pattern for scoped sub-graphs — not a reason to abandon the root container for app-lifetime singletons.
+The direction Jnana's per-identity layer already took (`WorkspaceStores`/`AccountStores` behind `UserContext`/`AccountContext`, read via `hook()` loads in scopes): sub-graphs provided by React context, stores receiving exactly the dependencies they use as constructor arguments. Assessment: right for *scoped lifetimes* (per-identity, per-space — where a container-of-everything can't express "this half rebuilds on login"), and scopes' `hook()` DI makes consumption clean.
+
+But as a wholesale replacement it trades the composition root's readability for constructor plumbing, and reactive store-to-store edges (reactions over the router) still need the object graph, not a React context. Keep it as the pattern for scoped sub-graphs — not a reason to abandon the root container for app-lifetime singletons.
 
 ### Sub-option worth stealing regardless: lazy sibling accessors
 

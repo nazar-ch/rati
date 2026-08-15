@@ -33,7 +33,9 @@ rati's router is a typed descendant of Django's URLconf: `urlpatterns` ↔ the `
 
 ### `include()` — modular route fragments (idea)
 
-Django composes a URLconf from per-app fragments: `path('blog/', include('blog.urls'))`. rati's routes live in one central file; as features grow, each could own a route fragment aggregated at the root — exactly how the backend builds `crontab.ts` from per-domain fragments. `group()` already returns a spliceable tuple, so a fragment is just an exported tuple `...`spread into the root. An `include(prefix, fragment)` variant could also factor a shared path prefix — the prefix-DRY we deliberately skipped for the central file is more defensible per-fragment, where the prefix *is* the fragment's identity. Constraint: the type machinery must still see one flat literal tuple, so fragments stay `as const` and the root spreads them — no lazy/dynamic registration without losing the literal types.
+Django composes a URLconf from per-app fragments: `path('blog/', include('blog.urls'))`. rati's routes live in one central file; as features grow, each could own a route fragment aggregated at the root — exactly how the backend builds `crontab.ts` from per-domain fragments. `group()` already returns a spliceable tuple, so a fragment is just an exported tuple `...`spread into the root.
+
+An `include(prefix, fragment)` variant could also factor a shared path prefix — the prefix-DRY we deliberately skipped for the central file is more defensible per-fragment, where the prefix *is* the fragment's identity. Constraint: the type machinery must still see one flat literal tuple, so fragments stay `as const` and the root spreads them — no lazy/dynamic registration without losing the literal types.
 
 ### Namespaced route names (idea)
 
@@ -41,7 +43,9 @@ Django's `app_name` + `namespace` scope reverse lookups: `reverse('blog:detail')
 
 ### Typed path converters (sketched — the strongest fit)
 
-Django's `<int:id>`, `<uuid:id>`, `<slug:slug>`, and custom converters **validate and coerce** a segment at match time (`to_python` / `to_url`). rati types params — and brands them via `prop<Base64Uuid>()` — but matches every segment as a permissive `[^/]+` string, so a malformed `:pageId` still matches and renders, failing later inside the scope. A converter on a param would: (1) tighten the match regex, so a non-uuid `pageId` falls through to the `*` 404 instead of rendering broken; (2) parse the segment to its branded type before the component sees it; and (3) format it back in `getPath` / `Link`, so a typed param round-trips. This closes the gap between the raw URL string and the branded prop the component already expects — the most type-first idea here.
+Django's `<int:id>`, `<uuid:id>`, `<slug:slug>`, and custom converters **validate and coerce** a segment at match time (`to_python` / `to_url`). rati types params — and brands them via `prop<Base64Uuid>()` — but matches every segment as a permissive `[^/]+` string, so a malformed `:pageId` still matches and renders, failing later inside the scope.
+
+A converter on a param would: (1) tighten the match regex, so a non-uuid `pageId` falls through to the `*` 404 instead of rendering broken; (2) parse the segment to its branded type before the component sees it; and (3) format it back in `getPath` / `Link`, so a typed param round-trips. This closes the gap between the raw URL string and the branded prop the component already expects — the most type-first idea here.
 
 ```ts
 route('/~:space/:pageId', 'page', PageBody, {
