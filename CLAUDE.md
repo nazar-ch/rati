@@ -4,7 +4,7 @@ rati is a small, custom TypeScript frontend framework for **React**, built and e
 
 Yarn-workspaces monorepo: `packages/rati` (the published `rati` package) plus `examples/{demo,ssr}` (dev/test apps). Workspace names: `rati`, `demo`, `ssr-demo`.
 
-The workflow every jnana-kit consumer shares — branch → gate → PR → push, work items and findings, the env-feedback boundary, the toolchain, style, memory, the seams — is already in your session from user scope ($JNANA_KIT_HOME/plugin/claude-md/base.md), with the doctrine behind it read from $JNANA_KIT_HOME/plugin/docs/. This file carries only what is rati's.
+The workflow every jnana-kit consumer shares — branch → gate → PR → push, work items and findings, the env-feedback boundary, the toolchain, style, memory, the seams — is already in your session from user scope ($JNANA_KIT_HOME/plugin/claude-md/), with the doctrine behind it read from $JNANA_KIT_HOME/plugin/docs/. This file carries only what is rati's.
 
 ## Canonical docs — read these first
 
