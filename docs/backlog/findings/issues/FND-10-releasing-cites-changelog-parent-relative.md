@@ -11,7 +11,7 @@ Spotted in passing by jnana-kit's findings-close-2 batch (jnana-kit PR #110), me
 
 ## Problem
 
-`docs/current/RELEASING.md:3` links the changelog as `[CHANGELOG.md](../../CHANGELOG.md)`. The family doc-link convention (jnana-kit:///plugin/docs/planning.md §"Doc links") bans `../` chains: they re-encode their depth on every move and are ungreppable from the target side. The root-relative form (`CHANGELOG.md` from the repo root — here written as the root-relative path) survives the citing file's own move and keeps `rg CHANGELOG.md` able to find every inbound reference.
+`docs/current/RELEASING.md:3` links the changelog as `[CHANGELOG.md](../../CHANGELOG.md)`. The family doc-link convention (jnana-kit:///plugin/docs/planning/doc-links.md) bans `../` chains: they re-encode their depth on every move and are ungreppable from the target side. The root-relative form (`CHANGELOG.md` from the repo root — here written as the root-relative path) survives the citing file's own move and keeps `rg CHANGELOG.md` able to find every inbound reference.
 
 Second, structural half: rati's `verify` is `yarn ci fmt lint typecheck test` — **no doc-links gate** — so nothing in this repo would flag the next violation either. The kit's checker (`jnana-kit:///tools/check-doc-links.ts`) is what caught this one, from another repo's session, by accident of kit◊FND-63's measurement.
 
