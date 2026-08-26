@@ -1,0 +1,6 @@
+  __               _   _
+ (o>      _ _ __ _| |_(_)
+ //\     | '_/ _` |  _| |
+ V_/_    |_| \__,_|\__|_|
+
+         the declarative data layer for React

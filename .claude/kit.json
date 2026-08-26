@@ -1,0 +1,113 @@
+// kit.json — rati's jnana-kit manifest: the facts a kit tool would otherwise hard-code about this
+// repo. One kit serves many projects; this file is the seam. JSONC (comments + trailing commas,
+// like tsconfig). Contract: jnana-kit `docs/design.md` §2. Every field is optional; a malformed
+// manifest is a hard error naming the field, because a typo'd guardrail must never read as "no
+// guardrail".
+//
+// The `$schema` pointer below names the copy the `@jnana-app/kit` INSTALL brings, not a path into
+// somebody's kit checkout — the pin in .yarnrc.yml then decides which schema version this file is
+// edited against, the same way it decides which gate runs (kit◊ASK-04, ruled 2026-08-08).
+// Nothing in this repo reads the pointer and no gate touches it: it buys an editor hint.
+{
+    "$schema": "../node_modules/@jnana-app/kit/kit.schema.json",
+
+    // Short name — pool slot dirs (`rati-wt-<n>`), central-feedback filenames, registry key.
+    "project": "rati",
+
+    // The one pre-push gate, and it is now the kit's STANDARD BATTERY rather than a list this repo
+    // maintains (kit◊KC-13). What runs is `node_modules/.bin/kit-verify` out of the
+    // `@jnana-app/kit` pin above — every step the battery declares, at the version .yarnrc.yml
+    // names, with no `verify:*` script here and nothing for a reader to keep in step by hand. The
+    // list this field used to carry, and its twin `GATE_STAGES` in `scripts/ci.ts`, are both gone:
+    // "they move together" was an admission that two hand-written lists existed at all, and the
+    // battery is what removes the second one.
+    //
+    // The BARE bin, with no `$JNANA_KIT_HOME` in it: the packaged entry writes the run stamp itself
+    // (kit◊KC-30), so the gate needs no kit-side wrapper to carry the stamp for it. That stamp
+    // is what a session hook reads for the "pushed without running the gate" reminder, cut against a
+    // rati session (kit◊FND-03). The hook keeps its own kit-level READER, which must load when
+    // `node_modules` is broken; a writer running behind this bin has an install by definition.
+    //
+    // What is NOT in the battery stays in `scripts/ci.ts` and is run by hand before a release: the
+    // deep `fuzz` stage (500 runs) and `build`. `yarn ci` with no arguments runs both.
+    "verify": "node_modules/.bin/kit-verify",
+
+    // Idempotent "make this checkout runnable": install deps only (Node 26 + Yarn 4.17.1 via
+    // corepack, `enableScripts: false`). No codegen; never git sync.
+    "bootstrap": "yarn install",
+    // Existence only, for preflight's report — never a gate on the bootstrap above, which now runs
+    // unconditionally. A freshness pair here (yarn.lock vs the install stamp) could not be cleared
+    // by the very `yarn install` it prescribed (kit◊FND-108).
+    "bootstrapStale": {
+        "missing": ["node_modules"],
+    },
+
+    // The second half of "make this checkout runnable", and `bootstrap` cannot be it: `yarn install`
+    // links the workspaces but builds nothing, and `packages/rati/dist` is git-ignored. The ssr
+    // example's node-side config (examples/ssr/tsconfig.node.json) resolves `rati/server`,
+    // `rati/ssr` and `rati/vite` through the PUBLISHED entries — deliberately, so serve.ts
+    // type-checks against what a real consumer installs rather than through the `rati-dev`
+    // condition the two Vite-side configs use (the reasoning is in serve.ts's own header). Those
+    // entries are `dist/*.d.ts`, so in a checkout that has never built, `ssr-demo#typecheck` fails
+    // with three TS2307s and the whole `verify` gate is red before a worker touches anything. The
+    // main checkout only ever passed because a `dist/` from some earlier build was sitting in it —
+    // every fresh pool slot inherited the red.
+    //
+    // Runs where `bootstrap` runs (a tree that moved, or one that was never bootstrapped), so a
+    // steady-state session start pays nothing; a slot claim pays ~1s.
+    "prep": [
+        {
+            "id": "rati-build",
+            "label": "rati dist",
+            "command": "yarn workspace rati build && echo built",
+        },
+    ],
+
+    // Host guardrail: the publish path stays user-run outside a sandbox VM, layered over the kit
+    // baseline (`ansible`; `prisma` minus `prisma:generate` — neither used here). `scripts/release.sh`
+    // bumps the version, git-tags, and runs `yarn npm publish` to npmjs with the token in this
+    // machine's Keychain — an irreversible publish of the public `rati` package. Inert inside a VM
+    // (marker present), where the Keychain token is absent anyway.
+    "denyRules": {
+        "keywords": ["release", "publish"],
+        "rules": [
+            {
+                "id": "release",
+                "category": "package publish",
+                // `bash scripts/release.sh` / `./scripts/release.sh` tokenize to `release.sh`; the
+                // `release` npm script to `release`. The `^publish$` token pattern catches every
+                // wrapping of the publish itself — `npm publish`, `yarn npm publish`,
+                // `yarn workspace rati npm publish` — which the command-word rules alone can't
+                // (`yarn npm publish`'s command word is `npm`). `--publish` (release.sh's auth
+                // check) is a different token and stays allowed.
+                "command": ["release.sh", "release"],
+                "tokenPattern": "^publish$",
+                "reason": "scripts/release.sh (the `release` script) and a bare `yarn npm publish` bump and publish the public `rati` package to npmjs with the token in this machine's Keychain, and re-running does not undo a publish. Releasing is the maintainer's call (docs/current/RELEASING.md); `--dry-run` is the only safe form and is still user-run."
+            },
+        ],
+    },
+
+    // Repos whose work-item ids may be cited here in the qualified `<alias>◊<ID>` form. Both are
+    // already cited: rati's findings track their downstream in jnana (`jnana◊FND-237`), and this
+    // repo's configs name the kit records their shape comes from (`kit◊FND-170`). Undeclared,
+    // a qualified id reads as a typo'd local one and `issues.ts check` errors on it.
+    "citableRepos": ["jnana", "jnana-kit"],
+
+    // This corpus is SWEPT: every reference outside docs/archive/ carries the standing
+    // `<alias>◊<ID>` form, so the id gate reads the whole tree instead of a diff's added lines
+    // (kit◊KF-02, 52 sites — 37 the sweep rewrote, 15 qualified by hand where a bare sigil wore
+    // another repo's id, a backtick hid a citation, or a `#` opened the line). A legacy bare
+    // `◊KC-71` or colon `jnana:FND-237` anywhere in the tree is an error naming the standing form.
+    //
+    // The four bare sigils in `.vite-hooks/pre-commit` are the one exception, and the gate never
+    // reads them: that file is byte-identical in five repos at once, so its ids resolve against
+    // whichever tracker reads the line, and its own header states why each one is backtick-quoted.
+    "referenceScope": "corpus",
+
+    // rati files no LOCAL env-feedback — friction goes to the central jnana-kit-feedback repo.
+    // Everything else in scanRoots takes jnana's default layout (docs/planned/<effort>/issues/,
+    // which rati already uses).
+    "scanRoots": {
+        "feedback": null,
+    },
+}
