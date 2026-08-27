@@ -1,5 +1,5 @@
 ---
-area: src/data (form, field, query), src/util/utils.ts
+area: packages/rati/src/data (form, field, query), packages/rati/src/util/utils.ts
 needs:
 status: open
 disposition: —
