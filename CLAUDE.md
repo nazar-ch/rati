@@ -83,4 +83,8 @@ The mechanism the gallery leans on — `prerender` over `renderToString`, dehydr
 
 ## Memory
 
-Where a note lands here: the canonical docs are the stations, and point-in-time status goes to the owning work-item record — never to a `.claude/` note that then has to be kept in sync with both.
+Where a note lands here: the canonical docs are the stations, and point-in-time status goes to the owning work-item record — never to a note that then has to be kept in sync with both. What is left is the situational claim no station owns, and it goes to a topic under `docs/memory/`.
+
+rati's memory surface is **generated**: the source folders under `docs/memory/` render, per machine and uncommitted, into the ignored `.memory/` mirror. `kit.ts surface generate` writes them and the session-start and slot-prep hooks run it; `kit.ts surface check` holds each rendering against its source. **Edit the source folder, never a rendering.**
+
+The per-topic index is the generated `CLAUDE.local.md` at this repo's root, rendered from `docs/memory/CLAUDE.local/`, which your session loads beside this file. A checkout that has never rendered has neither: run the generator.
