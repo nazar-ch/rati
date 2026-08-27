@@ -110,4 +110,14 @@
     "scanRoots": {
         "feedback": null,
     },
+
+    // rati's memory surface. The note root is the family default (docs/memory/), so only the
+    // always-loaded TOTAL is declared: the bytes every session in this repo pays before it opens
+    // anything, over the root CLAUDE.md plus the CLAUDE.local.md that docs/memory/CLAUDE.local/
+    // renders. Measured with the kit's own memory check rather than summed by hand, and only ever
+    // walked DOWN from here — a raise is the user's call, never a branch's. Absent, the step
+    // reports the tier as unmeasured instead of holding it to a number.
+    "memory": {
+        "alwaysLoadedTotal": 11266,
+    },
 }

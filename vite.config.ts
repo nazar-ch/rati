@@ -14,9 +14,10 @@ import { defineConfig } from 'vite-plus';
 // of the gate at once. Both halves reach them now: lint from here, and tsc through the root
 // `tsconfig.node.json`, the config program kit◊KC-13 added.
 //
-// A named constant because it has TWO readers — the lint config below and the pre-commit lint task's
-// filter, which drops what oxlint would ignore. Those were two hand-maintained lists until
-// kit◊FND-72, and one array is what keeps them from drifting apart again.
+// A named constant so this file's one ignore list carries its rationale where a future entry is
+// written rather than inside the `lint()` call below. It had a second reader until the kit's
+// canonical `staged()` dropped its lint task, which is what kit◊FND-72's shared array was keeping
+// in step.
 const lintIgnorePatterns = ['**/dist/**'];
 
 // Toolchain config for the rati monorepo (lint = oxlint, fmt = oxfmt), on the family's canonical
@@ -145,18 +146,8 @@ export default defineConfig({
     // `staged.test.ts` pins both against the factory's output, so this repo inherits the same pins
     // instead of re-deriving them here.
     staged: staged({
-        // The directory this config sits in IS the repo root, and the lint filter relativizes against
-        // it — lint-staged hands tasks absolute paths, so a root-anchored ignore entry tested against
-        // one can never match (kit◊FND-72). `import.meta.dirname` rather than `process.cwd()`:
-        // measured to survive the vite-plus config loader, and correct wherever a future caller's cwd
-        // happens to be.
-        root: import.meta.dirname,
         // A consumer: the scans are the kit's files, reached through its `bin/` and
         // `$JNANA_KIT_HOME` rather than by a repo-relative path.
         kitScripts: 'kit-home',
-        // The same array the lint config above is built from, not a second copy of it:
-        // kit◊FND-72's defect was the copy, and passing the list is what makes the filter track
-        // it.
-        lintIgnorePatterns,
     }),
 });

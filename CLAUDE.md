@@ -4,7 +4,7 @@ rati is a small, custom TypeScript frontend framework for **React**, built and e
 
 Yarn-workspaces monorepo: `packages/rati` (the published `rati` package) plus `examples/{demo,ssr}` (dev/test apps). Workspace names: `rati`, `demo`, `ssr-demo`.
 
-The workflow every jnana-kit consumer shares — branch → gate → PR → push, work items and findings, the env-feedback boundary, the toolchain, style, memory, the seams — is already in your session from user scope ($JNANA_KIT_HOME/plugin/docs/rules/), with the doctrine behind it read from $JNANA_KIT_HOME/plugin/.docs/. This file carries only what is rati's.
+The workflow every jnana-kit consumer shares — branch → gate → PR → push, work items and findings, the env-feedback boundary, the toolchain, style, memory, the seams — is already in your session from user scope (the kit's rules file), with the doctrine behind it read from `$DOCTRINE/`. This file carries only what is rati's.
 
 ## Canonical docs — read these first
 
@@ -43,7 +43,7 @@ Design intent (the "why"): the author dislikes hook-style data loading (react-qu
 
 ## Restricted actions
 
-- **Don't run `vp lint --fix` blindly** — `no-unnecessary-type-assertion`'s autofix breaks the typecheck, which is why that rule is off here and tsc is the authoritative gate; the detail is $JNANA_KIT_HOME/plugin/.docs/toolchain/lint.md.
+- **Don't run `vp lint --fix` blindly** — `no-unnecessary-type-assertion`'s autofix breaks the typecheck, which is why that rule is off here and tsc is the authoritative gate; the detail is `$DOCTRINE/toolchain/lint.md`.
 
 ## Toolchain — Vite+ (`vp`)
 
@@ -83,4 +83,8 @@ The mechanism the gallery leans on — `prerender` over `renderToString`, dehydr
 
 ## Memory
 
-Where a note lands here: the canonical docs are the stations, and point-in-time status goes to the owning work-item record — never to a `.claude/` note that then has to be kept in sync with both.
+Where a note lands here: the canonical docs are the stations, and point-in-time status goes to the owning work-item record — never to a note that then has to be kept in sync with both. What is left is the situational claim no station owns, and it goes to a topic under `docs/memory/`.
+
+rati's memory surface is **generated**: the source folders under `docs/memory/` render, per machine and uncommitted, into the ignored `.memory/` mirror. `kit.ts surface generate` writes them and the session-start and slot-prep hooks run it; `kit.ts surface check` holds each rendering against its source. **Edit the source folder, never a rendering.**
+
+The per-topic index is the generated `CLAUDE.local.md` at this repo's root, rendered from `docs/memory/CLAUDE.local/`, which your session loads beside this file. A checkout that has never rendered has neither: run the generator.
