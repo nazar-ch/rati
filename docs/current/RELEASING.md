@@ -1,6 +1,6 @@
 # Releasing `rati`
 
-**Before the version bump: retitle CHANGELOG.md's `## Unreleased` section to `## <version> — <date>`, and open a fresh empty one above it.** The notes are written as the changes land (rati's `CLAUDE.md` carries that rule), so releasing is a rename, not a writing session — pre-1.0, a minor bump under `^` lands on consumers automatically, and the entry is the half of the break the version number doesn't carry.
+**Before the version bump: retitle CHANGELOG.md's `## Unreleased` section to `## <version> — <date>`, and open a fresh empty one above it.** The notes are written as the changes land (rati's always-loaded layer carries that rule), so releasing is a rename, not a writing session — pre-1.0, a minor bump under `^` lands on consumers automatically, and the entry is the half of the break the version number doesn't carry.
 
 Two things to check while you are there, because a release is the last moment either is cheap: that every removal is paired with its replacement, and that a rename keeping an old import resolving with a *new* meaning is called out (the 0.6.3 `Router` entry is the worked example). An `## Unreleased` that is genuinely empty releases as one line saying nothing consumer-visible changed — that is an answer, not a gap.
 

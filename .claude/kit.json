@@ -113,11 +113,15 @@
 
     // rati's memory surface. The note root is the family default (docs/memory/), so only the
     // always-loaded TOTAL is declared: the bytes every session in this repo pays before it opens
-    // anything, over the root CLAUDE.md plus the CLAUDE.local.md that docs/memory/CLAUDE.local/
-    // renders. Measured with the kit's own memory check rather than summed by hand, and only ever
-    // walked DOWN from here — a raise is the user's call, never a branch's. Absent, the step
-    // reports the tier as unmeasured instead of holding it to a number.
+    // anything, over the CLAUDE.local.md that docs/memory/CLAUDE.local/ renders. The root CLAUDE.md
+    // is an empty tracked file — the tier's whole content is the source folder's, so a session
+    // reads one surface and an editor has one place to write (user, 2026-08-30). Measured with the
+    // kit's own memory check rather than summed by hand, and only ever walked DOWN from here — a
+    // raise is the user's call, never a branch's. It was 11,266 over two files, until the hand-owned
+    // one moved in and its restatements of the user-scope gate, commit-subject and
+    // edit-the-source-folder rules went. Absent, the step reports the tier as unmeasured instead of
+    // holding it to a number.
     "memory": {
-        "alwaysLoadedTotal": 11266,
+        "alwaysLoadedTotal": 9459,
     },
 }
