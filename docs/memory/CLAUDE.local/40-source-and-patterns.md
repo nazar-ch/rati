@@ -15,6 +15,6 @@
 
 - rati uses **relative imports** (no `#` path alias), and no barrel beyond `main.ts`. Every relative specifier carries an explicit `.js` extension — `./scope/scope.js`, a directory as `./data/index.js`.
 
-why: tsc copies the specifier into the emitted `.d.ts` verbatim, so an extensionless one is unresolvable to a `nodenext` consumer (kit◊KC-42).
+evidence: tsc copies the specifier into the emitted `.d.ts` verbatim, so an extensionless one is unresolvable to a `nodenext` consumer (kit◊KC-42).
 
 <!--/r-->
