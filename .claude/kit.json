@@ -124,4 +124,11 @@
     "memory": {
         "alwaysLoadedTotal": 9459,
     },
+
+    // The docs sweep's baseline: the commit through which this repo's docs scope is converted, read
+    // by style-targets.ts to window the next sweep (kit◊SW-13). This one is kit◊SW-10's landing. No
+    // comment sweep has run here, so `commentsBaseline` stays absent, and absent means first run.
+    "styleSweep": {
+        "docsBaseline": "fe110d8b843ef1936918920c399c1a189cd56928",
+    },
 }

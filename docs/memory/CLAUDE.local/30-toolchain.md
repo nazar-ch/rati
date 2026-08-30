@@ -13,7 +13,7 @@ node_modules/.bin/kit-verify   # the gate
 
 **Never run `dprint fmt` yourself.** Reflow Markdown with `node node_modules/@jnana-app/kit/dist/checks/dprint-mangle-scan.js --fmt <file.md…>`, which the gate's own failure names as an absolute path.
 
-why: a bare reflow bypasses the mangle scan, and dprint cannot see its own damage (kit◊FND-47). The bare `dprint-mangle-scan.ts` left `PATH` with kit◊KC-14, which is why the invocation is spelled out.
+evidence: a bare reflow bypasses the mangle scan, and dprint cannot see its own damage (kit◊FND-47). The bare `dprint-mangle-scan.ts` left `PATH` with kit◊KC-14, which is why the invocation is spelled out.
 
 <!--/r-->
 
