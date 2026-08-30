@@ -14,7 +14,8 @@ The stations, and the source of truth for what each covers.
 - docs/current/internals.md — contributor internals: source layout, the `mandala` engine, the resolver/refresh machinery, lifecycle/teardown, channels, SSR dehydration, testing, toolchain.
 - docs/research/ — deferred features, design directions, testing strategy.
 - docs/planned/ — committed efforts: an effort `README.md` (framing, decisions, narrative item map), an optional `plan.md` (batches + grading), and one work-item record per item under `issues/<ID>-<slug>.md`.
-- docs/current/RELEASING.md — the release process; docs/planned/website/website-plan.md — the public site.
+- docs/current/RELEASING.md — the release process.
+- docs/planned/website/website-plan.md — the public site.
 - New public surface documents in docs/current/public/ and nowhere else — that tree is what the website renders.
 
 ## Mental model
@@ -28,4 +29,4 @@ route(path, name, component, { scope, … })           →  the same, on a URL
 useScope(scope)                                       →  read what it provides, below
 ```
 
-Design intent (the "why"): the author dislikes hook-style data loading (react-query/SWR) that makes components manage loading states and re-declare types. rati resolves declarative typed specs into fully-loaded props, with types inferred end-to-end from backend types. Resolution is all-or-nothing — a half-resolved bag is incoherent. Naming is deliberately plain English mapped to concepts React devs already know; **avoid coining new terms** in the public API (the internal engine name `mandala` is the lone exception, and stays internal — callers only ever see `island`/`route`).
+Design intent (the "why"): the author dislikes hook-style data loading (react-query/SWR) that makes components manage loading states and re-declare types. rati resolves declarative typed specs into fully-loaded props, with types inferred end-to-end from backend types. Resolution is all-or-nothing — a half-resolved bag is incoherent. Naming is deliberately plain English mapped to concepts React devs already know. **Never coin a new term** in the public API — the internal engine name `mandala` is the lone exception, and stays internal, so callers only ever see `island`/`route`.
