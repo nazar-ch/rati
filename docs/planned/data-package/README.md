@@ -77,7 +77,7 @@ Separately, a 2026-07-20 coverage map of rati's own data tests found unpinned br
 
 ## Wave-two findings — the second jnana migration round (recorded 2026-07-25)
 
-A second migration wave (three parallel legs on jnana) produced two feedback records; the 2026-07-25 maintainer discussion turned them into the second-round items above. The load-bearing judgements, so they aren't re-derived:
+A second migration wave (three parallel legs on jnana) produced two feedback records; the 2026-07-25 maintainer discussion turned them into the second-round items above. The load-bearing judgments, so they aren't re-derived:
 
 - **The line-count test is retired.** DATA-03 measured +4; the second wave's legs measured +11, +10, and +129 — three independent runs, same direction, and the diagnosis holds: the primitives import a mechanism but add a surface, so lines move out of component bodies and grow in transit (the auth views lost 165 lines while their extracted state modules added 294 — a good trade the metric scores as a loss).
 

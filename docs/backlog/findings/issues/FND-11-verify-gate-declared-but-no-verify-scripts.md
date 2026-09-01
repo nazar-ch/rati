@@ -11,13 +11,17 @@ disposition: —
 
 `.claude/kit.json` declares `"verify": "verify.ts"`, and the kit's runner works by enumerating the repo's `verify:*` package.json scripts. rati has none:
 
-    $ verify.ts
-    verify: FAILED — no `verify:*` scripts in package.json; the gate would be empty.
-    $ echo $?
-    2
+```
+$ verify.ts
+verify: FAILED — no `verify:*` scripts in package.json; the gate would be empty.
+$ echo $?
+2
+```
 
-    $ jq -r '.scripts | keys[]' package.json
-    ci  fmt  lint  lint:types  prepare  release  test  typecheck  upgrade  …
+```
+$ jq -r '.scripts | keys[]' package.json
+ci  fmt  lint  lint:types  prepare  release  test  typecheck  upgrade  …
+```
 
 The pieces a gate would run all exist — `fmt`, `lint`, `lint:types`, `typecheck`, `test`, and a `ci` script that presumably chains them. They are simply not named in the form the runner looks for.
 

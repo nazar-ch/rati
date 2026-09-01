@@ -11,7 +11,7 @@ disposition: cut 2026-07-25 from the second-round migration feedback (first wave
 
 Every keyed resource hand-rolls `Map<key, instance>` with lazy get-or-create — jnana's `SpaceMembersStore` did, `ResourcePool` is a near-twin, and `mutation.refreshes` wants something to point at (`refreshes: (spaceId) => [this.members.get(spaceId)]`). ~20 library lines delete that everywhere.
 
-Deliberately **thin and primitive-agnostic** — the factory returns *whatever you build*: a `query` of a composite payload, a `collection`, a `pagedCollection`, or a store class stitching several (the blessed pattern once DATA-13's `reconciled` exists). It is a lazy instance map, **not a cache**: no eviction, no TTL, no cross-key identity (see DATA-13 boundaries; unbounded key spaces want a selection, not this — DATA-17's page carries that judgement).
+Deliberately **thin and primitive-agnostic** — the factory returns *whatever you build*: a `query` of a composite payload, a `collection`, a `pagedCollection`, or a store class stitching several (the blessed pattern once DATA-13's `reconciled` exists). It is a lazy instance map, **not a cache**: no eviction, no TTL, no cross-key identity (see DATA-13 boundaries; unbounded key spaces want a selection, not this — DATA-17's page carries that judgment).
 
 ## Scope
 
