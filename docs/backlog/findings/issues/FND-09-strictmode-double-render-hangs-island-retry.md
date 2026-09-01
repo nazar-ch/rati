@@ -15,7 +15,7 @@ StrictMode is dev-only, so this costs no production user anything. It costs ever
 
 `adminUsersScope` — a plain promise `.load` island on a route — with `window.fetch` stubbed to force one status for `GET /api/admin/users`, attempts timestamped, the rendered slot sampled every 500 ms. The only thing changed between the two tables is jnana's `strictMode` const in `main.tsx`.
 
-**Baseline first, because the original jnana-side measurement was normalised wrong:** a *successful* resolution fires **2** fetches with StrictMode on and **1** with it off. Raw fetch counts under StrictMode therefore carry the double-fire and are not a count of retry attempts.
+**Baseline first, because the original jnana-side measurement was normalized wrong:** a *successful* resolution fires **2** fetches with StrictMode on and **1** with it off. Raw fetch counts under StrictMode therefore carry the double-fire and are not a count of retry attempts.
 
 StrictMode **on** — forced 500 (`retryable: true`), two runs:
 

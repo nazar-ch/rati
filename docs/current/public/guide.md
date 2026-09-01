@@ -517,7 +517,7 @@ And under **SSR the primitives stay pending**: a `Source` attaches from an effec
 
 ### Choosing a shape
 
-The primitives are easy to use and easy to *pick wrong*. In practice that's where the time goes: not the API, but deciding which shape a given piece of data is. The same handful of judgements keeps coming up, so here they are, each with the reason behind it.
+The primitives are easy to use and easy to *pick wrong*. In practice that's where the time goes: not the API, but deciding which shape a given piece of data is. The same handful of judgments keeps coming up, so here they are, each with the reason behind it.
 
 **Is the response the array?** A `collection` fetches the rows themselves — its `fetch` returns `T[]`. Plenty of endpoints return the rows *inside* something, and a composite payload is **one value with one fetch and one error**, which is a `query`. Give its list half the identity story with `reconciled`, rather than bending the payload into a shape it isn't:
 

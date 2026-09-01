@@ -14,24 +14,6 @@
     // Short name — pool slot dirs (`rati-wt-<n>`), central-feedback filenames, registry key.
     "project": "rati",
 
-    // The one pre-push gate, and it is now the kit's STANDARD BATTERY rather than a list this repo
-    // maintains (kit◊KC-13). What runs is `node_modules/.bin/kit-verify` out of the
-    // `@jnana-app/kit` pin above — every step the battery declares, at the version .yarnrc.yml
-    // names, with no `verify:*` script here and nothing for a reader to keep in step by hand. The
-    // list this field used to carry, and its twin `GATE_STAGES` in `scripts/ci.ts`, are both gone:
-    // "they move together" was an admission that two hand-written lists existed at all, and the
-    // battery is what removes the second one.
-    //
-    // The BARE bin, with no `$JNANA_KIT_HOME` in it: the packaged entry writes the run stamp itself
-    // (kit◊KC-30), so the gate needs no kit-side wrapper to carry the stamp for it. That stamp
-    // is what a session hook reads for the "pushed without running the gate" reminder, cut against a
-    // rati session (kit◊FND-03). The hook keeps its own kit-level READER, which must load when
-    // `node_modules` is broken; a writer running behind this bin has an install by definition.
-    //
-    // What is NOT in the battery stays in `scripts/ci.ts` and is run by hand before a release: the
-    // deep `fuzz` stage (500 runs) and `build`. `yarn ci` with no arguments runs both.
-    "verify": "node_modules/.bin/kit-verify",
-
     // Idempotent "make this checkout runnable": install deps only (Node 26 + Yarn 4.17.1 via
     // corepack, `enableScripts: false`). No codegen; never git sync.
     "bootstrap": "yarn install",

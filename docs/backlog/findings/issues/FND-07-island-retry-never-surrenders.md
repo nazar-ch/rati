@@ -15,7 +15,7 @@ Retry is default-on since DATA-11, and the gate reads `retryable`. So the moment
 
 ## Measured (jnana, live app, dev build, rati 0.6.3, 2026-07-27)
 
-Driven in Chrome against a plain promise `.load` island, with `window.fetch` stubbed to force one status for a single endpoint, counting attempts and sampling the rendered slot every 3s. Attempt counts normalised against a measured 1 fetch per resolution.
+Driven in Chrome against a plain promise `.load` island, with `window.fetch` stubbed to force one status for a single endpoint, counting attempts and sampling the rendered slot every 3s. Attempt counts normalized against a measured 1 fetch per resolution.
 
 | Forced status | `retryable` | Attempts | Slot after the attempts                     |
 | ------------- | ----------- | -------- | ------------------------------------------- |

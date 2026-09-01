@@ -6,7 +6,7 @@ Type-checking is **tsc** run from the workspace root as `yarn run -T tsc`, and l
 vp run rati#build         # vite lib bundle + tsc emits dist/*.d.ts
 vp run rati#typecheck     # tsc --noEmit (src); rati#typecheck:test for the test tree
 vp run rati#test          # Vitest (runtime + *.test-d.ts type tests via the tsc checker)
-node_modules/.bin/kit-verify   # the gate
+verify.ts                     # the gate
 ```
 
 <!--r-->
