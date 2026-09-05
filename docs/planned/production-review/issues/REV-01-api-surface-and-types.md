@@ -2,7 +2,7 @@
 area: packages/rati/src/main.ts + every entry barrel (mobx, data*, ssr, server, vite, debug, testing), the built dist/*.d.ts, docs/current/public/reference.md as the claimed contract
 needs: — (best after scope-and-island + testing-and-dx land)
 status: open
-disposition: cut 2026-07-19; production-review lens 1 (*data excluded — see README)
+disposition: cut 2026-07-19; production-review lens 1 (*data excluded — see docs/planned/production-review/plan.md)
 ---
 
 # REV-01 — public API surface & types
@@ -31,4 +31,4 @@ Read the entire exported surface, then hunt:
 
 - The scratch dist-consumer check from §3 committed (as a findings-note artifact or a real test if it earns one).
 - `yarn ci` green after any in-session fix; each fix pinned.
-- Findings filed in the effort README with repro (for type findings: the code + the error text observed).
+- Findings filed in this record with repro (for type findings: the code + the error text observed).

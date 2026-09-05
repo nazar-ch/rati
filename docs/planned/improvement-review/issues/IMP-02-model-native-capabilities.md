@@ -34,3 +34,13 @@ For each direction kept: the README's proposal format (problem, sketch, preceden
 - Proposals filed under `docs/research/` (new file or extensions), each citing the records it borders (dependency-graphs, deferred-scope-features, router-extensions, ssg-and-rsc, dx-and-tooling) — the anti-duplication check.
 - Each proposal names its trigger (what real need graduates it) — the wait-for-need discipline applied.
 - Summary note in the effort README with the top-3.
+
+## Outcome (2026-07-20)
+
+Output: docs/research/scope-model-capabilities.md — the end-to-end walk of what "the spec is data" buys, grounded in the source (`scope.ts`, `resolver.tsx`, `mandala.tsx`, `channel.ts`) rather than the docs. Its spine: the model holds two graphs no hook-based peer has — the declared shape (levels, keys, kinds: free at module load via `flattenLevels` plus the classifiers) and the observed dependency graph (per-cell read-sets from `trackReads`, refreshed by every run) — and each proposal is one of the two graphs cashed in.
+
+The two directions the cut expected to be large mostly *reduced* onto IMP-01's record: prefetch inference became M2's sharpening of D1, and runtime introspection became M1, the minimal seam D3's panel needs, which answers the cut's "without freezing internals" constraint — the walk is half-public today (`prevScope` and `InputSymbol` are exported, the classifiers are not).
+
+The honest limits that shaped everything: what a function load *returns* and what it *reads* are runtime facts, so the statically-known prefix is provisional (a load can hand back a `Source`) and the advisor is a heuristic (read-sets under-report conditional reads).
+
+The composition direction yielded a fact rather than a feature — scope identity keys the channels, so factories work but mint identities, and `.extend()`'s recorded identity question is that fact surfacing. No `packages/rati/src/` or docs/current/ changes; no bugs found to file to production-review.

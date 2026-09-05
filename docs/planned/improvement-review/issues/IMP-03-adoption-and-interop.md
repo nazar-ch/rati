@@ -19,7 +19,7 @@ Walk the paths for real — a scratch app per leg, driving the actual package (b
 2. **Coexistence.** rati islands under a foreign router (URL params must come from somewhere — what is the seam when RouterStore isn't the source?); a foreign data layer (redux/react-query) feeding scope inputs; rati's `Link` vs the host's; two islands sharing one store without the full stores container.
 3. **The greenfield hour.** Fresh Vite app → first route rendering data, timed and journaled: every error hit, every "where does this import from" pause, every step the examples paper over because they were written by the author. (Docs quality is out of scope; *API-shaped* friction — a missing default, a mandatory option that could be inferred, an unhelpful error — is exactly in scope.)
 4. **Interop outward.** A rati island's subtree using ordinary context/portals/suspense from the host app; nesting islands; an island inside a modal mounted outside the tree. What breaks, what's undefined, what should be stated?
-5. **Proposals** from the walk: each friction point → fix-proposal (README format) or a recorded "cost of the model, accepted" position. Rank top-3.
+5. **Proposals** from the walk: each friction point → fix-proposal (the proposal format in docs/planned/improvement-review/plan.md) or a recorded "cost of the model, accepted" position. Rank top-3.
 
 ## Boundaries
 
@@ -29,6 +29,6 @@ Walk the paths for real — a scratch app per leg, driving the actual package (b
 
 ## Verify
 
-- The walk journals (per leg: steps, timings, friction list with severity) attached to the effort README's summary note — the evidence the paths were walked, not imagined.
+- The walk journals (per leg: steps, timings, friction list with severity) attached to this record's summary note — the evidence the paths were walked, not imagined.
 - Proposals filed under `docs/research/`, each traceable to a journal entry (no armchair proposals).
 - Summary note with the top-3.

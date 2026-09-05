@@ -106,8 +106,16 @@
     // edit-the-source-folder rules went. Absent, the step reports the tier as unmeasured instead of
     // holding it to a number.
     "memory": {
-        "alwaysLoadedTotal": 9459,
+        "alwaysLoadedTotal": 9320,
     },
+
+    // rati's docs tree was swept of orientation files at kit◊RB-08: the three effort framings
+    // became plan.md files, the research station's index became each doc's own first line, and the
+    // ASCII drafts' how-to became a memory note. With that list empty, this repo takes the erroring
+    // state rather than the counting one, so the next stray orientation file is a regression at the
+    // gate instead of a backlog item. rati tracks no root README yet — DOC-3 in
+    // docs/planned/website/public-prep-tasks.md writes the one npm and a stranger read.
+    "readmes": "required",
 
     // The docs sweep's baseline: the commit through which this repo's docs scope is converted, read
     // by style-targets.ts to window the next sweep (kit◊SW-13). This one is kit◊SW-10's landing. No
