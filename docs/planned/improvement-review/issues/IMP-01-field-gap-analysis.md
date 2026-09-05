@@ -29,3 +29,11 @@ rati's adopters arrive from somewhere — react-query/SWR + React Router, TanSta
 - The comparison table + classification committed under `docs/research/` (new file, linked from research README) with every field claim cited (URL + version, checked this session).
 - Class-(c) entries each cite the existing record — zero duplicated proposals (the anti-duplication rule's check).
 - Summary note in the effort README with the top-3.
+
+## Outcome (2026-07-20)
+
+Output: docs/research/field-gap-analysis.md — the full comparison (react-query v5 / SWR 2, TanStack Router 1.170 + Start RC, React Router 8.2, Next 16.2; every claim cited at session time), every field feature classified (a) covered / (b) rejected / (c) recorded / (d) net-new, three proposals, and four notes filed to the data effort: environment revalidation triggers, offline posture, `pagedCollection` page cap, mutation serialization evidence.
+
+The existing records held up well against the field — most expected axes (mutations, invalidation, stale UX, guards, search params, streaming, RSC) were already class (a) or (c); the genuinely unnoticed gaps clustered in *pre-navigation* behavior (prefetch, scroll, back/forward), which no prior record covers.
+
+Where the field moved since a record was written (throwable redirects from data code, Standard Schema search validation, view transitions as a stable `Link` prop, TanStack's `'data-only'` SSR mode, `pendingMinMs`), the evidence was noted on the record rather than re-proposed. No `packages/rati/src/` or docs/current/ changes; no bugs found to file to production-review.

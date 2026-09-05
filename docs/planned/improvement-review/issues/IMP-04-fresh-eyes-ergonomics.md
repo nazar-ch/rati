@@ -30,5 +30,5 @@ The API was designed by its one user, iteratively, against one app — the ideal
 ## Verify
 
 - The re-derivation diff committed under `docs/research/` with each divergence dispatched (scar-with-reason or proposal-with-severity) — no undispatched divergences.
-- The breaking-now-cheap list explicitly marked as the headline in the effort README's summary note, with the top-3.
+- The breaking-now-cheap list explicitly marked as the headline in this record's summary note, with the top-3.
 - Zero overlap with naming.md decisions absent new evidence (each engagement cites the section it argues with).
