@@ -18,9 +18,12 @@
     // corepack, `enableScripts: false`). No codegen; never git sync.
     "bootstrap": "yarn install",
     // `yarn install` is the whole of this repo's bootstrap, so its output directory is what says
-    // this checkout never had one.
+    // this checkout never had one. `packages/rati/dist` is the `rati-build` step's own output and
+    // is listed here because one trigger opens the arm that runs both: absent it, a provisioned
+    // checkout — deps already installed by sandbox/provision.sh, tree never moved — reads as
+    // prepared and that step is never reached.
     "bootstrapStale": {
-        "missing": ["node_modules"],
+        "missing": ["node_modules", "packages/rati/dist"],
     },
 
     // The second half of "make this checkout runnable", and `bootstrap` cannot be it: `yarn install`
