@@ -1,0 +1,118 @@
+// kit.json — rati's jnana-kit manifest: the facts a kit tool would otherwise hard-code about this
+// repo. One kit serves many projects; this file is the seam. JSONC (comments + trailing commas,
+// like tsconfig). Contract: jnana-kit `docs/design.md` §2. Every field is optional; a malformed
+// manifest is a hard error naming the field, because a typo'd guardrail must never read as "no
+// guardrail".
+//
+// The `$schema` pointer below names the copy the `@jnana-app/kit` INSTALL brings, not a path into
+// somebody's kit checkout — the pin in .yarnrc.yml then decides which schema version this file is
+// edited against, the same way it decides which gate runs (kit◊ASK-04, ruled 2026-08-08).
+// Nothing in this repo reads the pointer and no gate touches it: it buys an editor hint.
+{
+    "$schema": "../node_modules/@jnana-app/kit/kit.schema.json",
+
+    // Short name — pool slot dirs (`rati-wt-<n>`), central-feedback filenames, registry key.
+    "project": "rati",
+
+    // Idempotent "make this checkout runnable": install deps only (Node 26 + Yarn 4.17.1 via
+    // corepack, `enableScripts: false`). No codegen; never git sync.
+    "bootstrap": "yarn install",
+    // `yarn install` is the whole of this repo's bootstrap, so its output directory is what says
+    // this checkout never had one. `packages/rati/dist` is the `rati-build` step's own output and
+    // is listed here because one trigger opens the arm that runs both: absent it, a provisioned
+    // checkout — deps already installed by sandbox/provision.sh, tree never moved — reads as
+    // prepared and that step is never reached.
+    "bootstrapStale": {
+        "missing": ["node_modules", "packages/rati/dist"],
+    },
+
+    // The second half of "make this checkout runnable", and `bootstrap` cannot be it: `yarn install`
+    // links the workspaces but builds nothing, and `packages/rati/dist` is git-ignored. The ssr
+    // example's node-side config (examples/ssr/tsconfig.node.json) resolves `rati/server`,
+    // `rati/ssr` and `rati/vite` through the PUBLISHED entries — deliberately, so serve.ts
+    // type-checks against what a real consumer installs rather than through the `rati-dev`
+    // condition the two Vite-side configs use (the reasoning is in serve.ts's own header). Those
+    // entries are `dist/*.d.ts`, so in a checkout that has never built, `ssr-demo#typecheck` fails
+    // with three TS2307s and the whole `verify` gate is red before a worker touches anything. The
+    // main checkout only ever passed because a `dist/` from some earlier build was sitting in it —
+    // every fresh pool slot inherited the red.
+    //
+    // Runs where `bootstrap` runs (a tree that moved, or one that was never bootstrapped), so a
+    // steady-state session start pays nothing; a slot claim pays ~1s.
+    "prep": [
+        {
+            "id": "rati-build",
+            "label": "rati dist",
+            "command": "yarn workspace rati build && echo built",
+        },
+    ],
+
+    // Host guardrail: the publish path stays user-run outside a sandbox VM, layered over the kit
+    // baseline (`ansible`; `prisma` minus `prisma:generate` — neither used here). `scripts/release.sh`
+    // bumps the version, git-tags, and runs `yarn npm publish` to npmjs with the token in this
+    // machine's Keychain — an irreversible publish of the public `rati` package. Inert inside a VM
+    // (marker present), where the Keychain token is absent anyway.
+    "denyRules": {
+        "keywords": ["release", "publish"],
+        "rules": [
+            {
+                "id": "release",
+                "category": "package publish",
+                // `bash scripts/release.sh` / `./scripts/release.sh` tokenize to `release.sh`; the
+                // `release` npm script to `release`. The `^publish$` token pattern catches every
+                // wrapping of the publish itself — `npm publish`, `yarn npm publish`,
+                // `yarn workspace rati npm publish` — which the command-word rules alone can't
+                // (`yarn npm publish`'s command word is `npm`). `--publish` (release.sh's auth
+                // check) is a different token and stays allowed.
+                "command": ["release.sh", "release"],
+                "tokenPattern": "^publish$",
+                "reason": "scripts/release.sh (the `release` script) and a bare `yarn npm publish` bump and publish the public `rati` package to npmjs with the token in this machine's Keychain, and re-running does not undo a publish. Releasing is the maintainer's call (docs/current/RELEASING.md); `--dry-run` is the only safe form and is still user-run."
+            },
+        ],
+    },
+
+    // Repos whose work-item ids may be cited here in the qualified `<alias>◊<ID>` form. Both are
+    // already cited: rati's findings track their downstream in jnana (`jnana◊FND-237`), and this
+    // repo's configs name the kit records their shape comes from (`kit◊FND-170`). Undeclared,
+    // a qualified id reads as a typo'd local one and `issues.ts check` errors on it.
+    "citableRepos": ["jnana", "jnana-kit"],
+
+    // This corpus is SWEPT: every reference outside docs/archive/ carries the standing
+    // `<alias>◊<ID>` form, so the id gate reads the whole tree instead of a diff's added lines
+    // (kit◊KF-02, 52 sites — 37 the sweep rewrote, 15 qualified by hand where a bare sigil wore
+    // another repo's id, a backtick hid a citation, or a `#` opened the line). A legacy bare
+    // `◊KC-71` or colon `jnana:FND-237` anywhere in the tree is an error naming the standing form.
+    //
+    // The four bare sigils in `.vite-hooks/pre-commit` are the one exception, and the gate never
+    // reads them: that file is byte-identical in five repos at once, so its ids resolve against
+    // whichever tracker reads the line, and its own header states why each one is backtick-quoted.
+    "referenceScope": "corpus",
+
+    // rati files no LOCAL env-feedback — friction goes to the central jnana-kit-feedback repo.
+    // Everything else in scanRoots takes jnana's default layout (docs/planned/<effort>/issues/,
+    // which rati already uses).
+    "scanRoots": {
+        "feedback": null,
+    },
+
+    // rati's memory surface. The note root is the family default (docs/memory/), so only the
+    // always-loaded TOTAL is declared: the bytes every session in this repo pays before it opens
+    // anything, over the CLAUDE.local.md that docs/memory/CLAUDE.local/ renders. The root CLAUDE.md
+    // is an empty tracked file — the tier's whole content is the source folder's, so a session
+    // reads one surface and an editor has one place to write (user, 2026-08-30). Measured with the
+    // kit's own memory check rather than summed by hand, and only ever walked DOWN from here — a
+    // raise is the user's call, never a branch's. It was 11,266 over two files, until the hand-owned
+    // one moved in and its restatements of the user-scope gate, commit-subject and
+    // edit-the-source-folder rules went. Absent, the step reports the tier as unmeasured instead of
+    // holding it to a number.
+    "memory": {
+        "alwaysLoadedTotal": 9459,
+    },
+
+    // The docs sweep's baseline: the commit through which this repo's docs scope is converted, read
+    // by style-targets.ts to window the next sweep (kit◊SW-13). This one is kit◊SW-10's landing. No
+    // comment sweep has run here, so `commentsBaseline` stays absent, and absent means first run.
+    "styleSweep": {
+        "docsBaseline": "fe110d8b843ef1936918920c399c1a189cd56928",
+    },
+}
