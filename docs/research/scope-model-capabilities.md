@@ -4,7 +4,7 @@ Status: research record (2026-07-20), the output of the improvement-review effor
 
 This record is the end-to-end walk of what "the spec is data" buys, grounded in the source at session time (packages/rati/src/scope/scope.ts, packages/rati/src/mandala/resolver.tsx, packages/rati/src/mandala/mandala.tsx, packages/rati/src/mandala/channel.ts, packages/rati/src/router/store.ts) rather than in the docs' claims.
 
-Neighbors it engages rather than restates: the field-gap-analysis.md (its D1 prefetch and D3 devtools proposals border two sections here), undecided/dependency-graphs.md (`derive()`, the `PartialProps` note), undecided/deferred-scope-features.md (`.live()`, `.extend()`), ssg-and-rsc.md, undecided/ssr-streaming.md (the shell-line idea), router-extensions.md, and the executed docs/planned/testing-and-dx/README.md / docs/archive/efforts/scope-and-island/README.md efforts.
+Neighbors it engages rather than restates: the field-gap-analysis.md (its D1 prefetch and D3 devtools proposals border two sections here), undecided/dependency-graphs.md (`derive()`, the `PartialProps` note), undecided/deferred-scope-features.md (`.live()`, `.extend()`), ssg-and-rsc.md, undecided/ssr-streaming.md (the shell-line idea), router-extensions.md, and the executed docs/archive/efforts/testing-and-dx/README.md / docs/archive/efforts/scope-and-island/README.md efforts.
 
 ## The inventory — what the value actually exposes
 

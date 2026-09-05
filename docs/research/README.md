@@ -14,7 +14,7 @@ This is the flattened successor of the `directions-2026-07/` design review — t
 - stores-container-implementation.md — the concrete Option A plan (table-blind `AppRouter` surface + the stores-cluster renames from the naming review §6). The rename mechanics landed (`input`, `RouterStore`, `useRouter`, the `rati/ssr`
   - `rati/debug` entries); this shape change did not.
 - ssg-and-rsc.md — SSG (a build script over the shipped `renderApp`) and RSC as a compatibility constraint; direction only.
-- dx-and-tooling.md — test utilities (`rati/testing`), a `dataTrace` sibling to `navTrace`, DevTools naming for `Step` components. **In execution:** docs/planned/testing-and-dx/README.md (cut 2026-07-19).
+- dx-and-tooling.md — test utilities (`rati/testing`), a `dataTrace` sibling to `navTrace`, DevTools naming for `Step` components. **In execution:** docs/archive/efforts/testing-and-dx/README.md (cut 2026-07-19).
 
 ## Parked (left as-is — not part of this sort)
 

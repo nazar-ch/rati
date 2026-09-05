@@ -10,7 +10,7 @@ Out of scope for every direction: `src/data/` (not ready — its roadmap is the 
 
 Every session **starts by reading the existing design space** and may only propose net-new (or materially sharpened) directions. The inventory to read, verified at cut:
 
-- `docs/research/README.md` and everything it indexes — especially `router-extensions.md` (composition, layout scope, guards, typed search params, navigation status/blocking — a large claimed space; note `src/router/group.tsx` exists, so check what has landed since), `ssg-and-rsc.md`, and the executed `scope-and-island-directions.md` / `dx-and-tooling.md` (their efforts: `docs/archive/efforts/scope-and-island/`, `docs/planned/testing-and-dx/`).
+- `docs/research/README.md` and everything it indexes — especially `router-extensions.md` (composition, layout scope, guards, typed search params, navigation status/blocking — a large claimed space; note `src/router/group.tsx` exists, so check what has landed since), `ssg-and-rsc.md`, and the executed `scope-and-island-directions.md` / `dx-and-tooling.md` (their efforts: `docs/archive/efforts/scope-and-island/`, `docs/archive/efforts/testing-and-dx/`).
 - `docs/research/undecided/` (`.live()`/`.extend()`, `derive()`, SSR streaming) and `docs/research/postponed/rsc-support.md` — weighed or deferred; a proposal touching them must engage with the recorded reasoning, not restate it.
 - `docs/archive/directions-2026-07/` — the July review's shipped record, including `naming.md` (the vocabulary rules any proposal must respect: plain English, no coined terms) and `data-package.md` (the boundary with the excluded layer).
 

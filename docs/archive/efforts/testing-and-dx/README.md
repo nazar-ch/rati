@@ -1,6 +1,6 @@
 # testing-and-dx — the `rati/testing` entry, grounded in what both repos hand-roll
 
-Status: planned 2026-07-19. Per-item status is each record's own `status:` field — never from this file; conventions below.
+Status: **done — cut 2026-07-19, closed & archived 2026-09-05.** Per-item status is each record's own `status:` field — never from this file; conventions below.
 
 Executes docs/research/dx-and-tooling.md, checked against what rati's own suites and Jnana's frontend tests actually hand-roll (survey below) and built as **public API** — the utilities ship for consumers, not just for rati's test tree. The research doc's three bullets survive contact with the survey intact, and gain one member it missed (the SSR round-trip kit).
 
@@ -39,7 +39,7 @@ DX-01 is the calibration gate: it creates the entry and sets the API style (nami
 - DX-08 — SSR error-channel hardening: per-collector rejection dedup + a prerender settle budget (issues/DX-08-ssr-error-channel.md)
 - DX-09 — a real RouterStore fits a `PartialStores` slot (issues/DX-09-router-in-partial-stores.md) (cut 2026-07-20 from the DX-06 frictions)
 
-Batching, dependencies, grading: docs/planned/testing-and-dx/plan.md.
+Batching, dependencies, grading: docs/archive/efforts/testing-and-dx/plan.md.
 
 ## Findings
 

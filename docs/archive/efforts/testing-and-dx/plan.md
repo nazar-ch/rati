@@ -1,6 +1,8 @@
 # testing-and-dx — implementation plan
 
-Items live in docs/planned/testing-and-dx/issues; each record's `status:` field is the workflow state. No status here.
+> **Archived 2026-09-05** (all nine items shipped; closed in the kit's readme-ban S0 pass) — closed tracker, kept as the historical record. No successor effort, and no open items carried: DX-01 through DX-09 all landed by 2026-07-20, DX-09 closing both frictions the Jnana adoption leg found. The shipped entry is documented in docs/current/public/reference.md §`rati/testing`; where its promoted cores left the fuzz harnesses is docs/current/internals.md.
+
+Items live in docs/archive/efforts/testing-and-dx/issues; each record's `status:` field is the workflow state. No status here.
 
 ## Batches
 
