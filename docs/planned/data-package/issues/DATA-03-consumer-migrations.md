@@ -29,7 +29,7 @@ For each leg: line-count and concept-count before/after, and a dated findings no
 
 ## Verify
 
-- Jnana's own gates green after each leg; the before/after deltas recorded in §Findings.
+- Jnana's own gates green after each leg; the before/after deltas and the findings recorded in §Findings, which `issues.ts show DATA-03` prints.
 
 ## Findings (recorded 2026-07-20)
 
