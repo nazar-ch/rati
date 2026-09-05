@@ -42,7 +42,7 @@ Second round (cut 2026-07-25 from the wave-two feedback, below; decisions in eac
 - DATA-18 — "with React Aria Components" (issues/DATA-18-react-aria-section.md) — the consumer-stack field notes, mined from jnana.
 - issues/DATA-19-form-success-state.md — **deferred**: jnana latches app-side; the record parks the two-level-shape discussion.
 
-Related, outside this effort: FND-03 — `is.class` under minification (docs/backlog/findings/issues/FND-03-is-class-minification.md) runs in this batch (the class-factory pattern DATA-13/14 bless must not be prod-broken).
+Related, outside this effort: FND-03 — `is.class` under minification (docs/archive/backlog-closed-1/issues/FND-03-is-class-minification.md) runs in this batch (the class-factory pattern DATA-13/14 bless must not be prod-broken).
 
 Batch structure: wave 1 runs four independent legs — A: DATA-10+11 (errors + retry) · B: DATA-12+13 (rename + reconciled/facade, one branch, that order) · C: DATA-14 · E: FND-03. Wave 2, on the landed surfaces — D: DATA-15+16 · F: DATA-17+18.
 
