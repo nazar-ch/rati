@@ -16,7 +16,8 @@
         "upgrade-node": "vp env install",
         "ci": "node scripts/ci.ts",
         "release": "./scripts/release.sh",
-        "prepare": "vp config"
+        "prepare": "vp config",
+        "postinstall": "vp config"
     },
     "devDependencies": {
         "@jnana-app/kit": "catalog:",
