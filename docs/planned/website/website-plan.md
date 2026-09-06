@@ -18,7 +18,7 @@ Implementation tasks live in public-prep-tasks.md (SITE-*).
 
 **Voice.** Developer-to-developer, dry, concrete. Every showcase section opens from a pain the reader has personally caused ("you've written this component"). No exclamation marks, no mascot antics, no superheroes; wit lives in precision, not decoration. Code is always real and always typed.
 
-**ASCII props.** Draft ASCII art (parrot marks, wordmarks, boards, trains, concept diagrams) lives in assets/ascii/README.md — raw material for the 404 page, loading placeholders, README, and anywhere a plain-text mark fits the voice.
+**ASCII props.** Draft ASCII art (parrot marks, wordmarks, boards, trains, concept diagrams) lives in assets/ascii/ — raw material for the 404 page, loading placeholders, README, and anywhere a plain-text mark fits the voice.
 
 **Words we use / avoid.**
 

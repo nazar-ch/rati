@@ -13,7 +13,7 @@ The stations, and the source of truth for what each covers.
 - docs/current/public/ — the **guide** + **reference**: the public API and mental model, app setup, routing, SSR, rendered by the website.
 - docs/current/internals.md — contributor internals: source layout, the `mandala` engine, the resolver/refresh machinery, lifecycle/teardown, channels, SSR dehydration, testing, toolchain.
 - docs/research/ — deferred features, design directions, testing strategy.
-- docs/planned/ — committed efforts: an effort `README.md` (framing, decisions, narrative item map), an optional `plan.md` (batches + grading), and one work-item record per item under `issues/<ID>-<slug>.md`.
+- docs/planned/ — committed efforts: an effort `plan.md` (the framing paragraph, the sequence, the orchestration notes) and one work-item record per item under `issues/<ID>-<slug>.md`.
 - docs/current/RELEASING.md — the release process.
 - docs/planned/website/website-plan.md — the public site.
 - New public surface documents in docs/current/public/ and nowhere else — that tree is what the website renders.

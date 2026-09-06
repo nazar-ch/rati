@@ -1,6 +1,6 @@
 # scope-and-island — resolution control and advanced loading states
 
-Status: planned 2026-07-19. Per-item status is each record's own `status:` field — never from this file; conventions below.
+Status: **done — cut 2026-07-19, closed & archived 2026-09-05.** Per-item status is each record's own `status:` field — never from this file; conventions below.
 
 Executes parts 1 and 2 of docs/research/scope-and-island-directions.md — the scope/ resolution half (abort signals) and the island loading-state half (`loadingDelayMs`, `keepStale` + the status surface, retry policy, per-island `ssr: false`, SSR-error dehydration). Part 3 (`ResourceContainer` migrating into core) stays in research — it waits on the `.extend()` / layout-scope work and is not cut here.
 
@@ -27,7 +27,7 @@ SI-02 (`loadingDelayMs`) builds on the kept-bucket mechanism and pins the compos
 - SI-05 — automatic retry policy (issues/SI-05-retry-policy.md)
 - SI-06 — SSR error dehydration (`ssrErrors`) (issues/SI-06-ssr-error-dehydration.md)
 
-Batching, dependencies, grading: docs/planned/scope-and-island/plan.md.
+Batching, dependencies, grading: docs/archive/efforts/scope-and-island/plan.md.
 
 ## Findings
 

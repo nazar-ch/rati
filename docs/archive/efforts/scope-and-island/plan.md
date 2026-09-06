@@ -1,6 +1,8 @@
 # scope-and-island — implementation plan
 
-Items live in docs/planned/scope-and-island/issues; each record's `status:` field is the workflow state. No status here.
+> **Archived 2026-09-05** (all six items shipped; closed in the kit's readme-ban S0 pass) — closed tracker, kept as the historical record. No successor effort, and no open items carried: SI-01 through SI-06 all landed by 2026-07-20. The shipped surface is documented in docs/current/public/guide.md, docs/current/public/reference.md and docs/current/public/ssr.md; the engine machinery is in docs/current/internals.md. The three directions execution left open are recorded in docs/research/scope-and-island-directions.md.
+
+Items live in docs/archive/efforts/scope-and-island/issues; each record's `status:` field is the workflow state. No status here.
 
 ## Batches
 
