@@ -1,0 +1,32 @@
+#!/bin/sh
+# why-shell: hook-dispatch — a git hook body, and a file that cannot move into the kit: git runs hooks
+# from the repo whose tree they act on, so every consumer must carry this file itself.
+#
+# `.vite-hooks/post-checkout`, `.vite-hooks/post-merge` and `.vite-hooks/post-rewrite` are these same
+# bytes under three names. Each is the seam that reaches the kit's `tools/surface-hook.sh`, which
+# re-renders the gitignored read surface after a checkout, a merge or a rebase moved its sources
+# (kit◊FND-210). A consumer adopts it by copying the three files once, beside `.vite-hooks/pre-commit`,
+# and picks up every later change by doing nothing (kit◊WTH-02). Sourced rather than spawned, so it
+# needs nothing on PATH the body does not need anyway.
+#
+# Every id here carries the `kit` alias, which is the one spelling right in every repo these
+# bytes live in: self-qualification resolves in the kit, and a consumer reads it as the foreign
+# citation it is, against the `jnana-kit` its own `citableRepos` declares (kit◊KF-01).
+#
+# Fails OPEN when the kit is not resolvable: git makes a post-checkout hook's exit status the exit
+# status of `git checkout`, so a transition that cannot reach the body still has to succeed. Loudly,
+# though — the renderings then describe the tree git just left, and the next `surface` gate step reds
+# on a file nobody edited.
+#
+# `$JNANA_KIT_HOME` is the whole of how the kit is found here, with no default behind it, exactly as
+# in `.vite-hooks/pre-commit`: an unset variable takes the same loud open arm below as a wrong path.
+KIT="${JNANA_KIT_HOME:-}"
+if [ -r "${KIT}/tools/surface-hook.sh" ]; then
+    # The body is the kit's own file, outside this repo's tree by construction, so a shell linter
+    # standing here has nothing to follow. The kit lints that file directly.
+    # shellcheck disable=SC1091
+    . "${KIT}/tools/surface-hook.sh"
+else
+    printf '%s: no jnana-kit surface hook at %s — the read surface was NOT re-rendered, so it can describe the tree git just left. Point JNANA_KIT_HOME at a kit carrying tools/surface-hook.sh (a promotion brings the installed kit up to one), then run: kit.ts surface generate\n' "${0##*/}" "${KIT}" >&2
+    exit 0
+fi
