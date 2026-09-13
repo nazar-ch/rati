@@ -10,5 +10,15 @@
     // ("Unexpected non-string, boolean, or int property (includes)") when it appears in a config
     // reached via extends, so every consumer repeats this line even though its value never varies.
     "includes": ["**/*.md"],
-    "excludes": ["**/node_modules", "**/.git", "**/.yarn", "**/dist", "**/coverage"]
+    // The pool's brief is ignored only by `.git/info/exclude`, which dprint never reads from a linked
+    // worktree, so the Markdown gate would read it in every slot (kit◊FND-213). Every consumer
+    // repeats that line: dprint refuses `excludes` in an extended base.
+    "excludes": [
+        "/.jnana-kit-brief.md",
+        "**/node_modules",
+        "**/.git",
+        "**/.yarn",
+        "**/dist",
+        "**/coverage"
+    ]
 }
