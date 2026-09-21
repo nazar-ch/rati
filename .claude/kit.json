@@ -14,6 +14,18 @@
     // Short name — pool slot dirs (`rati-wt-<n>`), central-feedback filenames, registry key.
     "project": "rati",
 
+    // The tree as it stood when the size gate landed; an entry leaves in the change that splits its
+    // path.
+    "sizeExempt": {
+        "fileLines": [
+            { "path": "packages/rati/src/__tests__/mandala/scopeControls.test.tsx", "reason": "past the limit when the size gate landed, and exempt until its split" },
+        ],
+        "dirFiles": [
+            { "path": "packages/rati/src/__tests__/mandala", "reason": "past the limit when the size gate landed, and exempt until its split" },
+            { "path": "packages/rati/src/__tests__/router", "reason": "past the limit when the size gate landed, and exempt until its split" },
+        ],
+    },
+
     // Idempotent "make this checkout runnable": install deps only (Node 26 + Yarn 4.17.1 via
     // corepack, `enableScripts: false`). No codegen; never git sync.
     "bootstrap": "yarn install",
