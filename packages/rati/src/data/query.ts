@@ -158,12 +158,11 @@ export function createQuery<T>(
     let requestId = 0;
     let controller: AbortController | null = null;
     let inFlight: Promise<void> | null = null;
-    let scheduled: {
-        timer: ReturnType<typeof setTimeout>;
-        firstCallAt: number;
-        promise: Promise<void>;
-        resolve: () => void;
-    } | null = null;
+    const debouncer = createDebouncer(startFetch, () =>
+        runInAction(() => {
+            state.pending = true; // a fetch is imminent — honest, not presentational
+        }),
+    );
     let reaction: Reaction | null = null;
     let memoizedSource: Source<ReadyQuery<T>> | undefined;
 
@@ -171,25 +170,14 @@ export function createQuery<T>(
     // producer executions): a tracked observable changing re-runs the query. The
     // reaction re-tracks on every fetch, so conditional reads stay accurate.
     // Called inside the fetch IIFE's try, so a synchronous throw (either path)
-    // lands on the normal error path — but a throw inside `track` must be
-    // re-raised *outside* it, or the reaction's own error boundary swallows it.
+    // lands on the normal error path.
     function callProducer(signal: AbortSignal): Promise<T> {
         if (!options.reactive) return producer(signal);
         reaction ??= new Reaction('rati.query.reactive', () => {
             if (options.onReactiveInvalidate) options.onReactiveInvalidate();
             else reactiveRefresh();
         });
-        let result!: Promise<T>;
-        let caught: { value: unknown } | undefined;
-        reaction.track(() => {
-            try {
-                result = producer(signal);
-            } catch (thrown) {
-                caught = { value: thrown };
-            }
-        });
-        if (caught) throw caught.value;
-        return result;
+        return trackRethrowing(reaction, () => producer(signal));
     }
 
     function startFetch(): Promise<void> {
@@ -233,38 +221,9 @@ export function createQuery<T>(
         return promise;
     }
 
-    function scheduleDebounced(waitMs: number, maxWaitMs: number | undefined): Promise<void> {
-        if (scheduled) {
-            clearTimeout(scheduled.timer);
-            const elapsed = Date.now() - scheduled.firstCallAt;
-            const wait =
-                maxWaitMs === undefined
-                    ? waitMs
-                    : Math.min(waitMs, Math.max(0, maxWaitMs - elapsed));
-            scheduled.timer = setTimeout(fire, wait);
-            return scheduled.promise;
-        }
-        let resolve!: () => void;
-        const promise = new Promise<void>((res) => {
-            resolve = res;
-        });
-        scheduled = { timer: setTimeout(fire, waitMs), firstCallAt: Date.now(), promise, resolve };
-        runInAction(() => {
-            state.pending = true; // a fetch is imminent — honest, not presentational
-        });
-        return promise;
-    }
-
-    function fire(): void {
-        const current = scheduled;
-        if (!current) return;
-        scheduled = null;
-        void startFetch().then(current.resolve);
-    }
-
     function prime(): Promise<void> {
-        if (scheduled) return scheduled.promise;
-        if (inFlight) return inFlight;
+        const joined = debouncer.pending ?? inFlight;
+        if (joined) return joined;
         if (state.hasData && !state.error) return Promise.resolve(); // ready → no-op
         return startFetch();
     }
@@ -272,7 +231,7 @@ export function createQuery<T>(
     function refresh(): Promise<void> {
         if (inFlight) return inFlight;
         const { debounce } = options;
-        if (debounce) return scheduleDebounced(debounce.waitMs, debounce.maxWaitMs);
+        if (debounce) return debouncer.schedule(debounce.waitMs, debounce.maxWaitMs);
         return startFetch();
     }
 
@@ -283,7 +242,7 @@ export function createQuery<T>(
     // settle and show briefly before the debounced re-fetch supersedes it.
     function reactiveRefresh(): void {
         const { debounce } = options;
-        if (debounce) void scheduleDebounced(debounce.waitMs, debounce.maxWaitMs);
+        if (debounce) void debouncer.schedule(debounce.waitMs, debounce.maxWaitMs);
         else void startFetch();
     }
 
@@ -309,11 +268,7 @@ export function createQuery<T>(
         controller?.abort();
         controller = null;
         inFlight = null;
-        if (scheduled) {
-            clearTimeout(scheduled.timer);
-            scheduled.resolve(); // a cancelled coalesced refresh resolves, not hangs
-            scheduled = null;
-        }
+        debouncer.cancel();
         // Stop reacting: the next explicit prime()/refresh() re-establishes tracking.
         reaction?.dispose();
         reaction = null;
@@ -359,6 +314,84 @@ export function createQuery<T>(
         },
     };
     return self;
+}
+
+interface Debouncer {
+    /** The promise every call of the scheduled burst shares; null when no burst is open. */
+    readonly pending: Promise<void> | null;
+    schedule(waitMs: number, maxWaitMs: number | undefined): Promise<void>;
+    /** Drops the scheduled fire and resolves its promise: a cancelled burst resolves, not hangs. */
+    cancel(): void;
+}
+
+// The `debounce` coalescer: a burst runs `start` once, `waitMs` after its last call and no later
+// than `maxWaitMs` after its first. `onScheduled` runs when a burst opens.
+function createDebouncer(start: () => Promise<void>, onScheduled: () => void): Debouncer {
+    let scheduled: {
+        timer: ReturnType<typeof setTimeout>;
+        firstCallAt: number;
+        promise: Promise<void>;
+        resolve: () => void;
+    } | null = null;
+
+    function fire(): void {
+        const current = scheduled;
+        if (!current) return;
+        scheduled = null;
+        void start().then(current.resolve);
+    }
+
+    return {
+        get pending() {
+            return scheduled?.promise ?? null;
+        },
+        schedule(waitMs, maxWaitMs) {
+            if (scheduled) {
+                clearTimeout(scheduled.timer);
+                const elapsed = Date.now() - scheduled.firstCallAt;
+                const wait =
+                    maxWaitMs === undefined
+                        ? waitMs
+                        : Math.min(waitMs, Math.max(0, maxWaitMs - elapsed));
+                scheduled.timer = setTimeout(fire, wait);
+                return scheduled.promise;
+            }
+            let resolve!: () => void;
+            const promise = new Promise<void>((res) => {
+                resolve = res;
+            });
+            scheduled = {
+                timer: setTimeout(fire, waitMs),
+                firstCallAt: Date.now(),
+                promise,
+                resolve,
+            };
+            onScheduled();
+            return promise;
+        },
+        cancel() {
+            if (!scheduled) return;
+            clearTimeout(scheduled.timer);
+            scheduled.resolve();
+            scheduled = null;
+        },
+    };
+}
+
+// Runs `run` under `reaction`'s tracking. A throw inside `track` is re-raised *outside* it, or
+// the reaction's own error boundary swallows it.
+function trackRethrowing<R>(reaction: Reaction, run: () => R): R {
+    let result!: R;
+    let caught: { value: unknown } | undefined;
+    reaction.track(() => {
+        try {
+            result = run();
+        } catch (thrown) {
+            caught = { value: thrown };
+        }
+    });
+    if (caught) throw caught.value;
+    return result;
 }
 
 /**
