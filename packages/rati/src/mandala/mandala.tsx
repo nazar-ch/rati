@@ -14,11 +14,11 @@ import { AfterHydration } from './afterHydration.js';
 import { MandalaErrorBoundary } from './boundary.js';
 import { registerScopeChannel, setScopeLabel } from './channel.js';
 import { registerScopeControlsChannel } from './controls.js';
-import { HydrationContext } from './hydration.js';
+import { HydrationContext, type Hydration } from './hydration.js';
 import { LoadingDelay, noDelaySubscribe, notHeld } from './loadingDelay.js';
 import { discardRun, RefreshController } from './refresh.js';
 import { buildTree, flattenLevels, type Bucket, type Shared } from './resolver.js';
-import { RetryPolicy, resolveRetry, type RetryOption } from './retryPolicy.js';
+import { RetryPolicy, resolveRetry, type RetryOption, type RetrySettings } from './retryPolicy.js';
 import { createRejectionGuard } from './ssrErrors.js';
 
 import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope.js';
@@ -303,6 +303,244 @@ function generationCause(previousKey: string | undefined, retry: number): DataTr
     return previousKey.endsWith(`:${retry}`) ? 'inputs' : 'retry';
 }
 
+type ErrorSlotComponent = ComponentType<{ inputs: unknown; error: SourceError; retry: () => void }>;
+
+/** Tracks `inputs` by value: `versionRef` counts the changes, `initialInputsRef` holds the first. */
+function useInputsVersion<I>(inputs: I) {
+    const initialInputsRef = useRef(inputs);
+    const inputsRef = useRef(inputs);
+    const versionRef = useRef(0);
+    if (!deepEqual(inputsRef.current, inputs)) {
+        inputsRef.current = inputs;
+        versionRef.current += 1;
+    }
+    return { initialInputsRef, versionRef };
+}
+
+/** One generation of the mandala's inner tree: its per-level data-cell caches and run state. */
+type Generation = {
+    key: string;
+    buckets: Bucket[];
+    trace: DataTrace | undefined;
+    recordedRejections: WeakSet<Promise<unknown>> | undefined;
+    guardRejection: ((promise: Promise<unknown>) => Promise<unknown>) | undefined;
+};
+
+/** The hydration registry's verbs and slices, bound to one mandala's id. */
+type HydrationBinding = Pick<
+    Shared,
+    'collect' | 'collectError' | 'claim' | 'hydration' | 'seeds' | 'errors'
+>;
+
+function bindHydration(
+    hydration: Hydration,
+    mandalaId: string,
+    firstMount: boolean,
+    dehydrateErrors: boolean,
+): HydrationBinding {
+    return {
+        hydration: firstMount ? hydration.data?.[mandalaId] : undefined,
+        seeds: firstMount ? hydration.seeds?.[mandalaId] : undefined,
+        // Same gate, and for the same reason: a retry (manual or the policy's) and an
+        // inputs change both mean "run the load", which is precisely what a dehydrated
+        // failure is the alternative to.
+        errors: firstMount ? hydration.errors?.[mandalaId] : undefined,
+        // Bound to this mandala's id; present only on the server (client has no `collect`),
+        // where each Step records its resolved promise for the wire.
+        collect: hydration.collect
+            ? (key, value, kind) => hydration.collect!(mandalaId, key, value, kind)
+            : undefined,
+        // The island's `ssrErrors` mode rides along: every failure is recorded for the
+        // status derivation, and this is what decides whether it also crosses the wire.
+        collectError: hydration.collectError
+            ? (key, error) => hydration.collectError!(mandalaId, key, error, dehydrateErrors)
+            : undefined,
+        claim: hydration.claim
+            ? (key, section) => hydration.claim!(mandalaId, key, section)
+            : undefined,
+    };
+}
+
+function openGeneration(
+    key: string,
+    levels: readonly unknown[],
+    trace: DataTrace | undefined,
+    binding: HydrationBinding,
+    dehydrateErrors: boolean,
+): Generation {
+    return {
+        key,
+        buckets: levels.map(() => ({
+            cells: new Map(),
+            sources: [],
+            built: false,
+            abort: null,
+        })),
+        trace,
+        // Which rejecting loads this generation already reported to the render's error
+        // collector (see the resolver's recordRejection). Scoped to the run for the same
+        // reason the trace is: a *later* render reusing the same promise instance is a new
+        // report, not a duplicate of this one.
+        recordedRejections: binding.collectError ? new WeakSet<Promise<unknown>>() : undefined,
+        // The rejection-proof twins this generation's Steps wait on under
+        // `ssrErrors: 'dehydrate'` — scoped to the run for the same reason. Gated
+        // on the collector, like the source-side `ssr` marker and for the same
+        // reason: with nothing to carry the failure over, painting the error slot
+        // would only mean the client paints something else a moment later. The
+        // default degradation is what a render without a payload is *for*.
+        guardRejection: binding.collect && dehydrateErrors ? createRejectionGuard() : undefined,
+    };
+}
+
+/**
+ * Retire the generation a new one replaces. Only a run that reached the screen is worth keeping
+ * — and only if none already is. A second re-resolve mid-stale-window discards the run that never
+ * committed and keeps showing the original: swapping in a half-built replacement would blank
+ * exactly what `keepStale` exists to preserve.
+ */
+function retireGeneration(
+    previous: Generation,
+    committed: CommittedOutput | null,
+    keepsRun: boolean,
+    keptRef: { current: KeptRun | null },
+    orphanedRef: { current: Bucket[][] },
+): void {
+    if (keepsRun && !keptRef.current && committed && committed.buckets === previous.buckets) {
+        keptRef.current = {
+            buckets: previous.buckets,
+            resolved: committed.resolved,
+            provided: committed.provided,
+            disposeProvided: null,
+        };
+    } else {
+        orphanedRef.current.push(previous.buckets);
+    }
+}
+
+/**
+ * The leaf's hooks into the run lifecycle — `Shared.commit`, `.swap` and `.retainProvided`.
+ * `commitRun` is the leaf's commit, where a run becomes "what is on screen": recording the output
+ * there rather than during render is what makes the kept baseline a *committed* one.
+ */
+function runCallbacks(
+    committedRef: { current: CommittedOutput | null },
+    keptRef: { current: KeptRun | null },
+    delay: LoadingDelay | null,
+    policy: RetryPolicy | null,
+) {
+    const commitRun = (
+        buckets: Bucket[],
+        resolved: Record<string, unknown>,
+        provided: { value: unknown } | null,
+    ) => {
+        committedRef.current = { buckets, resolved, provided };
+        // Content is on screen, so the delay has nothing to hold back and the next
+        // stretch without content gets the full deadline again...
+        delay?.settled();
+        // ...and whatever failure the retry policy was working through is over, however
+        // many attempts it took: the budget is per failure streak, not per island.
+        policy?.reset();
+    };
+
+    // The swap: the successor is on screen, so the run it replaced can go. Split from
+    // `commitRun` and driven from the leaf's *passive* effect for two reasons. The
+    // phase: every layout effect of the commit — including the new Steps' source
+    // attach — has run by then, so a source both runs hold is never detached and
+    // re-attached across the window. And the caller: a Suspense retry re-renders the
+    // boundary's children, not the mandala, so an effect of the mandala's own would
+    // simply not run on the commit that ends the window.
+    const swapRun = (buckets: Bucket[]) => {
+        releaseKept(keptRef, buckets);
+    };
+
+    // A retiring `ProvideLeaf` offering its dispose: taken only when its run is the one
+    // being kept, in which case the value stays alive (and published) until the swap
+    // releases it. Everything else disposes on the spot, as always.
+    const retainProvided = (buckets: Bucket[], dispose: () => void): boolean => {
+        const kept = keptRef.current;
+        if (!kept || kept.buckets !== buckets) return false;
+        kept.disposeProvided = dispose;
+        return true;
+    };
+
+    return { commitRun, swapRun, retainProvided };
+}
+
+/**
+ * The retry a *human* asked for — the error slot's prop, `useScopeControls().retry`, and
+ * `refresh()` with no key. It resets the automatic budget: a click is new information, not a
+ * continuation of the streak the policy just gave up on. Held on a ref so the error slot's
+ * `retry` prop keeps the stable identity `bumpRetry` had; without the option it *is* `bumpRetry`,
+ * and nothing here is in the way.
+ */
+function useManualRetry(
+    retrySettings: RetrySettings | null,
+    policyRef: { current: RetryPolicy | null },
+    bumpRetry: () => void,
+): () => void {
+    const manualRetryRef = useRef<(() => void) | null>(null);
+    if (retrySettings) {
+        manualRetryRef.current ??= () => {
+            policyRef.current?.reset();
+            bumpRetry();
+        };
+    }
+    return manualRetryRef.current ?? bumpRetry;
+}
+
+/** The mandala's unmount: every run it still holds goes, and its pending countdowns with it. */
+function teardownRun(
+    cacheRef: { current: Generation | null },
+    orphanedRef: { current: Bucket[][] },
+    keptRef: { current: KeptRun | null },
+    delayRef: { current: LoadingDelay | null },
+    policyRef: { current: RetryPolicy | null },
+): void {
+    discardRun(cacheRef.current?.buckets);
+    // An unmount racing a generation change can leave a bucket queued but
+    // unswept (the effect above never ran for it).
+    for (const buckets of orphanedRef.current) discardRun(buckets);
+    orphanedRef.current = [];
+    // The run `keepStale` was holding on screen: the island is gone, so there
+    // is nothing left to keep it for. Same order as the swap.
+    releaseKept(keptRef, null);
+    // ...and nothing left to delay or retry: the pending countdowns go with it.
+    delayRef.current?.dispose();
+    policyRef.current?.dispose();
+    cacheRef.current = null;
+}
+
+/**
+ * The resolver's server-side error path: the run's guard, plus the error slot the Step renders in
+ * place of the throw React would hand to nobody. Undefined without a guard.
+ */
+function ssrErrorPath(
+    guard: Generation['guardRejection'],
+    ErrorSlot: ErrorSlotComponent | undefined,
+    inputs: unknown,
+    retry: () => void,
+): Shared['ssrErrors'] {
+    if (!guard) return undefined;
+    return {
+        guard,
+        slot: ErrorSlot
+            ? (error: SourceError) => <ErrorSlot inputs={inputs} error={error} retry={retry} />
+            : null,
+    };
+}
+
+function forwardLazy(
+    mandala: Pick<MandalaComponent<Scope>, 'preload' | 'moduleId'>,
+    component: unknown,
+): void {
+    const lazyComponent = component as {
+        preload?: () => Promise<unknown>;
+        moduleId?: string;
+    };
+    if (typeof lazyComponent.preload === 'function') mandala.preload = lazyComponent.preload;
+    if (lazyComponent.moduleId !== undefined) mandala.moduleId = lazyComponent.moduleId;
+}
+
 /**
  * Build a mandala component from a scope + component + slots. `kindLabel` is the public
  * concept the caller represents (`Island` / `Route`) — used for the React `displayName`
@@ -321,9 +559,7 @@ export function createMandala<S extends Scope<any>>(
     const Loading = (config.loading ?? DefaultLoading) as ComponentType<{ inputs: unknown }>;
     // Undefined means "no slot": the boundary rethrows to the nearest outer one, and a
     // server render has nothing deterministic to paint (see `ssrErrors`).
-    const ErrorSlot = config.error as
-        | ComponentType<{ inputs: unknown; error: SourceError; retry: () => void }>
-        | undefined;
+    const ErrorSlot = config.error as ErrorSlotComponent | undefined;
     const levels = flattenLevels(config.scope as Scope);
     // Build-time constants, so the element tree below keeps one stable shape per mandala.
     const ssrEnabled = config.ssr !== false;
@@ -363,13 +599,7 @@ export function createMandala<S extends Scope<any>>(
         // tears the old one down (children first: the `.provide()` value disposes before
         // its sources detach) and resolves the new inputs from scratch. Source transitions
         // (same inputs) re-render in place, keeping promise/source identity.
-        const initialInputsRef = useRef(inputs);
-        const inputsRef = useRef(inputs);
-        const versionRef = useRef(0);
-        if (!deepEqual(inputsRef.current, inputs)) {
-            inputsRef.current = inputs;
-            versionRef.current += 1;
-        }
+        const { initialInputsRef, versionRef } = useInputsVersion(inputs);
         const treeKey = `${versionRef.current}:${retry}`;
 
         // Seed from server-resolved values only on this mandala's *first* resolution: a
@@ -377,40 +607,12 @@ export function createMandala<S extends Scope<any>>(
         // post-hydration source re-render keeps (retry 0, initial inputs), consistent
         // with the server HTML.
         const firstMount = retry === 0 && deepEqual(inputs, initialInputsRef.current);
-        const hydrationSlice = firstMount ? hydration.data?.[mandalaId] : undefined;
-        const seedsSlice = firstMount ? hydration.seeds?.[mandalaId] : undefined;
-        // Same gate, and for the same reason: a retry (manual or the policy's) and an
-        // inputs change both mean "run the load", which is precisely what a dehydrated
-        // failure is the alternative to.
-        const errorsSlice = firstMount ? hydration.errors?.[mandalaId] : undefined;
-
-        // Bound to this mandala's id; present only on the server (client has no `collect`),
-        // where each Step records its resolved promise for the wire.
-        const collect = hydration.collect
-            ? (key: string, value: unknown, kind: 'value' | 'seed') =>
-                  hydration.collect!(mandalaId, key, value, kind)
-            : undefined;
-        // The island's `ssrErrors` mode rides along: every failure is recorded for the
-        // status derivation, and this is what decides whether it also crosses the wire.
-        const collectError = hydration.collectError
-            ? (key: string, error: SourceError) =>
-                  hydration.collectError!(mandalaId, key, error, dehydrateErrors)
-            : undefined;
-        const claim = hydration.claim
-            ? (key: string, section: 'data' | 'seeds' | 'errors') =>
-                  hydration.claim!(mandalaId, key, section)
-            : undefined;
+        const binding = bindHydration(hydration, mandalaId, firstMount, dehydrateErrors);
 
         // Per-level data-cell caches, rebuilt when the inner tree remounts (treeKey
         // change). Held on the mandala's committed ref so a Step's `use()` suspension
         // can't discard a half-built cell (which would re-run its load forever).
-        const cacheRef = useRef<{
-            key: string;
-            buckets: Bucket[];
-            trace: DataTrace | undefined;
-            recordedRejections: WeakSet<Promise<unknown>> | undefined;
-            guardRejection: ((promise: Promise<unknown>) => Promise<unknown>) | undefined;
-        } | null>(null);
+        const cacheRef = useRef<Generation | null>(null);
         // Buckets the line below replaced, awaiting the sweep in the commit effect. A Step
         // torn down while its bucket was still live keeps its sources attached on purpose
         // (it can't tell a source swap from an unmount — see the resolver's detach effect)
@@ -444,52 +646,12 @@ export function createMandala<S extends Scope<any>>(
             // A resolution starts here — the generation being built *is* the resolution —
             // so this is where the delay's window opens (timer-less; see LoadingDelay).
             delay?.begin();
-            if (previous) {
-                // Only a run that reached the screen is worth keeping — and only if none
-                // already is. A second re-resolve mid-stale-window discards the run that
-                // never committed and keeps showing the original: swapping in a half-built
-                // replacement would blank exactly what `keepStale` exists to preserve.
-                if (
-                    keepsRun &&
-                    !keptRef.current &&
-                    committed &&
-                    committed.buckets === previous.buckets
-                ) {
-                    keptRef.current = {
-                        buckets: previous.buckets,
-                        resolved: committed.resolved,
-                        provided: committed.provided,
-                        disposeProvided: null,
-                    };
-                } else {
-                    orphanedRef.current.push(previous.buckets);
-                }
-            }
+            if (previous) retireGeneration(previous, committed, keepsRun, keptRef, orphanedRef);
             committedRef.current = null;
-            cacheRef.current = {
-                key: treeKey,
-                buckets: levels.map(() => ({
-                    cells: new Map(),
-                    sources: [],
-                    built: false,
-                    abort: null,
-                })),
-                // A generation is a data-trace run: fresh timeline, and a cause to open it
-                // with. Undefined unless `globalThis.__DEBUG__.data` is on.
-                trace: startDataTrace(displayName, generationCause(previous?.key, retry)),
-                // Which rejecting loads this generation already reported to the render's
-                // error collector (see the resolver's recordRejection). Scoped to the run
-                // for the same reason the trace is: a *later* render reusing the same
-                // promise instance is a new report, not a duplicate of this one.
-                recordedRejections: collectError ? new WeakSet<Promise<unknown>>() : undefined,
-                // The rejection-proof twins this generation's Steps wait on under
-                // `ssrErrors: 'dehydrate'` — scoped to the run for the same reason. Gated
-                // on the collector, like the source-side `ssr` marker and for the same
-                // reason: with nothing to carry the failure over, painting the error slot
-                // would only mean the client paints something else a moment later. The
-                // default degradation is what a render without a payload is *for*.
-                guardRejection: collect && dehydrateErrors ? createRejectionGuard() : undefined,
-            };
+            // A generation is a data-trace run: fresh timeline, and a cause to open it
+            // with. Undefined unless `globalThis.__DEBUG__.data` is on.
+            const trace = startDataTrace(displayName, generationCause(previous?.key, retry));
+            cacheRef.current = openGeneration(treeKey, levels, trace, binding, dehydrateErrors);
         }
 
         // Is the delay holding the loading slot back right now? Read after the block above,
@@ -506,35 +668,14 @@ export function createMandala<S extends Scope<any>>(
         // and by the refresh controller (dirty cells / swapped values re-render in place).
         const [, forceRebuild] = useReducer((count: number) => count + 1, 0);
 
-        // The retry a *human* asked for — the error slot's prop, `useScopeControls().retry`,
-        // and `refresh()` with no key. It resets the automatic budget: a click is new
-        // information, not a continuation of the streak the policy just gave up on. Held on
-        // a ref so the error slot's `retry` prop keeps the stable identity `bumpRetry` had;
-        // without the option it *is* `bumpRetry`, and nothing here is in the way.
-        const manualRetryRef = useRef<(() => void) | null>(null);
-        if (retrySettings) {
-            manualRetryRef.current ??= () => {
-                policyRef.current?.reset();
-                bumpRetry();
-            };
-        }
-        const manualRetry = manualRetryRef.current ?? bumpRetry;
+        const manualRetry = useManualRetry(retrySettings, policyRef, bumpRetry);
 
         // The resolver's server-side error path, assembled where the pieces are: the run's
         // guard, plus the error slot the Step renders in place of the throw React would
         // hand to nobody. Present only on a collected server render of a `'dehydrate'`
         // island — `guardRejection` already carries both conditions.
-        const guardRejection = cacheRef.current.guardRejection;
-        const ssrErrors = guardRejection
-            ? {
-                  guard: guardRejection,
-                  slot: ErrorSlot
-                      ? (error: SourceError) => (
-                            <ErrorSlot inputs={inputs} error={error} retry={manualRetry} />
-                        )
-                      : null,
-              }
-            : undefined;
+        const guard = cacheRef.current.guardRejection;
+        const ssrErrors = ssrErrorPath(guard, ErrorSlot, inputs, manualRetry);
 
         // The instance's refresh controller — the value behind `useScopeControls`. Wired
         // every render so it always sees the current run's buckets; created once so the
@@ -581,59 +722,10 @@ export function createMandala<S extends Scope<any>>(
         // that is gone has no reader for them.
         useEffect(() => {
             if (cacheRef.current === null) forceRebuild();
-            return () => {
-                discardRun(cacheRef.current?.buckets);
-                // An unmount racing a generation change can leave a bucket queued but
-                // unswept (the effect above never ran for it).
-                for (const buckets of orphanedRef.current) discardRun(buckets);
-                orphanedRef.current = [];
-                // The run `keepStale` was holding on screen: the island is gone, so there
-                // is nothing left to keep it for. Same order as the swap below.
-                releaseKept(keptRef, null);
-                // ...and nothing left to delay or retry: the pending countdowns go with it.
-                delayRef.current?.dispose();
-                policyRef.current?.dispose();
-                cacheRef.current = null;
-            };
+            return () => teardownRun(cacheRef, orphanedRef, keptRef, delayRef, policyRef);
         }, []);
 
-        // The leaf's commit — where a run becomes "what is on screen". Recording the
-        // output here rather than during render is what makes the kept baseline a
-        // *committed* one: a render React discards never reaches this.
-        const commitRun = (
-            buckets: Bucket[],
-            resolved: Record<string, unknown>,
-            provided: { value: unknown } | null,
-        ) => {
-            committedRef.current = { buckets, resolved, provided };
-            // Content is on screen, so the delay has nothing to hold back and the next
-            // stretch without content gets the full deadline again...
-            delay?.settled();
-            // ...and whatever failure the retry policy was working through is over, however
-            // many attempts it took: the budget is per failure streak, not per island.
-            policy?.reset();
-        };
-
-        // The swap: the successor is on screen, so the run it replaced can go. Split from
-        // `commitRun` and driven from the leaf's *passive* effect for two reasons. The
-        // phase: every layout effect of the commit — including the new Steps' source
-        // attach — has run by then, so a source both runs hold is never detached and
-        // re-attached across the window. And the caller: a Suspense retry re-renders the
-        // boundary's children, not the mandala, so an effect of the mandala's own would
-        // simply not run on the commit that ends the window.
-        const swapRun = (buckets: Bucket[]) => {
-            releaseKept(keptRef, buckets);
-        };
-
-        // A retiring `ProvideLeaf` offering its dispose: taken only when its run is the one
-        // being kept, in which case the value stays alive (and published) until the swap
-        // releases it. Everything else disposes on the spot, as always.
-        const retainProvided = (buckets: Bucket[], dispose: () => void): boolean => {
-            const kept = keptRef.current;
-            if (!kept || kept.buckets !== buckets) return false;
-            kept.disposeProvided = dispose;
-            return true;
-        };
+        const callbacks = runCallbacks(committedRef, keptRef, delay, policy);
 
         // What the island shows while it has no fresh content: the loading slot, or — while
         // a stale window is open — the previous run standing in for it. `keepStale` keeps it
@@ -679,22 +771,17 @@ export function createMandala<S extends Scope<any>>(
             bucketRetained: (index, bucket) =>
                 cacheRef.current?.buckets[index] === bucket ||
                 keptRef.current?.buckets[index] === bucket,
-            controller: collect ? undefined : controller,
-            collect,
-            collectError,
+            controller: binding.collect ? undefined : controller,
+            ...binding,
             recordedRejections: cacheRef.current.recordedRejections,
             ssrErrors,
-            claim,
-            hydration: hydrationSlice,
-            seeds: seedsSlice,
-            errors: errorsSlice,
             trace: cacheRef.current.trace,
             // The leaf reports its commit only where something reads it: with none of the
             // three options there is no baseline to keep and no streak to end, and the
             // default path stays untouched.
-            commit: keepsRun || retrySettings ? commitRun : undefined,
-            swap: keepsRun ? swapRun : undefined,
-            retainProvided: keepsRun ? retainProvided : undefined,
+            commit: keepsRun || retrySettings ? callbacks.commitRun : undefined,
+            swap: keepsRun ? callbacks.swapRun : undefined,
+            retainProvided: keepsRun ? callbacks.retainProvided : undefined,
         };
 
         const tree = <Fragment key={treeKey}>{buildTree(levels, 0, inputs, shared)}</Fragment>;
@@ -730,12 +817,7 @@ export function createMandala<S extends Scope<any>>(
     // (built through rati/vite) its `.moduleId` on itself; surface both on the mandala,
     // so the router can prefetch through the wrapper and a server render can name the
     // chunk of a route that folded its scope in.
-    const lazyComponent = config.component as {
-        preload?: () => Promise<unknown>;
-        moduleId?: string;
-    };
-    if (typeof lazyComponent.preload === 'function') Mandala.preload = lazyComponent.preload;
-    if (lazyComponent.moduleId !== undefined) Mandala.moduleId = lazyComponent.moduleId;
+    forwardLazy(Mandala, config.component);
 
     // Tell the RouterOutlet not to remount this one on every navigation — a kept run cannot
     // survive its own island being replaced. See MandalaComponent.keepsRun.
