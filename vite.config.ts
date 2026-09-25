@@ -145,9 +145,5 @@ export default defineConfig({
     // because lint-staged re-parses its returned string whole (kit◊FND-91). The package's
     // `staged.test.ts` pins both against the factory's output, so this repo inherits the same pins
     // instead of re-deriving them here.
-    staged: staged({
-        // A consumer: the scans are the kit's files, reached through its `bin/` and
-        // `$JNANA_KIT_HOME` rather than by a repo-relative path.
-        kitScripts: 'kit-home',
-    }),
+    staged: staged(),
 });
