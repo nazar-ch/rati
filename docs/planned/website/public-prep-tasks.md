@@ -72,4 +72,4 @@ All depend on SITE-1/2/4; SSR-dependent demos (SITE-28) also on SITE-3. Copy dra
 2. Prerequisite stores work finishes → DOC-2.
 3. SITE-1 → SITE-2/3/4 (parallel).
 4. Batch D: SITE-10/11/21/23/40 first (shared components/pipelines), then the pages that consume them, in any order.
-5. Batch E, then DOC-1 (user review) whenever convenient — earlier is cheaper.
+5. Batch E, then DOC-1, the user's review, whenever convenient — earlier is cheaper.
