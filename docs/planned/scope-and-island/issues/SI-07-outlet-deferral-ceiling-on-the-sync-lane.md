@@ -27,7 +27,7 @@ The product want it answers is jnana's ⭑APP-31: a navigation the app cannot fi
 
 - `vp test packages/rati/src/__tests__/router/routerSuspense.test.tsx` and the router fuzz suite green, with the three new cases.
 - Kill step: remove the forced commit and confirm the past-the-ceiling case goes red.
-- `vp run verify` green; a release with the change so jnana can bump its pin.
+- `verify.ts` green; a release with the change so jnana can bump its pin.
 
 ## Where
 
