@@ -2,8 +2,8 @@
 area: rati releases, cross-repo work items
 needs:
 needs-human: Whether a rati fix a jnana change depends on releases first with jnana following, or the jnana change waits merge-blocked on a `rati-dev` alias until that release.
-status: open
-disposition: —
+status: done
+disposition: accepted — option 1: the rati fix lands and releases first, and the jnana change follows against the released version (2026-09-28)
 ---
 
 # ASK-01 — Which side lands first when a rati fix is what a jnana change needs
@@ -27,3 +27,7 @@ Some work in jnana cannot be finished honestly without a change in rati — jnan
 ## Provenance
 
 Raised by DX-09 and left explicitly undecided: docs/archive/efforts/testing-and-dx/README.md §"2026-07-20 — DX-09 (the DX-06 frictions addressed)", whose closing note asks for the rule and names the next release as the moment to state one. DX-09 is itself an instance — the fix landed in rati, unreleased, with a jnana leg (`anonymousShell.browser`'s router partial) waiting on it. The consumer-side ask is jnana's own feedback record, jnana:///docs/feedback/2026-07-20-lima-dx-06-rati-adoption.md.
+
+## Disposition — 2026-09-28
+
+Closed at the 2026-09-28 queue triage on option 1, with the record's rider: a fix jnana is blocked on justifies its own release rather than a `rati-dev` alias. jnana states the same order in its memory note j162 (`docs/memory/frontend-architecture/j162-bumping-rati-touches-more-than-one-version-string.md`).
