@@ -108,4 +108,12 @@
     "styleSweep": {
         "docsBaseline": "fe110d8b843ef1936918920c399c1a189cd56928",
     },
+
+    // The four test checks stand down while rati's test files carry no kind in their names. Under
+    // `off` the package builds no kind project, the spawn guard wraps nothing, the limit reporter
+    // reads no time, and the gate's `test` step runs the files it ran before.
+    "testKinds": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
+    "testSpawns": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
+    "testToolSpawns": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
+    "testLimits": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
 }
