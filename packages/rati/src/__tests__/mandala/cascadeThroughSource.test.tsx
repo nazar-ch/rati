@@ -10,17 +10,10 @@ import { scope } from '../../scope/scope.js';
 import { controllableSource, flush } from '../../testing/index.js';
 
 /*
-    A source key's value must reach the loads that read it — found while deciding whether the
-    MF-02 command model's expected-value fixpoint could hold through a source key (it could
-    not), and fixed. Effort record: docs/archive/efforts/mandala-fuzz/README.md
-    §Findings 2026-07-15.
-
-    What was wrong: a source key's value reached its dependents through
-    `RefreshController.sourceReady()`, which emitted changed (so a `.provide()` factory
-    rebuilt) but never called `markDependents` — so no later-level cell whose producer read
-    the key was marked dirty, and nothing downstream re-ran. The promise path (`settled()`)
-    and the sync path (`valueChanged()`) always did. The resolver now runs the same equals
-    gate on each new source snapshot and calls `valueChanged` when it moves.
+    A source key's new value must reach the loads that read it, as a promise settle's does:
+    the resolver runs each new source snapshot through the equals gate and calls
+    `valueChanged` when it moves, which re-runs every later-level cell whose producer read
+    the key (docs/current/internals.md).
 */
 
 const Loading: FC = () => <div>loading...</div>;

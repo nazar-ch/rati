@@ -4,15 +4,14 @@ import type { Harness } from './routerHarness.js';
 import type { RouterModel, Step } from './routerModel.js';
 
 /*
+    long:2
     The invariants both router fuzz properties check, in one place: the smoke property
-    (RF-02) drives them over forward navigation, the command property (RF-03) over
-    traversal interleavings, and neither may hold the router to a different bar than the
-    other.
+    (rati◊RF-02) drives them over forward navigation, the command property (rati◊RF-03) over
+    traversal interleavings, and both hold the router to the one bar.
 
-    Every assert here sits at the contract altitude (docs/archive/efforts/router-fuzz/README.md
-    §"Decisions taken"): the rendered route, `history.location`, the public getters, remount
-    discipline through mount effects, the redirect trail. Never `pathCounter`, the skip
-    marker's spelling, or a listener count.
+    Every assert here reads the contract (rati◊RF-03): the rendered route, `history.location`,
+    the public getters, remount discipline through mount effects, the redirect trail. Never
+    `pathCounter`, the skip marker's spelling, or a listener count.
 */
 
 /**

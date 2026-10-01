@@ -11,7 +11,8 @@ import { readContent, readSlot, type BuiltHarness } from './scopeHarness.js';
 import { flush } from '../../testing/index.js';
 
 /*
-    The MF-02 command alphabet: the events an island actually meets, driven against the real
+    long:2
+    The command alphabet (rati◊MF-02): the events an island actually meets, driven against the real
     thing and mirrored in the reference model (model.ts). Every command asserts the contract
     invariants after itself, so fast-check shrinks a violation to a minimal command sequence
     rather than a whole run.
@@ -24,12 +25,13 @@ import { flush } from '../../testing/index.js';
         inapplicable and gut the search.
       - **Every mutation runs inside `act`, followed by one fixed flush.** React delivers a
         Suspense retry (and the controller's microtask-deferred `pending` notification) a
-        tick after the resolution — `suspense-situations.md` S2. Never poll-until-green: a
-        fixed flush count is what makes a failure mean something.
+        tick after the resolution (packages/rati/src/__tests__/suspense-situations.md, S2).
+        Never poll-until-green: a fixed flush count is what makes a failure mean something.
 
-    The invariants encoded here are 1-5 and 7 of docs/archive/mandala-testing.md
-    §"Invariants"; the lifecycle ledger (6) is MF-03's — its mid-run bounds ride along in
-    `assertContract` (ledger.ts), its balance is the property's teardown.
+    The invariants encoded here are slot correctness, no-blank, convergence, identity
+    stability, run-count upper bounds and `pending` agreement (rati◊MF-02). The lifecycle
+    ledger is rati◊MF-03's: its mid-run bounds ride along in `assertContract` (ledger.ts), its
+    balance is the property's teardown.
 */
 
 export type Model = ReferenceModel;

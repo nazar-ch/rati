@@ -22,19 +22,19 @@ import {
 import { RouterModel, type Step } from './routerModel.js';
 
 /*
-    The RF-02 smoke property: a generated route table mounts, a generated sequence of
+    long:2
+    The smoke property (rati◊RF-02): a generated route table mounts, a generated sequence of
     navigate/replace calls runs against it, and at every step the Router shows exactly what
     the reference model says — the route (name + decoded params), the URL bar, the router's
     own path/search/hash/state, the redirect trail, and whether the route remounted.
 
-    Traversal is not here: back/forward over the entry stack is RF-03's alphabet, and this
-    property is the foundation it grows from (the model already keeps the stack). Route
-    components are plain — data resolution under navigation is the mandala suite's ground.
+    Traversal is not here: back/forward over the entry stack is the command property's
+    alphabet (rati◊RF-03), on the same model. Route components are plain — data resolution
+    under navigation is the mandala suite's ground.
 
-    Every assert sits at the contract altitude (docs/archive/efforts/router-fuzz/README.md
-    §"Decisions taken"): the rendered route, `history.location`, the public getters,
-    remount discipline through mount effects. Never `pathCounter`, the skip marker, or a
-    listener count.
+    Every assert reads the contract (rati◊RF-03): the rendered route, `history.location`, the
+    public getters, remount discipline through mount effects. Never `pathCounter`, the skip
+    marker, or a listener count.
 */
 
 afterEach(cleanup);

@@ -572,14 +572,10 @@ function buildRedirect(table: RouteTable, spec: RedirectSpec): RouteRedirect {
     };
 
     switch (spec.form) {
-        // `buildPath` writes the basename in, which for a *string* target is not the
-        // harness being kind to the router: a string is used verbatim, so under a basename
-        // the author must include it — RF-06 made that explicit contract (reference.md
-        // §Routing, `RouteRedirect`'s doc comment) rather than change the behavior, since
-        // auto-prepending would break every app already writing the full path, and a target
-        // outside the app's mount point would stop being expressible at all. So this draws
-        // the documented shape, and `to: '/b'` under `/admin` is a table bug rather than a
-        // case the model should bless.
+        // `buildPath` writes the basename in because a string target is used verbatim: under
+        // a basename the author must include it (rati◊RF-06, `RouteRedirect`'s doc comment,
+        // docs/current/public/reference.md). So `to: '/b'` under `/admin` is a table bug,
+        // never a case the model blesses.
         case 'string':
             return {
                 to: buildPath(table.basename, target.path, literals()),

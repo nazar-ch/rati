@@ -2,9 +2,9 @@
     The reference model — the mandala contract's semantics as plain JS, plus the vocabulary
     the harness and the commands share (the spec shape, the value formula, the declared
     state). No React, no engine imports, no `deepEqual` borrowed from `util/` — the file's
-    import list is the altitude rule made structural (docs/archive/mandala-testing.md
-    §"The altitude rule"). If a rule here needed engine code to express, it would not be a
-    contract.
+    import list is the altitude rule made structural: the model states the contract, never
+    the engine's mechanism (rati◊MF-01). If a rule here needed engine code to express, it
+    would not be a contract.
 
     THE VALUE FORMULA. Every key's value is a pure function of three declared things: its
     own name, its *epoch*, and its reads' current values. The epoch is not a run counter —
