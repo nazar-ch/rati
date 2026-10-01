@@ -2,9 +2,9 @@
     The router's reference model — the routing contract's semantics as plain JS, plus the
     vocabulary the harness and the property share (the table spec, the redirect forms).
     No React, no router imports: the file's empty import list is the altitude rule made
-    structural, as in the mandala model next door (docs/archive/mandala-testing.md
-    §"The altitude rule"). If a rule here needed router code to express, it would not be
-    a contract.
+    structural, as in the mandala model next door — the model states the contract, never
+    the router's mechanism (rati◊RF-02). If a rule here needed router code to express, it
+    would not be a contract.
 
     THE INDEPENDENCE RULE. Where the engine uses a regex, the model walks segments. The
     engine compiles each route to `^/x/(?<id>[^/]+?)/{0,1}$` (`buildPathRe`) and
@@ -14,7 +14,7 @@
     reached by a different mechanism, so a bug in the engine's pattern machinery cannot
     hide behind a model that shares it. (This is the same reason the mandala model refuses
     the engine's `deepEqual`.) `encodeURIComponent`/`decodeURIComponent` are platform
-    primitives, not router code: naming them *is* stating the codec RF-01 decided.
+    primitives, not router code: naming them *is* stating the codec rati◊RF-01 decided.
 
     What the model deliberately does not do:
       - Mid-segment params (`/p/x:id`). `PARAM_RE` accepts them; the arbitrary never

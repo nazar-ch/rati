@@ -4,10 +4,10 @@ import type { Slot } from './model.js';
 import type { BuiltHarness } from './scopeHarness.js';
 
 /*
-    MF-03 — invariant 6 of docs/archive/mandala-testing.md §"Invariants": the lifecycle
-    ledger, read off the harness's per-source-instance attach/detach counters and its
-    `.provide()` value's build/dispose record. The machinery under it is the refresh work's
-    source-lifetime rework (a cascade swaps a source mid-flight, a Step's teardown keeps
+    long:2
+    The lifecycle ledger invariant (rati◊MF-03), read off the harness's per-source-instance
+    attach/detach counters and its `.provide()` value's build/dispose record. The machinery
+    under it is source lifetime (a cascade swaps a source mid-flight, a Step's teardown keeps
     entries the live bucket still holds, the mandala's unmount sweep is the backstop) —
     exactly the class a ledger catches and example tests miss.
 

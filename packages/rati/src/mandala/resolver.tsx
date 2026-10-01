@@ -197,13 +197,9 @@ export type Shared = {
     scope: Scope;
     component: ComponentType<any>;
     channel: Context<unknown>;
-    // What the island shows while it has no fresh content, built once by the mandala so all
-    // three sites that can show it (the Suspense fallback, a Step pending on a source,
-    // `ProvideLeaf`'s build frame) render one element, and re-renders at any one site
-    // reconcile against it (the sites are different fiber positions, so a move between them
-    // still remounts — see internals.md §The kept run). It is the loading slot, the kept run
-    // standing in for it (`keepStale`), or nothing at all while `loadingDelayMs` holds the
-    // slot back; whichever it is reports its own phase.
+    // What the island shows while it has no fresh content: the loading slot, the kept run
+    // (`keepStale`), or nothing while `loadingDelayMs` holds it back, reporting its own
+    // phase. One element for the three sites that can show it (docs/current/internals.md).
     slot: ReactNode;
     // Per-level data-cell caches, held on the mandala's committed ref (see Bucket).
     buckets: Bucket[];

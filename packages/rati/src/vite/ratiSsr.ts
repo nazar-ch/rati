@@ -292,7 +292,7 @@ async function reply(
 
     return {
         // Already the baseline policy — catch-all → 404, a not-available load → 404, a
-        // failed load → 500. See docs/current/public/ssr.md §Response statuses.
+        // failed load → 500. See docs/current/public/ssr.md.
         status: result.status,
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
         body: await assemble(server, options, result, url, originalUrl),

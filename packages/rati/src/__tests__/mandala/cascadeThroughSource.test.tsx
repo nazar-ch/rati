@@ -10,17 +10,10 @@ import { scope } from '../../scope/scope.js';
 import { controllableSource, flush } from '../../testing/index.js';
 
 /*
-    A source key's value must reach the loads that read it — found while deciding whether the
-    MF-02 command model's expected-value fixpoint could hold through a source key (it could
-    not), and fixed. Effort record: docs/archive/efforts/mandala-fuzz/README.md
-    §Findings 2026-07-15.
-
-    What was wrong: a source key's value reached its dependents through
-    `RefreshController.sourceReady()`, which emitted changed (so a `.provide()` factory
-    rebuilt) but never called `markDependents` — so no later-level cell whose producer read
-    the key was marked dirty, and nothing downstream re-ran. The promise path (`settled()`)
-    and the sync path (`valueChanged()`) always did. The resolver now runs the same equals
-    gate on each new source snapshot and calls `valueChanged` when it moves.
+    A source key's new value must reach the loads that read it, as a promise settle's does:
+    the resolver runs each new source snapshot through the equals gate and calls
+    `valueChanged` when it moves, which re-runs every later-level cell whose producer read
+    the key (docs/current/internals.md).
 */
 
 const Loading: FC = () => <div>loading...</div>;
@@ -37,10 +30,9 @@ function probeControls<S extends Parameters<typeof useScopeControls>[0]>(testSco
 }
 
 describe('a cascade reaches through a source key', () => {
-    // The documented promise (docs/current/public/reference.md §refresh): "a changed value re-runs
-    // exactly the downstream loads whose producers read the key" — `b` being a source is not
-    // an exemption. The cascade re-creates `b`; once its replacement settles on a new value,
-    // `c` must re-run over it rather than keep a value derived from the old one.
+    // The promise docs/current/public/reference.md makes for `refresh`: "a changed value
+    // re-runs exactly the downstream loads whose producers read the key", a source `b`
+    // included — once its replacement settles on a new value, `c` re-runs over it.
     test('a changed refresh cascades through a re-created source to its readers', async () => {
         let aValue = 1;
         const testScope = scope()

@@ -4,26 +4,21 @@
 //
 //   node scripts/ci.ts                        # both stages
 //   node scripts/ci.ts build                  # one, by name
-//   FUZZ_RUNS=2000 node scripts/ci.ts fuzz    # deepen the randomized stage
-//   FUZZ_SEED=7 node scripts/ci.ts fuzz       # pin the seed (reproduce a failure)
+//   FUZZ_RUNS=<n> node scripts/ci.ts fuzz     # deepen the randomized stage
+//   FUZZ_SEED=<n> node scripts/ci.ts fuzz     # pin the seed (reproduce a failure)
 //
-// THIS IS NOT THE PRE-PUSH GATE, and until kit◊KC-13 it was. `.claude/kit.json`'s `verify`
-// now names the kit's standard battery, which runs fmt, lint, typecheck, the Markdown and doc-link
-// gates, the control-byte scan, the `@jnana-app/kit` conformance checks and the full Vitest suite —
-// every stage this file used to carry except the two below. The `GATE_STAGES` list that used to sit
-// at the bottom of this file, and the identical list in `.claude/kit.json`, went with them: two
-// hand-written lists that "move together" is the coupling the battery exists to delete, and the run
-// stamp they existed to guard is written by the battery's own wrapper now.
+// THIS IS NOT THE PRE-PUSH GATE (kit◊KC-13): `.claude/kit.json`'s `verify` names the kit's
+// standard battery, which runs fmt, lint, typecheck, the Markdown and doc-link gates, the
+// control-byte scan, the `@jnana-app/kit` conformance checks and the full Vitest suite. No stage
+// list lives here or in the manifest: two hand-written lists that "move together" is the coupling
+// the battery exists to delete.
 //
-// So what is left is the deliberate residue — the two things a gate should not pay for on every
-// push, run before a release or when you touch the mandala engine or the packaging:
+// What is left is the two things a gate must not pay for on every push, run before a release or
+// when you touch the mandala engine or the packaging:
 //
-//   - `fuzz` re-runs only the randomized suites at a raised budget (default 500 — the mandala-fuzz
-//     effort's deep-run bar). The battery's `test` step runs the same suites at their deliberately
-//     tiny default budget, which is seconds; the distinction is MF-04's finding, that an unpinned
-//     default-budget green is weak evidence for the fuzz invariants and the deep budget is what
-//     makes a green mean something (docs/archive/efforts/mandala-fuzz/README.md §Findings — the
-//     effort archived, and this pointer had been left at its planned/ path).
+//   - `fuzz` re-runs only the randomized suites at a raised budget. The battery's `test` step runs
+//     the same suites at their deliberately tiny default budget, which is seconds, and an unpinned
+//     default-budget green is weak evidence for the fuzz invariants (rati◊MF-04).
 //   - `build` produces the library bundle + d.ts and both example apps. Nothing type-checks the
 //     emit, and a bundle that fails to build is a release-time fact, not a per-push one.
 
