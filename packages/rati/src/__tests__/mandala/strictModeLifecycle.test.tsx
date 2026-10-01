@@ -10,44 +10,42 @@ import { scope } from '../../scope/scope.js';
 import { controllableSource, type ControllableSource } from '../../testing/index.js';
 
 /*
-    Pin 8 (docs/archive/mandala-testing.md §"Deterministic pins"): StrictMode accounting
-    for the machinery the selective-refresh / SSR-sources work added. island.test.tsx
-    pins the double-mount for the *old* lifecycle (the surviving run's identities, the
-    discarded run's dispose-before-detach); what needs its own home is what the rework
-    changed — a refresh reaching the surviving run and swapping a source there, across
-    two generations, all of it released at the end.
+    long:2
+    Pin 8 (rati◊MF-05): StrictMode accounting for selective refresh and SSR sources.
+    island.test.tsx pins the double-mount for the base lifecycle (the surviving run's
+    identities, the discarded run's dispose-before-detach); this file pins a refresh
+    reaching the surviving run and swapping a source there, across two generations, all of
+    it released at the end.
 
     Dev StrictMode mounts → cleans up → remounts; the mandala drops its cache on the fake
     unmount and rebuilds, so producers legitimately run once per generation (S7).
 
-    Two harness rules bound what a StrictMode test here can even ask, both learned the
-    expensive way:
+    Two harness rules bound what a StrictMode test here can even ask:
 
       - `<StrictMode>` must be the element `render()` gets. One component deeper, React
         double-*renders* but skips the double-*mount* — no cleanup, no re-run — and the
-        test silently asserts nothing about the lifecycle it exists for (MF-03).
+        test silently asserts nothing about the lifecycle it exists for (rati◊MF-03).
       - The second generation only reaches the levels the *initial mount* reached. A
         level behind a pending promise is first built when that promise settles, which is
         after the double-mount is over, so it sees one generation however deep the scope
         is. A test that wants a *dependent* level doubled needs its upstream to resolve
         synchronously — hence the sync `v` below. (This is the fuzz smoke property's
-        run-count range, stated the other way round: `fuzz/mandala.smoke.fuzz.test.tsx`
-        §runCountBound.)
+        run-count range, stated the other way round: `runCountBound` in
+        `fuzz/mandala.smoke.fuzz.test.tsx`.)
 
-    Pin 8's other two thirds are not here, and the README's MF-05 finding says why:
+    Two StrictMode subjects have no test here (rati◊MF-05):
 
-      - "SSR-seeded cells" under the double-mount has no test because it has no
-        situation. Cells come off the wire only on a hydration root, and a hydration root
-        does not double-mount at all — measured, not assumed (a ready source at level 0
-        under `hydrateRoot(<StrictMode>…)` builds exactly one generation).
+      - "SSR-seeded cells" under the double-mount has no situation. Cells come off the
+        wire only on a hydration root, and a hydration root does not double-mount at all
+        (a ready source at level 0 under `hydrateRoot(<StrictMode>…)` builds exactly one
+        generation).
       - "the unmount sweep" is not a StrictMode subject: at every unmount a mounted Step
         can see, the Step's own cleanup already detaches everything (the mandala's
         cleanup nulls the cache first, so the Step calls its bucket dead). The sweep is
         load-bearing only for buckets whose Steps are *already gone* — pinned where that
-        happens, in suspenseEdges.test.tsx §S8.
+        happens, in the S8 tests of suspenseEdges.test.tsx.
 
-    The test carries a *kill note*: the one-line source mutation that must make it fail,
-    executed once at authoring and reverted.
+    The test carries a *kill note*: the one-line source mutation that must make it fail.
 */
 
 const Loading: FC = () => <div>loading...</div>;

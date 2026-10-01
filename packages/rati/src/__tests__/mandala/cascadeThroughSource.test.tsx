@@ -37,10 +37,9 @@ function probeControls<S extends Parameters<typeof useScopeControls>[0]>(testSco
 }
 
 describe('a cascade reaches through a source key', () => {
-    // The documented promise (docs/current/public/reference.md §refresh): "a changed value re-runs
-    // exactly the downstream loads whose producers read the key" — `b` being a source is not
-    // an exemption. The cascade re-creates `b`; once its replacement settles on a new value,
-    // `c` must re-run over it rather than keep a value derived from the old one.
+    // The promise docs/current/public/reference.md makes for `refresh`: "a changed value
+    // re-runs exactly the downstream loads whose producers read the key", a source `b`
+    // included — once its replacement settles on a new value, `c` re-runs over it.
     test('a changed refresh cascades through a re-created source to its readers', async () => {
         let aValue = 1;
         const testScope = scope()

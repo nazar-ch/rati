@@ -6,13 +6,12 @@ import { createQuery, instanceSource, type Query } from './query.js';
 import { type Source } from '../scope/source.js';
 
 /*
-    `pagedCollection` — pages are queries. Design record:
-    docs/archive/directions-2026-07/data-package.md §3.
+    long:2
+    `pagedCollection` — pages are queries.
 
-    The page, not the list, is the unit of load state (the `Chunks.ts` lasting
-    idea), and a page *is* a `query` — so per-page phase, stale-on-refresh,
-    abort and `SourceError` come for free instead of forming a third state
-    machine. One identity map (the shared reconciler) sits under all pages:
+    The page, not the list, is the unit of load state, and a page *is* a
+    `query` — so per-page phase, stale-on-refresh, abort and `SourceError` come
+    for free instead of forming a third state machine. One identity map (the shared reconciler) sits under all pages:
     pages own fetch topology; the map owns item identity, so an item that moves
     across a page boundary on refresh keeps its instance.
 
@@ -29,8 +28,7 @@ import { type Source } from '../scope/source.js';
     identities survive, and the reconciler absorbs rows that moved across page
     boundaries. A refreshed page whose `nextCursor` becomes null truncates its
     successors (the list shrank). Cursor drift under heavy concurrent mutation
-    is bounded, not eliminated — the recorded fallback is a truncating restart
-    variant, if drift proves visible in practice.
+    is bounded, not eliminated.
 
     `reactive: true` is *reset*, not refresh: a tracked filter-param change
     invalidates every cursor (each page anchors on its predecessor's now-defunct
@@ -38,9 +36,9 @@ import { type Source } from '../scope/source.js';
     producer (it reads the params at `cursor === null`); on change the whole list
     resets to a fresh first page and reloads — so a mounted island drops to its
     loading slot (an honest "new query", unlike a flat `collection`'s
-    stale-while-refetch). Design pass: data-package.md §DATA-01. Debounce is not
-    wired for the paged reset in v1 (the reactive paged case is the infrequent
-    dropdown filter; a keystroke filter uses the flat `collection`).
+    stale-while-refetch; rati◊DATA-01). Debounce is not wired for the paged reset (the
+    reactive paged case is the infrequent dropdown filter; a keystroke filter uses
+    the flat `collection`).
 */
 
 export interface PageResult<T, C> {

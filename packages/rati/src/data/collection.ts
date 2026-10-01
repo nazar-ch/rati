@@ -5,8 +5,8 @@ import { reconciled } from './reconciled.js';
 import { type Source, type SourceError } from '../scope/source.js';
 
 /*
-    `collection` — keyed items, reconciliation, nested reactivity. Design record:
-    docs/archive/directions-2026-07/data-package.md §2.
+    long:2
+    `collection` — keyed items, reconciliation, nested reactivity.
 
     A refresh returns fresh JSON; naive replacement destroys object identity, so
     rows re-render wholesale and selection/DnD/refs churn. The reconciler (the

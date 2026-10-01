@@ -6,21 +6,21 @@ import { scope, hook } from '../../scope/scope.js';
 import { controllableSource, deferred, flush, renderIsland, cleanup } from '../../testing/index.js';
 
 /*
+    long:2
     The Suspense-produced situations React makes possible around a committed island —
-    pins 10-12 of docs/archive/mandala-testing.md §"Deterministic pins", one per
-    situation in packages/rati/src/__tests__/suspense-situations.md (S4, S5, S8). Each
-    carries a *kill note*: the one-line source mutation that must make it fail, executed
-    once at authoring and reverted.
+    pins 10-12 (rati◊MF-05), one per situation in
+    packages/rati/src/__tests__/suspense-situations.md (S4, S5, S8). Each carries a *kill
+    note*: the one-line source mutation that must make it fail.
 
-    They are grouped here rather than in scopeControls.test.tsx (the strategy doc's
-    suggested home) because none of them involves the controls: what they share is the
-    catalog, and reading them next to it is what makes them legible.
+    They live here rather than in scopeControls.test.tsx because none of them involves the
+    controls: what they share is the catalog, and reading them next to it is what makes
+    them legible.
 
-    The altitude these assert at is deliberately low-commitment (§"The altitude rule"):
-    the ledger's *bounds* (never a second attach of a live entry; balanced at teardown),
-    not its exact event sequence. Whether the engine keeps a source attached through a
-    hide or cycles it is its own business — S4/S8 say so explicitly — so pinning the
-    sequence would freeze an implementation nicety into a promise.
+    The altitude these assert at is deliberately low-commitment, the contract and never
+    the mechanism: the ledger's *bounds* (never a second attach of a live entry; balanced
+    at teardown), not its exact event sequence. Whether the engine keeps a source attached
+    through a hide or cycles it is its own business — S4/S8 say so explicitly — so pinning
+    the sequence would freeze an implementation nicety into a promise.
 
     A `controllableSource`'s transitions must drive an **async** act (`act(async () =>
     source.setReady(v))`) and be awaited: S2's rule for the mount is really about any act
@@ -193,12 +193,13 @@ describe('S5 — unmount while suspended', () => {
 });
 
 describe('S8 — a mid-tree source dropping to pending', () => {
+    // long:2
     // Pin 12. Unlike S4's hide, a committed source going ready → pending renders the
     // loading slot as ordinary children: the levels below unmount for real. Their data
     // cells stay cached on the mandala's buckets, so recovering onto the same value
-    // renders them again with **no producer re-runs** (reference.md §Sources states
-    // exactly this). The deeper source's attach/detach churn through the window is the
-    // engine's choice — only the bounds are asserted (S8).
+    // renders them again with **no producer re-runs**, as docs/current/public/reference.md
+    // states for sources. The deeper source's attach/detach churn through the window is
+    // the engine's choice — only the bounds are asserted (S8).
     //
     // Kill: resolver.tsx, the source-snapshot gate in the resolve loop — `if
     // (!equals(cell.lastValue, state.value))` → `if (true)` → the recovery blip is

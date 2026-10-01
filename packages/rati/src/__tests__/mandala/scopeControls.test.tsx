@@ -457,11 +457,9 @@ describe('useScopeControls — selective refresh', () => {
 });
 
 /*
-    The deterministic pins for the refresh machinery (MF-05; the list they implement is
-    docs/archive/mandala-testing.md §"Deterministic pins"). Each carries a *kill note* —
-    the one-line source mutation that must make it fail, executed once at authoring and
-    reverted. They guard the contract stated in docs/current/public/reference.md
-    §useScopeControls, never the mechanism (§"The altitude rule").
+    The deterministic pins for the refresh machinery (rati◊MF-05). Each carries a *kill note*:
+    the one-line source mutation that must make it fail. They guard the contract
+    docs/current/public/reference.md states for `useScopeControls`, never the mechanism.
 */
 
 describe('selective refresh — races', () => {
@@ -664,12 +662,8 @@ describe('selective refresh — races', () => {
         expect(captured.current!.pending.size).toBe(0);
     });
 
-    // Follow-up pin (2026-07-15; MF-02 left this standing as an observation, promoted to a
-    // fix): a cascade-swapped source that errors settles its swap the way a first ready
-    // would — an error is a settled state, not an in-flight one, so the key leaves
-    // `pending` before the boundary shows the error slot. It used to sit there until a
-    // retry's `treeCommitted`, so the error slot read a `pending` with nothing actually
-    // fetching. Effort record: docs/archive/efforts/mandala-fuzz/README.md §Findings.
+    // A cascade-swapped source that errors settles its swap like a first ready (rati◊MF-02):
+    // the key leaves `pending` before the boundary shows the error slot.
     //
     // Kill: resolver.tsx, the source error branch — drop the `sourceErrored` call → 'live'
     // stays in `pending` for the error slot's whole life.
@@ -729,13 +723,11 @@ describe('selective refresh — races', () => {
 });
 
 describe('selective refresh — cascade semantics', () => {
-    // Pin 3. The cascade is transitive (a → b → c), and it stops at the first link
-    // whose value did not move: "a changed value re-runs exactly the downstream loads
-    // whose producers read the key" (reference.md §useScopeControls), applied at every
-    // hop rather than just the first.
+    // Pin 3. The cascade is transitive (a → b → c) and stops at the first link whose
+    // value did not move: the `useScopeControls` promise of
+    // docs/current/public/reference.md, applied at every hop.
     //
-    // Kill: refresh.ts `settled()` — `const changed = true` → the equal `b` re-runs `c`
-    // anyway and cRuns is 2 after the first refresh.
+    // Kill: refresh.ts `settled()` — `const changed = true` → the equal `b` re-runs `c`.
     test('a transitive cascade: an equal middle link cuts the chain, a changed one carries it', async () => {
         let aValue = 1;
         const runs = { a: 0, b: 0, c: 0 };
@@ -958,15 +950,11 @@ describe('selective refresh — cascade semantics', () => {
 });
 
 describe('selective refresh — hydrated cells', () => {
-    // Pin 5. A hydrated cell short-circuits to its server value, so its producer never
-    // ran and it carries no read-set. The documented asymmetry
-    // (directions-2026-07/mandala-refresh-and-ssr-sources.md §Caveats): it answers a
-    // *direct* refresh, but joins the cascade only once that first re-run records what
-    // it reads. This pin is a change detector on that asymmetry, not an endorsement —
-    // if hydrated cells ever gain a read-set up front, it should fail and be rewritten.
+    // Pin 5. A hydrated cell never ran its producer, so it has no read-set: it answers a
+    // *direct* refresh and joins the cascade only from that run on (rati◊MF-05).
     //
-    // Kill: resolver.tsx `buildCell()`, the hydration short-circuit — `rerunnable:
-    // false` → refresh('a') warns and no-ops, and the hydrated cell never re-runs.
+    // Kill: resolver.tsx `buildCell()` — `rerunnable: false` on the hydration
+    // short-circuit → the hydrated cell never re-runs.
     test('a hydrated cell answers a direct refresh and joins the cascade from that run on', async () => {
         let aValue = 'a1';
         const runs = { a: 0, b: 0 };

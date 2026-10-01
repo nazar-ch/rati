@@ -727,13 +727,9 @@ export function createMandala<S extends Scope<any>>(
 
         const callbacks = runCallbacks(committedRef, keptRef, delay, policy);
 
-        // What the island shows while it has no fresh content: the loading slot, or — while
-        // a stale window is open — the previous run standing in for it. `keepStale` keeps it
-        // there for the whole re-resolution; a bare `loadingDelayMs` only until the deadline,
-        // after which the slot takes over. Built here so all three sites that can show it
-        // share one element, and re-renders at any one site reconcile against it. (The sites
-        // are different fiber positions, so a move *between* them still remounts — see
-        // internals.md §The kept run.)
+        // `Shared.slot`: the loading slot, or the kept run standing in for it — for the whole
+        // re-resolution under `keepStale`, until the deadline under a bare `loadingDelayMs`.
+        // Built once here so all three sites share one element (docs/current/internals.md).
         const kept = keptRef.current;
         const showKept = kept !== null && (keepStale || held);
         const slot = showKept ? (

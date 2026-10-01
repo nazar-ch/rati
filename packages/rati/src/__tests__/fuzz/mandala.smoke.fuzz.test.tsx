@@ -11,17 +11,18 @@ import { allKeys, createDeclaredState, createModel, type ScopeSpec } from './mod
 import { buildHarness, readContent, readSlot, scopeSpecArb } from './scopeHarness.js';
 
 /*
-    The MF-01 smoke property: a generated scope mounts, its held loads settle one by one in a
+    long:2
+    The smoke property (rati◊MF-01): a generated scope mounts, its held loads settle one by one in a
     generated order, and at every step the island shows exactly what the reference model says —
     the loading slot until the last key, then content carrying the model's values (convergence).
     Teardown balance is asserted in a `finally`, so a lifecycle leak fails the run even when
-    every mid-run assert passed. All asserts sit at the contract altitude
-    (docs/archive/mandala-testing.md §"The altitude rule").
+    every mid-run assert passed. Every assert reads the contract — what a component, a user or
+    an attached source can tell — never the mechanism.
 
     Initial resolution only — the event alphabet (refreshes, rejections, source transitions,
-    remounts) is the MF-02 command property next door.
+    remounts) is the command property next door (rati◊MF-02).
 
-    MF-03 runs the same property a second time under `<StrictMode>` (see `runCountBound`): the
+    The same property runs a second time under `<StrictMode>` (see `runCountBound`, rati◊MF-03): the
     contract must not depend on React's dev double-mount, and the ledger must balance through
     the mount → cleanup → mount sequence — the one place a source can be attached by a run
     whose cells were already thrown away.

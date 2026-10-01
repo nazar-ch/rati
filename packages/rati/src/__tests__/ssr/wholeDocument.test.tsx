@@ -241,30 +241,19 @@ describe('the CSR fallback', () => {
         expect(document.title).toBe('Torcal · Site');
         // The entry that is running this render survived the mount that it started.
         expect(document.querySelector('script[src="/assets/entry-a1b2.js"]')).not.toBeNull();
-        // The point of the client entry's branch (docs/current/public/ssr.md §The client entry):
-        // hydrating this document instead would reach the same page *through* recovery,
-        // and tell the reader's console about it on every fallback.
+        // The point of the client entry's branch (docs/current/public/ssr.md): hydrating
+        // this document instead would reach the same page *through* recovery, and tell the
+        // reader's console about it on every fallback.
         expect(recovered).not.toHaveBeenCalled();
         expect(reactErrors(error.mock.calls)).toEqual([]);
     });
 });
 
 /*
-    The canary, and the reason it is a test and not a comment: `createRoot(document)` is
-    what the fallback above rests on, and react.dev does not document it — the page says
-    createRoot takes "a DOM element" and names `document` only under `hydrateRoot`. The
-    types (DefinitelyTyped's `Container` includes `Document`), the runtime
-    (`isValidContainer` accepts `nodeType === 9`, `clearContainer` has a document branch)
-    and two browsers say otherwise, but that is observed behaviour rather than a stated
-    contract. The maintainer accepted that soft spot on the condition that a React release
-    which narrows the container fails *here*, loudly, instead of in a consumer's 500 path.
-
-    If this goes red, the escape hatch is the shape SSR-12 was filed with: hydrate the
-    synthesized document instead and let React's mismatch recovery client-render it — the
-    same working page, at the cost of a reported error (`onRecoverableError` →
-    `reportGlobalError`, an uncaught error in the console) on every fallback. See
-    docs/archive/directions-2026-07/ssr-server-kit.md §The fallback for whole-document
-    apps, and docs/current/public/ssr.md §When a render throws.
+    The canary for `createRoot(document)`, which the fallback above rests on and react.dev
+    does not document (rati◊SSR-12): a React release that narrows the container must fail here,
+    never in a consumer's 500 path. If it goes red, docs/current/public/ssr.md names the
+    escape hatch.
 */
 describe('createRoot(document) — the React contract the fallback rests on', () => {
     test('renders a synthesized minimal document into a working page', async () => {

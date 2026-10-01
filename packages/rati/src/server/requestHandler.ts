@@ -86,7 +86,7 @@ export function createRequestHandler(
 
             // `result.status` is already the baseline policy — catch-all → 404, a
             // not-available load → 404, a failed load → 500. See
-            // docs/current/public/ssr.md §Response statuses.
+            // docs/current/public/ssr.md.
             return html(result.status, assemble(options, placeholders, result));
         } catch (error) {
             onError(error, request);

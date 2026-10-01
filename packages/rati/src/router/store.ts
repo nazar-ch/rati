@@ -359,6 +359,7 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
                     `Known routes: ${this.routes.map((item) => item.name).join(', ')}.`,
             );
         }
+        // long:1
         // Substitute at the path's own `:param` boundaries (PARAM_RE — the same tokens
         // the matcher compiles), so a name can never be found inside a longer one.
         // Values are percent-encoded, which is the outbound half of the round-trip
@@ -369,7 +370,7 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
         // escape from that (URLs read it as a dot for precisely this reason — it is what
         // stops percent-encoding from smuggling a traversal past a path check). No URL
         // carries such a value, so getPath refuses it instead of building one that
-        // resolves somewhere else — see docs/current/public/reference.md §Routing.
+        // resolves somewhere else — see docs/current/public/reference.md.
         const path = matched.path.replace(PARAM_RE, (token, key: string, tail: string) => {
             const value = (params as Record<string, string | undefined>)[key];
             // Types require every param, so a missing one means a caller reaching past

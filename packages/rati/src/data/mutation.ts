@@ -3,8 +3,8 @@ import { observable, runInAction } from 'mobx';
 import { toSourceError, type SourceError } from '../scope/source.js';
 
 /*
-    `mutation` — an imperative operation with visible state. Design record:
-    docs/archive/directions-2026-07/data-package.md §4.
+    long:2
+    `mutation` — an imperative operation with visible state.
 
     The optimistic choreography apps hand-roll per method, owned once:
     `optimistic` patches the read side synchronously before the request (expected

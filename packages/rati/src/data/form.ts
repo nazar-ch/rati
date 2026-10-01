@@ -5,8 +5,8 @@ import { FieldExternalErrors, type Field, type FieldInternal } from './field.js'
 import { toSourceError, type SourceError } from '../scope/source.js';
 
 /*
-    `form` — an aggregate over fields: staged edits with one submit seam. Design
-    record: docs/archive/directions-2026-07/data-package.md §5–6.
+    long:2
+    `form` — an aggregate over fields: staged edits with one submit seam.
 
     The form is the draft: fields enumerate the edited set explicitly, the
     baseline lives per field, dirty is a comparison, not an overlay. Before
@@ -23,8 +23,8 @@ import { toSourceError, type SourceError } from '../scope/source.js';
     inputs are controlled by the fields: a failed submit still *completes* the
     action, and React's action-completion form reset pushes every controlled input
     back to its mount-time value — erasing the draft on exactly the submits the
-    user must correct. `onSubmit` + `preventDefault` is the wiring
-    (docs/current/public/guide.md §"With React Aria Components").
+    user must correct. `onSubmit` + `preventDefault` is the wiring, as
+    docs/current/public/guide.md shows for React Aria Components.
 */
 
 /** Thrown by a submit handler (typically built by the API layer from a 422). */

@@ -3,13 +3,13 @@ import { autorun, runInAction } from 'mobx';
 import { itemMap, type ItemMapOptions } from './itemMap.js';
 
 /*
-    `reconciled` — the identity-stable list view, standalone. Design record:
-    docs/archive/directions-2026-07/data-package.md §2.
+    long:2
+    `reconciled` — the identity-stable list view, standalone.
 
     `collection` is secretly a `query` plus the shared reconciler; this is that
     second half on its own, over *any* observable rows. It exists because a
-    composite response — `{ usefulData, spaces }` — is a `query`, and its list
-    half used to get no reconciliation at all:
+    composite response — `{ usefulData, spaces }` — is a `query`, and a `query`
+    reconciles nothing, so its list half reconciles here:
 
         overview = query((signal) => fetchOverview(this.spaceId, signal));
         spaces = reconciled(() => this.overview.data?.spaces ?? [], { key: (s) => s.id });
@@ -21,9 +21,8 @@ import { itemMap, type ItemMapOptions } from './itemMap.js';
     truth over it).
 
     **The derivation is eager**, not lazy: an `autorun` established at
-    construction re-reconciles whenever the getter's output changes — exactly
-    when `collection` used to reconcile inside its query's settling action, and
-    identical in cost (one reconcile per rows change, observers or not). The
+    construction re-reconciles whenever the getter's output changes — one
+    reconcile per rows change, observers or not. The
     lazy alternative — reconciling on the first `items` read — would write
     observable state from inside whatever derivation happens to read it, which
     MobX forbids in a `computed`. Two consequences to know:

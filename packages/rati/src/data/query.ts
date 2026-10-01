@@ -4,16 +4,14 @@ import { observableSource } from '../mobx/observableSource.js';
 import { toSourceError, type Source, type SourceError } from '../scope/source.js';
 
 /*
+    long:2
     `query` — the refreshable unit (the rati/data atom): one async producer, one
-    current value, honest phases, race-guarded. Design record:
-    docs/archive/directions-2026-07/data-package.md §1.
+    current value, honest phases, race-guarded.
 
       - `prime()` is idempotent *ensure*: it fetches from `idle` or `error`,
         no-ops when `ready`, and returns the in-flight promise while pending.
         Scopes (via `source()`) and effects call it. Priming an already-primed
-        pump does nothing — the name says so, which the old `load()` did not
-        (a UI button wired to it was a silent no-op; that trap is why it was
-        renamed).
+        pump does nothing, and the name says so — a UI button wants `refresh()`.
       - `refresh()` is the only re-fetch; the data stays visible (phase
         `refreshing`), and a refresh failure keeps the stale value alongside the
         error. Mutations and user gestures call it.
@@ -27,8 +25,7 @@ import { toSourceError, type Source, type SourceError } from '../scope/source.js
       - `reactive: true` re-fetches when the producer's *synchronous prefix* reads
         change (opt-in — implicit refetching is never the default). A MobX
         `Reaction` tracks those reads during the real fetch and re-runs `refresh()`
-        on change, coalesced by `debounce` if set. Design pass:
-        data-package.md §DATA-01.
+        on change, coalesced by `debounce` if set (rati◊DATA-01).
 */
 
 export type QueryPhase = 'idle' | 'loading' | 'ready' | 'refreshing' | 'error';

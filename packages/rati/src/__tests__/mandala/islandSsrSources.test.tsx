@@ -147,9 +147,9 @@ describe('SSR sources — live (ssr: { dehydrate, hydrate })', () => {
 });
 
 /*
-    Pin 7 (MF-05; docs/archive/mandala-testing.md §"Deterministic pins"): what the two
-    SSR-source failure modes do. Both pin the *degraded* behavior on purpose — an SSR
-    source that fails must cost the server render, never the page.
+    Pin 7 (rati◊MF-05): what the two SSR-source failure modes do. Both pin the *degraded*
+    behavior on purpose — an SSR source that fails must cost the server render, never the
+    page.
 */
 
 // The loader shape's error path: attach starts work that fails instead of resolving —
@@ -167,17 +167,14 @@ function failingLoaderSource(log: string[], error: SourceError) {
 }
 
 describe('SSR sources — error paths', () => {
+    // long:2
     // Pin 7a. A marked source erroring during `firstSettle` is a rejecting promise load
     // by any other name, so it lands in the behavior islandSsrErrors.test.tsx pinned by
     // experiment: `prerender` resolves, React emits the loading slot behind its
-    // "switched to client rendering" marker, and the error slot never participates
-    // server-side. What rati adds is the `collectError` record (the server's 404/5xx
-    // signal) — reached here through a *source*, and the client then makes its own
-    // attempt against a fresh instance.
-    //
-    // NB: the strategy doc's pin list and suspense-situations.md §S10 both predicted an
-    // error slot in the HTML. That is not what React does — both are corrected in this
-    // commit; this test is the pin.
+    // "switched to client rendering" marker, and the error slot never enters the HTML.
+    // What rati adds is the `collectError` record (the server's 404/5xx signal) — reached
+    // here through a *source*, and the client then makes its own attempt against a fresh
+    // instance.
     //
     // Kill: ssrSource.ts `firstSettle()` — `reject(state.error)` → `reject(new
     // Error('source failed'))`, the wrapper the comment there warns about → the code is
