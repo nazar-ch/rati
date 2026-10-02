@@ -1,10 +1,10 @@
 #!/bin/sh
-# why-shell: hook-dispatch kit⭑KIT-63 — git runs a hook from the repo whose commits it gates, so every *consumer* carries this hop to the kit's gate itself.
+# why-shell: hook-dispatch kit⭑KIT-63 — git runs a hook from the repo whose commits it gates, so every consumer carries this hop to the kit's gate itself.
 #
 # The gate is the kit's `tools/pre-commit-gate.ts`: two lanes over `vp staged`, a read-only one for
 # an agent session and vp's stock mutating one for a human's (kit◊RG-01). This body finds the kit,
 # puts the kit's `bin/` first on PATH, which resolves the gate's `run-node.sh` shebang and every
-# commit task the gate spawns, and execs the gate. A *consumer* adopts it by copying these lines
+# commit task the gate spawns, and execs the gate. A consumer adopts it by copying these lines
 # once and picks up every later change by doing nothing (kit◊WTH-02).
 #
 # Every id here carries the `kit` alias, which is the one spelling right in every repo these bytes
