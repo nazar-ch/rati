@@ -1,11 +1,11 @@
 #!/bin/sh
-# why-shell: hook-dispatch kit⭑KIT-63 — git runs a hook from the repo whose tree it acted on, so every *consumer* carries this hop to the kit's transition render itself.
+# why-shell: hook-dispatch kit⭑KIT-63 — git runs a hook from the repo whose tree it acted on, so every consumer carries this hop to the kit's transition render itself.
 #
 # `.vite-hooks/post-checkout`, `.vite-hooks/post-merge` and `.vite-hooks/post-rewrite` are these
 # same bytes under three names. Each finds the kit, puts the kit's `bin/` first on PATH, which
 # resolves the render's `run-node.sh` shebang, and execs the kit's `tools/surface-hook.ts` under its
 # own hook name: the render re-renders the gitignored read surface after a checkout, a merge or a
-# rebase moved its sources (kit◊FND-210). A *consumer* adopts the three by copying them once, beside
+# rebase moved its sources (kit◊FND-210). A consumer adopts the three by copying them once, beside
 # `.vite-hooks/pre-commit`, and picks up every later change by doing nothing (kit◊WTH-02).
 #
 # Every id here carries the `kit` alias, which is the one spelling right in every repo these bytes
