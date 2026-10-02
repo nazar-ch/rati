@@ -1,38 +1,25 @@
 #!/bin/sh
-# why-shell: hook-dispatch — a git hook body, and the one script here that cannot move to the TS
-# lane or into the kit: git runs hooks from the repo whose commits they gate, so every consumer
-# must carry this file itself.
+# why-shell: hook-dispatch kit⭑KIT-63 — git runs a hook from the repo whose commits it gates, so every *consumer* carries this hop to the kit's gate itself.
 #
-# So it carries as little as possible. The gate is the kit's `tools/pre-commit-gate.sh`
-# (`vp staged --no-stash`, a per-worktree backup ref, the cross-worktree commit lock — kit◊WTH-03);
-# this is the seam that reaches it. It is the LAST place a consumer spells the kit's path itself:
-# the session hooks carried the same shape in `.claude/settings.json` until kit◊IL-07 moved them to
-# a plugin that resolves the kit from its own location, needing no variable at all. A git hook
-# cannot be delivered that way. A consumer adopts the gate by copying these lines once, and picks up
-# every later change to it by doing nothing (kit◊WTH-02). Sourced rather than spawned, so it needs
-# nothing on PATH that the gate does not need anyway.
+# The gate is the kit's `tools/pre-commit-gate.ts`: two lanes over `vp staged`, a read-only one for
+# an agent session and vp's stock mutating one for a human's (kit◊RG-01). This body finds the kit,
+# puts the kit's `bin/` first on PATH, which resolves the gate's `run-node.sh` shebang and every
+# commit task the gate spawns, and execs the gate. A *consumer* adopts it by copying these lines
+# once and picks up every later change by doing nothing (kit◊WTH-02).
 #
-# Every id here carries the `kit` alias, which is the one spelling right in all five repos these
-# bytes live in: self-qualification resolves in the kit, and a consumer reads kit◊WTH-03 as the
-# foreign citation it is, against the `jnana-kit` its own `citableRepos` declares (kit◊KF-01).
+# Every id here carries the `kit` alias, which is the one spelling right in every repo these bytes
+# live in (kit◊KF-01).
 #
-# Fails OPEN to a bare `vp staged` when the kit is not resolvable: a checkout without the kit is a
-# machine without pool slots, where lint-staged's own backup is the right one and only the
-# serialization is missing. Loudly, though — a gate that quietly changed shape is how kit◊FND-92
-# went unnoticed for a whole effort.
-#
-# `$JNANA_KIT_HOME` is the whole of how the kit is found here, with no default behind it: this line
-# used to guess `$HOME/Sites/jnana-kit`, which was right for one machine layout and silently wrong
-# for every other. Unset now takes the same loud open arm below as a wrong path, which already
-# names the variable as the fix.
+# `$JNANA_KIT_HOME` is the whole of how the kit is found, with no default behind it, and an unset
+# variable, a wrong path and a kit that carries no gate all take the arm below the `if`. That arm
+# fails OPEN, because a commit that cannot reach the gate still has to happen, and LOUDLY, because
+# its bare run is the mutating one whatever session it is in and backs up onto the repo-shared
+# `refs/stash` (kit◊FND-92).
 KIT="${JNANA_KIT_HOME:-}"
-if [ -r "${KIT}/tools/pre-commit-gate.sh" ]; then
-    # The gate body is the kit's own file, outside this repo's tree by construction, so a shell
-    # linter standing here has nothing to follow and says so once per run. The kit lints that file
-    # directly, in the corpus it belongs to.
-    # shellcheck disable=SC1091
-    . "${KIT}/tools/pre-commit-gate.sh"
-else
-    printf 'pre-commit: no jnana-kit gate at %s — running vp staged bare: no cross-worktree commit lock, and lint-staged backs its work up onto the repo-shared refs/stash. Set JNANA_KIT_HOME.\n' "${KIT}" >&2
-    exec vp staged
+if [ -x "${KIT}/tools/pre-commit-gate.ts" ]; then
+    PATH="${KIT}/bin:${PATH}"
+    export PATH
+    exec "${KIT}/tools/pre-commit-gate.ts"
 fi
+printf 'pre-commit: no jnana-kit gate at %s — running vp staged bare: it REWRITES staged files whoever is committing, and lint-staged backs its work up onto the repo-shared refs/stash. Point JNANA_KIT_HOME at a kit carrying tools/pre-commit-gate.ts (a promotion brings the installed kit up to one).\n' "${KIT}" >&2
+exec vp staged
