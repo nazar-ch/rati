@@ -1,25 +1,17 @@
 #!/bin/sh
 # why-shell: hook-dispatch kit⭑KIT-63 — git runs a hook from the repo whose commits it gates, so every consumer carries this hop to the kit's gate itself.
 #
-# The gate is the kit's `tools/pre-commit-gate.ts`: two lanes over `vp staged`, a read-only one for
-# an agent session and vp's stock mutating one for a human's (kit◊RG-01). This body finds the kit,
-# puts the kit's `bin/` first on PATH, which resolves the gate's `run-node.sh` shebang and every
-# commit task the gate spawns, and execs the gate. A consumer adopts it by copying these lines
-# once and picks up every later change by doing nothing (kit◊WTH-02).
+# The gate is the kit's `tools/pre-commit-gate.ts`: two lanes, a read-only one for an agent session
+# and a mutating one for a human's (kit◊RG-01). This body puts the kit's `bin/` first on PATH, which
+# resolves the gate's `run-node.sh` shebang and every commit task the gate spawns, and execs the
+# gate. A consumer adopts it by copying these lines once and picks up every later change by doing
+# nothing (kit◊WTH-02).
 #
 # Every id here carries the `kit` alias, which is the one spelling right in every repo these bytes
 # live in (kit◊KF-01).
 #
-# `$JNANA_KIT_HOME` is the whole of how the kit is found, with no default behind it, and an unset
-# variable, a wrong path and a kit that carries no gate all take the arm below the `if`. That arm
-# fails OPEN, because a commit that cannot reach the gate still has to happen, and LOUDLY, because
-# its bare run is the mutating one whatever session it is in and backs up onto the repo-shared
-# `refs/stash` (kit◊FND-92).
-KIT="${JNANA_KIT_HOME:-}"
-if [ -x "${KIT}/tools/pre-commit-gate.ts" ]; then
-    PATH="${KIT}/bin:${PATH}"
-    export PATH
-    exec "${KIT}/tools/pre-commit-gate.ts"
-fi
-printf 'pre-commit: no jnana-kit gate at %s — running vp staged bare: it REWRITES staged files whoever is committing, and lint-staged backs its work up onto the repo-shared refs/stash. Point JNANA_KIT_HOME at a kit carrying tools/pre-commit-gate.ts (a promotion brings the installed kit up to one).\n' "${KIT}" >&2
-exec vp staged
+# `$JNANA_KIT_HOME` is the whole of how the kit is found. Never add an arm for a kit, gate or node
+# that is missing: the commit fails with the exec's own error (kit¶PCG-9).
+PATH="${JNANA_KIT_HOME:-}/bin:${PATH}"
+export PATH
+exec "${JNANA_KIT_HOME:-}/tools/pre-commit-gate.ts"
