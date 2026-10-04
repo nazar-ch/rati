@@ -116,4 +116,8 @@
     "testSpawns": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
     "testToolSpawns": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
     "testLimits": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
+
+    // Under `off` the gate's `exports` step reads no export, so no export rati's tests alone import
+    // fails the gate.
+    "testOnlyExports": { "state": "off", "reason": "the kit sweeps its own exports first (kit◊RT-53)" },
 }
