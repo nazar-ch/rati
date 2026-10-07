@@ -1,8 +1,7 @@
 ---
 area: packages/rati/src/data/query.ts (+ collection/pagedCollection options)
 needs: a design decision against the mandala's selective refresh (below)
-status: done
-disposition: cut 2026-07-18 at the implementation session, deferred by maintainer choice
+status: done — cut 2026-07-18 at the implementation session, deferred by maintainer choice
 ---
 
 # DATA-01 — `reactive` params for query (design pass first)

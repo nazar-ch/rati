@@ -1,8 +1,7 @@
 ---
 area: packages/rati/src/data — field.ts (+ reference.md if the shape is mentioned)
 needs: nothing
-status: done
-disposition: cut 2026-07-20 from the DATA-03 findings (gap 4)
+status: done — cut 2026-07-20 from the DATA-03 findings (gap 4)
 ---
 
 # DATA-07 — `field.props` under `exactOptionalPropertyTypes`

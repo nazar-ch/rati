@@ -2,7 +2,6 @@
 area: ci, dx
 needs:
 status: open
-disposition: —
 ---
 
 # FND-01 — the pre-push `verify` gate is not self-contained on a fresh checkout

@@ -2,7 +2,6 @@
 area: package.json, .claude/kit.json
 needs:
 status: open
-disposition: —
 ---
 
 # FND-11 — the declared verify gate cannot run: there are no `verify:*` scripts

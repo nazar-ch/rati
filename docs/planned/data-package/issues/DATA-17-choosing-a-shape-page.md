@@ -1,8 +1,7 @@
 ---
 area: docs/current/public/guide.md (or a sibling page + website nav)
 needs: DATA-13 + DATA-14 landed (the guidance names reconciled/keyed); wave 2
-status: done
-disposition: cut 2026-07-25 from the second-round migration feedback ("the doc gap I'd fix first")
+status: done — cut 2026-07-25 from the second-round migration feedback ("the doc gap I'd fix first")
 ---
 
 # DATA-17 — the "choosing a shape" page

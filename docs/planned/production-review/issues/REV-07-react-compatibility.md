@@ -1,8 +1,7 @@
 ---
 area: rati's React contract: peer range vs reality, StrictMode semantics, concurrent rendering, Suspense usage (`use()`, prerender), react-dom/static + hydrateRoot assumptions, RSC-world importability
 needs: — (best after scope-and-island lands — SI-03/06 deepen the Suspense surface)
-status: open
-disposition: cut 2026-07-19; production-review lens 7 (added at cut)
+status: open — cut 2026-07-19; production-review lens 7 (added at cut)
 ---
 
 # REV-07 — React compatibility & rendering modes

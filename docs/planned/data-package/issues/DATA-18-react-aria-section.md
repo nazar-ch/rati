@@ -1,8 +1,7 @@
 ---
 area: docs/current/public/guide.md (a "with React Aria Components" section)
 needs: wave 2 (rides the same guide surface as DATA-17); the traps are mined from jnana, readable now
-status: done
-disposition: cut 2026-07-25 from the second-round migration feedback
+status: done — cut 2026-07-25 from the second-round migration feedback
 ---
 
 # DATA-18 — document against the real consumer stack: "with React Aria Components"

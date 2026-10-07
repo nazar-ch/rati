@@ -1,8 +1,7 @@
 ---
 area: packages/rati/src/__tests__/data — tests only, no source changes expected
 needs: nothing
-status: done
-disposition: cut 2026-07-20 from a coverage map of the data tests taken at the DATA-03 review
+status: done — cut 2026-07-20 from a coverage map of the data tests taken at the DATA-03 review
 ---
 
 # DATA-09 — pin the unpinned data branches

@@ -1,8 +1,7 @@
 ---
 area: packages/rati/src/mandala/retryPolicy.ts (+ island docs: reference.md §retry)
 needs: DATA-10 (the retryable semantics it gates on)
-status: done
-disposition: cut 2026-07-25 from the second-round migration feedback; absorbs docs/archive/backlog-closed-1/issues/FND-02-retry-gate-by-error-class.md
+status: done — cut 2026-07-25 from the second-round migration feedback; absorbs docs/archive/backlog-closed-1/issues/FND-02-retry-gate-by-error-class.md
 ---
 
 # DATA-11 — default-on retry, gated by error class, jittered

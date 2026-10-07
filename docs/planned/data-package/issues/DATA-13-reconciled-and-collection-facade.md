@@ -1,8 +1,7 @@
 ---
 area: packages/rati/src/data — new reconciled.ts, collection.ts rebuilt over it (+ itemMap.ts, reference.md, internals.md)
 needs: DATA-12 (same leg — the facade forwards `prime`)
-status: done
-disposition: cut 2026-07-25 from the second-round migration feedback (breaking; collection stays a primitive — no fold into query)
+status: done — cut 2026-07-25 from the second-round migration feedback (breaking; collection stays a primitive — no fold into query)
 ---
 
 # DATA-13 — `reconciled()` derived view; `collection` becomes a full facade
