@@ -1,8 +1,7 @@
 ---
 area: packaging — packages/rati (exports, peers) vs a new workspace
 needs: DATA-03's findings (in: DATA-03-consumer-migrations.md §Findings, 2026-07-20) and the API items they cut — DATA-05..08 — so the extraction ships the surface the migration demanded, not the one it outgrew
-status: open
-disposition: cut 2026-07-18 at the implementation session, from the design record's open questions
+status: open — cut 2026-07-18 at the implementation session, from the design record's open questions
 ---
 
 # DATA-04 — extraction & entry-layout decision

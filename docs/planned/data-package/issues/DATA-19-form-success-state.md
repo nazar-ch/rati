@@ -1,8 +1,7 @@
 ---
 area: packages/rati/src/data — form.ts (if ever taken)
 needs: real-world evidence from jnana's app-side latch
-status: open
-disposition: deferred 2026-07-25 — jnana latches success app-side; revisit with usage evidence
+status: deferred — 2026-07-25 — jnana latches success app-side; revisit with usage evidence
 ---
 
 # DATA-19 — the success half of the form state machine (deferred)

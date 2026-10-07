@@ -2,7 +2,6 @@
 area: docs/current/RELEASING.md, .claude/kit.json
 needs:
 status: open
-disposition: —
 ---
 
 # FND-10 — RELEASING.md cites CHANGELOG.md parent-relative, and no gate here would catch the next one

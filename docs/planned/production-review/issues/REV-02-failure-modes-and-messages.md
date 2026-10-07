@@ -1,8 +1,7 @@
 ---
 area: every `throw` / `console.warn` / `console.error` / silent-catch in packages/rati/src (excluding data/), dev-vs-prod behavior divergence
 needs: — (best after scope-and-island + testing-and-dx land)
-status: open
-disposition: cut 2026-07-19; production-review lens 2
+status: open — cut 2026-07-19; production-review lens 2
 ---
 
 # REV-02 — failure modes & messages

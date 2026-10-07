@@ -2,7 +2,6 @@
 area: packages/rati/src/router/RouterOutlet.tsx
 needs:
 status: open
-disposition: —
 ---
 
 # SI-07 — the outlet's deferral gets a ceiling that commits on the sync lane

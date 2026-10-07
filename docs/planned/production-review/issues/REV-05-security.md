@@ -1,8 +1,7 @@
 ---
 area: the trust boundaries: ssr/{payload,html,renderApp,headTags}, mandala/hydration, server/{requestHandler,node} (static files, headers, redirects), router URL/param handling, vite plugin dev server
 needs: —
-status: open
-disposition: cut 2026-07-19; production-review lens 5
+status: open — cut 2026-07-19; production-review lens 5
 ---
 
 # REV-05 — security

@@ -1,8 +1,7 @@
 ---
 area: packages/rati/src/testing (+ reference.md §rati/testing)
 needs: DATA-12 + DATA-13 (helpers mirror the final surfaces)
-status: done
-disposition: cut 2026-07-25 from the second-round migration feedback
+status: done — cut 2026-07-25 from the second-round migration feedback
 ---
 
 # DATA-16 — data-layer test helpers: `controllableQuery` + a controllable producer

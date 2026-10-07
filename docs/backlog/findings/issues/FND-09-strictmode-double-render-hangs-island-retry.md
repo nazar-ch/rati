@@ -2,7 +2,6 @@
 area: packages/rati/src/mandala/boundary.tsx, packages/rati/src/mandala/retryPolicy.ts
 needs:
 status: open
-disposition: —
 ---
 
 # FND-09 — under React StrictMode a retryable island failure still hangs on `loading`

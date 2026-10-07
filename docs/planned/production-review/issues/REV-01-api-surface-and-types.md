@@ -1,8 +1,7 @@
 ---
 area: packages/rati/src/main.ts + every entry barrel (mobx, data*, ssr, server, vite, debug, testing), the built dist/*.d.ts, docs/current/public/reference.md as the claimed contract
 needs: — (best after scope-and-island + testing-and-dx land)
-status: open
-disposition: cut 2026-07-19; production-review lens 1 (*data excluded — see docs/planned/production-review/plan.md)
+status: open — cut 2026-07-19; production-review lens 1 (*data excluded — see docs/planned/production-review/plan.md)
 ---
 
 # REV-01 — public API surface & types

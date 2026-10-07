@@ -1,8 +1,7 @@
 ---
 area: packages/rati/src/data — query.ts types (+ collection facade if meaningful), test-d
 needs: DATA-12 + DATA-13 (the final surfaces it brands)
-status: done
-disposition: cut 2026-07-25 from the second-round migration feedback (first-wave finding; type-level only)
+status: done — cut 2026-07-25 from the second-round migration feedback (first-wave finding; type-level only)
 ---
 
 # DATA-15 — brand the ready source: `Source<ReadyQuery<T>>`

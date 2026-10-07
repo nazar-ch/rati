@@ -2,7 +2,6 @@
 area: packages/rati/src/data (form, field, query), packages/rati/src/util/utils.ts
 needs:
 status: open
-disposition: —
 approved: user, 2026-08-26 — routed from the jnana agent-testing-space session (2026-08-26)
 ---
 
