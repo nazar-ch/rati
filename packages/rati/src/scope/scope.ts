@@ -17,52 +17,36 @@ export const ScopeDefinitionsSymbol = Symbol();
 // off the scope instead of re-deriving it.
 export const ScopeProvidesSymbol = Symbol();
 
-// Brands a load as a *hook load* (see `hook()`): the resolver runs it every render
+// Brands a load as a hook load (see `hook()`): the resolver runs it every render
 // in stable order and never caches it, so its function may call React hooks. A
 // symbol prop (not a name) so it survives minification, mirroring `InputSymbol`.
 export const HookSymbol = Symbol();
 
 /**
- * A hook load — a function the resolver calls every render (so it may call any React
- * hook: `use(SomeContext)`, Apollo's `useQuery`, react-query, SWR…) and never caches.
- * It's the adapter seam: shape the resolved-so-far into the hook's inputs and map its
- * output back to a value or a `Source`. The hook owns its own subscription lifecycle;
- * rati never attaches/detaches a hook source. Create one with {@link hook}.
+ * A load the resolver calls every render and never caches, so it may call any React hook
+ * (`use(SomeContext)`, `useQuery`, SWR) and map its output to a value or a `Source` whose
+ * lifecycle the hook owns. Create one with {@link hook}.
  */
 export type HookLoad<T = unknown> = ((resolved: any) => T) & { readonly [HookSymbol]: true };
 
 /**
- * The second argument a function load receives — the run it belongs to, seen from
- * inside the load. Today it carries one thing: an `AbortSignal` that fires when that
- * run is discarded (an input change, a retry, `refresh()`, unmount), so a load can hand
- * it to `fetch` and have the request cancelled instead of finishing for a tree that is
- * already gone.
+ * The second argument a function load receives, optional to declare: an `AbortSignal` that
+ * fires when the load's run is discarded — an input change, a retry, `refresh()`, unmount.
+ * `hook()` loads and sources get none.
  *
- * A bag rather than a bare signal so later additions don't reshuffle parameters. Taking
- * it is opt-in: a load declaring only its props argument behaves exactly as before.
- *
- *     scope({ spaceId: input<string>() }).load({
- *         members: ({ spaceId }, { signal }) => api.members.list(spaceId, { signal }),
- *     });
- *
- * `hook()` loads don't get one (a hook owns its own lifecycle), and neither do sources —
- * `detach()` is already their cancellation.
+ *     members: ({ spaceId }, { signal }) => api.members.list(spaceId, { signal }),
  */
 export type LoadContext = {
     /**
      * Aborted when this load's run is discarded. Pass it to `fetch` or any signal-aware
-     * client; ignoring it leaves the load running to completion, as it always did.
+     * client; ignored, the load runs to completion.
      */
     readonly signal: AbortSignal;
 };
 
-// One entry of a scope's merged definition: an `input()` marker (head only), a `hook()`
-// load, or a data load (function / promise / source / class / value). They're kept
-// apart at the builder surface — `scope({…})` takes inputs, `.load({…})` takes hooks
-// and data — but the merged definition carries all, so the resolver and input helpers
-// see them. (A `HookLoad` is structurally a function, so the function member covers it
-// here; it's not listed separately to avoid polluting the contextual argument typing of
-// plain function loads.)
+// One entry of a scope's merged definition: an `input()` marker, a `hook()` load, or a data
+// load. A `HookLoad` is structurally a function, so the function member covers it; a member
+// of its own widens plain function loads' contextual argument type.
 type ScopeEntry =
     | ((...args: any) => any | Promise<any>)
     | { new (...args: any): any }
@@ -89,10 +73,9 @@ export type ScopeProvideDef = {
     channel?: Context<unknown> | undefined;
 };
 
-// `Provided` defaults to `unknown` so the many `Scope<any>` constraint sites keep
-// accepting provide-bearing scopes (a `PageContextStore` value is assignable to
-// `unknown`); a scope without `.provide()` carries `unknown` here, and `useScope`
-// reads that as "provide the resolved props" (see ScopeProvidesOf).
+// `Provided` defaults to `unknown` so the `Scope<any>` constraint sites keep accepting
+// provide-bearing scopes; a scope without `.provide()` carries `unknown`, which `useScope`
+// reads as "provide the resolved props" (ScopeProvidesOf).
 export type Scope<
     VD extends GenericScopeDefinition = GenericScopeDefinition,
     Provided = unknown,
@@ -157,24 +140,15 @@ type ScopeProvided<S extends Scope<any>> = S extends Scope<any, infer P> ? P : n
 export type ScopeProvidesOf<S extends Scope<any>> =
     unknown extends ScopeProvided<S> ? ScopeProps<S> : ScopeProvided<S>;
 
-// ---------------------------------------------------------------------------------------
-
 type CreateScopeFunc = <P extends InputsDefinition = {}>(inputs?: P) => ChainableScope<P>;
 
 // The head takes inputs only — `input()` markers (route params or host props). Data
 // goes into `.load()`, never here.
 type InputsDefinition = Record<string, Input<any>>;
 
-// A dependent level: each entry receives the prior levels' resolved values and
-// yields data — a `hook()` load, function, promise, source, class, or value. Not
-// `input()`: inputs live in the `scope({…})` head, so an `input()` here is a (type)
-// error. A `hook()` load satisfies the function member (a `HookLoad` is a function),
-// so it's accepted without a dedicated union member — which would otherwise widen the
-// contextual argument type of plain function loads to `any`.
-//
-// The second parameter is the load's {@link LoadContext}. Declaring it is optional —
-// a function of lower arity stays assignable — so `({ id }) => …` is unchanged and
-// `({ id }, { signal }) => …` gets `signal` contextually typed.
+// A dependent level: each entry receives the prior levels' resolved values; `input()` is a
+// type error here. A `hook()` load satisfies the function member, because a member of its own
+// widens plain loads' argument type to `any`. The {@link LoadContext} parameter is optional.
 type LoadDefinition<PrevDefs extends GenericScopeDefinition> = {
     [key: string]:
         | ((
@@ -188,14 +162,11 @@ type LoadDefinition<PrevDefs extends GenericScopeDefinition> = {
 };
 
 /**
- * Build a scope. The single entry form — always chainable:
+ * Builds a scope: an `input()` head, `.load()` levels, an optional terminal `.provide()`.
  *
- *     scope({ space: input<string>(), pageId: input<Base64Uuid>() })  // inputs
- *         .load({ spaceId: ({ space }) => resolveSpaceId(space) })    // dependent level
- *         .load({ tree: ({ spaceId }) => trees.source(spaceId) })     // parallel level
- *         .provide(({ tree }) => new PageContext(tree));              // terminal (optional)
- *
- * `scope()` with no inputs is valid for a data-only scope: `scope().load({ … })`.
+ *     scope({ space: input<string>() })
+ *         .load({ tree: ({ space }) => trees.source(space) })
+ *         .provide(({ tree }) => new PageContext(tree));
  */
 export const scope: CreateScopeFunc = <P extends InputsDefinition = {}>(inputs?: P) =>
     createScopeChain<P>(inputs ?? ({} as P), undefined);
@@ -204,20 +175,10 @@ export type ChainableScope<VD extends GenericScopeDefinition> = Scope<VD> & {
     load<NextDef extends LoadDefinition<VD>>(def: NextDef): ChainableScope<Simplify<VD & NextDef>>;
 
     /**
-     * Customize what the island provides to its subtree. By default an island
-     * provides the resolved props; `.provide(factory)` replaces that with
-     * `factory(resolvedProps)` — a derived, lifecycle-managed value (read with
-     * `useScope(Island)`). The factory runs once every level is ready; if the
-     * value is `Disposable`, its `[Symbol.dispose]` runs on island teardown
-     * *before* the scope's sources detach, so a value built over a grabbed
-     * resource is torn down while that grab is still live (fixing the decoupled
-     * "accessed after releasing" race). Set-up is the factory's job — construct,
-     * activate, return the value; there is no separate mount step. Terminal:
-     * `.provide()` ends the chain.
-     *
-     * `provideTo` additionally publishes the value into an app-owned React
-     * context, so app code can read it via that context (no `useScope`, no import
-     * cycle with the island the reader is rendered under).
+     * Replaces what the island provides — the resolved props by default — with
+     * `factory(resolvedProps)`, built once every level is ready. A `Disposable` value is
+     * disposed on teardown BEFORE the sources detach; `provideTo` also publishes it into an
+     * app-owned React context. Terminal.
      */
     provide<C>(
         factory: (resolved: Simplify<ResolveScopeDefinition<VD>>) => C,
@@ -259,8 +220,6 @@ function createScopeChain<VD extends GenericScopeDefinition>(
     };
 }
 
-// ----------------------
-
 export const InputSymbol = Symbol();
 
 export type Input<T> = {
@@ -275,15 +234,10 @@ export function input<T>(): Input<T> {
     };
 }
 
-// ----------------------
-
 /**
- * Mark a load as a *hook load*: `fn` runs every render (never cached), so it may
- * call any React hook. Use it for dependency injection — `hook(() => use(StoresCtx))`
- * — and to adapt external hook-based data libs to a `Source`. The resolver classifies
- * `fn`'s return like a function load (a `Source<T>` unwraps to `T`); a bare function
- * load that calls a hook (no `hook()`) is a bug — it would be cached and its hook run
- * once.
+ * Marks a load as a hook load: `fn` runs every render, never cached, so it may call any
+ * React hook — `hook(() => use(StoresCtx))`. Its return resolves like a function load's. A
+ * bare function load that calls a hook is a bug: it is cached, and its hook runs once.
  */
 export function hook<T>(fn: (resolved: any) => T): HookLoad<T> {
     (fn as { [HookSymbol]?: true })[HookSymbol] = true;
@@ -293,9 +247,7 @@ export function hook<T>(fn: (resolved: any) => T): HookLoad<T> {
 export const isHookLoad = (entry: unknown): entry is HookLoad =>
     typeof entry === 'function' && (entry as { [HookSymbol]?: true })[HookSymbol] === true;
 
-// ----------------------
-
-// Brands a load as a *data load with options* (see `data()`). A symbol prop so it
+// Brands a load as a data load with options (see `data()`). A symbol prop so it
 // survives minification, mirroring `HookSymbol`.
 export const DataSymbol = Symbol();
 
@@ -311,7 +263,7 @@ export type DataLoadOptions<T = unknown> = {
 
 /**
  * A data load carrying per-load options — a plain function load plus configuration the
- * resolver reads (today: the `equals` refresh gate). Create one with {@link data}.
+ * resolver reads (the `equals` refresh gate). Create one with {@link data}.
  */
 export type DataLoad<T = unknown> = ((resolved: any, context: LoadContext) => T) & {
     readonly [DataSymbol]: true;
@@ -319,16 +271,12 @@ export type DataLoad<T = unknown> = ((resolved: any, context: LoadContext) => T)
 };
 
 /**
- * Mark a function load as a *data load with options* — the counterpart of {@link hook}:
- * `hook()` says how a load runs (as a hook, every render), `data()` says what a load is
- * (a cached data load) and attaches per-load options. A bare function load behaves
- * exactly like `data(fn)` with no options.
+ * Marks a function load with per-load options: `hook()` says how a load runs, `data()`
+ * what it is. A bare function load is `data(fn)` with no options.
  *
- *     scope().load({
- *         members: data(({ spaceId }) => fetchMembers(spaceId), {
- *             equals: (a, b) => a.etag === b.etag,
- *         }),
- *     });
+ *     members: data(({ spaceId }) => fetchMembers(spaceId), {
+ *         equals: (a, b) => a.etag === b.etag,
+ *     }),
  */
 export function data<T>(
     fn: (resolved: any, context: LoadContext) => T,
@@ -342,8 +290,6 @@ export function data<T>(
 
 export const isDataLoad = (entry: unknown): entry is DataLoad =>
     typeof entry === 'function' && (entry as { [DataSymbol]?: true })[DataSymbol] === true;
-
-// ----------------------
 
 export type ScopeComponent<S extends Scope<any>, Props extends Record<string, unknown> = {}> = FC<
     ScopeProps<S> & Props
