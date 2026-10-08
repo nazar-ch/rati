@@ -67,6 +67,7 @@
 
     "styleSweep": {
         "docsBaseline": "fe110d8b843ef1936918920c399c1a189cd56928",
+        "commentsBaseline": "037cecb68a44c459bb0bb01356f8957d979b746d",
     },
 
     // Off while rati's test files carry no kind in their names.
