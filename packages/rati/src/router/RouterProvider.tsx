@@ -4,17 +4,16 @@ import type { Router } from './router.js';
 import { RouterStore, type AnyRouter } from './store.js';
 
 /*
-    The router's own React plumbing: `RouterProvider` puts the app's router (built by
-    `createRouter`) into context; `useRouter` reads and subscribes to it. This is the
-    whole delivery mechanism — the router is not a member of some framework-owned stores
-    container (rati has none; app store graphs are app code).
+    The router's React plumbing: `RouterProvider` puts the app's router into context, and
+    `useRouter` reads and subscribes to it. rati carries no stores container; an app's store
+    graph is app code.
 */
 
 const RouterContext = React.createContext<RouterStore | null>(null);
 
 /**
- * Provide the app's router to the tree. Wrap everything that navigates or reads the
- * router — including shells above `<RouterOutlet/>` — in one of these:
+ * Provides the app's router to everything that navigates or reads it, shells above
+ * `<RouterOutlet/>` included:
  *
  * ```tsx
  * const router = createRouter(routes);
@@ -71,10 +70,9 @@ export function useRouterStore(): RouterStore {
 }
 
 /**
- * Read the app's router and subscribe to it, so a component that navigates or reads
- * `activeRoute` / `path` re-renders on navigation. This is the public way to reach the
- * router programmatically — `Link`, `RouterOutlet`, and app code all go through this
- * context. Throws when no `<RouterProvider>` is above.
+ * Reads the app's router and subscribes, so a component reading `activeRoute` or `path`
+ * re-renders on navigation — the public way to reach the router. Throws when no
+ * `<RouterProvider>` is above.
  */
 export function useRouter(): Router {
     // Same widening as createRouter's: the context holds the table-generic store, the

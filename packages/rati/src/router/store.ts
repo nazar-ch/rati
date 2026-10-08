@@ -44,11 +44,9 @@ export function toRouterStore(router: AnyRouter): RouterStore {
 }
 
 /**
- * Snapshot used to seed a router on the client after server rendering. Mirrors
- * what the server entry serialized into the HTML response — the client passes it
- * back so the first paint reads the same active route as the server. This is the
- * *routing* snapshot only; a route's resolved scope data is dehydrated separately
- * by the mandala engine (see `HydrationProvider` in `rati/ssr`).
+ * The routing snapshot seeding a client router after a server render, so the first paint
+ * reads the server's active route. A route's resolved scope data is dehydrated separately
+ * (`HydrationProvider` in `rati/ssr`).
  */
 export interface RouterHydratedState {
     path: string;
@@ -116,32 +114,16 @@ function redirectTargetPathname(targetPath: string, basename: string): string {
 }
 
 /**
- * The router's string vocabulary is absolute path references; anything else is refused
- * here, at the choke point, rather than misnavigating quietly.
+ * long:1
+ * The router's string vocabulary is absolute path references; anything else is refused here,
+ * at the choke point. A relative string resolves against the current URL in the browser and
+ * against a placeholder origin in memory history, so the two hosts disagree; `<Link>` or an
+ * anchor is the surface that owns a relative reference.
  *
- * A relative string has no single meaning in this router. The platform resolves one
- * against the current URL, but only in the browser: `createMemoryHistory` parses every
- * input against a fixed placeholder origin, so the two hosts disagree on every relative
- * spelling — `push('sub')` from `/a/b/c` is `/a/b/sub` in the browser and `/sub` in
- * memory, and SSR, tests and the fuzz model all run on the latter. Teaching both to
- * resolve was the alternative; refusing is the decision, because two hosts can only
- * disagree about input we accept. It also closes a trap the spelling opened: a
- * self-targeting redirect written relatively (`to: 'self'` on `/self`) walked past the
- * loop check, which compares resolutions and saw `'self' !== '/self'`.
- *
- * Where a relative reference is genuinely meant, `<Link>`/an anchor is the surface that
- * owns it — the platform resolves it there, and the router receives the answer.
- *
- * A leading `/` is not yet a path: the URL parser reads a second authority introducer as
- * another origin — `//host`, and every spelling it normalizes into that (`/\host`,
- * `///host`, tab/newline-smuggled variants; the parser strips those characters before it
- * looks). The two hosts split on exactly this class (the browser's pushState refuses it
- * as cross-origin, the memory history quietly lands on the parsed pathname), and a
- * redirect target travels verbatim into the server's `Location` header — where an
- * authority the app never chose is an open redirect, reachable through a function
- * redirect composed from a decoded param (params carry `/` via `%2F`). So the check is
- * the memory history's own parse: resolve against the placeholder origin and refuse
- * anything that leaves it.
+ * A leading `/` is not yet a path: the URL parser reads `//host`, and every spelling it
+ * normalizes into one (`/\host`, tab-smuggled variants), as another origin. A redirect target
+ * travels verbatim into the server's `Location` header, where that is an open redirect, so
+ * the check resolves against the placeholder origin and refuses anything that leaves it.
  */
 function assertAbsolutePathTarget(target: string, where: string): void {
     if (!target.startsWith('/')) {
@@ -173,15 +155,9 @@ function assertAbsolutePathTarget(target: string, where: string): void {
 const PLACEHOLDER_ORIGIN = 'http://_';
 
 /**
- * Percent-decode the matched params — the inbound half of the round-trip `getPath`
- * opens, so a component reads the value that was put in rather than the browser's
- * encoding of it (`hello world`, not `hello%20world`).
- *
- * A URL is user input: hand-typed, truncated, or copied wrong, it can carry a sequence
- * `decodeURIComponent` rejects (`/pages/%zz`). Decoding runs during `setPath`, so
- * letting the URIError fly would turn a bad address into a dead app; the raw segment is
- * handed through instead — the component sees exactly what the URL said — and the
- * problem is reported rather than swallowed.
+ * Percent-decodes the matched params, the inbound half of `getPath`'s round trip. A sequence
+ * `decodeURIComponent` rejects (`/pages/%zz`) hands the raw segment through and is reported:
+ * a throw during `setPath` turns a bad address into a dead app.
  */
 function decodeParams(groups: Record<string, string | undefined> | undefined) {
     const params: Record<string, string> = {};
@@ -201,13 +177,9 @@ function decodeParams(groups: Record<string, string | undefined> | undefined) {
 }
 
 /**
- * Shallow value-equality for per-entry history `state`. Used to decide whether a
- * same-URL navigation changed its `state` and so should re-resolve the route
- * (see {@link RouterStore.setPath}). Reference equality is wrong here: POP
- * restores `state` as a freshly-deserialized object, and StrictMode re-reads
- * `history.state` into a new object too — both must compare equal to their prior
- * value. A shallow compare matches `state`'s documented purpose (flat UI-local
- * context like `{ panelId }`); deeply-nested changes are out of scope by design.
+ * Shallow value-equality for per-entry history `state`, deciding whether a same-URL
+ * navigation re-resolves ({@link RouterStore.setPath}). Never reference equality: POP and
+ * StrictMode both re-read `state` into a fresh object. Shallow fits flat UI-local context.
  */
 function shallowEqualState(a: unknown, b: unknown): boolean {
     if (a === b) return true;
@@ -238,10 +210,8 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
     /** Normalized basename — empty string when none was configured. */
     readonly basename: string;
     /**
-     * Always-resolved sentinel kept for backwards compatibility with server
-     * entries that `await` it before reading `activeRoute`. Navigation is now
-     * synchronous, so `activeRoute` is populated by the time the constructor
-     * returns and awaiting this is a no-op.
+     * Always resolved: navigation is synchronous, so `activeRoute` is set when the constructor
+     * returns. Kept for server entries that `await` it.
      */
     pendingNavigation: Promise<void> = Promise.resolve();
     private uninstallScrollRestoration: () => void = () => {};
@@ -292,11 +262,10 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
         }
 
         if (options.hydratedState) {
-            // Server-rendered snapshot — seed observables so the first client
-            // render matches the server HTML. The route is already resolved.
+            // Server-rendered snapshot: seeded so the first client render matches the server
+            // HTML. The route is already resolved.
             this.seedFromHydratedState(options.hydratedState);
         } else {
-            // Set path where the page is opened
             this.setPath(this.history.location);
         }
     }
@@ -304,11 +273,9 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
     private seedFromHydratedState(state: RouterHydratedState) {
         const matched = this.routes.find((r) => r.name === state.activeRouteName);
         if (!matched) {
-            // The hydrated route name doesn't exist in this client's route table
-            // (e.g. server and client routes drifted). Fall back to running the
-            // normal matcher against the URL so we at least render *something*.
-            // Don't seed _path here so setPath's same-path early-return doesn't
-            // skip the resolve.
+            // The hydrated route name is missing from this client's table (the routes
+            // drifted): run the matcher against the URL. `_path` stays unseeded, so setPath's
+            // same-path early return cannot skip the resolve.
             this.setPath(this.history.location);
             return;
         }
@@ -335,19 +302,16 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
     dispose() {
         this.unlistenHistory();
         this.uninstallScrollRestoration();
-        // Unlistening only detaches *this* store; the history it created is still
+        // Unlistening only detaches THIS store; the history it created is still
         // holding the window's popstate. Nobody else can let go of it.
         if (this.ownsHistory) this.history.dispose?.();
     }
 
     getPath(args: NameToRoute<T> | string) {
         if (typeof args === 'string') {
-            // String paths are passed through verbatim (basename is the caller's
-            // responsibility here — they may already have the full URL). Not held to the
-            // absolute-path rule `navigate`/`replace` enforce, on purpose: this output
-            // feeds `href` attributes (the ContextualLink path), and an anchor is the one
-            // surface where a relative reference is legal — the platform resolves it there
-            // and the router only ever sees the resolved answer (see Link's anchorPath).
+            // String paths pass through verbatim, basename included, and exempt from the
+            // absolute-path rule: this output feeds `href` attributes, where the platform
+            // resolves a relative reference (Link's anchorPath).
             return args;
         }
 
@@ -359,18 +323,10 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
                     `Known routes: ${this.routes.map((item) => item.name).join(', ')}.`,
             );
         }
-        // long:1
-        // Substitute at the path's own `:param` boundaries (PARAM_RE — the same tokens
-        // the matcher compiles), so a name can never be found inside a longer one.
-        // Values are percent-encoded, which is the outbound half of the round-trip
-        // getActiveRoute closes: what the caller passes here is what the component is
-        // handed back, whatever characters it contains — save one shape no encoding
-        // reaches. A value of exactly '.' or '..' is a path operator, not data: the URL
-        // parser resolves the segment away before any router sees it, and `%2E` is not an
-        // escape from that (URLs read it as a dot for precisely this reason — it is what
-        // stops percent-encoding from smuggling a traversal past a path check). No URL
-        // carries such a value, so getPath refuses it instead of building one that
-        // resolves somewhere else — see docs/current/public/reference.md.
+        // Substitutes at the path's own `:param` boundaries (PARAM_RE), so a name is never
+        // found inside a longer one; values are percent-encoded, the outbound half of the
+        // round trip. A value of exactly '.' or '..' is a path operator the URL parser
+        // resolves away, `%2E` included, so getPath refuses it.
         const path = matched.path.replace(PARAM_RE, (token, key: string, tail: string) => {
             const value = (params as Record<string, string | undefined>)[key];
             // Types require every param, so a missing one means a caller reaching past
@@ -411,14 +367,9 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
     }
 
     /**
-     * User state attached to the current history entry via `navigate`/`replace`
-     * `{ state }`, or `null`. The browser persists it per entry, so it survives
-     * back/forward. Use it to carry UI-local context that shouldn't live in the
-     * URL itself — e.g. which panel a navigation targets.
-     *
-     * A navigation that changes only `state` (same URL, different value) still
-     * re-resolves the active route, so consumers that route off `state` react to
-     * back/forward between two entries sharing a URL. See {@link setPath}.
+     * User state attached to the current history entry by `navigate`/`replace` `{ state }`,
+     * or `null`, persisted per entry across back/forward. A navigation changing only `state`
+     * still re-resolves the active route.
      */
     get state(): unknown {
         return this._state;
@@ -445,12 +396,9 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
     }
 
     /**
-     * Begin loading the chunk for the route that matches `path`, without
-     * navigating. No-op if the matched route's component is not a
-     * preload-capable lazy component (see {@link lazy}). Safe to call
-     * repeatedly — the underlying factory dedupes.
-     *
-     * Used by `<Link prefetch>` to start the import on hover/touch.
+     * Begins loading the chunk for the route matching `path`, without navigating — what
+     * `<Link prefetch>` calls on hover. A no-op unless the route's component is a
+     * preload-capable {@link lazy}; the factory dedupes repeats.
      */
     preloadRoute(path: string): Promise<unknown> | undefined {
         const stripped = stripBasename(path, this.basename);
@@ -474,7 +422,7 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
     activeRoute: StoreActiveRoute<T> | null = null;
 
     /**
-     * The route-level redirects the *current* navigation followed, oldest first —
+     * The route-level redirects the CURRENT navigation followed, oldest first —
      * reset when a fresh navigation starts. `prepareRoute` reads it to report the 30x;
      * on the client it is normally invisible (the history entry was replaced).
      */
@@ -504,14 +452,10 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
             this._hash = location.hash;
             this._state = nextState;
 
-            // Skip resolution only when the URL didn't change, the per-entry state
-            // is equal, AND we already have a resolved route. The path/route guard
-            // covers the initial mount race and StrictMode re-fires (where _path was
-            // set but activeRoute wasn't yet committed). The state guard is what
-            // makes a state-only change re-resolve: stepping back/forward between two
-            // entries that share a URL but carry different `state` (e.g. the same
-            // page open in two panels) must re-key the active route so consumers
-            // routing off it react — otherwise the entry change is invisible to them.
+            // Skip resolution only when the URL is unchanged, the entry state is equal AND a
+            // route is resolved; the path/route guard covers the mount race and StrictMode
+            // re-fires. A state-only change re-resolves, so stepping between two entries
+            // sharing a URL re-keys the route.
             if (this._path === pathname && this.activeRoute && !stateChanged) {
                 return;
             }
@@ -536,33 +480,26 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
                     this.pathCounter,
                 ) ?? null;
 
-            // A route-level redirect is followed here, before the route ever renders:
-            // resolve the target, record the hop (prepareRoute's 30x input), and
-            // `replace` — the history listener fires synchronously, so the nested
-            // setPath resolves the target route before this frame returns. The depth
-            // guard breaks redirect cycles by rendering the last route instead.
+            // A route-level redirect is followed before the route renders: record the hop
+            // (prepareRoute's 30x input) and `replace`, whose synchronous listener resolves the
+            // target in this frame. The depth guard breaks a cycle by rendering the last route.
             if (matched?.redirect && this.redirectDepth < MAX_REDIRECT_DEPTH) {
                 const { to, permanent = false } = matched.redirect;
                 const target = typeof to === 'function' ? to(matched.routeParams) : to;
                 let targetPath: string;
                 if (typeof target === 'string') {
-                    // Refused before the hop is recorded or followed: a relative target is
-                    // also how a self-redirect used to slip past the 1-cycle check below,
-                    // which compares resolved pathnames and reads a spelling as different.
+                    // Refused before the hop is recorded: the 1-cycle check below compares
+                    // resolved pathnames and reads a relative spelling as different.
                     assertAbsolutePathTarget(target, `redirect from route "${matched.name}"`);
                     targetPath = target;
                 } else {
                     targetPath = this.getPath(target as NameToRoute<T>) + this._search + this._hash;
                 }
                 this.redirectHops.push({ from: pathname, to: targetPath, permanent });
-                // A target pointing back at the pathname being resolved is a cycle of
-                // length 1, and following it cannot reveal that: the nested setPath sees
-                // its own path unchanged, takes the same-path early return above, and
-                // leaves the *previous* route on screen at the new URL. Stop here and
-                // fall through to the loop report instead, so a 1-cycle ends the way a
-                // capped longer one does — trail recorded, the route's own component
-                // rendered. Search and hash are excluded from the comparison on purpose:
-                // a target differing from its own route only in query is the same trap.
+                // A target pointing back at the pathname being resolved is a 1-cycle the nested
+                // setPath cannot see — its same-path early return leaves the PREVIOUS route at
+                // the new URL — so it falls through to the loop report. Search and hash stay
+                // out of the comparison: a query-only difference is the same trap.
                 if (redirectTargetPathname(targetPath, this.basename) !== pathname) {
                     this.redirectDepth++;
                     try {
@@ -644,46 +581,20 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
     }
 
     /**
-     * Navigate to `to` by pushing a new history entry. The route re-resolves
-     * and re-renders; browser back returns to the previous URL.
-     *
-     * Use for ordinary user-initiated navigation. `<Link>` calls this under
-     * the hood. For programmatic redirects where the previous URL must not be
-     * reachable via back (post-login, auth-gate, canonicalization), use
-     * `replace()`.
-     *
-     * Pass `{ keepCurrentRoute: true }` for a *shallow push*: grow the back
-     * stack and update the URL, but keep the currently mounted route component
-     * in place (no re-resolve). Use when a history-worthy change leaves the
-     * shown route valid — e.g. switching focus between split panels that each
-     * already hold their content, where back/forward should step the focus.
-     *
-     * Pass `{ state }` to attach user state to the entry (readable via `state`,
-     * survives back/forward). Coexists with `keepCurrentRoute`'s internal skip
-     * marker.
+     * Pushes a history entry and re-resolves the route; back returns to the previous URL. For
+     * a redirect whose previous URL must not stay reachable, use `replace()`.
+     * `{ keepCurrentRoute: true }` is a shallow push: the URL and back stack change, and the
+     * mounted route stays.
      */
     navigate(to: NameToRoute<T> | string, options: NavigateOptions = {}) {
         this.pushOrReplace('push', to, options);
     }
 
     /**
-     * Navigate to `to` by replacing the current history entry. The route
-     * re-resolves and re-renders, but browser back skips the previous URL.
-     *
-     * Use when the *previous* URL should not be reachable via back: post-login
-     * redirects, auth-gate bounces, URL canonicalization (e.g. `/users` →
-     * `/users/1`), navigation after a destructive action.
-     *
-     * Pass `{ keepCurrentRoute: true }` to update the URL without re-resolving
-     * the route — the currently mounted route component stays mounted. Useful
-     * when the same route owns sub-state reflected in the URL (an editor
-     * swapping files via tabs, a media player changing tracks). `keepCurrentRoute`
-     * is independent of push vs replace: replace (here) when the shallow change
-     * shouldn't grow the back stack; `navigate({ keepCurrentRoute })` when it should.
-     *
-     * Pass `{ state }` to attach user state to the entry (readable via `state`,
-     * survives back/forward). Coexists with `keepCurrentRoute`'s internal skip
-     * marker.
+     * Replaces the current history entry and re-resolves the route; back skips the previous
+     * URL — post-login redirects, auth-gate bounces, canonicalization.
+     * `{ keepCurrentRoute: true }` updates the URL without re-resolving, for sub-state the
+     * mounted route owns.
      */
     replace(to: NameToRoute<T> | string, options: NavigateOptions = {}) {
         this.pushOrReplace('replace', to, options);

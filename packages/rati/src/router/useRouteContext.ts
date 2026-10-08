@@ -8,11 +8,8 @@ import { useRouterStore } from './RouterProvider.js';
 
 import { useScopeRead } from '../mandala/channel.js';
 
-// Context-bearing route names, derived from the app's routes table
-// (`RatiUserTypes['routes']`) — the same source `Link`'s `to` reads, so the context
-// type comes from the route definitions with no separate registration. Falls back to
-// `string` when the app hasn't augmented its routes (e.g. rati's own tests), keeping
-// the hook usable (returning `unknown`).
+// Context-bearing route names off `RatiUserTypes['routes']`, the source `Link`'s `to` reads.
+// Without an augmentation, as in rati's own tests, the hook stays usable and returns `unknown`.
 type ContextName = [UserRoutes] extends [never] ? never : RouteContextNames<UserRoutes>;
 type RouteContextName = [ContextName] extends [never] ? string : ContextName;
 
@@ -39,16 +36,9 @@ function scopeForRoute(routes: readonly GenericRouteType[], name: string): objec
 }
 
 /**
- * Read the value a route's scope provides (`.provide()`, else its resolved props) by the
- * route `name` — the no-import convenience for routes. `route` builds the island from
- * the route's scope, so there is no island module to reference; the `name` resolves the
- * scope off the live routes table, and the value is read through that scope's channel.
- *
- * The return type is read off the app's routes table (`RatiUserTypes['routes']`) by
- * name — `useRouteContext('page')` is typed with no type argument, and only
- * context-bearing (scope-carrying) route names are accepted. The same augmentation
- * `Link` relies on; no separate registration. Falls back to `unknown` when the app
- * hasn't augmented its routes.
+ * Reads the value a route's scope provides by route `name`, with no island module to
+ * import: the name resolves the scope off the live routes table. Typed off
+ * `RatiUserTypes['routes']`, accepting only scope-carrying names; `unknown` without it.
  */
 export function useRouteContext<Name extends RouteContextName>(name: Name): RouteContextOf<Name> {
     const router = useRouterStore();

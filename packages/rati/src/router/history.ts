@@ -24,22 +24,10 @@ export interface History {
     push(to: string, state?: unknown): void;
     replace(to: string, state?: unknown): void;
     /**
-     * Traverse the entry stack by `delta` entries — the back/forward buttons,
-     * programmatically. Lands on an existing entry, so the location it restores
-     * carries that entry's own `state` and `key` rather than fresh ones, and the
-     * update arrives as `POP`.
-     *
-     * Out of range does nothing (the browser's rule: there is no entry to go to,
-     * so no traversal happens — it does not clamp to the ends). `delta: 0` is the
-     * host's reload: the browser reloads the document; a memory history has no
-     * document, so it does nothing.
-     *
-     * **The two implementations differ in *when* the POP arrives.** The memory
-     * history owns its stack and emits synchronously, before `go` returns. The
-     * browser's traversal is asynchronous — `window.history.go` queues it, and the
-     * `popstate` event (and so the update) arrives on a later task. Code that must
-     * work on both awaits the listener rather than reading `location` on the next
-     * line.
+     * Traverses the entry stack by `delta` entries, landing on an existing entry — with its
+     * own `state` and `key` — as a POP. Out of range does nothing, never clamping; `delta: 0`
+     * reloads the browser and does nothing in memory. The memory history emits before `go`
+     * returns, the browser on a later task.
      */
     go(delta: number): void;
     /** `go(-1)`. */
@@ -55,14 +43,10 @@ export interface History {
      */
     notify(action: Action): void;
     /**
-     * Detach from the host and drop every listener; the history is inert
-     * afterwards. `createBrowserHistory` subscribes to `window`'s `popstate`,
-     * which outlives the history object itself — without this, a history per
-     * test or per HMR cycle leaves its subscription behind.
-     *
-     * `RouterStore.dispose()` calls it on a history it created; an injected one
-     * is the caller's to dispose, since they may share or outlive the store.
-     * Optional: a host with nothing to detach need not implement it.
+     * Detaches from the host and drops every listener. `createBrowserHistory`'s `popstate`
+     * subscription outlives the object, so a history per test or HMR cycle leaks without it.
+     * `RouterStore.dispose()` calls it on a history it created; an injected one is its
+     * caller's.
      */
     dispose?(): void;
 }
@@ -149,12 +133,9 @@ export function createBrowserHistory(): History {
 }
 
 /**
- * In-memory history for environments without a DOM (server rendering, tests,
- * non-browser hosts). Mirrors the {@link History} surface over an entry stack
- * held in a closure instead of `window.history`, so back/forward traverse real
- * entries — {@link History.go} restores the entry's own `state` and `key`, which
- * is what scroll restoration and per-entry `state` key off. No `popstate`
- * listeners: the stack is ours, so traversal emits synchronously.
+ * In-memory history for hosts without a DOM — server rendering, tests. Mirrors
+ * {@link History} over an entry stack in a closure, so back/forward restore real entries
+ * with their own `state` and `key`; traversal emits synchronously.
  */
 export function createMemoryHistory(opts: { url?: string } = {}): History {
     const listeners = new Set<HistoryListener>();

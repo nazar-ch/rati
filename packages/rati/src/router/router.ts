@@ -7,16 +7,10 @@ import type {
 } from './route.js';
 
 /*
-    The public face of the router. `Router` is table-blind: navigation targets and the
-    active route are typed off the app's one `declare module 'rati'` augmentation
-    (`RatiUserTypes['routes']` — the same source `Link`'s `to` reads), never off a route
-    table imported as a value. That is what lets a store container hold `router: Router`
-    without its type embedding the route components — the inference cycle
-    (stores → routes → components → stores) cannot form, because none of these types
-    mention a component. See docs/research/stores-and-router.md.
-
-    The implementation behind it is `RouterStore` (./store.ts), which `createRouter`
-    constructs and rati's own internals (`RouterOutlet`, `Link`, SSR) narrow back to.
+    The public face of the router: `Router` is table-blind, typed off the app's
+    `RatiUserTypes['routes']` augmentation and never a route table imported as a value, so a
+    store container holds it with no stores → routes → components cycle. `RouterStore`
+    (./store.ts) implements it.
 */
 
 /**
@@ -44,21 +38,17 @@ type GenericActiveRoute = {
 };
 
 /**
- * The augmented table read by *indexed access*, not through `UserRoutes` — that alias
- * `infer`s the table out of a conditional, and a type built by conditioning on it again
- * stays deferred: `name` and `routeParams` read as the right unions, but the discriminant
- * narrows nothing (FND-06). The `keyof … & 'routes'` intersection is what keeps the index
- * legal inside the package, where the interface has no `routes` member yet — it resolves
- * to `never` there, and to `'routes'` under any augmentation.
+ * The augmented table read by indexed access, never through `UserRoutes`: a type conditioned
+ * on that alias's `infer` stays deferred, and its discriminant narrows nothing. The
+ * `keyof … & 'routes'` intersection keeps the index legal in the package, resolving to
+ * `never` there.
  */
 type UserRouteTable = RatiUserTypes[keyof RatiUserTypes & 'routes'];
 
 /**
- * The current route, typed off the `RatiUserTypes` augmentation — a union discriminated
- * by `name` when the app has one (`activeRoute.name === 'x'` narrows `routeParams`), the
- * generic shape when it doesn't. One conditional only: `ActiveRouteOf` is applied to the
- * indexed table directly (`never` satisfies its constraint in the unaugmented package) —
- * a second `extends` guard around it re-defers the result and kills the narrowing.
+ * The current route off the `RatiUserTypes` augmentation — a union discriminated by `name`
+ * when the app has one, the generic shape when not. One conditional only: a second
+ * `extends` guard re-defers the result and kills the narrowing.
  */
 export type ActiveRoute = [UserRoutes] extends [never]
     ? GenericActiveRoute
@@ -79,15 +69,10 @@ export interface NavigateOptions {
 }
 
 /**
- * The app's router — what {@link createRouter} returns, `<RouterProvider>` provides, and
- * `useRouter()` hands back. Navigation targets (`{ name, …params }`) and `activeRoute`
- * are typed from the `RatiUserTypes` augmentation, so this type never references the
- * route table as a value — safe to hold anywhere (a store container included) without
- * importing the routes module.
- *
- * Reactivity: a `subscribe`/`getSnapshot` pair (`useSyncExternalStore`-shaped).
- * Components that reach the router through `useRouter()` are subscribed automatically;
- * non-React consumers (a store reacting to navigation) use `subscribe` directly.
+ * The app's router — what {@link createRouter} returns and `useRouter()` hands back. Typed
+ * off the `RatiUserTypes` augmentation, never the route table, so any container can hold
+ * it. A `subscribe`/`getSnapshot` pair: `useRouter()` subscribes a component, and a
+ * non-React consumer calls `subscribe`.
  */
 export interface Router {
     /** The resolved current route, or `null` before the first match / when nothing matches. */
@@ -109,12 +94,9 @@ export interface Router {
     /** Build the URL path for a route reference (or pass a string through verbatim). */
     getPath(to: NameToRoute<UserRoutes> | string): string;
     /**
-     * Traverse the history stack by `delta` entries — the back/forward buttons,
-     * programmatically. A thin pass-through to the history: the update lands as a POP and
-     * resolves the route it restores. Out of range does nothing (the browser's rule). Note
-     * the timing difference between hosts: the browser's traversal is asynchronous (the
-     * update arrives on a later task), a memory history's is synchronous — code that must
-     * work on both subscribes rather than reading the location on the next line.
+     * Traverses the history stack by `delta` entries, landing as a POP; out of range does
+     * nothing. The browser traverses asynchronously and a memory history synchronously, so
+     * code for both subscribes rather than reading the location on the next line.
      */
     go(delta: number): void;
     /** `go(-1)` — "close this and go back". */

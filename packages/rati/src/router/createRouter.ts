@@ -3,14 +3,9 @@ import type { Router } from './router.js';
 import { RouterStore, type RouterOptions } from './store.js';
 
 /**
- * Build the app's router over its route table. Construct one per app on the client, one
- * per request on the server (with a memory `history`), then hand it to
- * `<RouterProvider router={…}>`.
- *
- * The return type is {@link Router} — table-blind, with navigation targets and
- * `activeRoute` typed from the `RatiUserTypes` augmentation — so the value can be held
- * anywhere (a store container included) without dragging the route table's component
- * types along. No type parameter: the augmentation is the single source of route typing.
+ * Builds the app's router over its route table — one per app on the client, one per request
+ * on the server with a memory `history` — for `<RouterProvider>`. Returns the table-blind
+ * {@link Router}, typed off the `RatiUserTypes` augmentation.
  */
 export function createRouter(
     routes: readonly GenericRouteType[],

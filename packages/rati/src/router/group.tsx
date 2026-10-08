@@ -18,23 +18,10 @@ export type GroupDefaults = {
 };
 
 /**
- * Apply shared options to a list of routes, removing the per-route duplication of a common
- * `wrapper` (and optionally `loading`/`error`). Returns the routes **unchanged at the type
- * level** — the same flat tuple of literal `name`/`path`/`scope` the router's type
- * machinery reads (`Link`'s `to`, `useRouteContext`) — so a group is purely an authoring
- * convenience: spread it into the `routes` tuple, paths stay absolute.
+ * Applies shared options to a list of routes; a child's own options win. The routes come back
+ * UNCHANGED at the type level; `loading`/`error` re-fold a scope-bearing child's mandala.
  *
- *     export const routes = [
- *         route('/', 'index', Index),
- *         ...group({ wrapper: SettingsLayout }, [
- *             route('/settings/', 'settings', Settings),
- *             route('/settings/account', 'settings-account', AccountPage),
- *         ]),
- *     ] as const;
- *
- * Each child keeps its own options; the group only fills the gaps. `wrapper` is applied at
- * render (the RouterOutlet reads `wrapperComponent`); `loading`/`error` re-fold the child's
- * mandala, so they affect only routes that carry a `scope`.
+ *     ...group({ wrapper: SettingsLayout }, [route('/settings', 'settings', Settings)]),
  */
 export function group<const T extends readonly GenericRouteType[]>(
     defaults: GroupDefaults,

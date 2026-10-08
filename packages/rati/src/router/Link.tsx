@@ -11,7 +11,6 @@ type GenericAnchorProps = Omit<
     'href'
 >;
 
-// TODO: replace with FC<{ name: 'name1' } | { name: 'name2', params: { x: string }} | ...>
 type RatiLinkBaseProps = {
     className?: string;
     activeClassName?: string;
@@ -21,7 +20,6 @@ type RatiLinkBaseProps = {
      * No-op for routes whose component isn't a `lazy()` component.
      */
     prefetch?: boolean;
-    // TODO: "exact" prop to match active path exactly or compare with startWith
 };
 
 type RatiLinkToProps<T extends readonly GenericRouteType[]> =
@@ -131,7 +129,7 @@ export const ContextualLink = function ContextualAnchor(
     props: PropsWithChildren<RatiLinkBaseProps & GenericAnchorProps>,
 ) {
     // Subscribe to the router so active state re-renders on navigation — the
-    // LinkContextStore getters derive from it. Replaces the old mobx `observer`.
+    // LinkContextStore getters derive from it.
     useRouterStore();
     const linkContext = useLinkContext();
 
@@ -141,16 +139,10 @@ export const ContextualLink = function ContextualAnchor(
 };
 
 /**
- * Where this anchor points, in the terms the router speaks: an absolute path.
- *
- * `anchor.href` (the IDL property, not `getAttribute('href')`) is the DOM's own
- * resolution of the attribute — the URL an unintercepted click would go to, `..` and
- * dot-segment normalization included. Reading it back is how a relative href resolves
- * with no resolution code in rati: the platform owns the reference an anchor carries, and
- * an intercepted click lands byte-identically where the unintercepted one would. A
- * Navigation API interception hands over exactly this shape, which
- * {@link shouldHandleLinkClick} already mirrors — and which has run by the time we call
- * this, so the URL is same-origin and only its path part is the router's business.
+ * Where this anchor points, as an absolute path. `anchor.href` (the IDL property) is the
+ * DOM's own resolution of the attribute, dot segments included, so a relative href resolves
+ * with no resolution code in rati and an intercepted click lands where an unintercepted one
+ * would.
  */
 function anchorPath(anchor: HTMLAnchorElement): string {
     const url = new URL(anchor.href);
@@ -158,19 +150,10 @@ function anchorPath(anchor: HTMLAnchorElement): string {
 }
 
 /**
- * Whether `href` names the route on screen — resolved before comparing, since the raw
- * spelling is not the destination. An anchor resolves relative to the current URL, so
- * `href="c"` at `/a/b/c` points at the page it is on while the string never equals the
- * path; comparing spellings reported it inactive forever.
- *
- * Resolution uses the URL parser against the base the anchor itself would use, so it
- * agrees with the click by construction — assuming no `<base href>` element, which would
- * move the anchor's base but not this one (rati doesn't support one). The placeholder
- * origin keeps it off `window`
- * (SSR-safe, same trick as the memory history); an href resolving away from that
- * placeholder is an absolute external URL, which is no path of this app's. A spelling the
- * parser rejects outright is likewise nothing we're on — and inactive is the answer to
- * give, not an exception thrown through a render.
+ * Whether `href` names the route on screen, resolved before comparing: `href="c"` at
+ * `/a/b/c` is the page it is on. Resolves against the placeholder origin, off `window`,
+ * assuming no `<base href>`; an href leaving that origin is external, and one the parser
+ * rejects is inactive.
  */
 function isHrefActive(router: RouterStore<readonly GenericRouteType[]>, href: string): boolean {
     const base = PLACEHOLDER_ORIGIN + router.basename + router.path + router.search;

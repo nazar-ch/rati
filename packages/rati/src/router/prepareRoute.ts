@@ -6,11 +6,9 @@ import {
 } from './store.js';
 
 /**
- * The server's routing decision object. {@link hydratedState} is embedded in the SSR
- * HTML response and passed back to the client as `RouterOptions.hydratedState`,
- * so the first client render matches the server HTML without an async routing gap;
- * {@link matchedCatchAll} and {@link redirect} carry what the response should be
- * before any rendering happens.
+ * The server's routing decision: {@link hydratedState} rides the SSR HTML back to the
+ * client's `RouterOptions.hydratedState`, so the first client render matches with no
+ * routing gap; {@link matchedCatchAll} and {@link redirect} say what the response is.
  */
 export interface PreparedRoute {
     hydratedState: RouterHydratedState;
@@ -19,15 +17,14 @@ export interface PreparedRoute {
     /**
      * Present when a route-level `redirect` was followed during matching: respond
      * 301/302 (per `permanent`) with `to` instead of rendering. `hydratedState` then
-     * describes the redirect *target* — usable if the server renders it anyway.
+     * describes the redirect TARGET — usable if the server renders it anyway.
      * `permanent` is true only when every followed hop was permanent.
      */
     redirect?: { to: string; permanent: boolean };
     /**
-     * The matched route's own module, as the client build's manifest keys it — present
-     * only for a `lazy()` route built through `rati/vite` (which records it). The
-     * server turns it into the route chunk's `modulepreload`, so the browser fetches
-     * the chunk alongside the HTML instead of discovering it after hydration.
+     * The matched route's own module, as the client build's manifest keys it — only for a
+     * `lazy()` route built through `rati/vite`. The server turns it into the chunk's
+     * `modulepreload`.
      */
     moduleId?: string;
 }
@@ -46,25 +43,9 @@ export function redirectFromHops(
 }
 
 /**
- * Drive a memory-history-backed router to its matched active route, then snapshot
- * its routing state for client hydration.
- *
- * Steps:
- * 1. Wait for the router's pending `setPath` (kicked off by the constructor) to
- *    populate `activeRoute`.
- * 2. If the matched component was created via `lazy()`, call its `preload()` so
- *    React.lazy doesn't throw during the server render with no fallback to show.
- *
- * Returns `null` when no route matches (typically a routing table without a
- * wildcard catch-all). Callers can treat that as a 404 — but a null return can also
- * mean a followed redirect landed outside the table, where the hop stands and only
- * the route to describe is missing. Consult `router.redirectHops` before answering
- * 404 (`renderApp` does, via {@link redirectFromHops}).
- *
- * Scope *data* is not resolved here — a route's scope is an island that resolves at
- * render time, so a Suspense-awaiting server render (`react-dom/static`
- * `prerender`) resolves it and the mandala engine dehydrates the promise values
- * (see `HydrationProvider` in `rati/ssr`). This builds only the routing snapshot.
+ * Drives a memory-history router to its matched route, preloading a `lazy()` component, and
+ * snapshots its routing state for hydration. `null` when nothing matches or a followed
+ * redirect left the table — check `router.redirectHops` before a 404 ({@link redirectFromHops}).
  */
 export async function prepareRoute(publicRouter: AnyRouter): Promise<PreparedRoute | null> {
     const router = toRouterStore(publicRouter);
