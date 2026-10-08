@@ -34,10 +34,9 @@ export interface CreatedApp {
 }
 
 /**
- * Build a fresh app instance. The server creates one per request (memory history);
- * the client creates one at hydration time (browser history seeded from the embedded
- * snapshot). Everything request-scoped — router, head store — is created here, never
- * at module level, so concurrent server renders can't share state.
+ * A fresh app instance: one per server request, one at client hydration. Everything
+ * request-scoped — router, head store — is created here, never at module level, so
+ * concurrent server renders share no state.
  */
 export function createApp({ history, hydratedState, hydration }: CreateAppOptions): CreatedApp {
     const router = createRouter(routes, { history, hydratedState });
@@ -50,8 +49,6 @@ export function createApp({ history, hydratedState, hydration }: CreateAppOption
         return (
             <RouterProvider router={router}>
                 <HeadProvider store={head}>
-                    {/* Region is injected here (server and client alike) and read inside
-                        the product scope via hook(() => useContext(RegionContext)). */}
                     <RegionContext.Provider value="US">
                         <HydrationProvider {...hydration}>
                             <Layout>

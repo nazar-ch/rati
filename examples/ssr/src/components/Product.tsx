@@ -3,9 +3,8 @@ import { Link, Meta, Title, useScopeControls, type SourceError } from 'rati';
 import type { Product, Review } from '../data';
 import { productScope } from '../scopes';
 
-// Matches the resolved shape of `productScope` (routes.tsx): the `productId` input,
-// the `region` from the hook load, then the dependent `product` and `reviews`
-// levels. `route` checks this component against that scope structurally.
+// The resolved shape of `productScope` (scopes.ts), which `route` checks this component
+// against structurally.
 interface ProductPageProps {
     productId: string;
     region: string;
@@ -18,10 +17,9 @@ const price = (cents: number, region: string) =>
     `${region === 'EU' ? '€' : '$'}${(cents / 100).toFixed(2)}`;
 
 export function ProductPage({ productId, region, product, reviews }: ProductPageProps) {
-    // The island's own status, read by the component the island renders. Keyed by the
-    // scope, so this file imports a data module — never the route that mounts it.
-    // `isStale` is true only inside a `keepStale` window: between a param change and the
-    // new waterfall committing, when everything below belongs to the *previous* product.
+    // The island's own status, keyed by the scope, so this file imports a data module and
+    // never the route. `isStale` holds between a param change and the new waterfall
+    // committing, while everything below shows the PREVIOUS product.
     const { phase, isStale } = useScopeControls(productScope);
 
     return (

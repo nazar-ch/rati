@@ -22,14 +22,10 @@ declare module 'rati' {
 }
 
 const aboutScope = scope().load({
-    // Both loads are async (promises), so the island engine dehydrates their
-    // resolved values into the SSR payload — the client reuses them verbatim
-    // instead of re-running the loads (a sync load would not be serialized, and
-    // its client re-run would mismatch the server HTML).
+    // Async loads dehydrate: the client reuses their server values instead of re-running
+    // them. A sync load is never serialized, so its client re-run mismatches the server HTML.
     serverTime: async () => new Date().toISOString(),
     fact: async () => {
-        // Pretend this is a database/HTTP fetch. Awaited on the server before
-        // render; embedded in the SSR payload so the client doesn't refetch.
         await new Promise((resolve) => setTimeout(resolve, 10));
         const facts = [
             'Octopuses have three hearts.',
@@ -46,10 +42,9 @@ const profileScope = scope({ userId: input<string>() }).load({
 
 const splitScope = scope().load({ chapter: async () => 'resolved before the chunk arrived' });
 
-// A route in a chunk of its own. `lazy()` is unchanged by any of this — but built
-// through rati/vite, the plugin records which module it imports, so the server can
-// name this page's chunk in the HTML (`<link rel="modulepreload">`) instead of leaving
-// the browser to discover it after hydration.
+// A route in a chunk of its own: rati/vite records the module `lazy()` imports, so the
+// server names this chunk in a `<link rel="modulepreload">` rather than the browser
+// finding it after hydration.
 const Split = lazy(() => import('./components/Split'));
 
 export const routes = [
@@ -70,13 +65,12 @@ export const routes = [
     route('/live', 'live', Live),
     route('/flaky', 'flaky', Flaky),
     // The island inside sets `ssrErrors: 'dehydrate'`, so the failure its load hits on the
-    // server is rendered as the error slot *and* carried to the client — which hydrates
+    // server is rendered as the error slot AND carried to the client — which hydrates
     // onto that slot instead of re-running the load. Answered with a 500 either way.
     route('/broken', 'broken', Broken),
-    // Throws during the server render from its `wrapper` — which the RouterOutlet renders
-    // outside the route's island, so no boundary catches it and `renderApp` rejects
-    // rather than encoding it in a status. rati/server answers that with the CSR shell
-    // (assets, no payload), so the page still works in the browser.
+    // Its `wrapper` throws in the server render, outside the route's island, so no
+    // boundary catches it and `renderApp` rejects; rati/server answers with the CSR shell,
+    // which works in the browser.
     route('/fallback', 'fallback', Fallback, { wrapper: FallbackWrapper }),
     route('/split', 'split', Split, { scope: splitScope }),
     // A route-level redirect: the legacy /store/:id path maps its param onto the

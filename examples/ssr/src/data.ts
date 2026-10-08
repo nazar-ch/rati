@@ -32,7 +32,6 @@ const CATALOG: Record<string, { name: string; priceCents: number }> = {
 };
 
 export async function fetchProduct(id: string, region: string): Promise<Product> {
-    // Pretend this hits a regional catalog service.
     await sleep(120);
     const entry = CATALOG[id];
     // The data-driven 404: the route matched, the entity doesn't exist. The error

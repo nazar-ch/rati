@@ -2,9 +2,8 @@ import { island, scope } from 'rati';
 
 import { sleep } from '../util';
 
-// A backend that is down for the server and up for the browser — the shape of a page
-// whose data lives behind something the render host can't reach. Contrived, and the only
-// way to show both halves of the round trip on one click.
+// A backend down for the server and up for the browser: the shape of a page whose data
+// sits behind something the render host can't reach.
 const orderStatus = async () => {
     await sleep(80);
     if (typeof window === 'undefined') {
@@ -42,9 +41,8 @@ const OrderCard = island({
             </button>
         </div>
     ),
-    // The option this page is about. Without it the server would ship the *loading* slot
-    // and the client would quietly re-run the load — self-healing, but the first paint
-    // would be a spinner for a failure the server already knew about.
+    // The option this page is about: without it the server ships the LOADING slot and the
+    // client re-runs the load, a first paint of a spinner for a failure the server knew of.
     ssrErrors: 'dehydrate',
 });
 

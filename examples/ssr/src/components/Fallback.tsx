@@ -3,16 +3,9 @@ import type { ReactNode } from 'react';
 import { Title } from 'rati';
 
 /**
- * The throw, and the reason it is *here* rather than in the page below: a route's
- * `wrapper` renders outside the route's island, and the island's boundary is what
- * catches a render error in the page. One component lower, this same throw would be
- * caught, the page would render without its content, and the response would be a
- * cheerful 200. Out here there is nothing to catch it — so `renderApp` rejects, and
- * rati/server answers with the shell.
- *
- * `import.meta.env.SSR` is true only in the server build, so the client build drops the
- * throw as dead code. That is what makes the fallback *work* here rather than merely
- * happen: a bug that lived on both sides would white-screen either way.
+ * Throws in the server render from a route `wrapper`, which renders outside the island
+ * whose boundary would catch it and answer 200: `renderApp` rejects, and rati/server
+ * answers with the shell. `import.meta.env.SSR` keeps the throw out of the client build.
  */
 export function FallbackWrapper({ children }: { children: ReactNode }) {
     if (import.meta.env.SSR) {

@@ -4,9 +4,8 @@ import { island, scope } from 'rati';
 
 import { CounterStore } from '../stores/CounterStore';
 
-// The scope resolves a single class load: the island does `new CounterStore(...)`
-// and hands the instance to the component. An `observer`, so reads of `count`
-// re-render on mutation.
+// A single class load; the component is an `observer`, so a read of `count` re-renders
+// on mutation.
 const counterScope = scope().load({ counter: CounterStore });
 
 const CounterCard = island({

@@ -11,14 +11,9 @@ import {
 let attempt = 0;
 
 /**
- * A deliberately flaky service as a `Source`. Every odd attempt fails — mapped
- * through `toSourceError` to the unified `error` state with a machine-readable
- * `code` — and every even attempt succeeds. So the island shows its error slot
- * first, and the slot's `retry` (which remounts the inner tree → a fresh source)
- * recovers. Pending under SSR, so the server render emits the loading slot.
- *
- * A `subscribe` / `getSnapshot` pair (the uSES-shaped Source contract): `attach`
- * stores the terminal state and notifies, and `getSnapshot` returns it.
+ * A flaky service as a `Source`: every odd attempt fails, so the island shows its
+ * error slot first, and the slot's `retry`, which remounts a fresh source, recovers.
+ * Pending under SSR, so the server HTML carries the loading slot.
  */
 export function flakyService(): Source<string> {
     let state: SourceState<string> = { status: 'pending' };
