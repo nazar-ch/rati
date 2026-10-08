@@ -123,8 +123,7 @@ describe('renderApp', () => {
     });
 
     test('the errors section is absent from a payload nothing dehydrated into', async () => {
-        // Every page of an app that never sets the option, i.e. the default: the payload
-        // is what it was before the section existed.
+        // Every page of an app that never sets the option carries no errors section.
         const result = await renderApp({ url: '/posts/hello', createApp });
         if (result.kind !== 'rendered') return;
         expect(result.hydration.errors).toBeUndefined();
@@ -201,11 +200,9 @@ describe('renderApp', () => {
     });
 
     test('a redirect whose target is outside the table still answers the 30x', async () => {
-        // The router follows the hop, `/new` matches nothing, so `activeRoute` is null
-        // and prepareRoute returns null — no route to describe. The declared 301 is
-        // still the answer: renderApp reads the hop off the router before it can call
-        // the request a no-match. Reachable whenever a target is same-origin but not a
-        // rati route (a static file, a legacy app).
+        // The hop's target matches nothing, so prepareRoute returns null, but the declared
+        // 30x stands: renderApp reads the hop off the router before calling it a no-match —
+        // a same-origin target that is no rati route (a static file, a legacy app).
         const redirectOnly = [
             route('/old', 'old', () => null, { redirect: { to: '/new', permanent: true } }),
         ] as const satisfies GenericRouteType[];

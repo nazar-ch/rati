@@ -136,10 +136,8 @@ describe('the CSR fallback', () => {
     });
 
     test('synthesizes a document when there is no template', async () => {
-        // A whole-document app has no shell to fill, which is what the unset option
-        // says — so the assets become one. Asserted whole rather than piecewise: React
-        // sweeps everything but script/style/stylesheet out of a document container on
-        // mount, so anything else that appears here would silently vanish client-side.
+        // A whole-document app has no shell, so the assets become one. Asserted whole: React
+        // sweeps everything but script/style/stylesheet out of a document container on mount.
         const handler = createRequestHandler({ render: boom, assets: ASSETS, onError: vi.fn() });
         const response = await get(handler);
 
@@ -165,7 +163,7 @@ describe('the CSR fallback', () => {
 
     test('answers plainly with neither a template nor assets', async () => {
         // The same reasoning one pattern over: a synthesized document that names no
-        // entry is a blank page with a 500 on it. This is the answer SSR-12 left alone.
+        // entry is a blank page with a 500 on it.
         const response = await get(createRequestHandler({ render: boom, onError: vi.fn() }));
 
         expect(response.status).toBe(500);
@@ -213,17 +211,13 @@ describe('the CSR fallback', () => {
         });
     });
 
-    // SSR-15. The handler's own misconfiguration is not a render failure, and must not
-    // be answered by the shape above: a fragment app with no template threads the gap
-    // between the two readings of `template === undefined` — `assemble` throws its
-    // config error (the app rendered a fragment), and the fallback, seeing no template,
-    // would synthesize a whole-document shell with no `#root` for that app's entry to
-    // boot into. Plain text is what this answered before SSR-12 built the fallback, and
-    // it was honest.
+    // long:2
+    // The handler's own misconfiguration is not a render failure: with no template, a
+    // fragment app's `assemble` throws its config error, and the fallback, reading no
+    // template as a whole-document app, synthesizes a shell with no `#root`. Plain text.
     //
     // Kill: requestHandler.ts, the catch — drop the `error instanceof Unservable` line
-    // → the assets synthesize an `<html>` this app cannot run (executed: red here, and
-    // nowhere else in the suite).
+    // → the assets synthesize an `<html>` this app cannot run.
     test('answers plainly when a fragment app has no template, assets or not', async () => {
         const onError = vi.fn();
         const handler = createRequestHandler({

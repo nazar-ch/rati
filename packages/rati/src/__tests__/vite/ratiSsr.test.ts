@@ -9,10 +9,9 @@ import { createServer, type ViteDevServer } from 'vite-plus';
 import { ratiSsr } from '../../vite/ratiSsr.js';
 
 /*
-    The plugin against a real Vite dev server: every result kind mapped onto a real
-    response, over a real socket. `fixture/entry-server.ts` hands back canned
-    `RenderAppResult`s — the contract is the whole coupling, so nothing here needs a
-    rati app (and assembly's string work is covered in html.test.ts).
+    The plugin against a real Vite dev server: every result kind mapped onto a real response,
+    over a real socket. `fixture/entry-server.ts` hands back canned `RenderAppResult`s, the
+    contract being the whole coupling; assembly's string work is html.test.ts's.
 */
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), 'fixture');
@@ -21,9 +20,9 @@ let server: ViteDevServer;
 let origin: string;
 
 /**
- * Vite reports the URL it actually bound — it picks the port itself (5173, or the next
- * free one, so a running dev server can't flake the suite) and binds `localhost`, which
- * resolves to ::1 here: a hardcoded 127.0.0.1 would find nothing listening.
+ * Vite reports the URL it bound: it picks the port itself, so a running dev server cannot
+ * flake the suite, and binds `localhost`, which resolves to ::1 here — a hardcoded 127.0.0.1
+ * finds nothing listening.
  */
 async function startServer(entry: string): Promise<{ server: ViteDevServer; origin: string }> {
     const started = await createServer({
@@ -151,12 +150,9 @@ describe('failures', () => {
 });
 
 describe('malformed escape', () => {
-    // A URL is user input, and the app already has an answer for a bad one (the router
-    // hands the raw segment through, the load reports not-available, 404). Dev must
-    // serve *that* — `transformIndexHtml` decodes the URL it is handed, and a URIError
-    // out of it lands on the error middleware, replacing the app's answer with a 500
-    // overlay: a bad address looking like an app bug, exactly where the developer is
-    // watching. Production has always agreed with the app here.
+    // A URL is user input, and the app has an answer for a bad one (the router hands the
+    // raw segment through, the load reports not-available, 404). Dev serves THAT, where a
+    // URIError out of `transformIndexHtml` puts up a 500 overlay instead.
     test.for([
         ['/products/%zz', '<h1>no such product</h1>'],
         ['/document/%zz', '<h1>no such document</h1>'],

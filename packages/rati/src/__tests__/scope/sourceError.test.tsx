@@ -8,13 +8,10 @@ import { cleanup, renderIsland, ssrRender } from '../../testing/index.js';
 afterEach(cleanup);
 
 /*
-    The two-level `SourceError` and the seam that fills it in.
-
-    Top level: `retryable` — transient (true) / terminal (false) / unclassified (absent),
-    the only thing the retry policy consults. Flavor: `code`, what an error slot switches
-    on. Classification happens at the *app's* transport edge — rati ships no fetch helper
-    and knows nothing of HTTP — so the seam has to take any error the app throws: carry a
-    string `code` (and optionally a boolean `retryable`) and it maps through intact.
+    The two-level `SourceError` and the seam filling it in: `retryable` (transient, terminal or
+    absent) is the only thing the retry policy consults, and `code` is what an error slot
+    switches on. Classification happens at the APP's transport edge, so any error carrying a
+    string `code` maps through.
 */
 
 /** The shape an app's transport edge produces: a plain error, classified in place. */
@@ -80,8 +77,7 @@ describe('toSourceError — the classification seam', () => {
         expect(plain).toMatchObject({ code: 'not-available', message: 'gone' });
         expect('retryable' in plain).toBe(false);
 
-        // The code option jnana used to smuggle a dialect through; still honored, and now
-        // no longer the only way in.
+        // The subclass's `code` option is honored too.
         expect(toSourceError(new NotAvailableError('nope', { code: 'forbidden' })).code).toBe(
             'forbidden',
         );

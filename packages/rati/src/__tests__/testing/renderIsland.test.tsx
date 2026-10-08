@@ -12,7 +12,7 @@ afterEach(cleanup);
 
 describe('renderIsland — the canonical flow', () => {
     // The documented example: mount with a deferred load → loading slot → resolve → flush →
-    // content slot. Runs here verbatim as a test (DX-02).
+    // content slot, run verbatim as a test.
     test('deferred load → loading, then resolve → flush → content', async () => {
         const gate = deferred<string>();
         const handle = await renderIsland(
@@ -175,7 +175,7 @@ describe('renderIsland — a dead island reads honestly', () => {
 
         await flush();
         expect(handle.container.textContent).toContain('caught outside');
-        // Before the fix this read 'loading' — a silently wrong answer for a dead island.
+        // A dead island throws rather than reading 'loading'.
         expect(() => handle.slot()).toThrow(/no slot marker/);
     });
 });

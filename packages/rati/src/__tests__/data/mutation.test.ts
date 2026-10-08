@@ -109,8 +109,8 @@ describe('optimistic choreography', () => {
     });
 
     test('refreshes sees the call arguments — only the keyed dependent re-fetches', async () => {
-        // The keyed shape from the jnana migration: one query per space, the
-        // mutation selecting its dependent by the call's own spaceId.
+        // The keyed shape: one query per space, the mutation selecting its dependent by
+        // the call's own spaceId.
         const fetches: string[] = [];
         const membersFor = new Map(
             ['a', 'b'].map((spaceId) => [
@@ -135,8 +135,7 @@ describe('optimistic choreography', () => {
     });
 
     test('a keyed optimistic patch is recovered through the keyed refresh on failure', async () => {
-        // DATA-05 + DATA-06 together — the FND-106 choreography: patch the one
-        // query the call names, and let onError: 'refresh' restore its truth.
+        // Patch the one query the call names, and let onError: 'refresh' restore its truth.
         const members = query(() => Promise.resolve({ retention: 30 }));
         await members.prime();
         const membersFor = (_spaceId: string) => members;

@@ -5,7 +5,7 @@ import { itemMap } from '../../data/itemMap.js';
 // The identity map under `collection`/`pagedCollection` (package-internal). The
 // collection suites drive it through the reconcile-on-refresh path; these pin the
 // direct-mutation branches (`insert`/`upsert`/`clear`) and the `equals` seam that no
-// collection test reaches — DATA-09's item-map coverage gaps.
+// collection test reaches.
 
 interface Row {
     id: string;

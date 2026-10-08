@@ -10,7 +10,7 @@ interface Row {
     title: string;
 }
 
-// Every fetch returns *fresh* row objects (as JSON parsing would), so identity
+// Every fetch returns FRESH row objects (as JSON parsing would), so identity
 // stability below is the reconciler's doing, never accidental reference reuse.
 function rowsCollection(initial: readonly Row[]) {
     let rows = initial;
@@ -200,8 +200,8 @@ describe('optimistic edits and server truth', () => {
 });
 
 describe('the flat facade', () => {
-    // DATA-13: fetch state and item state sit side by side; there is no `.query`
-    // to reach through, and no raw pre-reconcile array either.
+    // Fetch state and item state sit side by side; there is no `.query` to reach
+    // through, and no raw pre-reconcile array either.
     test('phase / error / isPending / prime / refresh reach the backing query', async () => {
         const server = controllableProducer<readonly Row[]>();
         const c = collection<Row>({ fetch: server.producer, key: (row) => row.id });
@@ -319,9 +319,8 @@ describe('reset() and the item map', () => {
 });
 
 describe('local writes racing an in-flight refresh (last-write-wins)', () => {
-    // The recorded stance (data-package README §Open questions): "last-write-wins —
-    // an upsert during a refresh is reconciled away if the refresh's rows disagree."
-    // The settle's `reconcile()` is the last write; these pin it in both directions.
+    // Last-write-wins: an upsert during a refresh is reconciled away if the refresh's rows
+    // disagree. The settle's `reconcile()` is the last write; these pin both directions.
     test('a local upsert the server never had is reconciled away on settle', async () => {
         const server = controllableProducer<readonly Row[]>();
         const c = collection<Row>({ fetch: server.producer, key: (row) => row.id });

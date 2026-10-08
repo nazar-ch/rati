@@ -4,10 +4,8 @@ import { autorun, observable, runInAction } from 'mobx';
 
 import { query } from '../../data/query.js';
 import { controllableProducer } from '../../testing/data/index.js';
-// A deferred fake walks a query through every phase without module mocking — the
-// "testability by construction" ground rule (data-package.md), now `rati/testing`'s.
-// `controllableProducer` is the same idea for a *sequence* of fetches: the gate array
-// plus call counter this file used to spell out by hand, with each call's signal on it.
+// A deferred fake walks a query through every phase without module mocking;
+// `controllableProducer` does it for a SEQUENCE of fetches, each call carrying its signal.
 import { deferred } from '../../testing/index.js';
 
 afterEach(() => {
@@ -239,7 +237,7 @@ describe('debounce', () => {
         expect(q.isPending).toBe(true); // a fetch is imminent — honest phase
         expect(producer).not.toHaveBeenCalled();
 
-        // 100ms after the *last* call, not the first.
+        // 100ms after the LAST call, not the first.
         await vi.advanceTimersByTimeAsync(99);
         expect(producer).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(1);

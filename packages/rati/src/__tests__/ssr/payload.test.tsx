@@ -154,12 +154,8 @@ describe('unclaimed-payload watchdog', () => {
             loading: () => <div>loading</div>,
         });
 
-        // Grab the real registry key by collecting once via a prerender-free trick:
-        // render, then read which key the island claimed is impossible without the
-        // server pass — so instead hydrate with data under every id the island will
-        // use by rendering it alone and reusing React's deterministic useId (:r0: on
-        // a fresh root would be brittle across React versions). Simplest robust path:
-        // provide no data at all — an empty payload arms nothing and must not warn.
+        // The island's registry key is unknowable without a server pass, so this provides no
+        // data at all: an empty payload arms nothing and must not warn.
         render(
             <HydrationProvider data={undefined} seeds={undefined}>
                 <Island />
@@ -197,7 +193,7 @@ describe('unclaimed-payload watchdog', () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const collector = createHydrationCollector();
 
-        // A collector *and* a payload — the guard is the presence of `collect`, not the
+        // A collector AND a payload — the guard is the presence of `collect`, not the
         // absence of data. A server pass must never warn about its own output, and the
         // prerender that would claim the slices isn't this render.
         render(

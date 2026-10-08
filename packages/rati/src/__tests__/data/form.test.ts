@@ -45,8 +45,8 @@ describe('field', () => {
     });
 
     test('props omits errorMessage while clean — a spread fits an `errorMessage?:` prop', () => {
-        // Present-but-undefined would reject under exactOptionalPropertyTypes on
-        // the consumer's side (the jnana migration had to widen its TextField).
+        // Present-but-undefined is rejected under exactOptionalPropertyTypes on the
+        // consumer's side.
         const title = field('', { validate: required() });
         expect('errorMessage' in title.props).toBe(false);
 

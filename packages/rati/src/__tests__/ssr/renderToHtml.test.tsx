@@ -5,20 +5,14 @@ import { scope, input } from '../../scope/scope.js';
 import { renderToHtml } from '../../ssr/renderToHtml.js';
 
 /*
-    Every island (so every route) is a Suspense boundary, which is what gives React
-    something to outline: past its progressive chunk budget it emits the boundary's
-    content into a trailing `<div hidden>` and swaps it in from a script. renderToHtml
-    buffers the whole render, so that trade buys nothing and costs a no-JS reader the
-    content. These pin the output shape.
-
-    The shell wrapper is load-bearing, not decoration: React never outlines a boundary
-    that *is* the root segment, so an island rendered bare stays inline at any size and
-    would pin nothing. A real route always sits inside the app shell (providers, the
-    Router), which is the shape that reaches the outlining path.
+    Every island is a Suspense boundary React can outline past its chunk budget, which
+    renderToHtml's buffered render forbids; these pin the output shape. The shell wrapper is
+    load-bearing: React never outlines the root segment, so a bare island stays inline at any
+    size.
 */
 const shellStyle = { padding: 8 };
 
-/** Comfortably past React's 12.8KB default budget — ~350 rows of ~40 bytes. */
+/** Comfortably past React's default outlining budget. */
 const bigRows = Array.from({ length: 350 }, (_, index) => `row ${index} — padded to weight`);
 
 const BigIsland = island({

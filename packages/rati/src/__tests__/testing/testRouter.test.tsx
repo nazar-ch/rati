@@ -38,8 +38,7 @@ describe('createTestRouter', () => {
         expect(tr.router.path).toBe('/about');
     });
 
-    // The acceptance case for Jnana's two `vi.mock('rati')` files: with a real test router
-    // mounted, <Link> works — no mock needed.
+    // With a real test router mounted, <Link> works under test — no `vi.mock('rati')`.
     test('a <Link> navigates against the test router, no mocks', async () => {
         const Nav: FC = () => (
             <div>
@@ -62,8 +61,8 @@ describe('createTestRouter', () => {
         expect(tr.text()).toBe('about page');
     });
 
-    // The RF-01 dispose pin: a disposed harness detaches its history, so driving that history
-    // afterwards is inert — no listener growth across sequential harnesses.
+    // A disposed harness detaches its history, so driving that history afterwards is inert —
+    // no listener growth across sequential harnesses.
     test('dispose detaches the history (a disposed router stops reacting)', async () => {
         const tr = await createTestRouter(routes, { url: '/' });
         const { router, history } = tr;
