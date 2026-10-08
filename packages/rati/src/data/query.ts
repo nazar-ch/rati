@@ -4,28 +4,9 @@ import { observableSource } from '../mobx/observableSource.js';
 import { toSourceError, type Source, type SourceError } from '../scope/source.js';
 
 /*
-    long:2
-    `query` — the refreshable unit (the rati/data atom): one async producer, one
-    current value, honest phases, race-guarded.
-
-      - `prime()` is idempotent *ensure*: it fetches from `idle` or `error`,
-        no-ops when `ready`, and returns the in-flight promise while pending.
-        Scopes (via `source()`) and effects call it. Priming an already-primed
-        pump does nothing, and the name says so — a UI button wants `refresh()`.
-      - `refresh()` is the only re-fetch; the data stays visible (phase
-        `refreshing`), and a refresh failure keeps the stale value alongside the
-        error. Mutations and user gestures call it.
-      - The race guard is an invariant, not an option: a superseded request's
-        settle is ignored and its `AbortSignal` fires, so producers can cancel.
-      - `set()`/`patch()` are the single-value write seam (`upsert`/`patchItem`'s
-        siblings): local truth now, server truth on the next refresh. They swap
-        the `data` reference (the notification) and touch no fetch and no error.
-      - `prime()`/`refresh()` resolve when the fetch settles either way — failure is
-        state (`phase`/`error`), not a rejection.
-      - `reactive: true` re-fetches when the producer's *synchronous prefix* reads
-        change (opt-in — implicit refetching is never the default). A MobX
-        `Reaction` tracks those reads during the real fetch and re-runs `refresh()`
-        on change, coalesced by `debounce` if set (rati◊DATA-01).
+    `query` — the refreshable unit: one async producer, one current value, honest phases. The
+    race guard is an invariant: a superseded request's settle is ignored and its `AbortSignal`
+    fires. `prime()`/`refresh()` resolve either way — failure is state, never a rejection.
 */
 
 export type QueryPhase = 'idle' | 'loading' | 'ready' | 'refreshing' | 'error';
@@ -39,13 +20,9 @@ export interface QueryOptions {
      */
     debounce?: { waitMs: number; maxWaitMs?: number };
     /**
-     * Opt-in: re-fetch when the observables the producer reads *synchronously*
-     * (before its first `await`) change — the type-ahead / filter case, the fix
-     * for a store's manual `prime()`-after-every-setter. The re-run is a
-     * `refresh()`, so it flows through `debounce` if set. Reads made after the
-     * first `await` are **not** tracked (MobX's async boundary) — destructure
-     * every reactive dependency at the top of the producer. Never the default;
-     * implicit refetching is opt-in in a package whose ethos is explicitness.
+     * Opt-in: re-fetch, through `debounce`, when the observables the producer reads
+     * SYNCHRONOUSLY — before its first `await` — change. A read after the first `await` is
+     * NOT tracked, so destructure every reactive dependency at the producer's top.
      */
     reactive?: boolean;
 }
@@ -70,7 +47,7 @@ export interface Query<T> {
     set(next: T): void;
     /**
      * Optimistic edit (`patchItem`'s single-value sibling): must return the next
-     * value — `data` is a ref, so the reference swap *is* the notification.
+     * value — `data` is a ref, so the reference swap IS the notification.
      * No-ops before the first value. No dirty-mark is needed: a refresh
      * overwrites wholesale, so `onError: 'refresh'` recovery works by
      * construction.
@@ -79,38 +56,24 @@ export interface Query<T> {
     /** Back to idle; drops data and error, aborts anything in flight. */
     reset(): void;
     /**
-     * Bridge to a scope's `.load()`: pending until the first ready, then ready
-     * forever with **this instance** as the value — later refreshes and refresh
-     * errors are the instance's own observable state and never re-trip the
-     * island. `attach()` triggers `prime()` (ensure); detach does nothing — the
-     * store owns the data's lifetime, not the island.
-     *
-     * Typed {@link ReadyQuery} — the resolved prop's `data` is `T`, not
-     * `T | undefined`.
+     * Bridges to a scope's `.load()`: pending until the first ready, then ready forever with
+     * THIS instance, so later refreshes and errors never re-trip the island. `attach()`
+     * primes; the store, not the island, owns the data's lifetime. Typed {@link ReadyQuery}.
      */
     source(): Source<ReadyQuery<T>>;
 }
 
 /**
- * A {@link Query} seen from *after* its first ready: `data` is `T`, no narrowing.
- *
- * The type a `source()` resolves with. The source only goes ready once `hasData`
- * is set, and it is `hasData` — never a refresh, never a refresh error — that the
- * island gates on, so a component holding the resolved prop is holding a query
- * that has a value. `reset()` clears `hasData`, which drops the source back to
- * `pending` and re-trips the island, so the claim can't go stale under a live
- * component.
- *
- * The brand is a *read-side* claim only. Everything else on the query still
- * works through it — `refresh()`, `set()`, `patch()`, `reset()` — because it is
- * the same instance, not a frozen view of one.
+ * A {@link Query} seen after its first ready: `data` is `T`. The `source()` goes ready only
+ * once `hasData` is set, and `reset()` clears it, re-tripping the island, so the claim never
+ * goes stale under a live component. A read-side claim only: every method works through it.
  */
 export type ReadyQuery<T> = Query<T> & { readonly data: T };
 
 /** Package-internal hooks — the seam `collection` builds on. Not public API. */
 export interface QueryInternalOptions<T> extends QueryOptions {
     /**
-     * Runs inside the settling action of a *current* (non-superseded) fetch, and
+     * Runs inside the settling action of a current (non-superseded) fetch, and
      * inside `set`/`patch`'s action — every way a value lands. `collection`
      * reconciles here, so a local write keeps the item map coherent.
      */
@@ -163,11 +126,9 @@ export function createQuery<T>(
     let reaction: Reaction | null = null;
     let memoizedSource: Source<ReadyQuery<T>> | undefined;
 
-    // Track the producer's synchronous reads during the *real* fetch (zero extra
-    // producer executions): a tracked observable changing re-runs the query. The
-    // reaction re-tracks on every fetch, so conditional reads stay accurate.
-    // Called inside the fetch IIFE's try, so a synchronous throw (either path)
-    // lands on the normal error path.
+    // Tracks the producer's synchronous reads during the REAL fetch, with no extra execution,
+    // re-tracking per fetch. Called inside the fetch's try, so a synchronous throw lands on
+    // the error path.
     function callProducer(signal: AbortSignal): Promise<T> {
         if (!options.reactive) return producer(signal);
         reaction ??= new Reaction('rati.query.reactive', () => {
@@ -208,7 +169,7 @@ export function createQuery<T>(
             }
         })();
         inFlight = promise;
-        // Cleanup outside the async body: it must run *after* the `inFlight`
+        // Cleanup outside the async body: it must run AFTER the `inFlight`
         // assignment even when the producer throws synchronously (the async
         // body settles before the assignment in that case).
         void promise.finally(() => {
@@ -232,11 +193,8 @@ export function createQuery<T>(
         return startFetch();
     }
 
-    // The default reactive invalidation. Unlike `refresh()` it does *not* dedupe
-    // against the in-flight fetch — a tracked input changed, so that fetch is now
-    // stale and must be superseded (startFetch aborts + bumps the race guard),
-    // not joined. Debounce still coalesces the burst; an in-flight stale fetch may
-    // settle and show briefly before the debounced re-fetch supersedes it.
+    // The default reactive invalidation. Unlike `refresh()` it supersedes the in-flight
+    // fetch, now stale, rather than joining it; the debounce still coalesces the burst.
     function reactiveRefresh(): void {
         const { debounce } = options;
         if (debounce) void debouncer.schedule(debounce.waitMs, debounce.maxWaitMs);
@@ -299,9 +257,8 @@ export function createQuery<T>(
         patch,
         reset,
         source() {
-            // The cast is the whole of DATA-15: `instanceSource` only publishes
-            // the instance once `hasData`, which is exactly the claim
-            // `ReadyQuery` makes. Nothing at runtime changes.
+            // The cast is safe: `instanceSource` publishes the instance only once `hasData`,
+            // the claim `ReadyQuery` makes.
             memoizedSource ??= instanceSource(
                 self as ReadyQuery<T>,
                 () => ({ hasData: state.hasData, error: state.error }),
@@ -375,7 +332,7 @@ function createDebouncer(start: () => Promise<void>, onScheduled: () => void): D
     };
 }
 
-// Runs `run` under `reaction`'s tracking. A throw inside `track` is re-raised *outside* it, or
+// Runs `run` under `reaction`'s tracking. A throw inside `track` is re-raised OUTSIDE it, or
 // the reaction's own error boundary swallows it.
 function trackRethrowing<R>(reaction: Reaction, run: () => R): R {
     let result!: R;
@@ -392,11 +349,9 @@ function trackRethrowing<R>(reaction: Reaction, run: () => R): R {
 }
 
 /**
- * Package-internal: the shared `source()` shape — pending until the instance's
- * first ready, then ready forever with the same reference (data-package.md
- * ground rules). An error *before* the first ready surfaces to the island's
- * error slot; its `retry` remounts → `attach()` → `prime()` re-fetches from
- * `error`.
+ * Package-internal: the shared `source()` shape — pending until the instance's first ready,
+ * then ready forever with the same reference. An error BEFORE the first ready reaches the
+ * island's error slot, whose `retry` re-primes from `error`.
  */
 export function instanceSource<I>(
     instance: I,

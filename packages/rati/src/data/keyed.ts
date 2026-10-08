@@ -1,21 +1,9 @@
 import { observable, runInAction } from 'mobx';
 
 /*
-    `keyed` — the lazy per-key instance map: the ~20 lines every keyed resource
-    hand-rolled (`Map<key, instance>` + get-or-create) hoisted into the package.
-    Design record: docs/planned/data-package/issues/DATA-14-keyed-factory.md.
-
-      - Deliberately **primitive-agnostic**: the factory returns whatever you
-        build — a `query` of a composite payload, a `collection`, a
-        `pagedCollection`, or a store class stitching several together. `keyed`
-        knows nothing about any of them and never calls into them.
-      - It is a **map, not a cache**: no eviction, no TTL, no LRU, and no
-        cross-key identity (two keys returning rows for the same entity are two
-        independent instances). An unbounded key space wants a selection —
-        one instance whose parameters change — not this.
-      - Per-key identity is the contract: `get(key)` returns the same instance
-        for the same key forever, so `mutation`'s `refreshes: (id) => [...]` can
-        point at exactly the instance a call invalidated.
+    `keyed` — the lazy per-key instance map (◊DATA-14): `get(key)` returns one instance per key
+    forever, so `mutation`'s `refreshes` reaches exactly the one a call invalidated. It is
+    primitive-agnostic, and a map, not a cache — no eviction, no TTL.
 */
 
 /** Keys are used as `Map` keys, so identity is `===` — branded strings pass. */
@@ -25,8 +13,8 @@ export interface Keyed<K extends KeyedKey, I> {
     /**
      * Get-or-create: the first call for a key runs the factory, every later one
      * returns that same instance. Creating is a write, so call this from an
-     * action, an event handler or a scope load — not from inside a `computed`,
-     * which may not cause side effects (read with `peek` there).
+     * action, an event handler or a scope load — never inside a `computed`, which
+     * must not cause side effects (read with `peek` there).
      */
     get(key: K): I;
     /**
@@ -36,25 +24,21 @@ export interface Keyed<K extends KeyedKey, I> {
      */
     peek(key: K): I | undefined;
     /**
-     * Drop one instance — the caller knowing the key is spent (a closed detail
-     * view, a deleted entity), which is what keeps this a map and not a cache:
-     * deleting on request is not an eviction policy. Same contract as `reset`,
-     * one key at a time: it does not call into the instance. Returns whether
-     * the key was present; the next `get` builds a fresh instance.
+     * Drops one instance, the caller knowing the key is spent — on request, never an
+     * eviction policy. Like `reset`, it does not call into the instance; returns whether the
+     * key was present.
      */
     delete(key: K): boolean;
     /**
-     * Drop every instance (the sign-out case). It deliberately does **not**
-     * call into the instances — dropping the references *is* the semantics, and
-     * a caller still holding one resets it itself. The next `get` for a key
-     * builds a fresh instance.
+     * Drops every instance (the sign-out case) without calling into them: dropping the
+     * references IS the semantics. The next `get` builds a fresh instance.
      */
     reset(): void;
 }
 
 export function keyed<K extends KeyedKey, I>(factory: (key: K) => I): Keyed<K, I> {
     // An observable map (not a plain one) so `peek` is reactive both ways: MobX
-    // tracks a *missing* key too, so a derivation that peeked nothing re-runs
+    // tracks a MISSING key too, so a derivation that peeked nothing re-runs
     // when the instance appears.
     const instances = observable.map<K, I>(undefined, { deep: false });
 
@@ -66,7 +50,7 @@ export function keyed<K extends KeyedKey, I>(factory: (key: K) => I): Keyed<K, I
             if (instances.has(key)) return existing as I;
             // The factory runs outside the action: it typically constructs a
             // query/collection/store, and whatever it kicks off (a `prime()`,
-            // say) shouldn't be silently batched into our write.
+            // say) must not be silently batched into our write.
             const created = factory(key);
             runInAction(() => {
                 instances.set(key, created);

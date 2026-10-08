@@ -1,14 +1,10 @@
 import { comparer, isObservableObject, observable, runInAction } from 'mobx';
 
 /*
-    The shared identity map under `collection` and `pagedCollection` — one
-    reconciler, one identity story (package-internal).
-
-    Reconcile-on-refresh: match new rows to existing items by `key`; unchanged
-    rows (per `equals`) keep their item instance untouched; changed rows update
-    the existing instance's observable fields in place, so only observers of
-    that item re-render. Order comes from the fresh result; the `items` array
-    reference swaps only when membership/order/identity actually moved.
+    The shared identity map under `collection` and `pagedCollection`, package-internal. A
+    reconcile matches rows by `key`: an unchanged row keeps its item, a changed one updates the
+    item's observable fields in place, and `items` swaps only when membership, order or
+    identity moved.
 */
 
 export interface ItemMapOptions<T, Item> {
@@ -16,12 +12,9 @@ export interface ItemMapOptions<T, Item> {
     /** Row equality deciding "unchanged → untouched". Default: `comparer.shallow`. */
     equals?: (a: T, b: T) => boolean;
     /**
-     * Wrap rows in app instances with behavior, preserving them across refreshes:
-     * `(raw, prev) => (prev ? prev.update(raw) : new Row(raw))`. Per-item UI
-     * state (expanded, editing) lives on the item and survives refresh. Without
-     * it, plain-object rows become shallow-observable items updated field-by-field
-     * in place (the default nested reactivity); non-object rows are kept as-is
-     * and replaced on change.
+     * Wraps rows in app instances, preserved across refreshes:
+     * `(raw, prev) => (prev ? prev.update(raw) : new Row(raw))`, so per-item UI state
+     * survives. Without it, plain-object rows become shallow-observable items updated in place.
      */
     into?: (raw: T, prev: Item | undefined) => Item;
 }

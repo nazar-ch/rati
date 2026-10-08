@@ -4,38 +4,19 @@ import { itemMap, type ItemMapOptions } from './itemMap.js';
 
 /*
     long:2
-    `reconciled` — the identity-stable list view, standalone.
-
-    `collection` is secretly a `query` plus the shared reconciler; this is that
-    second half on its own, over *any* observable rows. It exists because a
-    composite response — `{ usefulData, spaces }` — is a `query`, and a `query`
-    reconciles nothing, so its list half reconciles here:
+    `reconciled` — the identity-stable list view over ANY observable rows: a `collection`'s
+    reconciler half on its own, for the list half of a composite response a `query` holds.
 
         overview = query((signal) => fetchOverview(this.spaceId, signal));
         spaces = reconciled(() => this.overview.data?.spaces ?? [], { key: (s) => s.id });
 
-    No fetch, no phase, no error, no `source()` — the backing query owns all of
-    those. This owns identity: the same row across two fetches is the same item
-    instance, with the same optimistic-patch/server-truth contract collections
-    have (a patched entry is marked, so the next reconcile reapplies server
-    truth over it).
+    It owns identity and the optimistic-patch/server-truth contract; the backing query owns
+    fetch, phase and error. The derivation is EAGER — an `autorun` from construction, since a
+    reconcile on the first `items` read writes observable state inside a reader's `computed`:
 
-    **The derivation is eager**, not lazy: an `autorun` established at
-    construction re-reconciles whenever the getter's output changes — one
-    reconcile per rows change, observers or not. The
-    lazy alternative — reconciling on the first `items` read — would write
-    observable state from inside whatever derivation happens to read it, which
-    MobX forbids in a `computed`. Two consequences to know:
-
-      - the getter runs **once immediately**, so in a class the backing query
-        must be declared *above* the view (a field initializer reading a
-        not-yet-assigned field throws, loudly, at construction);
-      - the view holds a subscription for its lifetime — `dispose()` releases
-        it when the owner outlives its store (most stores never need to).
-
-    The reconcile itself runs in an action, and MobX actions are untracked, so
-    the item map's own reads never become dependencies of the derivation and
-    its writes can't re-trigger it.
+      - the getter runs ONCE IMMEDIATELY, so in a class the backing query is declared ABOVE
+        the view, or construction throws;
+      - the view holds a subscription for its lifetime, which `dispose()` releases.
 */
 
 /** Options for {@link reconciled} — the reconciler's half of `CollectionOptions`. */
