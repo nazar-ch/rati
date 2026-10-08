@@ -1,51 +1,9 @@
 import { deepEqual } from '../util/utils.js';
 
 /*
-    Document-head management: the store.
-
-    rati's head layer owns only the tags that need *dedupe by depth* plus a server
-    read-back after prerender — the title and per-page meta (description, Open Graph).
-    Several declarations are live at once in the normal case (a layout default plus a
-    page value, or the old and new page during a client-side navigation), and React 19
-    hoists metadata elements into `<head>` but does not dedupe them — so a rendered
-    `<title>`/`<meta>` cannot express "deepest wins". Everything that doesn't need
-    dedupe (one-off links, JSON-LD scripts, charset/viewport) belongs to native React
-    19 tags or the app's document shell, not here.
-
-    The mechanics that make this correct under SSR and concurrent React:
-
-      - Declarations register during *render* (`set`), because a Suspense-awaiting
-        prerender runs no effects — by the time the prerender drains, every `<Title>`
-        inside a resolved route has spoken. The server reads winners after prerender
-        (`headTags` in rati/ssr) with `snapshot('server')`.
-      - On the client, an effect re-registers and *confirms* the entry (`commit`), and
-        winners count only confirmed entries — a render React abandoned (an interrupted
-        transition) can register but never commit, so it can't leak a winner. `set`
-        never mutates a confirmed entry for the same reason; committed values change
-        only through `commit`, one commit behind the render — invisibly.
-      - Dedupe is a registration sequence: last registered = deepest in the tree (React
-        renders parent before child) = the winner per dedupe key. A value update keeps
-        the entry's seq so a re-rendering layout can't steal the win from a page.
-      - One store per rendered tree — on the server, per request; never a module
-        global, or concurrent requests clobber each other's heads.
-
-    The phase (`hydrating` → `live`, one-way) exists because "nothing declared yet" and
-    "nothing will be declared" are the same state to the entries above, and on a
-    server-rendered page they call for opposite acts. HeadProvider sits above the routes'
-    Suspense boundaries, so its first apply can run while the page that declares the
-    title is still unhydrated: no entry is confirmed, and writing `defaultTitle` (or
-    reconciling away the server's metas) would destroy a correct head. So while
-    `hydrating` the document is the server's — see domSync.ts. `remove()` settles the
-    store: an unmount can only follow that subtree's hydration, and it is the earliest
-    signal the head is churning (a navigation, a conditional declaration leaving).
-    `commit()` does not — on a multi-boundary page one boundary's commit says nothing
-    about its siblings. A page rati never server-rendered has no server head to protect;
-    HeadProvider detects that (no `data-rati-head="server"` tag in the document) and
-    `settle()`s on mount, so a client-only app is unaffected by any of this.
-
-    (In StrictMode's simulated remount the cleanup `remove()`s and settles early. Dev
-    only, and it lands on today's behavior — the pre-phase one — for the rest of the
-    page's life.)
+    Document-head management: the store. Its mechanism — render-phase registration,
+    effect-phase confirmation, dedupe by registration sequence, the one-way phase — is
+    docs/current/internals.md.
 */
 
 export type MetaTag = { name?: string; property?: string; content: string };
@@ -72,7 +30,7 @@ export interface HeadSnapshot {
 /**
  * `hydrating`: the document may carry a server-rendered head that no declaration has
  * spoken for yet, so it is treated as authoritative. `live`: the tree owns the head.
- * One-way — see the phase note above.
+ * One-way.
  */
 export type HeadPhase = 'hydrating' | 'live';
 
@@ -109,7 +67,7 @@ export class HeadStore {
     /**
      * Render-phase registration (keyed by the declarer's `useId`). Silent — emitting
      * mid-render is illegal; the client effect confirms and notifies after commit.
-     * Idempotent per id, and a no-op on confirmed entries (see the module comment).
+     * Idempotent per id, and a no-op on confirmed entries.
      */
     set(id: string, tag: HeadTag): void {
         const prev = this.entries.get(id);
@@ -140,9 +98,9 @@ export class HeadStore {
 
     /**
      * Effect-phase removal: an unmount, or a declaration that went `null` after
-     * committing. Settles the phase — but only on a real removal: `useHeadTag(null)`
-     * calls this on mount for a declaration that never registered, and that is not a
-     * head that has started churning.
+     * committing. Settles the phase on a real removal only — `useHeadTag(null)` calls this
+     * on mount for a declaration that never registered. StrictMode's simulated remount
+     * settles early, in dev.
      */
     remove(id: string): void {
         if (!this.entries.delete(id)) return;
@@ -158,15 +116,11 @@ export class HeadStore {
     }
 
     /**
-     * Compute the winners for one reader:
+     * The winners for one reader:
      *
-     *   - `'server'` counts every registration — prerender runs no effects, and its
-     *     single pass has no abandoned trees to guard against.
-     *   - `'client'` counts only effect-confirmed entries (abandoned renders never
-     *     confirm), and falls back to `defaultTitle`.
-     *   - `'hydrating'` is `'client'` minus the default: an undeclared title means
-     *     "nobody has hydrated yet", so there is nothing to say and the server's
-     *     `<title>` stands (the phase note above).
+     *   - `'server'` counts every registration, since prerender runs no effects.
+     *   - `'client'` counts only effect-confirmed entries, and falls back to `defaultTitle`.
+     *   - `'hydrating'` is `'client'` minus the default, so the server's `<title>` stands.
      */
     snapshot(mode: 'client' | 'server' | 'hydrating'): HeadSnapshot {
         const winners = new Map<string, Entry>();
