@@ -20,25 +20,15 @@ import { scope, input, type Scope } from '../../scope/scope.js';
 import { controllableSource, type ControllableSource } from '../../testing/index.js';
 
 /*
-    The generated-scope harness: a fast-check arbitrary over scope *specs*, and a builder
-    turning a spec into a real, instrumented island. The reference model this is measured
-    against lives in model.ts — React-free and engine-free on purpose; read its header for
-    the value formula and why the epoch is not a run counter.
-
-    Real producers compute from the resolved bag the *engine* hands them; the model computes
-    from its own state. The formula is shared, the state is not — so if the engine delivers
-    a producer wrong or stale upstream values, the two disagree and convergence fails.
-
-    Shape knobs (FUZZ_LEVEL via byLevel): level count byLevel(4, 1), keys per level
-    byLevel(3, 1) — level 2 already generates scopes up to 6 levels x 5 keys.
+    The generated-scope harness: an arbitrary over scope SPECS and a builder turning one into an
+    instrumented island, checked against model.ts. Producers compute from the bag the ENGINE
+    hands them, the model from its own state, so a stale upstream value fails convergence.
 */
 
 /**
- * `minLevels` lets a property insist on a real waterfall. The command property does: a
- * single-level scope has no dependents, so it cannot express a cascade — the thing that
- * property exists to search — and at the default budget fast-check's bias toward small
- * inputs made single-level scopes common enough to trip its non-vacuity guard. The smoke
- * property keeps the full range, single-level shapes included.
+ * `minLevels` lets a property insist on a real waterfall: a single-level scope has no
+ * dependents, so it expresses no cascade. The command property sets it; the smoke property
+ * keeps single-level shapes.
  */
 export function scopeSpecArb({
     minLevels = 1,
@@ -90,10 +80,8 @@ export function scopeSpecArb({
         });
 }
 
-// ---------------------------------------------------------------------------------------
-
 export type LedgerEntry = {
-    /** `key#n` — one entry per *source instance*, not per key: a cascade legitimately has
+    /** `key#n` — one entry per SOURCE INSTANCE, not per key: a cascade legitimately has
      * the new source attached (layout phase) before the old detaches (passive cleanup), so
      * per-key concurrency would read 2 on a correct swap. Per instance, >1 is a real
      * double-attach. */
@@ -104,28 +92,24 @@ export type LedgerEntry = {
     maxConcurrent: number;
     /** Attached right now — the ledger's live half. */
     attached: boolean;
-    /** The instance this key's cell holds now: the one whose transitions reach the render.
-     * A cascade-swapped predecessor is *not* current even while its value is still on
-     * screen (the stale bridge, resolver.tsx `swapped`) — which is why the "nothing
-     * detached still feeds renders" bound tests this rather than the rendered value's
-     * provenance, where a correct swap would read as a violation. */
+    /** The instance this key's cell holds now, whose transitions reach the render. A
+     * cascade-swapped predecessor is NOT current even while its value bridges on screen, which
+     * is why the "nothing detached still feeds renders" bound tests this. */
     current: boolean;
 };
 
 /**
  * One `.provide()` value's lifecycle. The contract it exists to pin: the value disposes
- * *before* the sources it was built over detach, so a value holding a grabbed resource is
+ * BEFORE the sources it was built over detach, so a value holding a grabbed resource is
  * torn down while that grab is still live (scope.ts `.provide()`).
  */
 export type ProvideRecord = {
     /** `provide#n` — one per build; a refresh-driven rebuild makes a new one. */
     id: string;
     /**
-     * Null while the value is live. At dispose: the source instances it was built over
-     * that had *already* detached by then — the violation list, captured at the only
-     * moment it is observable. Instances a later swap replaced are left out: that cascade
-     * detached them long before this teardown, on purpose, and the value's own reads went
-     * with the swapped-in ones.
+     * Null while the value is live. At dispose: the source instances it was built over that
+     * had ALREADY detached — the violation list. Instances a later swap replaced are left out:
+     * that cascade detached them on purpose.
      */
     detachedAtDispose: readonly string[] | null;
 };
@@ -140,15 +124,13 @@ type HeldEntry = {
     fail: () => void;
 };
 
-// The entry's `controllableSource` (its state machine + attach/detach ledger — attachCount /
-// detachCount / peakAttached / attached) with the harness's model driver layered on: `ready`
-// recomputes the formula value on every emit (a `sourceBump` moves the epoch between emits),
-// `restore` re-emits the last value with stable identity (S8's no-op recovery, pin #12), and
-// `id` / `key` identify the instance for the ledger's per-instance bounds.
+// The entry's `controllableSource` with the harness's model driver layered on: `ready`
+// recomputes the formula value per emit, `restore` re-emits the last value with stable
+// identity (S8's no-op recovery), and `id` / `key` identify the instance for the ledger.
 type Controllable = ControllableSource<HarnessValue> & {
     id: string;
     key: string;
-    /** Emit the value the formula says this source holds *now* — its first ready, and every
+    /** Emit the value the formula says this source holds NOW — its first ready, and every
      * later one after a `sourceBump` moves its epoch. */
     ready: () => void;
     pend: () => void;
@@ -170,7 +152,7 @@ export type BuiltHarness = {
     sourceRestore(key: string): void;
     sourceError(key: string): void;
     /** Re-emit `key`'s source at the epoch the declared state now holds — a live source
-     * moving by itself. The *model* owns epoch bumps (as it does for `refresh`), so this
+     * moving by itself. The MODEL owns epoch bumps (as it does for `refresh`), so this
      * only emits; bumping here too would double-count and desync the two. */
     sourceEmit(key: string): void;
     /** Mark every outstanding entry superseded — a remount drops the cells behind them. */
@@ -202,17 +184,14 @@ export const LOADING_TESTID = 'fuzz-loading';
 export const ERROR_TESTID = 'fuzz-error';
 
 /**
- * The slot node, if it is actually *on screen*. Presence in the DOM is not enough: when a
- * suspending update replaces a Suspense boundary's children, React keeps the old subtree
- * mounted and hides it (`display: none`, Offscreen semantics) while rendering the fallback
- * next to it — so mid-remount both the stale content and the loading slot are in the DOM.
- * Reading the contract off `querySelector` alone would call that "content" and quietly
- * excuse every loading-slot flash. See packages/rati/src/__tests__/suspense-situations.md S11.
+ * The slot node, if it is ON SCREEN: a suspending update keeps the old subtree mounted but
+ * hidden beside the fallback, so `querySelector` alone excuses every loading-slot flash
+ * (packages/rati/src/__tests__/suspense-situations.md).
  */
 function visibleNode(container: HTMLElement, testid: string): Element | null {
     const node = container.querySelector(`[data-testid="${testid}"]`);
     if (!node) return null;
-    // React hides the boundary's *children*, which are ancestors of these markers.
+    // React hides the boundary's CHILDREN, which are ancestors of these markers.
     for (let el: Element | null = node; el && el !== container; el = el.parentElement) {
         if (el instanceof HTMLElement && el.style.display === 'none') return null;
     }
@@ -266,10 +245,8 @@ export function buildHarness(
             key,
             ready: () => source.setReady(recompute()),
             pend: () => source.setPending(),
-            // S8 recovery re-emits the *same* value on purpose: pin #12's contract is
-            // "recovery without producer re-runs", and an unchanged snapshot must move
-            // nothing (its identity clears the equals gate's === fast path). A live source
-            // emitting a genuinely new value is `sourceBump` (→ `ready`).
+            // S8 recovery re-emits the SAME value: recovery runs no producer, and an unchanged
+            // snapshot moves nothing. A genuinely new value is `sourceBump` (→ `ready`).
             restore: () => source.emit(),
             fail: () => source.setError({ code: 'failed', message: id }),
         });
@@ -311,7 +288,7 @@ export function buildHarness(
             case 'source': {
                 // Recomputed rather than captured: a `sourceBump` moves this key's epoch and
                 // the source must then emit the new value without its producer re-running.
-                // Safe for the first ready too — only a *committed* source can be bumped, so
+                // Safe for the first ready too — only a COMMITTED source can be bumped, so
                 // the epoch cannot move between this run and that first settle.
                 const source = makeControllable(keySpec.key, () =>
                     formatValue(keySpec.key, declared.epochOf(keySpec.key), readValues),
@@ -330,12 +307,9 @@ export function buildHarness(
     };
 
     /*
-        The `.provide()` variant's factory. It records the value's build and its dispose,
-        and — the point of the whole variant — the source instances it was built over, so
-        the dispose can say whether they were still attached when it ran. It also touches
-        every resolved key, which is not decoration: the leaf tracks the factory's reads
-        and rebuilds the value when one of them changes, so reading all of them is what
-        makes "a changed value rebuilds the provided value" assertable for any key.
+        The `.provide()` variant's factory: it records the value's build and dispose and the
+        source instances it was built over, so the dispose says whether they were still
+        attached. It reads every resolved key, so a change to any key rebuilds the value.
     */
     const provideFactory = (resolved: Record<string, unknown>) => {
         const record: { id: string; detachedAtDispose: readonly string[] | null } = {
@@ -364,7 +338,7 @@ export function buildHarness(
         chain = chain.load(def) as typeof chain;
     }
     // `.provide()` stamps the factory onto the same node rather than adding a level, but it
-    // returns a *new* object — so the island, `useScopeControls` and `useScope` must all be
+    // returns a NEW object — so the island, `useScopeControls` and `useScope` must all be
     // keyed off this one (the channels are scope-identity keyed).
     const provideChain = chain as unknown as {
         provide: (factory: (resolved: Record<string, unknown>) => unknown) => Scope;
@@ -457,7 +431,7 @@ export function buildHarness(
             for (const entry of heldEntries) entry.superseded = true;
         },
         // Fire-and-forget on purpose: the returned promise settles only when the key does,
-        // which is a *later* command's job. Refresh failures resolve (they log), so no
+        // which is a LATER command's job. Refresh failures resolve (they log), so no
         // rejection escapes.
         refresh: (key) => void captured.current!.refresh(key),
         refreshAll: () => void captured.current!.refresh(),

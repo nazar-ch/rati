@@ -10,33 +10,22 @@ import { createDeclaredState, createModel } from './model.js';
 import { buildHarness, readContent, readSlot, scopeSpecArb } from './scopeHarness.js';
 
 /*
-    The MF-02 model-based property: a generated scope meets a generated *event sequence* —
-    settles, rejections, superseded settles, source transitions, selective refreshes, full
-    re-resolves, input changes — driven against a real island and mirrored in the reference
-    model. Each command asserts the contract after itself (commands.ts); this file owns the
-    two things only the whole run can say: the quiesce tail's **convergence** check, and the
-    teardown ledger.
+    long:2
+    The model-based property: a generated scope meets a generated EVENT SEQUENCE — settles,
+    rejections, superseded settles, source transitions, selective refreshes, full re-resolves,
+    input changes — against a real island, mirrored in the model. Each command asserts the
+    contract after itself (commands.ts); this file owns what only the whole run says: the
+    quiesce tail's convergence and the teardown ledger.
 
-    A generated fraction of runs deliberately ends mid-flight (`skipQuiesce`) and unmounts
-    with loads still in the air — situation S5 of `../suspense-situations.md`: the late
-    settles must be inert and the ledger must still balance, with never-attached sources at
-    0/0.
-
-    Another generated fraction (`withProvide`) ends the scope in `.provide()`, so the same
-    alphabet runs against an island that also owns a derived, disposable value. That variant
-    is what carries the `.provide()` half of the lifecycle contract: dispose-before-detach
-    and the dispose/rebuild pairing across refresh-driven rebuilds (ledger.ts + the
-    `assertProvideRebuild` in commands.ts).
-
-    Budget: fuzz(25) x byLevel(8, 4) commands keeps the default `vp run rati#test` in
-    seconds. Deep runs are manual — `FUZZ_RUNS=500 vp run rati#test src/__tests__/fuzz/`.
+    A drawn fraction ends mid-flight (`skipQuiesce`, situation S5): late settles stay inert and
+    the ledger still balances. Another (`withProvide`) ends the scope in `.provide()`, carrying
+    the lifecycle contract's `.provide()` half. Deep runs are manual:
+    `FUZZ_RUNS=<m> vp run rati#test src/__tests__/fuzz/`.
 */
 
-// Non-vacuity, accumulated across the whole run set: a green property that never actually
-// refreshed anything with a changed payload is a harness failure, not a pass. Counted here
-// rather than forced per-sequence (the record allows either): a per-case `fc.pre` would
-// discard the majority of sequences — most of a random alphabet never reaches a refresh —
-// and spend the budget generating cases instead of searching them.
+// Non-vacuity across the whole run set: a green property that never refreshed with a changed
+// payload is a harness failure. Counted rather than forced per sequence, since a per-case
+// `fc.pre` discards most random sequences.
 const exercised = { refreshWithChange: 0, cascades: 0, supersededRuns: 0, sourceValueChanges: 0 };
 
 beforeEach(() => {
@@ -53,16 +42,10 @@ afterEach(() => {
 });
 
 /**
- * Drive the initial resolution to content before the commands start.
- *
- * Half the runs take this (a generated boolean), because the two starts search different
- * things and a cold start alone barely reaches the interesting half: `refresh` needs content
- * showing, fast-check biases toward short command lists, and a multi-level scope can burn a
- * whole 8-command budget just settling its initial loads — the first version of this property
- * tripped its own non-vacuity guard with *zero* refreshes across 25 runs. Warm runs land in
- * the refresh/cascade/source-transition machinery immediately; cold runs keep the paths only
- * an unresolved island has (rejecting an initial load into the error slot, unmounting
- * mid-flight).
+ * Drives the initial resolution to content before the commands start, in half the runs:
+ * `refresh` needs content showing, and a cold start spends a short command list settling
+ * initial loads. Cold runs keep the paths only an unresolved island has — an initial
+ * rejection, a mid-flight unmount.
  */
 async function warmUp(model: Model, real: Real): Promise<void> {
     let guard = 0;

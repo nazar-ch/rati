@@ -20,47 +20,23 @@ import { RouterProvider, useRouter } from '../../router/RouterProvider.js';
 import { RouterStore } from '../../router/store.js';
 
 /*
-    The router fuzz harness: an arbitrary over route *tables*, and the builder that turns
-    one into a real RouterStore + <Router> with instrumented route components. The model
-    (routerModel.ts) reads the same declared table — the spec is the plumbing, the router
-    is the subject.
-
-    Route components here are plain: no scopes. Data resolution under navigation is the
-    mandala suite's ground, already covered, and folding an island in would put two
-    engines in one property (RF-02's boundary).
+    The router fuzz harness: an arbitrary over route TABLES, and the builder turning one into a
+    real RouterStore with instrumented route components; routerModel.ts reads the same declared
+    table. Route components carry no scope — data under navigation is the mandala suite's.
 */
 
-// ---------------------------------------------------------------------------------------
-// Param values
-
 /**
- * The value pool — the codec under fuzz. Every entry survives the whole round trip
- * (`getPath` encodes → the URL parser re-reads → the pattern matches → the match decodes),
- * so the model can expect the value back verbatim:
+ * long:2
+ * The value pool — the codec under fuzz. Every entry survives the whole round trip (`getPath`
+ * encodes, the URL parser re-reads, the pattern matches, the match decodes), so the model
+ * expects it back verbatim:
  *
- *   'a b'   space        → %20
- *   'a/b'   slash        → %2F, so it stays *one* segment rather than escaping the route
- *   '100%'  percent      → %25, the character that makes a decoder throw if mishandled
- *   'a?b'   'a#b'        → %3F/%23: the delimiters that would otherwise end the path
- *   'ä'     non-ASCII    → two-byte %C3%A4
- *   "a'b"   → neither encodeURIComponent nor the URL parser touches an apostrophe
- *   'a.b'   '..x'        → dots that are *part of* a value: ordinary characters, untouched
- *                          end to end. They are the live half of the dot rule below — the
- *                          boundary being "the whole segment is dots", not "dots occur".
- *   'new'   → collides with the static half of the shadow pair below, on purpose
+ *   'a b' → %20 · 'a/b' → %2F, ONE segment · '100%' → %25 · 'a?b' 'a#b' → %3F/%23
+ *   'ä' → %C3%A4 · "a'b" untouched · 'a.b' '..x' dots inside a value, untouched
+ *   'new' collides with the static half of the shadow pair, on purpose
  *
- * Deliberately absent:
- *   - '.' and '..' — a dot-only segment is a path operator rather than data, and no
- *     encoding rescues it: the URL parser resolves '/x/..' away to '/', and reads '%2E' as
- *     a dot too (that is what stops percent-encoding from smuggling a traversal past a
- *     path check). RF-06 confirmed both against the real histories; RF-08 turned that into
- *     refused by contract — getPath throws instead of building a URL that resolves
- *     elsewhere (deterministic pins in routeParams.test.ts). There is still no round trip
- *     here for the codec to be held to, and describing what the platform *would* do to one
- *     would mean growing URL dot-segment normalization into the model, which is the URL
- *     parser's contract, not the router's.
- *   - '' — `getPath` with an empty param builds a URL that no longer identifies the route
- *     ('/users/'). A caller violating the param contract is not a router behavior.
+ * Absent: '.' and '..', path operators getPath refuses (routeParams.test.ts), and '', which
+ * builds a URL no longer naming the route.
  */
 const PARAM_VALUES = [
     'a b',
@@ -79,12 +55,9 @@ const PARAM_VALUES = [
 
 const paramValueArb = () => fc.constantFrom(...PARAM_VALUES);
 
-/** Names drawn so that prefix collisions are frequent — `id` inside `idx` is RF-01's
- * finding 2, and `getPath` must substitute at the param boundary rather than by substring. */
+/** Names drawn so prefix collisions are frequent: `getPath` must substitute at the param
+ * boundary, never find `id` inside `idx`. */
 const PARAM_NAMES = ['id', 'idx', 'i', 'slug'];
-
-// ---------------------------------------------------------------------------------------
-// The table arbitrary
 
 /** Paths are derived from the route's index, so names and paths are unique by construction:
  * two routes with the same path would just make the second dead, which is a table-authoring
@@ -153,25 +126,15 @@ export type TableCase = {
 };
 
 /**
- * A generated route table. Always present, so the property's ground is fixed rather than
- * left to the draw:
+ * long:2
+ * A generated route table, whose fixed rows keep the property's ground off the draw:
  *
- *   `/`                  the root — with a basename, the URL is the basename itself, which
- *                        is the one branch of the strip that maps a whole pathname to '/'
- *   `/collide/:idx/:id`  RF-01 finding 2 under fuzz: `:id` lives inside `:idx`
- *   `/u/new` + `/u/:id`  a shadow pair, in generated order — with 'new' in the value pool,
- *                        `getPath({ name: 'uById', id: 'new' })` builds a URL that the
- *                        *static* route may answer. First-match-wins is the contract; the
- *                        model predicts whichever the order gives.
+ *   `/`                  the root — under a basename, the strip mapping a pathname to '/'
+ *   `/collide/:idx/:id`  `:id` inside `:idx`
+ *   `/u/new` + `/u/:id`  a shadow pair in generated order: the first match wins
  *   `/cy-a` ⇄ `/cy-b`    the cycle pair, for the depth guard
- *   `/cy-self`           the cycle of length one, for the guard RF-06 added. Fixed rather
- *                        than left to the target draw for the reason the pair is: a shape
- *                        the property claims to cover should not depend on a coin landing
- *                        (a drawn self-target needs a redirect route to exist, to pick
- *                        itself out of the pool, *and* to be navigated to — percentage
- *                        points, at a budget of 25)
- *   `*`                  the catch-all, last — anywhere else it would strand every route
- *                        after it, which is a dead table rather than a router behavior
+ *   `/cy-self`           the cycle of length one, fixed so its coverage rests on no draw
+ *   `*`                  the catch-all, last
  */
 export function tableArb(): fc.Arbitrary<TableCase> {
     const generatedCount = { minLength: 1, maxLength: byLevel(4, 2) };
@@ -218,12 +181,9 @@ export function tableArb(): fc.Arbitrary<TableCase> {
                 };
             });
 
-            // Targets may be any route, redirect routes included, so chains form naturally
-            // — and a route may name *itself*: RF-06 made that a cycle of length one
-            // (reported, the route renders), so it is ground the model states rather than
-            // an edge to step around. Drawn self-targets reach the shapes the fixed
-            // `/cy-self` below cannot: a self-target on a param path, and one arrived at
-            // partway down a chain.
+            // Targets may be any route, redirect routes included, so chains form — and a
+            // route may name ITSELF, a cycle of length one. A drawn self-target reaches what
+            // the fixed `/cy-self` cannot: one on a param path, or partway down a chain.
             const targetPool = [...plain.map((r) => r.name), ...redirects.map((r) => r.name)];
 
             return fc
@@ -324,9 +284,6 @@ export function tableArb(): fc.Arbitrary<TableCase> {
         });
 }
 
-// ---------------------------------------------------------------------------------------
-// Navigation targets
-
 export type NavTarget =
     | { kind: 'route'; name: string; params: Record<string, string>; keyOrder: number[] }
     | { kind: 'unmatched' };
@@ -334,12 +291,9 @@ export type NavTarget =
 export type Nav = {
     mode: 'navigate' | 'replace';
     target: NavTarget;
-    /** A reference (`{ name, …params }`) or a literal URL — the two shapes `navigate`
-     * accepts. Only the string form can carry a search or hash. The string form draws
-     * absolute paths (`buildPath` writes the leading `/` and the basename), which since
-     * RF-07 is the whole of the contract rather than a corner of it the draw declines to
-     * probe: a router-facing string that doesn't start with `/` is refused, so a relative
-     * draw would only ever pin the guard the deterministic suites already pin. */
+    /** A reference (`{ name, …params }`) or a literal URL, the two shapes `navigate` accepts;
+     * only the string carries a search or hash. The string is always absolute: a relative one
+     * is refused, which the deterministic suites pin. */
     form: 'reference' | 'string';
     search: string;
     hash: string;
@@ -369,9 +323,8 @@ function routeTargetArb(table: TableCase): fc.Arbitrary<NavTarget> {
         return fc
             .tuple(
                 fc.array(paramValueArb(), { minLength: names.length, maxLength: names.length }),
-                // The order the caller's object happens to list its params in. RF-01's
-                // finding 2 fired on exactly that (`Object.entries` is insertion-ordered),
-                // so the arbitrary must not assume the table is written path-order.
+                // The order the caller's object lists its params in: `Object.entries` is
+                // insertion-ordered, so the arbitrary never assumes path order.
                 fc.array(fc.nat({ max: 99 }), { minLength: names.length, maxLength: names.length }),
             )
             .map(([values, keyOrder]) => {
@@ -400,15 +353,9 @@ export function navArb(table: TableCase): fc.Arbitrary<Nav> {
             ),
         })
         .map((nav) =>
-            // The reference form is the only one that goes through `getPath` — the codec's
-            // outbound half — and it has nowhere to put a query or a fragment, since
-            // getPath builds the path alone. So resolve the two here rather than at the
-            // call: a reference carries neither, and anything else is a string URL.
-            //
-            // Drawing them independently is what the first cut did, and it quietly demoted
-            // ~17 navigations in 18 to the string form (which builds its URL without ever
-            // asking the router), leaving getPath almost unexercised — the prefix-collision
-            // kill needed a 20x budget to land.
+            // The reference form alone goes through `getPath`, which builds no query or
+            // fragment, so the pairing resolves here: a reference carries neither, anything
+            // else is a string URL. Independent draws starve getPath of navigations.
             nav.form === 'reference' && nav.target.kind === 'route'
                 ? { ...nav, search: '', hash: '' }
                 : { ...nav, form: 'string' as const },
@@ -429,12 +376,9 @@ export function routerCaseArb(): fc.Arbitrary<RouterCase> {
                 navs: fc.array(
                     fc.record({
                         nav: navArb(tableCase),
-                        // Re-aim a quarter of the navigations at wherever the previous one
-                        // went. Independent draws almost never collide (ten routes times ten
-                        // param values), which left the *skipped* navigation — same URL,
-                        // equal state, so the route must not re-key — at about 1% of steps.
-                        // Remount discipline is one of the four things the model answers, so
-                        // it needs to be reached on purpose rather than by luck.
+                        // Re-aim a quarter of the navigations at the previous destination:
+                        // independent draws almost never collide, and the SKIPPED navigation —
+                        // same URL, equal state, no re-key — needs reaching on purpose.
                         repeat: fc.constantFrom(true, false, false, false),
                     }),
                     { minLength: 1, maxLength: byLevel(6, 4) },
@@ -445,11 +389,9 @@ export function routerCaseArb(): fc.Arbitrary<RouterCase> {
                 initialUrl: urlFor(tableCase.table, initial, '', ''),
                 navs: navs.reduce<Nav[]>((acc, { nav, repeat }) => {
                     const previous = acc[acc.length - 1];
-                    // Repeat the whole destination — form included, since `navArb` pairs the
-                    // form with whether a search/hash may ride along, and a half-copy would
-                    // build a reference carrying a query it has nowhere to put. `mode` and
-                    // `state` stay as drawn: an equal state makes the navigation a no-op, a
-                    // different one re-resolves the same URL. Both are contract.
+                    // Repeat the whole destination, form included — a half-copy builds a
+                    // reference carrying a query. `mode` and `state` stay as drawn: an equal
+                    // state is a no-op, a different one re-resolves the same URL.
                     acc.push(
                         repeat && previous
                             ? {
@@ -470,10 +412,9 @@ export function routerCaseArb(): fc.Arbitrary<RouterCase> {
 export type CommandCase = { table: RouteTable; navigable: string[]; initialUrl: string };
 
 /**
- * The ground for the RF-03 command property: a generated table and the URL the app opens
- * at. The commands themselves are *not* drawn here — they pick their targets against the
- * model at run time (routerCommands.ts), so the alphabet needs to know nothing about the
- * table that gets drawn beside it.
+ * The ground for the command property: a generated table and the URL the app opens at. The
+ * commands pick their targets against the model at run time (routerCommands.ts), so the
+ * alphabet knows nothing about the table.
  */
 export function commandCaseArb(): fc.Arbitrary<CommandCase> {
     return tableArb().chain((tableCase) =>
@@ -496,9 +437,6 @@ export function urlFor(table: RouteTable, target: NavTarget, search: string, has
     return buildPath(table.basename, spec.path, target.params) + search + hash;
 }
 
-// ---------------------------------------------------------------------------------------
-// The real thing
-
 export type Mount = { name: string; params: Record<string, string> };
 
 export type Harness = {
@@ -520,14 +458,9 @@ const CONSUMER_ID = 'router-consumer';
 export type Consumed = { path: string; search: string; hash: string };
 
 /**
- * An ordinary app component: it reads the router through the public hook and renders what
- * it read. `useRouter` subscribes through `useSyncExternalStore`, so this is the whole
- * notification contract from the outside — a store that changed `search` without telling
- * its consumers leaves a stale value *here* while `router.search` reads correctly.
- *
- * Sits beside the `<Router>` rather than inside a route component on purpose: it must
- * survive the remounts, so that "the consumer re-read" cannot be satisfied by the route
- * being thrown away and rebuilt.
+ * An ordinary app component reading the router through `useRouter`, the whole notification
+ * contract from outside: a store changing `search` without notifying leaves a stale value
+ * HERE. It sits beside the `<Router>`, so a remount cannot satisfy "the consumer re-read".
  */
 function RouterConsumer() {
     const router = useRouter();
@@ -541,10 +474,8 @@ function RouterConsumer() {
  * moment React legitimately re-rendered. */
 function makeProbe(name: string, mounts: Mount[]) {
     return function Probe(params: Record<string, string>) {
-        // Mount-only, deliberately: the Router re-keys the route on every resolution, so a
-        // probe's params never change under a stable mount — a new set of params *is* a
-        // new mount, which is the discipline being observed. Re-running on `params` would
-        // log renders instead, and the ledger would stop meaning anything.
+        // Mount-only: the Router re-keys the route on every resolution, so a new set of
+        // params IS a new mount; re-running on `params` logs renders instead.
         useEffect(() => {
             mounts.push({ name, params: { ...params } });
             // eslint-disable-next-line react-hooks/exhaustive-deps -- mounts, not renders
@@ -572,10 +503,9 @@ function buildRedirect(table: RouteTable, spec: RedirectSpec): RouteRedirect {
     };
 
     switch (spec.form) {
-        // `buildPath` writes the basename in because a string target is used verbatim: under
-        // a basename the author must include it (rati◊RF-06, `RouteRedirect`'s doc comment,
-        // docs/current/public/reference.md). So `to: '/b'` under `/admin` is a table bug,
-        // never a case the model blesses.
+        // `buildPath` writes the basename in: a string target is used verbatim, so under a
+        // basename the author includes it (`RouteRedirect`), and `to: '/b'` under `/admin`
+        // is a table bug.
         case 'string':
             return {
                 to: buildPath(table.basename, target.path, literals()),
@@ -615,10 +545,8 @@ export function buildHarness(table: RouteTable, initialUrl: string): Harness {
     const router = new RouterStore(routes, {
         history: createMemoryHistory({ url: initialUrl }),
         ...(table.basename ? { basename: table.basename } : {}),
-        // Out of scope, and loud: scroll restoration would fire a double rAF and a
-        // window.scrollTo per navigation, thousands of times over a run. jsdom has no
-        // layout, so the README reserves it for a bookkeeping model of its own (which
-        // entry's position would be restored), not this property.
+        // Off: scroll restoration fires a double rAF and a window.scrollTo per navigation, and
+        // jsdom has no layout to restore.
         scrollRestoration: false,
     });
 
@@ -649,12 +577,9 @@ export function buildHarness(table: RouteTable, initialUrl: string): Harness {
 }
 
 /**
- * A URL that resolves to *something* other than wherever the router currently is — the
- * probe the teardown tail drives a disposed store with.
- *
- * Both candidates always resolve (every generated table has a root and a catch-all), so
- * driving the history with one is guaranteed to re-key the route of a store still
- * listening: the tripwire cannot come up vacuous by landing on the path it started from.
+ * A URL resolving to SOMETHING other than where the router is — the probe the teardown tail
+ * drives a disposed store with. Every table has a root and a catch-all, so a still-listening
+ * store re-keys, and the tripwire is never vacuous.
  */
 export function awayUrl(table: RouteTable, currentPath: string): string {
     return table.basename + (currentPath === UNMATCHED_PATH ? '/' : UNMATCHED_PATH);
@@ -677,11 +602,8 @@ export function applyNav(router: RouterStore<GenericRouteType[]>, table: RouteTa
 }
 
 /**
- * `{ name, …params }` with the params inserted in the caller's generated order.
- *
- * The order is drawn rather than fixed because RF-01's finding 2 fired on exactly it:
- * `getPath` substituted by substring, so `/x/:idx/:id` corrupted when the caller's object
- * happened to list `id` before `idx` (`Object.entries` is insertion-ordered).
+ * `{ name, …params }` with the params in the caller's generated order, so a `getPath`
+ * substituting by substring corrupts `/x/:idx/:id` when the caller lists `id` before `idx`.
  */
 export function referenceFor(
     name: string,
