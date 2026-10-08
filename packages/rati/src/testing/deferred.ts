@@ -1,11 +1,6 @@
 /**
- * A promise plus its `resolve`/`reject`, so a test can settle it by hand — the
- * "testability by construction" ground rule, and the single most-copied test helper
- * across both repos.
- *
- * Drive a load with it to observe every phase without module mocking: hand the promise
- * to a `.load({ … })` (or a `query`) and a suspended island sits on its loading slot until
- * you `resolve` — the moment the content appears is then yours to assert.
+ * A promise plus its `resolve`/`reject`, so a test settles it by hand: handed to a
+ * `.load({ … })` or a `query`, it holds a suspended island on its loading slot until `resolve`.
  *
  * ```ts
  * const gate = deferred<number>();

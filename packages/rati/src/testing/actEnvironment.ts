@@ -1,17 +1,7 @@
 /*
-    Scoped IS_REACT_ACT_ENVIRONMENT handling for the harness's own `act` calls.
-
-    The entry used to set the global flag permanently on first mount ("defensively"), but a
-    permanent set is a real policy change for the consuming suite: a runner that deliberately
-    leaves the flag unset (so non-act-driven async updates — editor portals, timers awaited
-    via waitFor — don't warn) would inherit it forever after the first rati/testing mount.
-    Instead, each helper sets the flag for the duration of its own `act` and restores the
-    previous value after — the same save/set/restore RTL does around its `act` calls. A
-    test's own bare `act(…)` drives still need the runner's environment (RTL sets one up on
-    import; or set the global yourself), exactly as documented.
-
-    Overlap note: React forbids overlapping `act` calls, so the save/restore pairs nest but
-    never interleave — the previous value is always the right thing to restore.
+    Scoped IS_REACT_ACT_ENVIRONMENT for the harness's own `act` calls: each sets the flag for
+    its `act` and restores the previous value, as RTL does, so a suite leaving it unset keeps its
+    policy. `act` calls never overlap, so the save/restore pairs nest.
 */
 
 interface ActEnvironmentGlobal {

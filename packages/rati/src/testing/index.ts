@@ -1,18 +1,7 @@
 /*
-    rati/testing — test utilities for apps built on rati, and for rati itself. Every
-    primitive here was hand-rolled across both repos' suites (a deferred promise ~10×, an
-    act-microtask flush 100+×, a controllable source ~8×, the island/router mount + provider
-    wiring inline everywhere); this entry is their sanctioned home. All of it is
-    test-environment-only — the harness and `flush` call React's `act`, which warns outside a
-    configured test runner.
-
-    Depends on `react` / `react-dom/client` (already peers). It does *not* pull in
-    `@testing-library/react`: the render harnesses use `react-dom/client` directly and return
-    a container you can query with whatever you already use.
-
-    The `rati/data` half — `controllableProducer` and `controllableQuery` — lives one
-    subpath over, in `rati/testing/data`, because it imports MobX; this barrel stays
-    MobX-free so an app that never uses `rati/data` needn't install the optional peer.
+    rati/testing — test-environment utilities for apps on rati and for rati itself, over
+    `react-dom/client` with no `@testing-library/react`. The MobX-backed `rati/data` half is
+    `rati/testing/data`, so this barrel stays MobX-free.
 */
 
 export { deferred, type Deferred } from './deferred.js';
