@@ -270,9 +270,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.12-c55121320c0e126add3fb38bb04f8b18.tgz":
-  version: 0.0.12
-  resolution: "@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.12-c55121320c0e126add3fb38bb04f8b18.tgz"
+"@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.15-4cdad6c1db8a767229bd8ed286311f8c.tgz":
+  version: 0.0.15
+  resolution: "@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.15-4cdad6c1db8a767229bd8ed286311f8c.tgz"
   dependencies:
     "@tsconfig/node26": "npm:^26.0.0"
     "@tsconfig/strictest": "npm:^2.0.8"
@@ -288,7 +288,7 @@ __metadata:
       optional: true
     zx:
       optional: true
-  checksum: 10/ada5527142533c6de53d1a7aa6427b8514e3e100252d22c2f5897f10d1e1a55c42218d52592aac60c0450eafd7c17ff707ac19d97723a59face1d5e796359498
+  checksum: 10/0a780ce01572062e4946766b696a969008e1e51dbabd189bf3373919f677c70ca30704be3ac973b788feb7d946f3ad3f8df7acaadc6bdd5219412d020efadb53
   languageName: node
   linkType: hard
 

@@ -18,23 +18,9 @@ import {
 import type { RenderAppResult } from '../ssr/renderApp.js';
 
 /*
-    `rati/vite`: `vite dev` serves the app and `vite build` builds both sides of it, so
-    an SSR app needs no server of its own and no build script of its own.
-
-    Dev — Vite's dev server already does the hard parts (transform, HMR, sourcemaps);
-    what every consumer hand-rolled around it was the same ~150 lines of middleware-mode
-    piping. So this is a catch-all HTML middleware inside Vite's own server: load the
-    app's server entry, call the Layer-1 contract (`render(url)` → `RenderAppResult`),
-    map the result kinds onto the response.
-
-    Build — an SSR app is two builds over one source tree, which consumers ran as two
-    commands and then re-joined by hand at runtime by reading the client manifest. The
-    environments API makes them one command, and being the thing that runs both is what
-    lets the plugin hand the client's manifest to the server build (see ./assets) rather
-    than leave every consumer to find it in production.
-
-    The render contract is the whole coupling — this plugin knows nothing about rati's
-    engine and rati's engine knows nothing about it.
+    `rati/vite`: `vite dev` serves the app through a catch-all HTML middleware inside Vite's own
+    server, and `vite build` builds both sides in one command, handing the client manifest to
+    the server build (./assets). The `render(url)` contract is the whole coupling to the engine.
 */
 
 export interface RatiSsrOptions {
@@ -215,7 +201,7 @@ export function ratiSsr(options: RatiSsrOptions = {}): Plugin {
         },
 
         configureServer(server) {
-            // Returning a hook installs the middleware *after* Vite's own, so module
+            // Returning a hook installs the middleware AFTER Vite's own, so module
             // and HMR requests never reach the renderer.
             return () => {
                 server.middlewares.use((req, res, next) => {
@@ -243,10 +229,9 @@ export function ratiSsr(options: RatiSsrOptions = {}): Plugin {
         },
 
         hotUpdate({ file, modules, server }) {
-            // The server entry's graph is not HMR-safe. `ssrLoadModule` re-evaluates it
-            // on the next request, but nothing asks the browser to make one — so reload
-            // for modules only the server renders. A module the client graph also has is
-            // Fast Refresh's to handle, and reloading would throw its state away.
+            // The server entry's graph is not HMR-safe: `ssrLoadModule` re-evaluates it on
+            // the next request, but nothing triggers one, so a module only the server renders
+            // reloads the page. A module the client also has is Fast Refresh's.
             if (this.environment.name !== 'ssr' || modules.length === 0) return;
             const client = server.environments.client;
             if (client.moduleGraph.getModulesByFile(file)?.size) return;
@@ -317,33 +302,19 @@ async function assemble(
         return transformHtml(server, spliceDocument(result.html, result, by), url, originalUrl);
     }
     const raw = await readFile(resolve(server.config.root, options.template), 'utf8');
-    // Transform the shell, *then* fill it: transforming the filled page would hand the
+    // Transform the shell, THEN fill it: transforming the filled page would hand the
     // app's own markup to Vite's HTML pipeline.
     const template = await transformHtml(server, raw, url, originalUrl);
     return fillTemplate(template, result, options.placeholders, by);
 }
 
 /**
- * `transformIndexHtml`, surviving a URL `decodeURIComponent` rejects (`/products/%zz`).
- * Vite decodes the URL to name the HTML file it reports to the html hooks, so a
- * malformed escape throws a URIError there — *after* the app rendered its answer — and
- * the middleware's `.catch` hands it to Vite's error middleware, which serves the 500
- * overlay. Production answers the app's 404. A URL is user input: dev disagreeing with
- * production about a bad one makes a bad address look like an app bug, exactly where the
- * developer is watching.
- *
- * Escaping every `%` is what makes the retry total — a stray `%` is not the only shape
- * rejected (`%FF` is well-formed hex that decodes to no character), and afterwards every
- * `%` opens `%25`, which decodes back to the characters the request carried. Nothing is
- * lost: the URL is plugin context here, and no file backs a route path anyway. The app
- * above still rendered from the raw URL — the router hands a segment it cannot decode
- * through as-is — and `originalUrl` Vite compares but never decodes.
- *
- * Retried rather than sanitized up front, which is not a style choice: a probe (decode
- * it, escape on throw) reads to the bundler as a pure call whose result is unused, so
- * `vite build` drops it and ships the identity function — green here, because the tests
- * run this source, and broken in every consumer, which is the one place it runs built.
- * Reaching for the error the real decode threw leaves nothing to drop.
+ * long:1
+ * `transformIndexHtml`, surviving a URL `decodeURIComponent` rejects (`/products/%zz`): Vite
+ * decodes the URL for its html hooks and throws a URIError after the app rendered its 404,
+ * which production serves. Escaping every `%` makes the retry total. Never a decode probe up
+ * front: the bundler drops it as an unused pure call, and the published plugin ships the
+ * identity function (docs/current/internals.md).
  */
 async function transformHtml(
     server: ViteDevServer,

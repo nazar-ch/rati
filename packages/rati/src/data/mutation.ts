@@ -9,14 +9,14 @@ import { toSourceError, type SourceError } from '../scope/source.js';
     The optimistic choreography apps hand-roll per method, owned once:
     `optimistic` patches the read side synchronously before the request (expected
     truth every observer sees early); `refreshes` declares the read-side
-    dependents and re-fetches them — **refresh**, so lists show stale content
+    dependents and re-fetches them — REFRESH, so lists show stale content
     instead of blanking — after success, and, under the default
     `onError: 'refresh'`, after failure too (actual truth recovered, no
     inverse-patch bookkeeping). Refreshes are fired, not awaited: their progress
     is the dependents' own `refreshing` phase, not this call's.
 
     A failure normalizes to `SourceError` on `mutation.error` (for UI watching
-    the operation — a toolbar button's badge) and still **rethrows**, so callers
+    the operation — a toolbar button's badge) and still RETHROWS, so callers
     (a form's submit) can react.
 */
 

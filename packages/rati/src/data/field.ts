@@ -12,8 +12,8 @@ import { observable, runInAction } from 'mobx';
     form's `validate()`); a field that currently has errors re-validates on every
     change, so errors disappear the moment the input becomes valid.
 
-    Baseline semantics (the `ActiveData` distillation): `field(space.title)` —
-    building a field from an entity *is* the draft; `isDirty` compares against
+    Baseline semantics: `field(space.title)` —
+    building a field from an entity IS the draft; `isDirty` compares against
     the baseline, `reset()` is cancel, `commit()` re-baselines (the form calls it
     after a successful save).
 */

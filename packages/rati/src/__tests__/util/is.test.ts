@@ -2,11 +2,9 @@ import { describe, test, expect } from 'vite-plus/test';
 
 import { is } from '../../util/utils.js';
 
-// `is.class` decides whether the resolver constructs a load entry (`new Entry(props)`)
-// or calls it (`Entry(props)`), so getting it wrong on a real build is fatal: a class
-// invoked without `new` throws "Class constructor … cannot be invoked without 'new'",
-// which blanked the ssr example's /counter in every production build (FND-03). The
-// shapes below are the ones a bundler actually produces.
+// `is.class` decides whether the resolver constructs a load entry or calls it, and a class
+// invoked without `new` throws, so a wrong answer on a real build is fatal. The shapes below
+// are the ones a bundler produces.
 
 describe('is.class', () => {
     test('a named class declaration', () => {

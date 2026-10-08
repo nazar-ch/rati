@@ -1,11 +1,9 @@
 import { is } from '../util/utils.js';
 
 /*
-    Sources — the reactive data primitive an island observes. A source is a live `pending | ready | error`
-    state machine; the island aggregates a set of them into one of those phases and
-    renders the matching slot. Source-agnostic: CRDT resources, REST loaders, plain
-    promises all implement the same interface, so the island never knows what's
-    behind a prop.
+    Sources: the live `pending | ready | error` state machine an island observes, aggregating
+    a set into one phase and rendering the matching slot. A CRDT resource, a REST loader and a
+    plain promise share the interface, so the island never knows what backs a prop.
 */
 
 /**
@@ -24,18 +22,10 @@ export class NotAvailableError extends Error {
 }
 
 /**
- * The blessed `code` vocabulary — the flavors an error slot switches on. An **open
- * set**: the `(string & {})` arm keeps completion for the five while letting a load
- * coin its own code, so nothing has to be augmented to say something new.
- *
- * The typical HTTP origin of each, mapped at the consumer's transport edge (rati
- * ships no fetch helper and knows nothing of status codes):
- *
- *   - `not-available` — 404 / 410. The thing does not exist. Terminal.
- *   - `forbidden` — 401 / 403. Not yours (or not signed in). Terminal.
- *   - `invalid` — 400 / 422. The request itself is wrong. Terminal.
- *   - `unreachable` — the network never got there. Transient.
- *   - `failed` — 5xx, and the fallback for anything unclassified.
+ * The blessed `code` vocabulary an error slot switches on, an OPEN set: `(string & {})`
+ * keeps completion for these while a load coins its own. `not-available`, `forbidden` and
+ * `invalid` are terminal, `unreachable` is transient, and `failed` is the fallback for
+ * anything unclassified.
  */
 export type SourceErrorCode =
     | 'not-available'
@@ -46,13 +36,12 @@ export type SourceErrorCode =
     | (string & {});
 
 /**
- * The one error shape, in two levels. not-available / forbidden / failed / … all
- * collapse here because the island's behavior is identical; `code` stays
- * machine-readable so the error slot (and routing/SSR) can still tell them apart.
+ * The one error shape: every failure collapses here, and `code` stays machine-readable
+ * for the error slot.
  *
- *   - `retryable` is the **top level**: the transient/terminal axis, and the only
- *     thing the automatic retry policy consults.
- *   - `code` is the **flavor** — see {@link SourceErrorCode}.
+ *   - `retryable` is the transient/terminal axis, the only thing the automatic retry
+ *     policy consults.
+ *   - `code` is the flavor — {@link SourceErrorCode}.
  */
 export interface SourceError {
     code: SourceErrorCode;
@@ -60,7 +49,7 @@ export interface SourceError {
     cause?: unknown;
     /**
      * Is another attempt worth making? `true` = transient (a blip, a 5xx, a dropped
-     * connection), `false` = terminal — an answer, not a fault. **Absent = unclassified**:
+     * connection), `false` = terminal — an answer, not a fault. ABSENT = unclassified:
      * the app never said, so the retry policy falls back to the code (see `retry`).
      */
     retryable?: boolean;
@@ -74,26 +63,17 @@ export type SourceState<T> =
 export const SourceSymbol = Symbol('rati.source');
 
 /**
- * Declares a source SSR-capable. Under a Suspense-awaiting server render the resolver
- * attaches the marked source *during render*, wraps its first settle into a promise
- * (React's own wait mechanics — `use()`/Suspense), and dehydrates the ready value. The
- * marker is a promise of conduct: `attach()` is server-safe and the state machine
- * settles in a reasonable timeframe — the same trust extended to any promise load (a
- * hung one hangs the prerender; budgets belong to the prerender helper).
+ * long:2
+ * Declares a source SSR-capable: the server render attaches it during render, awaits its
+ * first settle and dehydrates the ready value. The marker promises that `attach()` is
+ * server-safe and settles; a hung source hangs the prerender.
  *
- * Two shapes, one rule — loaders say `true`, live sources provide `hydrate`:
+ *   - `ssr: true` — a loader: the JSON-serializable ready value dehydrates, and the client
+ *     takes it without creating or attaching the source.
+ *   - `ssr: { hydrate, dehydrate? }` — a live source: the client calls `hydrate(data)` on
+ *     the fresh source BEFORE attaching, so its first snapshot is ready.
  *
- *   - `ssr: true` — "a loader in source clothing". Promise semantics end to end: the
- *     ready value (which must be JSON-serializable) is dehydrated; on the client the
- *     key short-circuits to that value and the source is never created nor attached —
- *     exactly how promise loads hydrate today.
- *   - `ssr: { hydrate, dehydrate? }` — a live source that can be seeded. The server
- *     dehydrates `dehydrate(value)` (defaults to the value itself); the client calls
- *     `hydrate(data)` on the freshly created source *before* attaching, so its first
- *     snapshot is already ready — no gap, no double fetch, fully live afterward.
- *
- * A live source that cannot seed simply stays unmarked: pending HTML, client
- * resolution — the previous behavior.
+ * Unmarked, a source stays pending under SSR and resolves on the client.
  */
 export type SourceSSR<T> =
     | true
@@ -105,16 +85,10 @@ export type SourceSSR<T> =
       };
 
 /**
- * A reactive 3-state data source, shaped for React's `useSyncExternalStore`: the
- * island subscribes with `subscribe(onChange)` and reads the current state with
- * `getSnapshot()`, so a transition re-renders. `getSnapshot()` must return a
- * referentially stable value while the state is unchanged — uSES compares snapshots
- * by identity, so a fresh object every call would loop. Lifetime is explicit:
- * `attach()` starts/holds the underlying work and returns a detach function the
- * island calls on teardown (unmount / param change).
- *
- * Reactivity-agnostic: a plain promise, a CRDT handle, or a MobX derivation can all
- * back one — see `rati/mobx`'s `observableSource` to adapt a MobX observable.
+ * A reactive pending/ready/error source shaped for `useSyncExternalStore`: `getSnapshot()`
+ * must return a referentially stable value while the state is unchanged. `attach()` starts
+ * the work and returns the detach the island calls on teardown. `rati/mobx` adapts a MobX
+ * observable.
  */
 export interface Source<T> {
     readonly [SourceSymbol]: true;
@@ -155,8 +129,7 @@ export function promiseSource<T>(promise: Promise<T>, options?: { ssr?: SourceSS
     const listeners = new Set<() => void>();
     const set = (next: SourceState<T>) => {
         state = next;
-        // Set iteration tolerates a listener unsubscribing mid-notify (a deleted,
-        // not-yet-visited entry is simply skipped), so iterate directly.
+        // Set iteration tolerates a listener unsubscribing mid-notify, so iterate directly.
         for (const listener of listeners) listener();
     };
     void promise.then(
@@ -185,7 +158,7 @@ export function toSource<T>(value: T | Promise<T> | Source<T>): Source<T> {
 }
 
 /**
- * Maps a thrown/rejected reason that may already *be* a SourceError (a plain object
+ * Maps a thrown/rejected reason that may already BE a SourceError (a plain object
  * with a string `code`) to the unified shape; anything else goes through
  * {@link toSourceError}. The boundary and the SSR error collector share it.
  */
@@ -201,18 +174,10 @@ export function asSourceError(thrown: unknown): SourceError {
 }
 
 /**
- * Maps an arbitrary thrown/rejected reason to the unified SourceError.
- *
- * The classification seam: **any** thrown `Error` carrying a string `code` — and,
- * optionally, a boolean `retryable` — maps through with both intact. That is how an
- * app's transport edge speaks to rati (`Object.assign(new Error(text), { code:
- * 'forbidden', retryable: false })`, or its own `ApiError` class); no subclass of
- * ours is needed to smuggle a code through. {@link NotAvailableError} is one such
- * error and keeps working exactly as before.
- *
- * Anything else — a plain `Error`, a rejected non-error — is **unclassified**:
- * `code: 'failed'` with `retryable` absent, which is what the retry policy reads as
- * "the app never said".
+ * Maps a thrown or rejected reason to the unified SourceError. Any `Error` carrying a
+ * string `code`, and optionally a boolean `retryable`, maps through with both intact — an
+ * app's transport edge speaks to rati this way. Anything else is unclassified:
+ * `code: 'failed'` with `retryable` absent.
  */
 export function toSourceError(reason: unknown): SourceError {
     if (reason instanceof Error) {

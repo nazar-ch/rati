@@ -18,39 +18,23 @@ import type { RouterModel, RouteTable, Step } from './routerModel.js';
 import { flush } from '../../testing/index.js';
 
 /*
-    The RF-03 command alphabet: the navigations an app actually makes — pushes and replaces
-    by reference and by URL, shallow ones, per-entry state, query rewrites, redirects, and
-    the back/forward traversal none of the forward-only smoke property reaches — driven
-    against a real RouterStore over a memory history and mirrored in the reference model
-    (routerModel.ts). Every command asserts the contract after itself, so fast-check shrinks
-    a violation to a minimal command sequence rather than a whole run.
-
-    Two conventions carried from the mandala alphabet next door (commands.ts):
-
-      - **Targets are picked at run time, not generation time.** A command carries `nat`s
-        and indexes into the model's *currently legal* targets; `check` gates only on
-        causality (a `back` needs somewhere to go). This is also what lets the alphabet be
-        drawn without knowing which route table it will meet.
-      - **Every mutation runs inside `act`, followed by one fixed flush.** The Router defers
-        the active route (`useDeferredValue`), so the low-priority render has to land before
-        anything is read. Never poll-until-green: a fixed flush is what makes a failure mean
-        something.
-
-    The invariants are the six of docs/archive/efforts/router-fuzz/issues/RF-03-commands-model.md;
-    the shared five live in routerAsserts.ts (both properties hold the router to them), and
-    the sixth — notification coherence — is here, since it is a fact about a *command*
-    rather than about a state.
+    long:2
+    The router's command alphabet: the navigations an app makes — pushes and replaces by
+    reference and by URL, shallow ones, per-entry state, query rewrites, redirects, and
+    back/forward traversal — driven against a real RouterStore over a memory history and
+    mirrored in routerModel.ts. commands.ts's conventions hold: targets picked at run time, and
+    every mutation inside `act` then one fixed flush, since the Router defers the active route.
+    routerAsserts.ts holds the shared invariants; notification coherence, a fact about a
+    COMMAND, is here.
 */
 
 export type Model = RouterModel;
 export type Real = { harness: Harness; table: RouteTable; log: ErrorLog };
 
 /*
-    Non-vacuity, accumulated across the whole run set (jnana's rule, carried from the mandala
-    suite: "a green run that never exercised the machinery is a failure of the harness, not
-    a pass"). RF-02 learned the sharper half the hard way — starvation comes from the
-    arbitrary's *joint* distribution, not from any one draw being wrong — so the shapes this
-    alphabet exists for are counted rather than assumed.
+    Non-vacuity across the whole run set: a green run that never exercised the machinery is the
+    harness failing. Starvation comes from the arbitrary's JOINT distribution, so the shapes this
+    alphabet exists for are counted.
 */
 export const exercised: Record<string, number> = {};
 const note = (what: string) => {
@@ -58,20 +42,16 @@ const note = (what: string) => {
 };
 
 /**
- * The per-entry state pool.
- *
- * `A1` and `A2` are the `shallowEqualState` seam: two *distinct objects* that agree on
- * every key. The store must read them as equal — a same-URL navigation from one to the
- * other resolves nothing — which is what stops a reference comparison from passing here.
- * The seam only exists where the URL repeats (anywhere else the path change forces a
- * resolution and the state is never asked), which is what `NavigateWithState` is for.
+ * The per-entry state pool. `A1` and `A2` are the `shallowEqualState` seam: DISTINCT objects
+ * agreeing on every key, which the store reads as equal, so a reference comparison fails here.
+ * The seam exists only where the URL repeats — `NavigateWithState`'s purpose.
  */
 const STATE_A1 = { panelId: 'p0' };
 const STATE_A2 = { panelId: 'p0' };
 const STATE_B = { panelId: 'p1' };
 const STATE_POOL: (Record<string, unknown> | null)[] = [null, STATE_A1, STATE_A2, STATE_B];
 
-/** `?? null` rather than `!`: the pool's first entry *is* `null` (a navigation that passes
+/** `?? null` rather than `!`: the pool's first entry IS `null` (a navigation that passes
  * no state at all), so asserting non-null here would be a type that lies. */
 const pickState = (pick: number): Record<string, unknown> | null =>
     STATE_POOL[pick % STATE_POOL.length] ?? null;
@@ -80,7 +60,6 @@ const pickState = (pick: number): Record<string, unknown> | null =>
  * encoding, since `URLSearchParams` spells a space `+` where `getPath` spells it `%20`. */
 const SEARCH_INITS: Record<string, string>[] = [{}, { tab: 'a' }, { a: '1', b: '2' }, { q: 'a b' }];
 
-// ---------------------------------------------------------------------------------------
 // The invariants that must hold after every command that resolved something.
 
 async function assertAfter(
@@ -105,13 +84,9 @@ async function assertAfter(
 }
 
 /**
- * The store told its consumers that something moved.
- *
- * `getSnapshot` is the public half of the store's `useSyncExternalStore` pair — the handle
- * React itself reads it through — so this is the subscription contract, not the mechanics
- * behind it. A *bound* rather than a count, deliberately: a followed redirect resolves more
- * than once, and how many notifications that costs is an implementation's business. What is
- * promised is that a command which moved the router cannot leave consumers unaware.
+ * The store told its consumers something moved, read through `getSnapshot`, the public half of
+ * its `useSyncExternalStore` pair. A BOUND, not a count: a followed redirect resolves more than
+ * once, but a command that moved the router never leaves consumers unaware.
  */
 function assertNotified(real: Real, versionBefore: number, label: string): void {
     expect(
@@ -121,10 +96,9 @@ function assertNotified(real: Real, versionBefore: number, label: string): void 
 }
 
 /**
- * And the consumers acted on it. `assertNotified` says the store emitted; this says an
- * ordinary component subscribed through `useRouter` has the *current* values on screen —
- * the difference between notifying and being read. A store that emitted before writing its
- * own fields, or a snapshot that didn't move, leaves a stale render here.
+ * And the consumers acted on it: an ordinary `useRouter` component has the CURRENT values on
+ * screen. A store emitting before writing its fields, or a snapshot that didn't move, leaves a
+ * stale render here.
  */
 function assertConsumerFresh(real: Real, step: Step, label: string): void {
     expect(real.harness.consumer(), `${label}: what a subscribed consumer last rendered`).toEqual({
@@ -145,15 +119,11 @@ function noteStep(step: Step): void {
     if (step.stateHasMark) note('a shallow entry carried per-entry state');
 }
 
-// ---------------------------------------------------------------------------------------
-// Target picking
-
 type NavDraw = {
     pick: number;
     /** Two, the most any generated path declares. */
     paramPicks: number[];
-    /** The order the caller's reference object happens to list its params in — RF-01's
-     * finding 2 fired on exactly that. */
+    /** The order the caller's reference object lists its params in. */
     keyPicks: number[];
     searchPick: number;
     hashPick: number;
@@ -184,9 +154,6 @@ function pickRoute(model: Model, names: string[], draw: NavDraw): Target {
     return { name, params };
 }
 
-// ---------------------------------------------------------------------------------------
-// The navigations
-
 abstract class NavCommand implements fc.AsyncCommand<Model, Real> {
     constructor(protected readonly draw: NavDraw) {}
 
@@ -211,10 +178,8 @@ abstract class NavCommand implements fc.AsyncCommand<Model, Real> {
     }
 
     async run(model: Model, real: Real): Promise<void> {
-        // A reference has nowhere to put a query or a fragment (`getPath` builds the path
-        // alone), so the two are decided together rather than drawn apart — RF-02 drew them
-        // independently and quietly demoted ~17 navigations in 18 to a literal URL, leaving
-        // `getPath` almost unexercised.
+        // A reference has nowhere to put a query or fragment, so the two are decided together;
+        // independent draws starve `getPath`.
         const literal = this.form === 'string';
         const search = literal ? SEARCH_VALUES[this.draw.searchPick % SEARCH_VALUES.length]! : '';
         const hash = literal ? HASH_VALUES[this.draw.hashPick % HASH_VALUES.length]! : '';
@@ -251,11 +216,8 @@ abstract class NavCommand implements fc.AsyncCommand<Model, Real> {
     }
 
     /**
-     * Reports the *generated* draw rather than what it resolved to. fast-check clones command
-     * instances between runs, so a target stashed on `this` during `run` is not necessarily
-     * on the instance that gets printed — a counterexample that lies about what it did is
-     * worse than one that says less. The resolved URL is in every assertion message instead,
-     * which is where a failure is read anyway.
+     * Reports the GENERATED draw: fast-check clones commands between runs, so a target stashed
+     * on `this` can print the wrong one. The resolved URL rides every assertion message.
      */
     toString(): string {
         return `${this.verb}#${this.draw.pick}`;
@@ -311,11 +273,9 @@ class ReplacePath extends NavCommand {
 }
 
 /**
- * A shallow push: grow the back stack and move the URL, but keep the mounted route.
- *
- * The literal form, so the shallow change can be a query rewrite — the canonical use the
- * docs name (an editor swapping files via tabs). Its `replace` twin takes the reference
- * form, so the pair covers both doors into `pushOrReplace`.
+ * A shallow push: the back stack grows and the URL moves, the mounted route stays. The literal
+ * form, so the change can be a query rewrite; its `replace` twin takes the reference form, so
+ * the pair covers both doors into `pushOrReplace`.
  */
 class NavigateShallow extends NavCommand {
     protected get mode() {
@@ -348,14 +308,9 @@ class ReplaceShallow extends NavCommand {
 }
 
 /**
- * Navigate into a redirect route on purpose — a single hop, the cycle pair, or the
- * self-target, depending on the pick.
- *
- * Reachable through the plain commands too (redirect routes are navigable like any other),
- * but only at a few percent of picks: a shape the property claims to cover should not
- * depend on a coin landing. The literal form, so a query rides along into the resolution —
- * an *object* target re-attaches the current search and hash to the URL it builds, and
- * nothing else in the alphabet reaches that branch of `resolveTarget`.
+ * Navigates into a redirect route on purpose — a single hop, the cycle pair, or the
+ * self-target. The literal form, so a query rides into the resolution: an OBJECT target
+ * re-attaches the current search and hash, a branch of `resolveTarget` nothing else reaches.
  */
 class ToRedirectRoute extends NavCommand {
     protected get mode() {
@@ -376,20 +331,10 @@ class ToRedirectRoute extends NavCommand {
 }
 
 /**
- * Navigate to the URL already on screen, carrying a drawn per-entry state — the
- * `shallowEqualState` seam.
- *
- * Aimed at the current URL rather than a drawn one because that is the only place the seam
- * exists: with a path change the route re-resolves regardless and the state is never asked.
- * Drawn targets almost never collide (ten routes times twelve param values), which is what
- * left RF-02's *skipped* navigation at ~1% of steps until it re-aimed a quarter of its
- * navigations at the previous destination. Here the shape is the command's whole purpose,
- * so it is reached on purpose.
- *
- * The three outcomes it searches, all contract: an equal state resolves nothing (even
- * though the object is a different one — the seam); a different state re-resolves the same
- * URL; and a second entry sharing a URL is exactly what a later `back`/`forward` needs in
- * order to step between two entries that differ only in state.
+ * Navigates to the URL on screen with a drawn per-entry state — the `shallowEqualState` seam,
+ * which exists only where the URL repeats. An equal state resolves nothing, a different one
+ * re-resolves the same URL, and the second entry sharing a URL is what a later traversal
+ * steps between.
  */
 class NavigateWithState implements fc.AsyncCommand<Model, Real> {
     constructor(private readonly statePick: number) {}
@@ -462,17 +407,10 @@ class SetSearchParams implements fc.AsyncCommand<Model, Real> {
     }
 }
 
-// ---------------------------------------------------------------------------------------
-// Traversal
-
 /**
- * `go(delta)` over the entry stack — the dimension the smoke property has none of.
- *
- * Ungated, unlike its `back`/`forward` twins: a delta with nowhere to go is *contract*
- * ("out of range does nothing — it does not clamp to the ends", and `go(0)` is the host's
- * reload, which a memory history has no document for), and the strongest thing to say about
- * it is that nothing at all happened — not even a notification. So this command asserts the
- * inert case itself rather than letting `check` hide it.
+ * `go(delta)` over the entry stack, ungated: a delta with nowhere to go is CONTRACT — out of
+ * range never clamps, and `go(0)` has no document in memory — so this command asserts that
+ * nothing happened, not even a notification.
  */
 class Go implements fc.AsyncCommand<Model, Real> {
     constructor(private readonly delta: number) {}
@@ -499,7 +437,7 @@ class Go implements fc.AsyncCommand<Model, Real> {
         await flush();
 
         if (step === null) {
-            // Nothing to do means *nothing*: no resolution, no re-render, and no
+            // Nothing to do means NOTHING: no resolution, no re-render, and no
             // notification — a store that re-emitted here would make every consumer in the
             // app re-read for a traversal that never happened.
             const location = real.harness.router.history.location;
@@ -591,8 +529,6 @@ function noteTraversal(before: Step, step: Step): void {
     }
     if (step.hops.length > 0) note('a traversal landed on a redirect and followed it');
 }
-
-// ---------------------------------------------------------------------------------------
 
 /**
  * The alphabet. Weighted by hand: the traversal verbs and the state seam are what this

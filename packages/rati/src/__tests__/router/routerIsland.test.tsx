@@ -92,8 +92,7 @@ describe('route + islands', () => {
         ]);
 
         // The per-route loading slot is the Suspense fallback while the promise
-        // entry resolves — proof route runs on the island engine (the
-        // old route-loader path had no per-route loading slot).
+        // entry resolves — proof route runs on the island engine.
         expect(screen.getByText('resolving…')).toBeTruthy();
         await act(async () => {
             greeting.resolve('hello');

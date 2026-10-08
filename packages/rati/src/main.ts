@@ -1,8 +1,5 @@
-// Opt-in debug tooling (`navTrace` and friends) lives in the `rati/debug` entry; the
-// MobX bindings (`observableSource`) in `rati/mobx`; the MobX-shaped data primitives
-// (`query` / `collection` / `mutation` / `form`) in `rati/data`; the server-facing
-// SSR surface (`HydrationProvider`, `createHydrationCollector`, `prepareRoute`) in
-// `rati/ssr` — all kept out of the client-focused main barrel.
+// The client-focused main barrel. Debug tooling, the MobX bindings, the data primitives and
+// the SSR surface live in the `rati/debug`, `rati/mobx`, `rati/data` and `rati/ssr` entries.
 
 export { createRouter } from './router/createRouter.js';
 export {

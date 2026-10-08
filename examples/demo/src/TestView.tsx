@@ -39,9 +39,8 @@ class SimpleTextStore {
     }
 }
 
-// A waterfall scope: a `productName` input, then an async `name` load that
-// depends on it, then a plain `first` value, then a `SimpleTextStore`
-// instantiated from the resolved props of the prior levels.
+// A waterfall scope: each `.load` level resolves from the levels before it, a class
+// level included.
 export const complexTestScope = scope({ productName: input<string>() })
     .load({
         name: async (params) => {

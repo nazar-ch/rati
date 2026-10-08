@@ -10,8 +10,8 @@ import { createApp } from './createApp';
 import './styles.css';
 
 // The server serialized the routing snapshot + island data into an inert JSON script
-// tag; readHydration() parses it (null on a client-only boot or a version mismatch —
-// the app then simply resolves from scratch).
+// tag; readHydration() parses it, and returns null on a client-only boot or a version
+// mismatch, where the app resolves from scratch.
 const state = readHydration();
 
 const { App } = createApp({
@@ -22,9 +22,7 @@ const { App } = createApp({
 
 const root = document.getElementById('root')!;
 
-// No payload, no server HTML: this is the CSR shell rati/server falls back to when a
-// render throws (see the /fallback page), or a plain client-only boot. Hydrating an
-// empty root against a tree that renders something is a mismatch React would report and
-// then recover from by doing this anyway — so do this.
+// No payload means no server HTML — the CSR shell rati/server falls back to when a
+// render throws, or a client-only boot — and hydrating an empty root is a mismatch.
 if (state) hydrateRoot(root, <App />);
 else createRoot(root).render(<App />);

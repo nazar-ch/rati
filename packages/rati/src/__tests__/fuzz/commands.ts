@@ -12,26 +12,18 @@ import { flush } from '../../testing/index.js';
 
 /*
     long:2
-    The command alphabet (rati◊MF-02): the events an island actually meets, driven against the real
-    thing and mirrored in the reference model (model.ts). Every command asserts the contract
-    invariants after itself, so fast-check shrinks a violation to a minimal command sequence
-    rather than a whole run.
+    The command alphabet: the events an island meets, driven against the real thing and
+    mirrored in model.ts. Every command asserts the contract after itself, so fast-check shrinks
+    a violation to a minimal command sequence.
 
-    Two conventions the whole file follows:
+      - TARGETS ARE PICKED AT RUN TIME: a command's `pick` nat indexes the model's currently
+        legal targets, since a key generated up front makes most commands inapplicable.
+      - EVERY MUTATION RUNS INSIDE `act`, then one fixed flush: React delivers a Suspense retry a
+        tick after the resolution (packages/rati/src/__tests__/suspense-situations.md). Never
+        poll-until-green.
 
-      - **Targets are picked at run time, not generation time.** A command carries a `pick`
-        nat and indexes into the model's *currently legal* targets; `check` only gates on
-        that list being non-empty. Generating a key up front would make most commands
-        inapplicable and gut the search.
-      - **Every mutation runs inside `act`, followed by one fixed flush.** React delivers a
-        Suspense retry (and the controller's microtask-deferred `pending` notification) a
-        tick after the resolution (packages/rati/src/__tests__/suspense-situations.md, S2).
-        Never poll-until-green: a fixed flush count is what makes a failure mean something.
-
-    The invariants encoded here are slot correctness, no-blank, convergence, identity
-    stability, run-count upper bounds and `pending` agreement (rati◊MF-02). The lifecycle
-    ledger is rati◊MF-03's: its mid-run bounds ride along in `assertContract` (ledger.ts), its
-    balance is the property's teardown.
+    The invariants: slot correctness, no-blank, convergence, identity stability, run-count upper
+    bounds, `pending` agreement, and the lifecycle ledger's mid-run bounds (ledger.ts).
 */
 
 export type Model = ReferenceModel;
@@ -48,7 +40,7 @@ export type Real = {
     spec: ScopeSpec;
 };
 
-/** The invariants that must hold after *every* command. */
+/** The invariants that must hold after EVERY command. */
 async function assertContract(model: Model, real: Real, label: string): Promise<void> {
     await flush();
     const { harness, container } = real;
@@ -57,36 +49,25 @@ async function assertContract(model: Model, real: Real, label: string): Promise<
     // 'ready' during a selective refresh, so a loading flash mid-refresh fails right here.
     expect(readSlot(container), `${label}: slot`).toBe(model.slot());
 
-    // The live frontier agrees exactly: which keys have a producer run outstanding is the
-    // contract's business — one running early, late, or not at all shows up here first.
-    // (Coalescing does not move this: it changes how many runs a key had, not whether it
-    // has one outstanding.)
+    // The live frontier agrees exactly: one run early, late or missing shows up here first.
+    // Coalescing changes how many runs a key had, never whether one is outstanding.
     expect(harness.held(), `${label}: live frontier`).toEqual(model.liveEntries());
 
-    // Superseded runs, on the other hand, only get a *bound*. The model marks one every time
-    // it cascades into a key that already had a run in flight, but the engine is free to
-    // coalesce two dirty marks into a single re-run — which is it being lazier, and the
-    // altitude rule says lazier must stay green. Asserting equality here would count engine
-    // re-runs through the back door (an earlier version did, and generated scopes with two
-    // cascades into one key failed while the engine was right).
+    // Superseded runs only get a BOUND: the engine may coalesce two dirty marks into one
+    // re-run, and the altitude rule keeps a lazier engine green.
     const staleBound = new Set(model.staleKeys());
     for (const key of harness.staleHeld()) {
         expect(staleBound.has(key), `${label}: unpredicted superseded run for ${key}`).toBe(true);
     }
 
-    // 7 — `pending` agreement, read through `useScopeControls` (the public surface).
-    //
-    // The error slot included, since 2026-07-15: a swapped source that errors rather than
-    // readies now settles its swap on the way to the boundary (`sourceErrored`), so the key
-    // leaves `pending` — an error is a settled state, not an in-flight one. What legitimately
-    // *stays* in `pending` there is a promise re-fetch still in flight when some other key
-    // errored the tree: it settles through the controller's own `.then`, boundary or not,
-    // and the model keeps its `inFlight` for exactly as long.
+    // 7 — `pending` agreement through `useScopeControls`, the error slot included: an erroring
+    // swapped source leaves `pending`, and a promise re-fetch in flight when another key errored
+    // the tree STAYS until it settles through the controller.
     expect(harness.pending(), `${label}: pending`).toEqual(model.pending());
 
     // 5 — run-count upper bounds: one run per generation, per direct refresh, and per time
     // a read changed. Never an exact count: an engine that coalesces two dirty marks into
-    // one re-run is *lazier*, which the altitude rule says must stay green.
+    // one re-run is LAZIER, which the altitude rule says must stay green.
     for (const keySpec of allKeys(real.spec)) {
         const runs = harness.runCounts().get(keySpec.key) ?? 0;
         expect(runs, `${label}: run bound for ${keySpec.key}`).toBeLessThanOrEqual(
@@ -96,7 +77,7 @@ async function assertContract(model: Model, real: Real, label: string): Promise<
 
     // 6 — the lifecycle ledger's mid-run half (bounds only; balance is the property's
     // teardown). Runs on every command, since a double attach or a source left feeding a
-    // render is a *transient* state — by teardown the sweep has tidied it away.
+    // render is a TRANSIENT state — by teardown the sweep has tidied it away.
     assertLedgerBounds(harness, model.slot(), label);
 }
 
@@ -109,13 +90,8 @@ const snapshot = (model: Model, real: Real): Snapshot => ({
 
 /**
  * The `.provide()` variant's pairing contract: a key the factory read changed, so the value
- * built over it is stale — it must have disposed and rebuilt. The harness factory reads
- * every key, so any committed change qualifies.
- *
- * Inert in the plain variant (no provided value, an empty log). Gated on the *model's*
- * committed-change counter rather than the rendered values, so a re-fetch the equals gate
- * correctly swallowed asks for nothing — and a first settle asks for nothing either, since
- * the leaf that owns the value only exists once every level is ready.
+ * built over it disposed and rebuilt. Gated on the MODEL's committed-change counter, so a
+ * re-fetch the equals gate swallowed, or a first settle, asks for nothing.
  */
 function assertProvideRebuild(before: Snapshot, model: Model, real: Real, label: string): void {
     if (!real.harness.provideLog().length) return;
@@ -128,14 +104,9 @@ function assertProvideRebuild(before: Snapshot, model: Model, real: Real, label:
 }
 
 /**
- * Indexes into a runtime-computed target list — see the header.
- *
- * `toString` deliberately reports the *generated* pick rather than the key it resolved to.
- * fast-check clones command instances between runs, so a key stashed on `this` during `run`
- * is not necessarily on the instance that gets printed — an early version of this class did
- * exactly that and printed `settle(k0_0)` for a command that had settled `k1_1`. A
- * counterexample that lies about what it did is worse than one that says less; the resolved
- * key is in every assertion message instead, which is where a failure is read anyway.
+ * Indexes into a runtime-computed target list. `toString` reports the GENERATED pick:
+ * fast-check clones commands between runs, so a key stashed on `this` can print the wrong one.
+ * The resolved key rides every assertion message.
  */
 abstract class PickCommand implements fc.AsyncCommand<Model, Real> {
     constructor(private readonly pick: number) {}
@@ -181,7 +152,7 @@ class Settle extends PickCommand {
         });
         await assertContract(model, real, `settle(${key})`);
 
-        // 4 — identity stability: a re-fetch the equals gate rejects keeps the *reference*
+        // 4 — identity stability: a re-fetch the equals gate rejects keeps the REFERENCE
         // the component already had, not just an equal value. Only asserted in the direction
         // the contract promises (an unchanged settle); a changed one is covered by value.
         if (wasRefetch && !changes) {
@@ -211,7 +182,7 @@ class Reject extends PickCommand {
         });
         await assertContract(model, real, `reject(${key})`);
 
-        // A failed *promise re-fetch* keeps the previous value and only logs — the island
+        // A failed PROMISE RE-FETCH keeps the previous value and only logs — the island
         // must not fall over because a refresh failed.
         if (wasRefetch && model.slot() === 'content') {
             expect(
@@ -223,18 +194,9 @@ class Reject extends PickCommand {
 }
 
 /**
- * Fire a superseded producer run — the refresh token guard's tripwire.
- *
- * Targets come from the *harness* rather than the model, because the model only bounds how
- * many runs got superseded (see `assertContract`): it gates on the model predicting at least
- * one, then fires whatever actually exists.
- *
- * It prefers a key that *also* has a run in flight, because that is the case the token guard
- * exists for — a refresh superseded by a later refresh of the same key, where the loser's
- * settle would otherwise overwrite the winner. A run superseded by a remount is inert for a
- * duller reason (its whole tree is gone), and those dominate the frontier: with a uniform
- * pick, dropping the guard from `settled()` left this property green at 500 runs, and only
- * a refresh-heavy alphabet caught it. Remount leftovers stay reachable as the fallback.
+ * Fires a superseded producer run, the refresh token guard's tripwire. Targets come from the
+ * HARNESS, since the model only bounds superseded runs. A key ALSO in flight is preferred —
+ * the guard's own case, a later refresh of the same key — over a remount's leftovers.
  */
 class SettleStale implements fc.AsyncCommand<Model, Real> {
     constructor(private readonly pick: number) {}
@@ -325,7 +287,7 @@ class SourceRestore extends PickCommand {
             real.harness.sourceRestore(key);
         });
         await assertContract(model, real, `sourceRestore(${key})`);
-        // Pin #12's contract: recovery without producer re-runs.
+        // Recovery without producer re-runs.
         expect(real.harness.totalRuns(), `sourceRestore(${key}): no producer re-ran`).toBe(
             runsBefore,
         );
@@ -364,7 +326,7 @@ class SourceBump extends PickCommand {
             real.harness.sourceEmit(key);
         });
         await assertContract(model, real, `sourceBump(${key})`);
-        // A source is a cascade *origin*, not just a target: its new value must reach the
+        // A source is a cascade ORIGIN, not just a target: its new value must reach the
         // loads that read it, and it must do so without ever dropping the content.
         expect(readSlot(real.container), `sourceBump(${key}): content stays up`).toBe('content');
     }
@@ -385,9 +347,8 @@ class Refresh extends PickCommand {
         });
         await assertContract(model, real, `refresh(${key})`);
 
-        // 2 — the no-blank promise, named explicitly: a selective refresh never drops the
-        // content that was on screen (kill #4's tripwire — defeat stale-while-refetch and
-        // this is what goes red).
+        // 2 — the no-blank promise: a selective refresh never drops the content on screen, the
+        // tripwire for a defeated stale-while-refetch.
         expect(readSlot(real.container), `refresh(${key}): content stays up`).toBe('content');
     }
 }
@@ -432,15 +393,9 @@ class ChangeInput implements fc.AsyncCommand<Model, Real> {
 }
 
 /**
- * Refresh a key whose re-fetch is *already* in flight — the superseded-refresh race, and the
- * only thing the refresh token guard exists for (strategy-doc pin #1: "refresh(key) twice in
- * flight; the older settle must be discarded" — the race-guard invariant all three legacy
- * generations carried, and the one this suite is meant to make searchable).
- *
- * A first-class command rather than a coincidence: reaching it through two plain `refresh`
- * commands needs both to pick the same key by chance, and with the guard removed from
- * `settled()` that left the property catching the break only about half the time. Targeted,
- * it is reliable.
+ * Refreshes a key whose re-fetch is ALREADY in flight — the superseded-refresh race the token
+ * guard exists for, where the older settle is discarded. A command of its own, since two plain
+ * `refresh` commands reach it only when both pick one key by chance.
  */
 class RefreshInFlight extends Refresh {
     protected override get verb() {

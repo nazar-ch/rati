@@ -9,16 +9,9 @@ import { createTestRouter, deferred, flush, cleanup } from '../../testing/index.
 afterEach(cleanup);
 
 /*
-    A route that keeps its previous run across a navigation — `keepStale`, or
-    `loadingDelayMs` for the length of its window. The case those options exist for, and the
-    one that needs the Router's help.
-
-    The Router keys a route's element by a per-navigation counter, so every navigation
-    remounts the component. For an island that keeps a run that is fatal: what it keeps lives
-    on the island instance, and a remounted island has no previous run to keep. So the
-    mandala carries the flag (`keepsRun`) and the Router keys those by route name instead —
-    which still remounts across routes, and lets a same-route param change reach the
-    mandala's own param-change path. These pins hold both halves of that, for both options.
+    A route keeping its previous run across a navigation — `keepStale`, or `loadingDelayMs` for
+    its window. The Router keys such a route by name rather than per navigation, so a same-route
+    param change reaches the mandala's own path, and a route change still remounts.
 */
 
 const DELAY = 200;

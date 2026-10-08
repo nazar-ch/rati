@@ -116,7 +116,7 @@ describe('controllableSource — state machine', () => {
         const seen = snapshots(source);
         source.emit();
         const snap = source.getSnapshot();
-        // A new state object (uSES re-renders) wrapping the *same* value (equals-gate holds).
+        // A new state object (uSES re-renders) wrapping the SAME value (equals-gate holds).
         expect(seen).toHaveLength(1);
         if (snap.status === 'ready') expect(snap.value).toBe(readyValue);
     });

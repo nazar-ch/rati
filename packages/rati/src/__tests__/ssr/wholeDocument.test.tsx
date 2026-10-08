@@ -19,19 +19,13 @@ import { HYDRATION_SCRIPT_ID, readHydration, serializeHydration } from '../../ss
 import { renderToHtml } from '../../ssr/renderToHtml.js';
 
 /*
-    The whole-document pattern end to end — the one docs/current/public/ssr.md describes but no
-    suite walked: React renders `<html>` itself, `headTags` and the payload script splice
-    into the rendered string *outside* the React tree, and the client hydrates `document`.
-    The seam being pinned is that last part: React must neither reconcile nor duplicate
-    the spliced tags, and the payload must still reach the islands.
-
-    Then the same pattern's failure path (SSR-12): a render that throws has no document to
-    splice into, so the handler synthesizes one from the assets and the client boots it
-    with `createRoot(document)` — the mount the last two describes below cover, one as the
-    real walk and one as a canary on React itself.
-
-    The other pattern (a template with `#root`) is covered by ssr/html.test.ts and the
-    router's hydration suite; this file is only the document-as-root half.
+    long:2
+    The whole-document pattern of docs/current/public/ssr.md end to end: React renders `<html>`,
+    `headTags` and the payload splice in OUTSIDE the React tree, and the client hydrates
+    `document` without reconciling or duplicating the spliced tags. Then its failure path: a
+    throwing render gets a document synthesized from the assets, which the client boots with
+    `createRoot(document)` — the last two describes, one a real walk and one a canary on React.
+    The template pattern is ssr/html.test.ts's and the router hydration suite's.
 */
 
 // spliceDocument reports who is assembling so a refusal can name the fix; no refusal is
@@ -44,10 +38,8 @@ const pristineDocumentElement = document.documentElement;
 let mounted: Root | null = null;
 
 afterEach(() => {
-    // Unmount here rather than at the end of each test: a failed assertion would leave
-    // the root attached to `document`, and the next test's mount on that same container
-    // warns about double-rooting — a second, misleading failure stacked on the real one.
-    // The canary below asserts a clean console, so it would be the one to report it.
+    // Unmount here rather than at each test's end: a failed assertion leaves the root on
+    // `document`, and the next mount warns about double-rooting — a misleading second failure.
     mounted?.unmount();
     mounted = null;
     // The tests swap the whole documentElement out; put jsdom's back for everyone else.
@@ -76,7 +68,7 @@ const Page = island({
     loading: () => <div>loading</div>,
 });
 
-/** The app root *is* the document — no shell, no `<script>` in the markup. */
+/** The app root IS the document — no shell, no `<script>` in the markup. */
 function Document({ head, hydration }: { head: HeadStore; hydration: Hydration }) {
     return (
         <HeadProvider store={head}>
@@ -110,17 +102,9 @@ function installDocument(html: string): void {
 }
 
 /**
- * The console.error calls React meant. One message is tolerated, the same artifact the
- * router's hydration suite documents: running react-dom/static and react-dom/client in a
- * single process shares the module-level context between two renderers, which cannot
- * happen where the server and the browser are separate processes.
- *
- * This is the weaker of the two checks each mount below makes, and deliberately not the
- * only one: React reports a *recoverable* error (a mismatch it client-rendered through)
- * to `onRecoverableError`, whose default is `reportGlobalError` — not console.error. In
- * this environment that lands as an unhandled error, which fails nothing. So every mount
- * here passes its own `onRecoverableError` and asserts it never fired; the console is
- * only what's left.
+ * The console.error calls React meant, tolerating the two-renderers-in-one-process artifact
+ * the router hydration suite documents. The weaker check: React reports a RECOVERABLE error
+ * to `onRecoverableError`, so every mount passes its own and asserts it never fired.
  */
 function reactErrors(calls: unknown[][]): unknown[][] {
     return calls.filter((args) => !String(args[0]).includes('multiple renderers concurrently'));
@@ -130,7 +114,7 @@ describe('the whole-document pattern', () => {
     test('prerender → splice → hydrate document: head reads back, payload round-trips', async () => {
         loads = 0;
 
-        // ----- Server -----
+        // Server.
         const head = newHeadStore();
         const collector = createHydrationCollector();
         const rendered = await renderToHtml(
@@ -152,7 +136,7 @@ describe('the whole-document pattern', () => {
             assembler,
         );
 
-        // ----- The wire -----
+        // The wire.
         installDocument(html);
 
         // The read-back reached the document React rendered, through the splice.
@@ -164,7 +148,7 @@ describe('the whole-document pattern', () => {
         ).toBe('a walk in the karst');
         expect(document.querySelector('article')?.textContent).toBe('Torcal');
 
-        // ----- Client -----
+        // Client.
         const error = vi.spyOn(console, 'error').mockImplementation(() => {});
         const recovered = vi.fn();
         const state = readHydration();
@@ -202,7 +186,7 @@ describe('the whole-document pattern', () => {
 
 describe('the CSR fallback', () => {
     test('throw → a synthesized document → the client boots it from scratch', async () => {
-        // ----- Server: the real handler, on its error path -----
+        // Server: the real handler, on its error path.
         const handler = createRequestHandler({
             // An error outside every island — a wrapper, the shell — is what rejects
             // `render`; a failing load never reaches here.
@@ -219,13 +203,13 @@ describe('the CSR fallback', () => {
 
         expect(response.status).toBe(500);
 
-        // ----- The wire -----
+        // The wire.
         installDocument(await response.text());
         // No payload is what makes the client resolve rather than hydrate — there is no
         // server render to reuse, and claiming otherwise is the mismatch this avoids.
         expect(readHydration()).toBeNull();
 
-        // ----- Client: no payload → createRoot(document), not hydrateRoot -----
+        // Client: no payload → createRoot(document), not hydrateRoot.
         loads = 0;
         const error = vi.spyOn(console, 'error').mockImplementation(() => {});
         const recovered = vi.fn();
@@ -242,7 +226,7 @@ describe('the CSR fallback', () => {
         // The entry that is running this render survived the mount that it started.
         expect(document.querySelector('script[src="/assets/entry-a1b2.js"]')).not.toBeNull();
         // The point of the client entry's branch (docs/current/public/ssr.md): hydrating
-        // this document instead would reach the same page *through* recovery, and tell the
+        // this document instead would reach the same page THROUGH recovery, and tell the
         // reader's console about it on every fallback.
         expect(recovered).not.toHaveBeenCalled();
         expect(reactErrors(error.mock.calls)).toEqual([]);
@@ -250,10 +234,9 @@ describe('the CSR fallback', () => {
 });
 
 /*
-    The canary for `createRoot(document)`, which the fallback above rests on and react.dev
-    does not document (rati◊SSR-12): a React release that narrows the container must fail here,
-    never in a consumer's 500 path. If it goes red, docs/current/public/ssr.md names the
-    escape hatch.
+    The canary for `createRoot(document)`, which the fallback above rests on and react.dev does
+    not document: a React release narrowing the container fails here, never in a consumer's 500
+    path. docs/current/public/ssr.md names the escape hatch.
 */
 describe('createRoot(document) — the React contract the fallback rests on', () => {
     test('renders a synthesized minimal document into a working page', async () => {
@@ -287,8 +270,7 @@ describe('createRoot(document) — the React contract the fallback rests on', ()
         // holds exactly those, so the mount cannot orphan the entry running it.
         expect(document.querySelector('script[src="/assets/entry-a1b2.js"]')).not.toBeNull();
         expect(document.querySelector('link[href="/assets/index-c3d4.css"]')).not.toBeNull();
-        // A first-class client render, not one React forgave: this is what separates the
-        // shipped shape from the one SSR-12 was filed with. See `recovered` above.
+        // A first-class client render, not one React forgave. See `recovered` above.
         expect(recovered).not.toHaveBeenCalled();
         expect(reactErrors(error.mock.calls)).toEqual([]);
     });

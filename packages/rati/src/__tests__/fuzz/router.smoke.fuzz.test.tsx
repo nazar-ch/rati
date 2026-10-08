@@ -22,30 +22,19 @@ import {
 import { RouterModel, type Step } from './routerModel.js';
 
 /*
-    long:2
-    The smoke property (rati◊RF-02): a generated route table mounts, a generated sequence of
-    navigate/replace calls runs against it, and at every step the Router shows exactly what
-    the reference model says — the route (name + decoded params), the URL bar, the router's
-    own path/search/hash/state, the redirect trail, and whether the route remounted.
-
-    Traversal is not here: back/forward over the entry stack is the command property's
-    alphabet (rati◊RF-03), on the same model. Route components are plain — data resolution
-    under navigation is the mandala suite's ground.
-
-    Every assert reads the contract (rati◊RF-03): the rendered route, `history.location`, the
-    public getters, remount discipline through mount effects. Never `pathCounter`, the skip
-    marker, or a listener count.
+    The router's smoke property: a generated table meets a generated sequence of
+    navigate/replace calls, and at every step the Router shows what the model says — the route,
+    the URL bar, the getters, the redirect trail, the remount. Traversal is the command
+    property's.
 */
 
 afterEach(cleanup);
 afterEach(() => vi.restoreAllMocks());
 
 /**
- * A generated table always carries a redirect cycle, and reaching it is a *pass* — the store
- * reports the loop it refused to keep following. The log sorts those from everything else
- * rather than silencing the channel: a React warning about this harness is a finding, and a
- * blanket no-op would eat it. Shared with the command property (routerAsserts.ts), which
- * must hold the router to the same bar.
+ * A generated table always carries a redirect cycle, and reaching it is a PASS — the store
+ * reports the loop it refused to follow. The log sorts those from everything else rather than
+ * silencing the channel: a React warning about this harness is a finding.
  */
 let log: ErrorLog;
 beforeEach(() => {
@@ -53,15 +42,9 @@ beforeEach(() => {
 });
 
 /*
-    The non-vacuity gate (jnana's rule, carried from the mandala suite: "a green run that
-    never exercised the machinery is a failure of the harness, not a pass").
-
-    It has already earned its keep twice on this item. The first cut drew a navigation's
-    search/hash independently of its form, which demoted all but ~1 navigation in 18 to a
-    literal URL — so `getPath` was barely called, and the prefix-collision kill needed a 20x
-    budget to land. The first cut also almost never repeated a URL, leaving the *skipped*
-    navigation at ~1% of steps. Both were invisible in a green run; both are counted here
-    now, so the next edit that starves a path says so.
+    The non-vacuity gate: a green run that never exercised the machinery is the harness failing.
+    A starved path — `getPath` barely called, the skipped navigation never reached — is
+    invisible in a green run, so the shapes are counted.
 */
 const exercised: Record<string, number> = {};
 const note = (what: string) => {
@@ -86,7 +69,7 @@ function noteWhatHappened(step: Step, nav: Nav) {
         if (Object.values(step.rendered.params).some(isHostile)) {
             note('a URL-hostile param value round-tripped');
         }
-        // The live half of the dot rule: a value *containing* dots is ordinary and must
+        // The live half of the dot rule: a value CONTAINING dots is ordinary and must
         // survive untouched. (A value that is only dots has no URL at all — see the pool.)
         if (Object.values(step.rendered.params).some((value) => value.includes('.'))) {
             note('a param value carrying dots round-tripped');
@@ -136,7 +119,7 @@ describe('router fuzz — smoke (navigation over generated route tables)', () =>
 
                         // The catch-all: nothing above left a stale route on screen. Every step
                         // was checked, so this restates the end state as one fact — the Router
-                        // is showing what the *current* URL resolves to.
+                        // is showing what the CURRENT URL resolves to.
                         assertRenderedState(harness, model.current(), 'final');
                     } finally {
                         harness.dispose();

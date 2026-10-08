@@ -5,8 +5,6 @@ import type { RetryOption } from '../mandala/retryPolicy.js';
 import type { Scope, ScopeComponent, ScopeProvidesOf } from '../scope/scope.js';
 import type { TupleToUnion } from '../types/generic.js';
 
-//--------------------------------------------
-
 // Sources:
 // https://twitter.com/danvdk/status/1301707026507198464
 // https://ja.nsommer.dk/articles/type-checked-url-router.html#d (with validation)
@@ -21,21 +19,16 @@ export type ExtractRouteParams<T extends string> = string extends T
         ? { [k in Param]: string }
         : {};
 
-// -------------------------------------------------------------
-
 export interface RatiUserTypes {
-    // routes: GenericRouteType[];
+    // An app augments `routes: typeof routes` here.
 }
 
 export type UserRoutes = RatiUserTypes extends { routes: infer R } ? R : never;
 
 /**
- * The context value the route registered under `Name` provides, read off the routes
- * tuple by the route's `scope` (its `.provide()` value, else its resolved props). The
- * context type comes from the route definitions themselves — the same
- * `RatiUserTypes['routes']` source `Link`'s `to` reads, no separate registration.
- * `unknown` when that route has no scope (so no context to read). This is what
- * `useRouteContext(name)` returns.
+ * The context value the route registered under `Name` provides, read off the routes tuple
+ * by its `scope` — the `.provide()` value, else its resolved props; `unknown` for a route
+ * without one. What `useRouteContext(name)` returns, with no separate registration.
  */
 export type RouteContextValueOf<Routes extends readonly GenericRouteType[], Name extends string> =
     Extract<Routes[number], { name: Name }> extends { scope: infer S }
@@ -57,19 +50,14 @@ export type RouteContextNames<Routes extends readonly GenericRouteType[]> = {
         : never;
 }[number];
 
-// -------------------------------------------------------------
-
 /**
  * Where a path's `:param` tokens are: a name runs from `:` to the next `/` or the end,
- * captured alongside that terminator. {@link buildPathRe} compiles these into the
- * matcher's named groups and `RouterStore.getPath` substitutes at the very same
- * boundaries — sharing the pattern is what keeps the two from drifting. Scanning for the
- * `:name` substring instead would let `:id` match inside `:idx`.
+ * captured with that terminator. {@link buildPathRe} and `RouterStore.getPath` share it, so
+ * the two never drift, and `:id` never matches inside `:idx`.
  */
 export const PARAM_RE = /:(.*?)(\/|$)/g;
 
 function buildPathRe(path: string): RegExp | null {
-    // TODO 2023: allow regexps for the path (manually type params in this case)
     const pathReCore = path.replace(PARAM_RE, '(?<$1>[^/]+?)$2');
     const pathReString =
         '^' +
@@ -77,7 +65,6 @@ function buildPathRe(path: string): RegExp | null {
         (pathReCore.endsWith('/')
             ? '$'
             : // Optional slash in the end (match /path & /path/)
-              // TODO 2023: use redirects for this case
               '/{0,1}$');
 
     return path === '*' ? null : new RegExp(pathReString);
@@ -87,24 +74,10 @@ function buildPathRe(path: string): RegExp | null {
 export type RedirectTarget = { name: string } & Record<string, string>;
 
 /**
- * A route-level internal redirect. The client router follows it like a `<Navigate>`
- * (history `replace`, no back-stack entry); on the server `prepareRoute` reports it so
- * the response can be a real 30x before anything renders. External URLs don't belong
- * here — redirect those at the HTTP layer.
- *
- * An object target resolves through the route table and keeps the current search and
- * hash (the alias-route expectation); a string target is an absolute path used verbatim —
- * so under a `basename` it must include it (`to: '/admin/b'`, not `to: '/b'`): write what
- * the URL bar should say, which is the same rule `getPath` follows for a string and the
- * only way a target outside the app's own mount point stays expressible. A relative string
- * — or one the URL parser reads as carrying an authority (`//host`), which on the server
- * would ride into the `Location` header as an open redirect — is refused where the
- * redirect is followed (the router resolves nothing — see `assertAbsolutePathTarget` in
- * `RouterStore`). A function receives the matched params —
- * the legacy-path shape (`/old/:id` → `/new/:id`); the rule reads its return.
- *
- * A target that resolves back to the route declaring it is a redirect loop: it is reported
- * and the route's component renders, rather than being followed (see `RouterStore.setPath`).
+ * A route-level internal redirect: the client `replace`s, and `prepareRoute` reports a
+ * server 30x before anything renders. An object target resolves through the route table,
+ * keeping search and hash; a string is an absolute path, basename included; a function
+ * receives the matched params.
  */
 export type RouteRedirect<Path extends string = string> = {
     to: string | RedirectTarget | ((params: ExtractRouteParams<Path>) => string | RedirectTarget);
@@ -114,21 +87,14 @@ export type RouteRedirect<Path extends string = string> = {
 
 export type RouteOptions<TScope extends Scope<any> | undefined, Path extends string = string> = {
     /**
-     * Data the route resolves before the component renders. When present, `route`
-     * folds it together with the component into a mandala (see below), so resolution
-     * runs on the source-based mandala engine — loading/error slots, attach-on-build /
-     * detach-on-navigate, SSR via Suspense (and promise dehydration). The component
-     * receives the resolved props.
-     *
-     * A scope value, exactly like `island`'s `scope` — a load reads its own deps via
-     * `hook(() => use(SomeContext))`, so there's no env to thread.
+     * Data the route resolves before the component renders, the same scope value `island`
+     * takes; `route` folds it with the component into a mandala, and the component receives
+     * the resolved props.
      */
     scope?: TScope extends Scope<any> ? TScope : undefined;
     /**
-     * Route-level wrapper rendered around the component. It is handed the route's
-     * element as `children` — always, which is why `children` is required here: a
-     * wrapper that ignores them still fits, and one that declares what it receives no
-     * longer has to lie to.
+     * Route-level wrapper rendered around the component, handed the route's element as
+     * `children` — always, which is why `children` is required.
      */
     wrapper?: ComponentType<{ children: ReactNode }> | undefined;
     /**
@@ -143,10 +109,9 @@ export type RouteOptions<TScope extends Scope<any> | undefined, Path extends str
      */
     error?: TScope extends Scope<any> ? MandalaConfig<TScope>['error'] : undefined;
     /**
-     * Resolve this route's scope during a server render? Default `true`. `false` ships the
-     * `loading` slot in the HTML and resolves on the client after hydration — the mandala's
-     * `ssr` option (see `island`), for a page that shouldn't gate TTFB. Only meaningful
-     * alongside `scope`.
+     * Resolve this route's scope during a server render? Default `true`; `false` ships the
+     * `loading` slot and resolves after hydration — the mandala's `ssr` (see `island`). Only
+     * meaningful alongside `scope`.
      */
     ssr?: TScope extends Scope<any> ? boolean : undefined;
     /**
@@ -163,20 +128,15 @@ export type RouteOptions<TScope extends Scope<any> | undefined, Path extends str
      */
     loadingDelayMs?: TScope extends Scope<any> ? number : undefined;
     /**
-     * The automatic retry policy — the mandala's `retry` option (see `island`), on by
-     * default: a failure the app classified `retryable: true` earns a couple more attempts
-     * with a jittered backoff. `{ count, backoffMs? }` asks for more (and reaches an
-     * unclassified failure too), `false` opts out. The page shows its `loading` slot while
-     * the policy works, and the `error` slot only once the budget is spent. Only meaningful
-     * alongside `scope`.
+     * The automatic retry policy, the mandala's `retry` (see `island`): on by default for a
+     * failure classified `retryable: true`; `{ count, backoffMs? }` asks for more, `false`
+     * opts out. Only meaningful alongside `scope`.
      */
     retry?: TScope extends Scope<any> ? MandalaConfig<TScope>['retry'] : undefined;
     /**
-     * What a server render does with a load that failed: `'retry'` (the default) ships the
-     * `loading` slot and lets the client re-run it, `'dehydrate'` renders the `error` slot
-     * into the HTML and carries the failure over — the mandala's `ssrErrors` (see
-     * `island`). The response status is the same either way. Only meaningful alongside
-     * `scope`.
+     * What a server render does with a failed load: `'retry'` (default) ships the `loading`
+     * slot, `'dehydrate'` the `error` slot — the mandala's `ssrErrors` (see `island`). Only
+     * meaningful alongside `scope`.
      */
     ssrErrors?: TScope extends Scope<any> ? MandalaConfig<TScope>['ssrErrors'] : undefined;
     /**
@@ -198,13 +158,9 @@ type MissingRouteParams<Missing extends PropertyKey> = {
 };
 
 /*
-    Validates the (inferred) route component, intersected onto its type so the
-    argument must satisfy it. With a `scope`, the component is checked against the
-    scope. Otherwise it's checked by param *name*: its required props must all be
-    path params. Values are intentionally not pinned to the path's plain `string`
-    — a component (typically an island) brands a URL segment via
-    `input<Base64Uuid>()`, so a branded prop like `pageId: Base64Uuid` is
-    accepted by name.
+    Validates the inferred route component, intersected onto its type: against the scope
+    when there is one, else by param NAME — its required props must all be path params.
+    Values stay unpinned, so a branded prop (`pageId: Base64Uuid`) is accepted.
 */
 type RouteComponentGuard<Path extends string, TScope extends Scope<any> | undefined, Component> = [
     TScope,
@@ -217,10 +173,9 @@ type RouteComponentGuard<Path extends string, TScope extends Scope<any> | undefi
       : unknown;
 
 /**
- * Fold a scope + component (+ slots) into the route's renderable mandala (labelled `Route`
- * for DevTools / read errors). Shared by `route` and `group`: `route` builds it eagerly
- * from its options; `group` rebuilds it when a group default supplies a `loading`/`error`
- * slot the route itself didn't declare, merging child-over-group.
+ * Folds a scope, component and slots into the route's mandala, labelled `Route`. `route`
+ * builds it eagerly; `group` rebuilds it when a group default supplies a `loading`/`error`
+ * slot the route lacks, child over group.
  */
 export function buildRouteComponent(
     component: ComponentType<any>,
@@ -271,27 +226,10 @@ export type RouteFoldInputs = {
 };
 
 /**
- * The URL-bound sibling of `island`: both build a mandala (rati's core renderable unit
- * — a scope bound to a component with loading/error), `route` specialized to a location.
- * Its data inputs (`scope`, `loading`, `error`) are the mandala's and behave identically;
- * a route adds the route bits (path, name, wrapper) and feeds the path-matched params in
- * as the mandala's props.
+ * The URL-bound sibling of `island`: folds `options.scope` with the component into a
+ * mandala fed the path params. Without a scope, the component renders with the params.
  *
- * When `options.scope` is given, the component + scope (+ `loading`, `error`) are folded
- * into a mandala and stored as the route's component, so resolution goes through the
- * source-based mandala engine — the RouterOutlet renders that component directly, handing it the
- * route params. So a route declares its data inline, no separate `island` module needed:
- *
- *     route('/spaces/:spaceId/pages/:pageId', 'page', PageBody, {
- *         scope: pageScope,
- *         loading: PageLoading,
- *         error: PageError,
- *     })
- *
- * A component built with `island` up front also works as-is with no `scope` — it is
- * already a mandala whose props are its scope's inputs, so the path params feed it
- * directly: `route('/spaces/:spaceId/pages/:pageId', 'page', PageIsland)`. A plain
- * component with no `scope` is rendered directly with the route params.
+ *     route('/pages/:pageId', 'page', PageBody, { scope: pageScope })
  */
 export function route<
     Path extends string,
@@ -306,10 +244,8 @@ export function route<
 ) {
     const scopeOption = options.scope;
 
-    // A route is a mandala coupled to a location. A supplied scope is folded with the
-    // component into a mandala (params arrive from the URL match; the mandala owns
-    // loading/error and source attach/detach across navigation). The fold inputs are kept
-    // in `foldInputs` so a wrapping `group` can re-fold with its shared slots.
+    // A supplied scope folds with the component into a mandala; `foldInputs` keeps the fold's
+    // inputs so a wrapping `group` can re-fold with its shared slots.
     const routeComponent =
         scopeOption !== undefined
             ? buildRouteComponent(component as ComponentType<any>, {

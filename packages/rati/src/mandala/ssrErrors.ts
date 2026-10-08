@@ -1,23 +1,9 @@
 import { asSourceError, type SourceError } from '../scope/source.js';
 
 /*
-    `ssrErrors: 'dehydrate'` — the server's half.
-
-    React runs no error boundary during a server render. A rejected load therefore reaches
-    nobody: `use()` throws, React abandons the Suspense boundary, emits the *loading* slot
-    with its client-retry marker, and the client re-runs the load. That is the default and
-    it is self-healing — but it is not deterministic, and an island that wants its error
-    slot in the HTML has to be met where the throw happens instead: in the resolver.
-
-    So the Step waits on a promise that *cannot* reject. The guard hands back a twin whose
-    rejection settles into a marker value, which the resolve pass recognizes and turns into
-    the island's error slot. Nothing else changes: the original promise still rejects, still
-    carries the rejection handler that records it for the status derivation, and the wire
-    section is filled from there.
-
-    The twins are keyed by the promise rather than kept on the cell, because `use()` needs
-    one identity across the level's resume and a *hook* load has no cached cell to hold one
-    — it re-classifies its result on every render.
+    `ssrErrors: 'dehydrate'` — the server's half: the Step waits on a rejection-proof twin,
+    keyed by promise, so a failed load becomes the island's error slot in the HTML. The design
+    is docs/current/internals.md.
 */
 
 /** A load's rejection, in the shape a resolved promise can carry. */

@@ -2,7 +2,7 @@ import { describe, test, expect, afterEach } from 'vite-plus/test';
 
 import { act, createContext, StrictMode, useContext, type FC } from 'react';
 
-// RTL is kept for the two mounts that are *not* a single island (a bare reader with no
+// RTL is kept for the two mounts that are NOT a single island (a bare reader with no
 // island above; two sibling islands sharing a scope) — renderIsland covers everything else.
 import { render, screen, cleanup as rtlCleanup } from '@testing-library/react';
 
@@ -454,11 +454,9 @@ describe('island', () => {
         expect(handle.text()).toBe('props a1');
     });
 
-    // StrictMode mounts, tears down, then remounts on the initial commit. Each
-    // remount builds a *fresh* run (new sources, new context). These tests pin that
-    // the subtree ends up reading the surviving run's identities — never a value
-    // from the discarded first run — and that the discarded context is disposed
-    // while its own source is still attached.
+    // StrictMode mounts, tears down and remounts on the initial commit, each remount a
+    // FRESH run. These pin that the subtree reads the surviving run's identities, and that
+    // the discarded context disposes while its own source is still attached.
 
     // A source ready immediately, tagged with a per-build identity so run #1 and run #2
     // are distinguishable, logging attach/detach so teardown is observable.
@@ -474,7 +472,7 @@ describe('island', () => {
         };
     }
 
-    // These pin StrictMode's discard-remount specifically, which needs a *synchronous* mount
+    // These pin StrictMode's discard-remount specifically, which needs a SYNCHRONOUS mount
     // (renderIsland mounts under an async act, and React skips the remount there — see its
     // docs). So they stay on a bare RTL render, driving the controllableSource-backed factory.
 
@@ -564,11 +562,9 @@ describe('island', () => {
     });
 
     test('islands sharing a scope each provide their own value; a by-scope reader gets the nearest', async () => {
-        // The reuse case: two distinct islands built from the *same* scope. They share
-        // one value channel (scope identity), but each renders its own Provider subtree,
-        // so a by-scope reader under each gets that island's value — nearest wins, no
-        // cross-talk. Two islands in one tree isn't a single-island mount, so this stays
-        // on a bare RTL render.
+        // Two islands built from the SAME scope share one value channel, but each renders its
+        // own Provider subtree, so a by-scope reader gets the nearest island's value. Not a
+        // single-island mount, so a bare RTL render.
         const sharedScope = scope({ id: input<string>() }).provide(({ id }) => ({ tag: `#${id}` }));
         const First = island({
             scope: sharedScope,

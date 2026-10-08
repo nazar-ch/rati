@@ -1,26 +1,20 @@
 // scripts/ci.ts — the release ritual: the two checks the kit's standard battery does NOT run
-// (`yarn ci`, or `node scripts/ci.ts` directly — Node 26 runs TS as-is). Every stage runs even when
-// an earlier one fails; the summary names the failures and the exit code is theirs.
+// (`yarn ci`, or `node scripts/ci.ts` directly). Every stage runs even when an earlier one fails;
+// the summary names the failures and the exit code is theirs.
 //
 //   node scripts/ci.ts                        # both stages
 //   node scripts/ci.ts build                  # one, by name
 //   FUZZ_RUNS=<n> node scripts/ci.ts fuzz     # deepen the randomized stage
 //   FUZZ_SEED=<n> node scripts/ci.ts fuzz     # pin the seed (reproduce a failure)
 //
-// THIS IS NOT THE PRE-PUSH GATE (kit◊KC-13): `.claude/kit.json`'s `verify` names the kit's
-// standard battery, which runs fmt, lint, typecheck, the Markdown and doc-link gates, the
-// control-byte scan, the `@jnana-app/kit` conformance checks and the full Vitest suite. No stage
-// list lives here or in the manifest: two hand-written lists that "move together" is the coupling
-// the battery exists to delete.
+// THIS IS NOT THE PRE-PUSH GATE — that is bare `verify.ts`, the kit's standard battery. These are
+// the two checks no push pays for, run before a release or after a change to the mandala engine or
+// the packaging:
 //
-// What is left is the two things a gate must not pay for on every push, run before a release or
-// when you touch the mandala engine or the packaging:
-//
-//   - `fuzz` re-runs only the randomized suites at a raised budget. The battery's `test` step runs
-//     the same suites at their deliberately tiny default budget, which is seconds, and an unpinned
-//     default-budget green is weak evidence for the fuzz invariants (rati◊MF-04).
-//   - `build` produces the library bundle + d.ts and both example apps. Nothing type-checks the
-//     emit, and a bundle that fails to build is a release-time fact, not a per-push one.
+//   - `fuzz` re-runs only the randomized suites at a raised budget: the battery's `test` step runs
+//     them at a tiny default budget, which is weak evidence for the fuzz invariants.
+//   - `build` produces the library bundle + d.ts and both example apps, a release-time fact rather
+//     than a per-push one.
 
 import path from 'node:path';
 import process from 'node:process';
@@ -30,8 +24,7 @@ import { $ } from 'zx';
 import type { ProcessPromise } from 'zx';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-// `vp` lives in the workspace bin — a bare shell (cron, a future CI job) won't have it. Bracket
-// access throughout: `process.env` is an index signature, and this file is in a tsc program now.
+// `vp` lives in the workspace bin, which a bare shell's PATH lacks.
 process.env['PATH'] = `${path.join(root, 'node_modules', '.bin')}:${process.env['PATH']}`;
 
 // Live output (a gate you watch), aggregated exits (a gate that always finishes).
@@ -78,8 +71,7 @@ const unknown = requested.filter((name) => !byName.has(name));
 if (unknown.length) {
     console.error(
         `unknown stage(s): ${unknown.join(', ')} (want: ${stages.map((stage) => stage.name).join(' | ')}).\n` +
-            `The pre-push gate moved to the kit's standard battery — .claude/kit.json's \`verify\` ` +
-            `names it, and it carries every stage this file used to.`,
+            `The pre-push gate is bare \`verify.ts\`, the kit's standard battery.`,
     );
     process.exit(2);
 }

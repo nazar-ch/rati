@@ -1,18 +1,14 @@
 {
     // rati's library source: platform-neutral (browser, worker, or Node under SSR), bundler-resolved
-    // and built by vite — the kit's `lib` profile exactly. Strictness, `bundler` resolution and the
-    // no-emit default are its now; only what is genuinely rati's stays below.
+    // and built by vite — the kit's `lib` profile.
     "extends": "@jnana-app/kit/tsconfig/lib.json",
     "compilerOptions": {
-        // `ESNext`, against the profile's engine-floor `lib` list: `Symbol.dispose` / `Disposable`
-        // (explicit resource management) live in `ESNext.Disposable`, which the floor does not
-        // carry, and the experimental island disposal contract uses them. Narrowing rati to the
-        // floor is a support-baseline decision this repo has not taken.
+        // `ESNext` over the profile's engine floor, which lacks `ESNext.Disposable`: the island
+        // disposal contract uses `Symbol.dispose`. Narrowing to the floor is a support-baseline
+        // decision.
         "lib": ["ESNext", "DOM", "DOM.Iterable"],
-        // The profile is platform-neutral (`types: []`); this program is not. `node`: the
-        // `rati/vite` plugin runs in the Vite process and reads the app's template off disk. It
-        // buys Node globals for the whole src program, which the browser side has no use for —
-        // tolerated because the alternative is a second program for one directory.
+        // `node` for the `rati/vite` plugin, which runs in the Vite process. It reaches the whole src
+        // program, because the alternative is a second program for one directory.
         "types": ["vite-plus/client", "node"],
         // React components live in this program; the platform-neutral profile carries no JSX.
         "jsx": "react-jsx",

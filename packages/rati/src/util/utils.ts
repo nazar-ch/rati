@@ -57,6 +57,7 @@ export function deepMergeReplaceArrays<T>(target: T, ...sources: Array<Partial<T
     return out as T;
 }
 
+// long:3
 // Based on @sindresorhus/is
 // MIT License
 // Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
@@ -72,11 +73,9 @@ export const is = {
             typeof (value as { catch?: unknown })?.catch === 'function'),
     function: (value: unknown): value is (...args: unknown[]) => unknown =>
         typeof value === 'function',
-    // A minifier drops the class name, so the source a production build stringifies is
-    // `class{…}` — no space after the keyword, which a `startsWith('class ')` check reads
-    // as "not a class" and then calls without `new`. Hence the `{` alternative. Upstream
-    // fixed the same hole in @sindresorhus/is 7.1.1 ("Fix `is.class` for minified class
-    // expression", #217) with `/^class(?:\s+|\{)/`.
+    // A minified class stringifies as `class{…}`, with no space after the keyword, hence the
+    // `{` alternative — upstream's fix in @sindresorhus/is 7.1.1 ("Fix `is.class` for
+    // minified class expression", #217).
     class: (value: unknown): value is new (...args: unknown[]) => unknown =>
         typeof value === 'function' && /^class[\s{]/.test(Function.prototype.toString.call(value)),
 };

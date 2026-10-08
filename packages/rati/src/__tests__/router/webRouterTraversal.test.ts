@@ -4,12 +4,9 @@ import { createMemoryHistory } from '../../router/history.js';
 import { route } from '../../router/route.js';
 import { RouterStore } from '../../router/store.js';
 
-// Arrival at an entry that already exists — the half of setPath the push-side suites
-// never reach. Each pin's kill is named at the test and was executed once, red, then
-// reverted. A memory history is deliberate: it owns its stack, so `back`/`forward`
-// restore the entry's own state and key and emit POP synchronously (the browser's
-// traversal is queued, and every POP test written before the stack existed had to
-// forge the event, which is what let the scroll-restoration pin rot into a vacuous one).
+// Arrival at an entry that already exists, the half of setPath the push-side suites never
+// reach; each pin names its kill. A memory history owns its stack, so `back`/`forward`
+// restore the entry's own state and key and emit POP synchronously.
 
 const NoopComponent = () => null;
 
@@ -21,10 +18,8 @@ const routes = [
 ] as const;
 
 describe('Router traversal — back()/forward()/go() on the public surface', () => {
-    // The methods are pass-throughs to the history, so the pins hold both hosts: the
-    // memory history (SSR/tests — synchronous POP) and the browser one (queued POP).
-    // Losing either half is how 0.6.2's `router.history.back()` regressed into
-    // `window.history.back()` at a consumer (FND-04).
+    // The methods pass through to the history, so the pins hold both hosts: the memory
+    // history's synchronous POP and the browser's queued one.
 
     test('go(-1)/back()/forward() on a memory history resolve the restored route in place', () => {
         const history = createMemoryHistory({ url: '/' });
@@ -66,9 +61,8 @@ describe('Router traversal — back()/forward()/go() on the public surface', () 
 
 describe('RouterStore across back/forward', () => {
     // Kill: compare the marker against the marker string alone, ignoring the counter
-    // (stamp `{ skip: this.sessionId }` and test for it) — the marker then never goes
-    // stale, the POP is skipped, and this reads 'home': whatever route the traversal
-    // left mounted, stranded on an entry whose URL names another one.
+    // (stamp `{ skip: this.sessionId }` and test for it) → the marker never goes stale,
+    // the POP is skipped, and this reads 'home'.
     test('a POP back onto a shallow entry finds its marker stale and re-resolves', () => {
         const history = createMemoryHistory({ url: '/dashboard' });
         const router = new RouterStore(routes, { history });
@@ -100,11 +94,9 @@ describe('RouterStore across back/forward', () => {
         history.back();
         first.dispose();
 
-        // A restored tab: the entries outlive the store that wrote them, so the next
-        // store reads a marker it did not stamp. The counter half is no defense — this
-        // store replays the same navigation count over the same stack, so it arrives
-        // holding exactly the counter the marker embeds. Only the session id, which a
-        // new store cannot reproduce, says the marker belongs to someone else.
+        // A restored tab: the next store reads a marker it did not stamp, and replays the
+        // same navigation count over the same stack, so the counter matches. Only the
+        // session id, which a new store cannot reproduce, marks the marker foreign.
         const second = new RouterStore(routes, { history });
         expect(second.activeRoute?.name).toBe('dashboard');
 

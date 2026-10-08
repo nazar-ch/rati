@@ -4,19 +4,14 @@ import type { Harness } from './routerHarness.js';
 import type { RouterModel, Step } from './routerModel.js';
 
 /*
-    long:2
-    The invariants both router fuzz properties check, in one place: the smoke property
-    (rati◊RF-02) drives them over forward navigation, the command property (rati◊RF-03) over
-    traversal interleavings, and both hold the router to the one bar.
-
-    Every assert here reads the contract (rati◊RF-03): the rendered route, `history.location`,
-    the public getters, remount discipline through mount effects, the redirect trail. Never
-    `pathCounter`, the skip marker's spelling, or a listener count.
+    The invariants both router fuzz properties check, smoke and command alike. Every assert
+    reads the contract — the rendered route, `history.location`, the public getters, mount
+    effects, the redirect trail — never `pathCounter` or a listener count.
 */
 
 /**
  * The store logs on one path this suite walks on purpose — the redirect loop it refused to
- * follow — and reaching that is a *pass*. Sorted from everything else rather than silenced:
+ * follow — and reaching that is a PASS. Sorted from everything else rather than silenced:
  * a React warning about the harness is a finding, and a blanket no-op would eat it.
  */
 export type ErrorLog = {
@@ -46,13 +41,9 @@ export function installErrorLog(): ErrorLog {
 }
 
 /**
- * The whole observable surface, checked against one model Step.
- *
- * `rendered` arrives as `{ oneOf }` only when a redirect cycle hit the depth guard: which
- * of the cycle's routes is left on screen follows from the cap's parity, and that is not
- * something the router promises (the deterministic pin makes the same call — see
- * `redirect.test.tsx`). What *is* promised, and asserted: following stops, one of the
- * cycle's routes renders, the loop is reported — and the trail is still exact.
+ * The whole observable surface against one model Step. `rendered` is `{ oneOf }` only for a
+ * capped redirect cycle, whose surviving route the router never promises; what IS asserted:
+ * following stops, one of the cycle's routes renders, the loop is reported, the trail is exact.
  */
 export function assertStep(harness: Harness, step: Step, label: string, log: ErrorLog) {
     assertRenderedState(harness, step, label);
@@ -71,15 +62,9 @@ export function assertStep(harness: Harness, step: Step, label: string, log: Err
 }
 
 /**
- * Everything the router is *showing*, as opposed to what the last command *did*.
- *
- * The split is load-bearing for the properties' closing catch-all, which restates the end
- * state after the last command rather than judging a command of its own: `reportedLoop` is
- * scoped to the resolution that raised it (`Step`), and a command that resolved nothing —
- * a traversal with nowhere to go — leaves the model still describing the last one that did
- * while the console log has moved on. Asserting a command-scoped fact out of a state
- * restatement fails on that disagreement rather than on anything the router got wrong; the
- * fuzz run found it by shrinking to `[initial URL is the cycle, go(0)]`.
+ * What the router is SHOWING, as opposed to what the last command DID: the properties' closing
+ * catch-all restates the end state, and `reportedLoop` belongs to the resolution that raised it,
+ * so a command resolving nothing leaves the model describing an earlier one.
  */
 export function assertRenderedState(harness: Harness, step: Step, label: string) {
     const rendered = harness.rendered();
@@ -108,16 +93,9 @@ export function assertRenderedState(harness: Harness, step: Step, label: string)
 }
 
 /**
- * `router.state` — the per-entry state, which the getter documents as "user state attached
- * to the current history entry via `navigate`/`replace` `{ state }`, or `null`".
- *
- * On an entry a *shallow* navigation created, it is not only that: the store keeps its
- * suppression marker inside the same object, so the getter hands the app an internal
- * `skip` key alongside its own. That is a filed finding (README, 2026-07-16 (RF-03)), not
- * a shape the model blesses — so the marker is allowed through here by name, and only
- * where the model says a stamp exists, while the user's own half is still held to equality.
- * The day the marker moves out of user state, the `stateHasMark` branch goes red and says
- * so, which is the point of asserting its presence rather than ignoring extra keys.
+ * `router.state`, the per-entry user state. On an entry a SHALLOW navigation created, the
+ * getter also hands over the store's internal `skip` marker, allowed by name only where the
+ * model says a stamp exists; the `stateHasMark` branch goes red when the marker leaves it.
  */
 function assertState(harness: Harness, step: Step, label: string) {
     const state = harness.router.state;

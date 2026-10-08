@@ -5,7 +5,7 @@
     `window.__DEBUG__.data = true`.
 
     Where navTrace stamps one navigation's phases onto a single timeline, the data log is
-    per *island run* — a mandala's inner-tree generation (the initial mount, an inputs
+    per island run — a mandala's inner-tree generation (the initial mount, an inputs
     change, an error-slot retry). A run gets a `DataTrace` alongside its bucket cache, or
     `undefined` when tracing is off; every hook in the resolver hands that straight back
     here and the call returns immediately.
@@ -90,17 +90,16 @@ export function traceLevelStart(
         trace.marks.set(`${index}:${key}`, now);
         trace.status.set(`${index}:${key}`, 'pending');
     }
-    // Level 0 starts when the run does, so it carries the run's cause; a deeper level
-    // starts when the one above it resolved — that *is* the waterfall. (Level 0 is the
-    // scope's inputs head, which is empty for an input-less scope — then the line is just
-    // the run's opening.)
+    // Level 0 starts with the run, so it carries the run's cause; a deeper level starts when
+    // the one above it resolved, which IS the waterfall. For an input-less scope level 0 is
+    // empty, and the line is the run's opening alone.
     const cause = index === 0 ? ` (${trace.cause})` : '';
     const listed = keys.length ? ` [${keys.join(',')}]` : '';
     log(trace, `level ${index} start${cause}${listed}`, now);
 }
 
 /**
- * A cell reached a state. Logged once per *transition*, so the re-reads (a source's
+ * A cell reached a state. Logged once per TRANSITION, so the re-reads (a source's
  * snapshot every render, a hook load's value every render) are silent while a live
  * source's flips are not. The mark moves with each transition, so the next Δ measures
  * how long the cell spent in the state it just left.
@@ -123,14 +122,9 @@ export function traceCellStatus(
 }
 
 /**
- * A cell that resolves through a promise — timed from here to its settle.
- *
- * Settle handlers attach once per promise *per run*: a suspended level re-renders on resume
- * and its cached cell (same promise identity) passes through again — the same guard the SSR
- * rejection recording keeps, on an equally run-scoped ledger, for the same reason. Two runs
- * sharing one promise instance — a module-level load, or a retry rebuilding a static promise
- * cell — each get their own settle line rather than the second silently going without. A
- * hook load handing back a fresh promise each render is traced each time, honestly: it re-ran.
+ * A cell that resolves through a promise, timed from here to its settle. Settle handlers
+ * attach once per promise PER RUN: a suspended level re-renders on resume with the same
+ * cached promise, while two runs sharing one promise each get their own settle line.
  */
 export function traceCellPromise(
     trace: DataTrace | undefined,

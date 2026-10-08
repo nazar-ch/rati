@@ -8,20 +8,14 @@ const debugBundlePreserveModules = false;
 const bundleWhitelist: string[] = [];
 
 export default defineConfig({
-    // `?? []` for the same reason the examples carry it: `lazyPlugins` returns `undefined` for
-    // non-Vite commands, and the root config program type-checks this file under
-    // `exactOptionalPropertyTypes` (kit◊FND-170 §C5).
+    // `?? []`: `lazyPlugins` returns `undefined` for a non-Vite command, which
+    // `exactOptionalPropertyTypes` refuses here.
     plugins: lazyPlugins(() => [react(), debugBundleContent && analyzer()]) ?? [],
     build: {
         emptyOutDir: true,
         lib: {
-            // Entries: the MobX-free core, the optional `rati/mobx` bindings, the
-            // MobX-shaped data primitives (`rati/data`), the server-facing `rati/ssr`
-            // surface, the `rati/server` production handler, the `rati/vite` plugin,
-            // the `rati/debug` tooling, and the `rati/testing` test utilities. Rolldown
-            // hoists the shared core modules into a common chunk, so SourceSymbol (and
-            // friends) keep one identity across all of them. `rati/vite` shares nothing
-            // but the HTML assembly — it type-imports the rest of the contract.
+            // Rolldown hoists the shared core into a common chunk, so `SourceSymbol` keeps one
+            // identity across every entry. `rati/vite` imports only the HTML assembly at runtime.
             entry: {
                 main: 'src/main.ts',
                 'mobx/index': 'src/mobx/index.ts',
@@ -35,7 +29,6 @@ export default defineConfig({
                 // MobX-free (same boundary as `rati/data` vs `rati`).
                 'testing/data/index': 'src/testing/data/index.ts',
             },
-            // the proper extensions will be added
             fileName: (_format, entryName) => `${entryName}.js`,
             formats: ['es'],
         },
@@ -49,13 +42,10 @@ export default defineConfig({
                   }
                 : {},
             external: (id) => {
-                // always bundle relative & absolute imports (your own source)
                 if (id.startsWith('.') || id.startsWith('/')) return false;
-                // bundle whitelisted packages (and their subpaths)
                 if (bundleWhitelist.some((pkg) => id === pkg || id.startsWith(pkg + '/'))) {
                     return false;
                 }
-                // externalize everything else
                 return true;
             },
         },

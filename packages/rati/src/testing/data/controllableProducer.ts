@@ -1,21 +1,9 @@
 import { deferred } from '../deferred.js';
 
 /*
-    The `rati/data` half of the hand-drive kit: a producer whose every call the test
-    settles, and a `query` pre-wired to one.
-
-    Every data suite written during the jnana migration hand-rolled the same three
-    lines — an array of `deferred`s, a call counter, and a closure indexing into them
-    (`const gates = [deferred(), deferred()]; let call = 0;
-    query(() => gates[call++]!.promise)`) — plus a `let signal` capture whenever the
-    abort mattered. That is the shape below, once, with the pieces the hand-rolled
-    version kept leaving out: which call is which, whether it settled, and each call's
-    own `AbortSignal`.
-
-    Like `controllableSource`'s mutators, the settles here are raw — resolving a call
-    notifies through the query's normal MobX path with no `act` wrapping. Awaiting the
-    `prime()`/`refresh()` promise is the settle point; in a React test, wrap the drive
-    in `act` or follow it with `await flush()`.
+    The `rati/data` half of the hand-drive kit: a producer whose every call the test settles,
+    with each call's arguments, settle state and own `AbortSignal`. The settles are raw, as
+    `controllableSource`'s are: wrap a React test's drive in `act`, or `await flush()` after it.
 */
 
 /** One invocation of a {@link ControllableProducer}'s producer. */

@@ -30,7 +30,7 @@ afterEach(() => {
  */
 function serverHead(tags: { title?: string; metas?: { name: string; content: string }[] }): void {
     if (tags.title !== undefined) {
-        // `document.title` reads (and writes) the *first* <title> in the document, and
+        // `document.title` reads (and writes) the FIRST <title> in the document, and
         // the reset below leaves an empty unmarked one behind — so clear before
         // planting, the way a server-rendered head has exactly one.
         for (const stale of document.head.querySelectorAll('title')) stale.remove();
@@ -173,7 +173,7 @@ describe('HeadStore winners', () => {
 
         // Going null withdrew the entry (a committed one leaves through the effect's
         // `remove`, not the render's `clear`), so the returning value registers at the
-        // *end* of the sequence — it now outranks the sibling it used to lose to.
+        // END of the sequence, outranking the sibling it lost to before.
         view.rerender(<Page title="Again" />);
         expect(document.title).toBe('Again');
     });
@@ -219,7 +219,7 @@ describe('HeadStore winners', () => {
         act(() => page.setReady('Page'));
         expect(document.title).toBe('Page');
 
-        // The source errors *after* the Title committed: the island swaps in its error
+        // The source errors AFTER the Title committed: the island swaps in its error
         // slot, so the declaration unmounts and its `remove` hands the win back out.
         act(() => page.setError('failed'));
         expect(await screen.findByText('error: failed')).toBeTruthy();
@@ -242,10 +242,9 @@ describe('HeadStore winners', () => {
 
 describe('hydration phase', () => {
     test('a server-rendered head stands while nothing has hydrated', () => {
-        // The clobber SSR-04 hit on nazar: HeadProvider sits above the route's Suspense
-        // boundary, so its first apply runs while the page that declares the title is
-        // still unhydrated. Nothing is confirmed — which is not the same as nothing
-        // being declared, and the server already said what this page's head is.
+        // HeadProvider sits above the route's Suspense boundary, so its first apply runs while
+        // the page declaring the title is unhydrated: nothing confirmed is not nothing
+        // declared, and the server already said what the head is.
         serverHead({
             title: 'Server page',
             metas: [{ name: 'description', content: 'from server' }],
@@ -280,7 +279,7 @@ describe('hydration phase', () => {
         expect(document.title).toBe('Hydrated page');
         expect(metaContent('description')).toBe('hydrated description');
         expect(managedMetas()).toHaveLength(2);
-        // `keywords` has no declaration *yet*: its declarer may be in a boundary that
+        // `keywords` has no declaration YET: its declarer may be in a boundary that
         // hasn't hydrated. Removing it here is the half of the bug that doesn't heal.
         expect(metaContent('keywords')).toBe('server, keywords');
         expect(store.phase).toBe('hydrating');
@@ -322,12 +321,9 @@ describe('hydration phase', () => {
     });
 
     test("the client sync's own leftover tags are not mistaken for a server head", () => {
-        // A client-only app that declared a <Meta> leaves it in <head> when its root
-        // unmounts: React tears the provider's subscription down before the
-        // declaration's removal, so the reconcile that would have dropped it never runs.
-        // A fresh store must read that as its own litter, not as a head to protect —
-        // otherwise a client-only page that declares no title never gets defaultTitle,
-        // which is the whole case the marker's `server` value exists to keep working.
+        // A client-only app's <Meta> stays in <head> when its root unmounts, React tearing the
+        // subscription down before the declaration's removal. A fresh store reads that as its
+        // own litter, so a client-only page declaring no title still gets defaultTitle.
         const first = createHeadStore({ defaultTitle: 'Default' });
         const view = render(
             <HeadProvider store={first}>

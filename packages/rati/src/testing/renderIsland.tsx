@@ -7,27 +7,14 @@ import { useScopeControls, type ScopeControls } from '../mandala/controls.js';
 import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope.js';
 
 /*
-    renderIsland — mount an island, drive it to resolution, and read which slot is showing.
-    The complete version of this sat in the fuzz harness (`__tests__/fuzz/scopeHarness.tsx`:
-    mount + readSlot/readContent + testids); the deterministic mandala suites hand-inlined it,
-    and consumers had nothing at all.
+    long:2
+    renderIsland — mount an island, drive it to resolution, and read which slot shows, through
+    `react-dom/client`, never `@testing-library/react`. Given a CONFIG, each slot is wrapped in a
+    private marker, so `slot()`, `text()` and `controls()` read the screen without leaking
+    testids; a built island can only mount and query.
 
-    It renders with `react-dom/client` directly (via ./dom) — it does *not* depend on
-    `@testing-library/react`. It returns the container (query it however you like) plus the
-    island-specific reads RTL can't give you: which slot is visible, and the island's
-    controls (`useScopeControls`) from the test side.
-
-    Slot detection: given a *config* (scope + component + slots), the harness wraps each slot
-    in a private marker element and reads which one is on screen — so testids never leak into
-    the island's own API. Given an already-built island, it can only mount and query
-    (`slot()` / `controls()` need the config — the built component exposes neither its scope
-    nor its slots).
-
-    One thing it can't do: the mount is an *async* act (so a pending promise/source settles
-    correctly), and React skips StrictMode's mount/unmount/remount double-invoke under an
-    async act. A test that pins StrictMode's discard-the-first-run behavior specifically must
-    render synchronously (a plain sync `act(() => root.render(<StrictMode>…)))`) — see the
-    StrictMode cases in mandala/island.test.tsx.
+    The mount is an ASYNC act, under which React skips StrictMode's double-invoke: a test pinning
+    StrictMode's discard-the-first-run renders synchronously (mandala/island.test.tsx).
 */
 
 const SLOT_ATTR = 'data-rati-testing-slot';
@@ -46,11 +33,9 @@ export interface IslandHandle<S extends Scope<any>> {
     /** The DOM node the island is mounted into (appended to `document.body`). */
     readonly container: HTMLElement;
     /**
-     * Which slot is on screen right now — `content` / `loading` / `error`. Presence in the
-     * DOM is not enough: mid-Suspense-transition React keeps stale content mounted but hidden
-     * (`display: none`), so this reads visibility, not just `querySelector`. Throws when no
-     * slot marker is in the DOM at all — an island that unmounted, or threw past its slots
-     * to an ErrorBoundary (no `error` slot declared). Config mode only.
+     * Which slot is visible — `content` / `loading` / `error` — read by visibility, since
+     * mid-transition React keeps hidden stale content mounted. Throws when no slot marker is
+     * in the DOM: an unmounted island, or one that threw past its slots. Config mode only.
      */
     slot(): SlotName;
     /** The visible slot's trimmed `textContent` (what it says), or `null`. Config mode only. */
@@ -60,10 +45,8 @@ export interface IslandHandle<S extends Scope<any>> {
      *  as the new inputs allow before returning. */
     rerender(...args: InputsArg<S>): Promise<void>;
     /**
-     * The nearest island's controls for this scope — imperative `refresh` plus the live
-     * `pending` set, read from the test side (no probe component of your own). Reads the
-     * value captured at the last render; call it after the drive whose effect you want.
-     * Config mode only, and only after the first render.
+     * The nearest island's controls for this scope, as captured at the last render — call it
+     * after the drive whose effect you want. Config mode only, after the first render.
      */
     controls(): ScopeControls<S>;
     /** Unmount the island and remove its container. */
@@ -89,13 +72,11 @@ export type RenderIslandOptions<S extends Scope<any>> = {
       });
 
 function visibleNode(container: HTMLElement, slot: SlotName): Element | null {
-    // *All* markers for the slot, not the first: a boundary showing its fallback keeps the
-    // previous children in the DOM (hidden) alongside it, so the same slot name can appear
-    // twice — once dead, once live. Under `keepStale` that pair is `content` next to
-    // `content` (the kept run renders in the fallback's place), where taking the first
-    // match reads the hidden one and reports the island as blank.
+    // EVERY marker for the slot: a boundary showing its fallback keeps the previous children
+    // hidden beside it, so one slot name appears dead and live — under `keepStale`, `content`
+    // beside `content`.
     for (const node of container.querySelectorAll(`[${SLOT_ATTR}="${slot}"]`)) {
-        // React hides a suspended boundary's *children* (ancestors of this marker), not the
+        // React hides a suspended boundary's CHILDREN (ancestors of this marker), not the
         // marker itself — walk up to the container looking for a display:none ancestor.
         let hidden = false;
         for (let el: Element | null = node; el && el !== container; el = el.parentElement) {
@@ -125,11 +106,9 @@ function readSlot(container: HTMLElement): SlotName {
 }
 
 /**
- * Mount an island (or a `{ scope, component, … }` config) and return a driving handle.
- *
- * `async`: the mount resolves the scope as far as it can before returning, so a load that
- * settles on its own is already `content`, while one still pending (a `deferred`, an
- * un-driven `controllableSource`) reads as `loading` — drive it, then `await flush()`.
+ * Mounts an island, or a `{ scope, component, … }` config, and returns a driving handle. The
+ * mount resolves the scope as far as it can, so an undriven `deferred` or
+ * `controllableSource` reads `loading` — drive it, then `await flush()`.
  */
 export async function renderIsland<S extends Scope<any>>(
     target: IslandConfig<S> | IslandComponent<S>,

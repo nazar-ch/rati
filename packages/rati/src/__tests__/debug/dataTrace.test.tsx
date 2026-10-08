@@ -10,13 +10,9 @@ import { NotAvailableError } from '../../scope/source.js';
 import { controllableSource, deferred, flush, renderIsland, cleanup } from '../../testing/index.js';
 
 /*
-    `dataTrace` (the rati/debug entry) — the emitted lines' shape.
-
-    The tracer reads one flag off `globalThis.__DEBUG__` and writes with `console.log`, so
-    the suite drives both ends: flag on, console captured, both restored per test. Timings
-    are the point of the tool but not assertable, so `shape()` normalizes every duration to
-    `+Nms` / `ΔNms` and the assertions are on the line *structure* — which run, which level,
-    which cell, which outcome, and in what order.
+    `dataTrace`'s emitted lines: the suite drives the `globalThis.__DEBUG__` flag and captures
+    `console.log`. Timings are unassertable, so `shape()` normalizes durations and the
+    assertions read the line STRUCTURE — run, level, cell, outcome, order.
 */
 
 type DebugGlobal = { __DEBUG__?: { data?: boolean } };
@@ -45,10 +41,9 @@ afterEach(() => {
 });
 
 describe('dataTrace — the resolution timeline', () => {
-    // The canonical read: one line per level start, one per cell settle, one for the run.
-    // Level 0 is the scope's inputs head (no settle lines — inputs arrive with the run);
-    // the sync `prefs` settles inside the level's build, the awaited `user` when it lands,
-    // and `tree` only after the level above resolved — the waterfall, in the log.
+    // The canonical read: a line per level start, per cell settle, and for the run. Level 0,
+    // the inputs head, has no settle lines; `tree` settles only after the level above
+    // resolved — the waterfall, in the log.
     test('a waterfall logs level starts, cell settles, and the run total', async () => {
         const user = deferred<string>();
         const log = traceLog();
@@ -157,7 +152,7 @@ describe('dataTrace — the resolution timeline', () => {
         ]);
     });
 
-    // A source is read every render; only its *transitions* are events. So a re-ready on a
+    // A source is read every render; only its TRANSITIONS are events. So a re-ready on a
     // new value is silent (the cell never left `ready`) while a drop back to pending is not.
     test('a source logs its transitions, not its reads', async () => {
         const log = traceLog();
@@ -188,10 +183,8 @@ describe('dataTrace — the resolution timeline', () => {
         ]);
     });
 
-    // The settle guard is per run, like the SSR rejection recorder it mirrors: one line
-    // however often a suspended level resumes, but a *second* run over the same promise
-    // instance (here two mounts of an island holding a module-level load) is its own
-    // timeline and gets its own settle line — a module-wide guard left the second silent.
+    // The settle guard is per run: one line however often a suspended level resumes, while a
+    // SECOND run over the same promise instance gets its own settle line.
     test('two runs sharing one promise each log their own settle', async () => {
         const log = traceLog();
         const shared = Promise.resolve('cached');

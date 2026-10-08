@@ -3,10 +3,9 @@ import { describe, test, expectTypeOf } from 'vite-plus/test';
 import type { SourceError, SourceErrorCode } from '../../scope/source.js';
 
 /*
-    The `code` vocabulary is an *open* set — the five blessed values for completion, the
-    `(string & {})` arm so an app can coin its own without augmenting anything. These pins
-    are the reason `SourceError.code` can be the union rather than a bare `string`: the two
-    are mutually assignable, so nothing an app already writes stops compiling.
+    The `code` vocabulary is an OPEN set: the blessed values for completion, `(string & {})` for
+    a coined one. The union and a bare `string` are mutually assignable, so nothing an app
+    writes stops compiling.
 */
 
 describe('SourceErrorCode', () => {

@@ -6,10 +6,9 @@ import type { IslandPhase, IslandStatus, RefreshController } from './refresh.js'
 import type { Scope, ScopeLoadKeys } from '../scope/scope.js';
 
 /*
-    The controls channel — `useScopeControls`. A second scope-keyed channel next to the
-    value channel (channel.ts): the value channel publishes what an island resolved; this
-    one publishes verbs on the island instance itself. Components keep receiving strictly
-    resolved state — the controls stay behind a hook, no promises or sources leak out.
+    The controls channel behind `useScopeControls`: beside the value channel (channel.ts),
+    which publishes what an island resolved, it publishes verbs on the island instance. No
+    promise or source leaks out to a component.
 */
 
 const controlsChannels = new WeakMap<object, Context<RefreshController | null>>();
@@ -26,14 +25,9 @@ export function registerScopeControlsChannel(scope: object): Context<RefreshCont
 
 export type ScopeControls<S extends Scope<any>> = {
     /**
-     * Re-resolve. With no key the whole scope re-resolves (the retry mechanism — the
-     * loading slot shows again). With a key, only that load re-runs: the previous value
-     * stays rendered while the re-fetch is in flight, an unchanged result (per the
-     * load's `equals` — deep by default, see `data()`) keeps the old value and identity,
-     * and a changed one re-runs exactly the downstream loads whose producers consumed
-     * the key. Promise loads only — sources are live and refresh themselves. The
-     * returned promise settles when the key does (its cascade may still be in flight);
-     * a failed re-fetch keeps the previous value and logs.
+     * Re-resolves the whole scope, or with a key only that promise load: the previous value
+     * stays rendered, an unchanged result (per `equals`) keeps it, and a changed one re-runs
+     * its dependents. Settles when the key does; a failed re-fetch keeps the previous value.
      */
     refresh: (key?: ScopeLoadKeys<S>) => Promise<void>;
     /** Keys currently re-fetching — selective refreshes and their cascade. */
@@ -41,36 +35,26 @@ export type ScopeControls<S extends Scope<any>> = {
     /**
      * Which slot the island is showing: `'loading'`, `'ready'`, or `'error'`. Aggregate —
      * the island resolves all-or-nothing, so there is no per-load phase to read. A stale
-     * window is `'ready'` (content *is* on screen); {@link ScopeControls.isStale} is what
+     * window is `'ready'` (content IS on screen); {@link ScopeControls.isStale} is what
      * distinguishes it.
      */
     phase: IslandPhase;
     /**
-     * Is the content on screen the *previous* resolution's? True only while kept content is
-     * up: a `keepStale` island's stale window — between a re-resolve starting and the new
-     * run committing — or a `loadingDelayMs` island's, until its deadline moves the loading
-     * slot in. Dim it, badge it, disable its actions.
-     *
-     * Not a per-key flag: a selective `refresh(key)` also keeps its previous value
-     * rendered, and that one is `pending` — which says *which* keys, where this says the
-     * whole view belongs to a resolution that is no longer current.
+     * Is the content on screen the PREVIOUS resolution's? True only while kept content is up —
+     * a `keepStale` window, or a `loadingDelayMs` one until its deadline. Dim it, badge it. A
+     * selective `refresh(key)` reports in `pending` instead.
      */
     isStale: boolean;
     /**
-     * Which automatic attempt the island's `retry` policy has in flight — `1` for the first
-     * one, and `0` whenever none is, the error slot included (a spent budget is not a retry
-     * in progress). Always `0` on an island with no policy.
-     *
-     * Not a phase of its own: an island retrying is an island resolving, so `phase` reads
-     * `'loading'` (or `'ready'` + `isStale` under `keepStale`) throughout. This is what a
-     * loading slot switches on to say *why* it is still up.
+     * Which automatic attempt the `retry` policy has in flight — `1` for the first, `0` when
+     * none, the error slot included. No phase of its own: `phase` reads `'loading'`
+     * throughout, and a loading slot switches on this to say WHY it is up.
      */
     retrying: number;
     /**
-     * Re-resolve from scratch — the error slot's `retry`, as a verb the whole subtree can
-     * reach, so a component can offer the affordance without being the error slot. The same
-     * action as `refresh()` with no key. On an island with a `retry` policy this also resets
-     * the automatic budget: a human asking again is new information.
+     * Re-resolves from scratch — the error slot's `retry` as a verb the whole subtree can
+     * reach, the same action as `refresh()` with no key. With a `retry` policy it also resets
+     * the automatic budget.
      */
     retry: () => void;
 };
@@ -82,13 +66,9 @@ const inertStatus: IslandStatus = { phase: 'loading', isStale: false, retrying: 
 const inertStatusSnapshot = () => inertStatus;
 
 /**
- * Read the nearest island's controls for a scope — imperative refresh (whole-scope or
- * per-key) and retry, plus what the island is doing right now: its `phase`, whether the
- * content is `isStale`, and the live set of keys currently re-fetching. Keyed by the
- * **scope**, like {@link useScope}: a descendant imports the scope, never the island
- * component.
- *
- * Throws when no island for the scope is above the calling component.
+ * Reads the nearest island's controls for a scope: refresh and retry, plus its `phase`,
+ * `isStale`, `retrying` and `pending`. Keyed by the scope, like {@link useScope}. Throws when
+ * no island for the scope is above the caller.
  */
 export function useScopeControls<S extends Scope<any>>(scope: S): ScopeControls<S> {
     const channel = controlsChannels.get(scope);

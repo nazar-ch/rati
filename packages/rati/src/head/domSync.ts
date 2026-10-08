@@ -8,26 +8,17 @@ import type { HeadStore, MetaTag } from './store.js';
 export const RATI_HEAD_ATTRIBUTE = 'data-rati-head';
 
 /**
- * …and the value says who wrote it. Both are rati's to reconcile, but only `server` is
- * evidence that this document's head came from a rati prerender — which is what
- * HeadProvider reads on mount to decide the store's phase (store.ts). The two are
- * distinct because a client-only app leaves its own marked metas in `<head>` when a
- * root unmounts (React tears the provider's subscription down before the declarations'
- * removals, so the final reconcile never runs); a fresh store must not read those as a
- * server head and spend its life protecting one that was never there.
+ * The marker's value says who wrote the tag. Only `server` is evidence of a rati prerender,
+ * which HeadProvider reads on mount to pick the store's phase: a client-only app's root
+ * unmount leaves its own marked metas behind (docs/current/internals.md).
  */
 export const RATI_HEAD_SERVER = 'server';
 export const RATI_HEAD_CLIENT = 'client';
 
 /**
- * Apply the store's winners to the live document: `document.title` (also updating a
- * server-injected `<title>`, which is the same node) and the rati-managed meta tags.
- * Runs from HeadProvider's effect on every store notification.
- *
- * While the store is `hydrating` the document belongs to the server (store.ts §phase):
- * declared winners land as they commit, but nothing the tree hasn't spoken for is
- * touched — no `defaultTitle` over the server's title, no removing a server meta whose
- * declarer may simply not have hydrated yet.
+ * Applies the store's winners to `document.title` and the rati-managed metas, from
+ * HeadProvider's effect on every store notification. While the store is `hydrating` the
+ * document is the server's: declared winners land, and nothing undeclared is touched.
  */
 export function applyToDocument(store: HeadStore): void {
     const live = store.phase === 'live';

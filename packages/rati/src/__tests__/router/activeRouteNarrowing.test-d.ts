@@ -4,15 +4,9 @@ import type { RatiUserTypes } from '../../router/route.js';
 import type { ActiveRoute, ActiveRouteOf, Router } from '../../router/router.js';
 
 /*
-    FND-06 — the augmentation-typed surface must behave like the table-parameterized one.
-    The route table is the sibling routeContext.test-d.ts's augmentation (`typedRoutes`:
-    product / profile / home) — a `declare module` is program-global, so registering a
-    second one here would collide; these probes deliberately read the same table.
-
-    The trap this file pins: `ActiveRoute` resolved through the `infer`ed `UserRoutes`
-    conditional stays deferred — `name` and `routeParams` read as the right unions but the
-    discriminant narrows nothing, and `Extract` filters nothing. A deferred `to` on
-    `navigate` is worse: it fails *open*, accepting targets that should not typecheck.
+    The augmentation-typed surface behaves like the table-parameterized one: an `ActiveRoute`
+    resolved through `UserRoutes`'s `infer` stays deferred and narrows nothing, and a deferred
+    `to` fails OPEN. The table is routeContext.test-d.ts's: a second `declare module` collides.
 */
 
 declare const active: ActiveRoute;

@@ -13,33 +13,9 @@ import {
 } from '../mandala/hydration.js';
 
 /*
-    The SSR round-trip kit — the drain-loop + collector/provider + hydrateRoot dance
-    hand-rolled across rati's islandSsr*, router/hydration, and ssr/* suites (~20 files), and
-    the one thing a public SSR consumer had no way to test at all: does my page hydrate from
-    the server's data without re-running its loads?
-
-    Three pieces, layered:
-
-      - `prerenderToString(node, options?)` — the bare drain loop over `react-dom/static`
-        `prerender` (the reference impl at islandSsr*.test.tsx). No dehydration wiring: what a
-        server-only render or a "marked source stays pending without a collector" test wants.
-        Its one addition over the hand-rolls: an opt-in `settleTimeout`, so a render that
-        never settles fails saying *what* was still pending instead of running out the
-        runner's clock (see startSettleWatchdog).
-      - `ssrRender(node, options?)` — a collected server render: wraps `node` in a
-        HydrationProvider carrying a fresh collector, drains it, and returns the HTML plus the
-        dehydrated `data` / `seeds` / `errors` / `dehydratedErrors`. The server half.
-      - `.hydrate(clientNode?, options?)` — feeds that payload back through a client-side
-        HydrationProvider and `hydrateRoot`s the HTML. The client half. By default a
-        recoverable hydration error (React client-rendering over markup that didn't match)
-        *throws*, naming the mismatch — the loud version of the "it silently refetched" bug;
-        `{ allowMismatch: true }` collects them on the handle for deliberate-degradation tests.
-
-    jsdom-environment only (where every existing SSR test runs); no streaming (the engine's
-    non-goal); no whole-`document` hydration or HTTP-level rendering — `renderApp` / the server
-    kit keep their own setups. The route-level round-trip is a documented composition: build a
-    server (memory-history) and client (browser-history) router, `prepareRoute` between them,
-    and pass the two trees to `ssrRender` / `.hydrate` — see the reference docs.
+    The SSR round-trip kit: does a page hydrate from the server's data without re-running its
+    loads? `prerenderToString` is the bare drain loop, `ssrRender` the collected server half,
+    and `.hydrate()` the client half, where a recoverable mismatch THROWS. jsdom only.
 */
 
 // Keep every resolved Suspense boundary inline (no hidden-div outlining + swap script), so
@@ -51,33 +27,24 @@ const NO_OUTLINING = Number.MAX_SAFE_INTEGER;
 /** Options for {@link prerenderToString} (and, extended, {@link ssrRender}). */
 export interface PrerenderToStringOptions {
     /**
-     * Forwarded to `prerender`. Fires for errors inside Suspense boundaries too, where React
-     * degrades to the loading slot and the render still resolves — pass `() => {}` to swallow
-     * an expected server-side throw (a load that rejects on purpose) so it doesn't surface as
-     * an unhandled rejection. Defaults to React's own logging.
+     * Forwarded to `prerender`, firing inside Suspense boundaries too, where React degrades to
+     * the loading slot — pass `() => {}` to swallow an expected server-side throw. Defaults to
+     * React's own logging.
      */
     onError?: (error: unknown) => void;
     /** Override the outlining budget. Defaults to never outlining (everything inline). */
     progressiveChunkSize?: number;
     /**
-     * Milliseconds to give the render before the drain fails instead of hanging: the
-     * diagnostic for a load whose promise never settles, or an `ssr`-marked source nobody
-     * drove to ready. Off by default — a budget rati picks would either sit above the
-     * runner's own timeout (useless) or below a legitimately slow load (a false failure),
-     * and rati can't know which. The value is the *message*: which budget ran out, how many
-     * Suspense boundaries were still pending, and where they were — instead of the runner's
-     * generic "test timed out".
-     *
-     * A real `setTimeout`, so under fake timers it fires only when the test advances them.
+     * Milliseconds before the drain fails instead of hanging, naming the budget and the
+     * still-pending Suspense boundaries with their location. Off by default: no budget rati
+     * picks fits every runner. A real `setTimeout`, so fake timers fire it only when advanced.
      */
     settleTimeout?: number;
 }
 
 /**
- * Drain `react-dom/static` `prerender` into one HTML string. `prerender` — not
- * `renderToString` — because it awaits Suspense, so an island's promise loads resolve during
- * the render and the HTML carries the content, not the loading slot. The reader loop nobody
- * should hand-write in a test again.
+ * Drains `react-dom/static` `prerender`, which awaits Suspense, into one HTML string carrying
+ * the resolved content.
  */
 export async function prerenderToString(
     node: ReactNode,
@@ -124,19 +91,15 @@ export async function prerenderToString(
 
     // `postponed` is React's own "this prerender did not complete" flag — null on a clean
     // drain. Gating on it (not on the timer alone) keeps a budget that expired during the
-    // *drain* of an already-finished render from failing a good test.
+    // DRAIN of an already-finished render from failing a good test.
     if (watchdog?.expired() && result.postponed !== null) throw watchdog.failure();
     return html;
 }
 
 /*
-    The settle budget, over `prerender`'s own `signal`. Aborting is what turns a hung render
-    into a reportable one: React resolves the prerender (it does not reject), closes the
-    stream, and calls `onError` once per still-pending task — with the abort reason and that
-    task's component stack. So the abort reason is both the release valve and the census.
-
-    Racing a timer instead would leave the render running and report nothing but the elapsed
-    budget.
+    The settle budget, over `prerender`'s own `signal`: aborting resolves the prerender and
+    calls `onError` once per still-pending task with its component stack — the release valve
+    and the census. A racing timer leaves the render running and reports only the elapsed time.
 */
 function startSettleWatchdog(budget: number, forward: ((error: unknown) => void) | undefined) {
     const controller = new AbortController();
@@ -200,7 +163,7 @@ export interface HydrateOptions {
      * Opt out of the mismatch-to-failure guard: collect React's recoverable hydration errors
      * on {@link HydratedTree.recovered} instead of throwing. For deliberate-degradation tests
      * (an SSR-error baseline whose loading slot the client re-renders through), where a
-     * recovery *is* the behavior under assertion.
+     * recovery IS the behavior under assertion.
      */
     allowMismatch?: boolean;
     /**
@@ -235,28 +198,22 @@ export interface ServerRender {
      *  to the client, which `.hydrate()` feeds back. Empty in the default mode. */
     readonly dehydratedErrors: HydrationErrors;
     /**
-     * Hydrate the server HTML on the client, feeding the collected payload back through a
-     * HydrationProvider, and return a handle. Pass `clientNode` when the client tree must
-     * differ from the server's — a route round-trip renders the server under memory history
-     * and the client under browser history; it defaults to the server node (the island case:
-     * one tree, rendered on both sides). A recoverable hydration error throws by default
-     * (naming the mismatch); `{ allowMismatch: true }` collects them on the handle instead.
+     * Hydrates the server HTML on the client, feeding the collected payload back through a
+     * HydrationProvider. `clientNode` replaces the server node where the trees differ — a
+     * route round-trip's browser history. A recoverable hydration error throws unless
+     * `{ allowMismatch: true }`.
      */
     hydrate(clientNode?: ReactNode, options?: HydrateOptions): Promise<HydratedTree>;
 }
 
 /**
- * Render `node` on the server, collecting its dehydration payload — the server half of an
- * SSR round-trip. Wraps `node` in a {@link HydrationProvider} with a fresh collector, drains
- * the prerender to HTML, and hands back the HTML plus the dehydrated `data` / `seeds` /
- * `errors` and a `.hydrate()` to run the client half.
+ * Renders `node` on the server with a fresh collector, returning the HTML, the dehydrated
+ * payload and a `.hydrate()` for the client half.
  *
  * ```ts
  * const server = await ssrRender(<Page />);
- * expect(server.html).toContain('Ada');   // resolved server-side, in the HTML
- * const client = await server.hydrate();
- * expect(client.text()).toContain('Ada');  // hydrated from the payload
- * expect(fetches).toBe(1);                 // the load did not re-run — and a mismatch would have thrown
+ * expect((await server.hydrate()).text()).toContain('Ada');
+ * expect(fetches).toBe(1);
  * ```
  */
 export async function ssrRender(

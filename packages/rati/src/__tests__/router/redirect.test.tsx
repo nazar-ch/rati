@@ -98,13 +98,10 @@ describe('route-level redirects', () => {
     });
 
     test('hydrating onto a redirect route replays it as-is — no follow', async () => {
-        // Reachable only from a server that ignored `renderApp`'s redirect result and
-        // built a snapshot naming the redirect route itself (the normal flow names the
-        // *target*, per prepareRoute). Pinning the choice rather than the accident:
-        // seeding is a verbatim replay of the server's decision, not a re-derivation —
-        // following the hop here would move the URL out from under the server's HTML
-        // and guarantee a mismatch. So the route renders as written, which for a
-        // redirect route means its (empty) component. The server is the thing at fault.
+        // Reachable only from a server that ignored `renderApp`'s redirect and snapshotted
+        // the redirect route itself. Seeding replays the server's decision verbatim — following
+        // the hop moves the URL from under the server's HTML — so the route renders its empty
+        // component.
         const tr = await createTestRouter(makeRoutes(), {
             url: '/settings',
             hydratedState: {
@@ -136,16 +133,12 @@ describe('route-level redirects', () => {
         const tr = await createTestRouter(routes, { url: '/a' });
 
         // Following stopped: one of the cycle's routes is active, rendered as-is.
-        // *Which* one is the parity of the cap and deliberately not pinned — the fuzz
+        // WHICH one is the parity of the cap and deliberately not pinned — the fuzz
         // property makes the same call (see routerAsserts' capped-cycle oneOf).
         expect(['a', 'b']).toContain(tr.router.activeRoute?.name);
-        // The half the store-level name cannot show: the route's own component is what
-        // reaches the DOM — not the catch-all, and not a blank screen. Two kills, both
-        // executed red — returning from the loop-report branch instead of falling
-        // through to the assignment below it (which the name above catches too), and the
-        // one that needs this line: a Router declining to render a route still carrying
-        // a `redirect` declaration, which leaves the store's answer right and the screen
-        // empty.
+        // The route's own component reaches the DOM — not the catch-all, not a blank screen.
+        // Kill: a Router declining to render a route still carrying a `redirect` → the
+        // store's answer stays right and the screen goes empty.
         expect(['a', 'b']).toContain(tr.container.textContent);
         // The cap, stated where it is observable: one hop per level the guard allowed
         // and no eleventh. Kill: move MAX_REDIRECT_DEPTH — the trail's length follows it.
@@ -153,9 +146,8 @@ describe('route-level redirects', () => {
         expect(tr.router.redirectHops[0]).toEqual({ from: '/a', to: '/b', permanent: false });
         expect(error).toHaveBeenCalledOnce();
         expect(error.mock.calls[0]![0]).toContain('redirect loop');
-        // The trail rides along in the report, and is the only thing naming which routes
-        // the cycle ran through — the first thing a reader needs and the only place it is
-        // written down. Kill: drop the hops join from the message. Executed once, red.
+        // The trail in the report is the only place naming the routes the cycle ran through.
+        // Kill: drop the hops join from the message.
         expect(error.mock.calls[0]![0]).toContain('/a → /b → /a');
         error.mockRestore();
     });
@@ -174,17 +166,13 @@ describe('route-level redirects', () => {
 
         router.navigate('/self');
 
-        // Entering from another route is load-bearing, and it is what made this the one
-        // shape that produced a genuinely stale route: the same-path early return needs a
-        // resolved `activeRoute` to skip past, so a router constructed straight at /self
-        // never had the bug — it recursed to the depth cap like any other cycle. With the
-        // self-check reverted this reads 'home' (executed once): the previous page, left
-        // on screen at the new URL.
+        // Entering from another route is load-bearing: the same-path early return needs a
+        // resolved `activeRoute` to skip past. Kill: revert the self-check → this reads 'home',
+        // the previous page at the new URL.
         expect(router.activeRoute?.name).toBe('self');
         expect(router.path).toBe('/self');
         expect(router.history.location.pathname).toBe('/self');
-        // One hop — the one it refused to follow — rather than the ten identical ones a
-        // cycle of length one would otherwise record on its way to the cap.
+        // One hop — the one it refused to follow — rather than identical ones up to the cap.
         expect(router.redirectHops).toEqual([{ from: '/self', to: '/self', permanent: false }]);
         expect(error.mock.calls[0]![0]).toContain('redirect loop');
 
@@ -204,11 +192,9 @@ describe('route-level redirects', () => {
             history: createMemoryHistory({ url: '/self' }),
         });
 
-        // The other way into setPath — no resolved route for the early return to skip
-        // past, so before the self-check this entry recursed to the depth cap: the same
-        // report after ten identical hops. The check unifies the two entries at one hop;
-        // this is the shape RF-06's kill shrank to, pinned here so the property isn't
-        // the only witness.
+        // The other way into setPath: no resolved route for the early return to skip, so
+        // without the self-check this entry recurses to the depth cap. The check unifies both
+        // entries at one hop.
         expect(router.activeRoute?.name).toBe('self');
         expect(router.path).toBe('/self');
         expect(router.redirectHops).toEqual([{ from: '/self', to: '/self', permanent: false }]);
@@ -247,22 +233,14 @@ describe('route-level redirects', () => {
     });
 
     /**
-     * RF-07: a relative target is refused where the redirect is followed. This is also the
-     * hole RF-06's loop check had — a *relative* self-target walked past a comparison that
-     * reads resolutions, because `'self' !== '/self'` as a spelling. Refusing the input
-     * class closes it: a spelling can no longer sneak past by not looking like its answer.
+     * long:2
+     * A relative target is refused where the redirect is followed — else a RELATIVE
+     * self-target walks past the loop check, which compares resolutions (`'self' !== '/self'`).
      *
-     * Kills executed once, 2026-07-17, reverted after. Both guards dropped (the pre-RF-07
-     * engine) reproduces the bypass exactly, on the browser history and here: one hop
-     * recorded, **no loop reported**, and `home` left on screen at URL `/self` — the stale
-     * shape RF-06 fixed, reached by spelling. Both pins go red.
-     *
-     * Dropping *only* the redirect branch's guard is the sharper kill, and the reason this
-     * guard exists rather than leaning on the `replace` one downstream: the target still
-     * throws — the nested `replace` refuses it — but says `[rati] replace:` instead of
-     * naming the route that declared it, and records the hop before dying, so
-     * `redirectHops` reports one it never followed. Both assertions below catch that; the
-     * function-redirect pin does not (it goes green), and is regression cover only.
+     * Kill: drop both guards → one hop recorded, NO LOOP REPORTED, `home` on screen at `/self`;
+     * both pins go red. Dropping ONLY the redirect branch's guard is the sharper kill: the
+     * nested `replace` still throws, but names `[rati] replace:` rather than the declaring
+     * route and records the hop first. The function-redirect pin is regression cover only.
      */
     test('a relative redirect target is refused rather than resolved', () => {
         const error = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -298,21 +276,17 @@ describe('route-level redirects', () => {
             history: createMemoryHistory({ url: '/home' }),
         });
 
-        // The function's *return* is the target — the string rule reads it there, so a
+        // The function's RETURN is the target — the string rule reads it there, so a
         // legacy mapper that forgets the leading slash is caught rather than followed.
         expect(() => router.navigate('/old/7')).toThrow(/not an absolute path/);
         router.dispose();
     });
 
     /**
-     * The open-redirect shape the origin check exists for. `:dest` matches one URL
-     * segment, but `%2F` decodes to `/` (decodeParams), so a request can hand the mapper
-     * a value that composes into `//evil.com` — starts with `/`, passes the absolute-path
-     * check, and on the server would ride `prepareRoute` verbatim into the `Location`
-     * header: a redirect to an origin the app never chose. Refused where the redirect is
-     * followed, before the hop is recorded. Kill: see webRouterCore.test.ts — dropping
-     * the origin check turns this red (the memory history quietly lands on `/`, the trail
-     * records the authority, and prepareRoute would report it).
+     * The open-redirect shape the origin check exists for: `%2F` decodes to `/`, so a mapper
+     * can compose `//evil.com`, which passes the absolute-path check and rides `prepareRoute`
+     * into the `Location` header. Refused before the hop is recorded; the kill is
+     * webRouterCore.test.ts's.
      */
     test('a redirect target carrying an authority is refused, not followed', () => {
         const routes = [

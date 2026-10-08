@@ -8,11 +8,9 @@ export type MetaProps = { content: string } & (
 );
 
 /**
- * Declares a `<meta>` tag that needs per-page dedupe — description, Open Graph, and
- * friends. Renders nothing; per `name`/`property` the deepest live declaration wins,
- * reaching the document via HeadProvider's client sync and the server's `headTags`
- * read-back. A meta that never varies by page belongs in the document shell (or as a
- * native React 19 tag), not here.
+ * Declares a `<meta>` tag that needs per-page dedupe — description, Open Graph. Renders
+ * nothing; per `name`/`property` the deepest live declaration wins. A meta that never
+ * varies by page belongs in the document shell or a native React 19 tag.
  */
 export function Meta({ name, property, content }: MetaProps): null {
     useHeadTag(

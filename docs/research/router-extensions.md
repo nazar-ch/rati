@@ -66,7 +66,15 @@ Django's `include(..., {'extra': v})` passes kwargs to every included view. The 
 
 ### `re_path()` — regex routes (idea)
 
-Django splits `path()` (converter syntax) from `re_path()` (raw regex). rati's `buildPathRe` already carries a TODO to allow regex paths (with manually typed params). Mostly relevant as the escape hatch under typed converters above.
+Django splits `path()` (converter syntax) from `re_path()` (raw regex). rati's `buildPathRe` takes no regex path, whose params a caller types by hand. Mostly relevant as the escape hatch under typed converters above.
+
+### Trailing-slash redirects (idea)
+
+`buildPathRe` matches a path with or without its trailing slash, so `/path` and `/path/` both render. A route-level redirect to one canonical spelling is the alternative.
+
+### Prefix-active links (idea)
+
+`Link` is active when its resolved href equals the current path. A prefix match marks a section link active on its child pages, and an `exact` prop picks between the two.
 
 ## What *not* to borrow from Django
 

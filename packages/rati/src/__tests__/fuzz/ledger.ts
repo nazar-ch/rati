@@ -5,7 +5,7 @@ import type { BuiltHarness } from './scopeHarness.js';
 
 /*
     long:2
-    The lifecycle ledger invariant (rati◊MF-03), read off the harness's per-source-instance
+    The lifecycle ledger invariant, read off the harness's per-source-instance
     attach/detach counters and its `.provide()` value's build/dispose record. The machinery
     under it is source lifetime (a cascade swaps a source mid-flight, a Step's teardown keeps
     entries the live bucket still holds, the mandala's unmount sweep is the backstop) —
@@ -13,7 +13,7 @@ import type { BuiltHarness } from './scopeHarness.js';
 
     Two altitudes, deliberately:
 
-      - `assertLedgerBounds` after every command: *bounds only*. No instance attached twice
+      - `assertLedgerBounds` after every command: BOUNDS ONLY. No instance attached twice
         at once, nothing detached still feeding the render, no provided value disposed after
         the sources it was built over. It never asserts churn-freedom — when a mid-tree
         source drops to pending the levels below unmount, and whether their sources ride
@@ -33,7 +33,7 @@ function assertProvideBounds(harness: BuiltHarness, label: string): void {
     for (const record of harness.provideLog()) {
         // The dispose-before-detach contract: `.provide()` promises the value is torn down
         // while the sources it was built over are still attached, so a value holding a
-        // grabbed resource never outlives its grab. The list is what the dispose *saw*.
+        // grabbed resource never outlives its grab. The list is what the dispose SAW.
         expect(
             record.detachedAtDispose ?? [],
             `${label}: ${record.id} disposed after its sources detached`,

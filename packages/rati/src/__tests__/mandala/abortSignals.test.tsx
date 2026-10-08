@@ -14,13 +14,10 @@ import {
 } from '../../testing/index.js';
 
 /*
-    SI-01 — the abort signal a function load receives as its second argument.
-
-    The contract in one line: the signal belongs to the *run*, not to the load. It fires when
-    the run that started the load is discarded (an inputs change, a retry, `refresh()`,
-    unmount) and at no other time — a plain re-render, a selective `refresh(key)`, and a
-    mid-tree teardown that keeps the bucket cache must all leave it alone. One
-    AbortController per bucket, fired by `discardRun` (mandala/refresh.ts).
+    The abort signal a function load receives belongs to the RUN, not the load: it fires when
+    the run that started the load is discarded — an inputs change, a retry, `refresh()`,
+    unmount — and never on a re-render, a selective `refresh(key)`, or a mid-tree teardown that
+    keeps the bucket cache.
 */
 
 const Loading: FC = () => <div>loading...</div>;
@@ -153,7 +150,7 @@ describe("a load's abort signal", () => {
             loading: Loading,
         });
 
-        // Selective: the load re-runs *inside* the run, so its cell is replaced but the run —
+        // Selective: the load re-runs INSIDE the run, so its cell is replaced but the run —
         // and its signal — is not. The re-run is handed the very same signal.
         let settled: Promise<void>;
         await act(async () => {
@@ -216,7 +213,7 @@ describe("a load's abort signal", () => {
         const handle = await renderIsland(
             {
                 scope: scope({ id: input<string>() })
-                    // No second parameter: the pre-SI-01 shape, still exactly as it was.
+                    // No second parameter: a one-parameter load.
                     .load({ plain: async ({ id }) => `plain:${id}` })
                     .load({
                         gated: data((_props: unknown, context: LoadContext) => {
@@ -293,8 +290,7 @@ describe("a load's abort signal", () => {
 
     test('never fires during a server render', async () => {
         // Under `prerender` there is no remount and no unmount: the controller is created
-        // with the level's cells and simply never fires. (Cancelling on a client disconnect
-        // would be a seam of its own — see the SI-01 record.)
+        // with the level's cells and never fires.
         const tracked = trackedLoad(async () => 'server');
         const Island = island({
             scope: scope().load({ value: tracked.load }),

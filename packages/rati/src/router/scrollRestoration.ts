@@ -1,21 +1,6 @@
 /**
- * SPA scroll restoration. The browser only restores scroll for full-document
- * loads, not for `pushState` navigation, so we have to do it ourselves.
- *
- * Behavior:
- * - `PUSH`/`REPLACE`: scroll to top (or to `#anchor` if the URL has one).
- * - `POP` (back/forward): restore the position the user was at when they
- *   last left this entry.
- *
- * Caveats:
- * - Restoration fires on the next paint, which is correct for routes that
- *   render synchronously. Routes that wait on async data (an island scope
- *   resolving) render later — the restored scroll position will be clamped
- *   against the pre-render content height. Anchor lookup may also miss elements
- *   not yet in the DOM. Both are acceptable defaults; tying restoration to async
- *   data-loading boundaries is a future enhancement.
- * - Saved positions live in memory for the session. They are not persisted
- *   across reloads.
+ * SPA scroll restoration, which the browser does only for full-document loads: PUSH/REPLACE
+ * scroll to the top or the `#anchor`, and POP restores the entry's position, kept in memory.
  */
 
 import type { History } from './history.js';
@@ -50,10 +35,9 @@ export function installScrollRestoration(
         positions.set(previousKey, { x: window.scrollX, y: window.scrollY });
         previousKey = location.key;
 
-        // Defer the restore until the new route has had a chance to commit.
-        // A double rAF lands one full frame later — long enough for React's
-        // synchronous renders to flush. Async island scopes will render after
-        // this fires; that's the documented caveat above.
+        // A double rAF, one full frame, lets React's synchronous renders flush. A route
+        // waiting on async island data renders later, so its restored position clamps to the
+        // pre-render height and an anchor can miss.
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 applyScroll(action, location, positions, scrollToTop);

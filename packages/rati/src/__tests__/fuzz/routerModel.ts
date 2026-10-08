@@ -1,27 +1,7 @@
 /*
-    The router's reference model — the routing contract's semantics as plain JS, plus the
-    vocabulary the harness and the property share (the table spec, the redirect forms).
-    No React, no router imports: the file's empty import list is the altitude rule made
-    structural, as in the mandala model next door — the model states the contract, never
-    the router's mechanism (rati◊RF-02). If a rule here needed router code to express, it
-    would not be a contract.
-
-    THE INDEPENDENCE RULE. Where the engine uses a regex, the model walks segments. The
-    engine compiles each route to `^/x/(?<id>[^/]+?)/{0,1}$` (`buildPathRe`) and
-    interpolates with a `PARAM_RE` replace (`getPath`); the model splits on `/` and maps.
-    Same contract — "a `:param` is one non-empty path segment", "a trailing slash is
-    optional", "values are percent-encoded on the way out and decoded on the way back" —
-    reached by a different mechanism, so a bug in the engine's pattern machinery cannot
-    hide behind a model that shares it. (This is the same reason the mandala model refuses
-    the engine's `deepEqual`.) `encodeURIComponent`/`decodeURIComponent` are platform
-    primitives, not router code: naming them *is* stating the codec rati◊RF-01 decided.
-
-    What the model deliberately does not do:
-      - Mid-segment params (`/p/x:id`). `PARAM_RE` accepts them; the arbitrary never
-        generates them, so the model's segment walk needn't. Not a contract claim either
-        way — just this suite's ground.
-      - Predict which route survives a redirect cycle *long enough to cap*. See `oneOf`
-        below. A cycle of length one is exact, and is stated.
+    The router's reference model — the routing contract's semantics as plain JS, importing nothing
+    from the router: where the engine compiles a regex, the model walks segments
+    (docs/current/internals.md). Mid-segment params are outside its ground.
 */
 
 /** Mirrors the store's documented cap. The model's own follow uses it only to decide when
@@ -29,33 +9,24 @@
  * something this model pins. */
 const MAX_REDIRECT_DEPTH = 10;
 
-// ---------------------------------------------------------------------------------------
-// The declared table: what the *test* said the app's routes are. The harness builds a real
-// route table from it; the model reads the same declaration. The spec is the plumbing, the
-// router is the subject.
+// The declared table: what the TEST said the app's routes are. The harness builds a real
+// route table from it, and the model reads the same declaration.
 
 /** A param on a redirect's target: a value fixed on the route definition, or one taken from
  * the redirect route's own matched params (the legacy-path shape, `/old/:id` → `/new/:id`). */
 export type ParamSource = { literal: string } | { fromMatch: string };
 
 /**
- * The four shapes `RouteRedirect.to` accepts, each a different resolution path in the store:
- *
- *   string     `to: '/users/7'`                     — used verbatim
- *   object     `to: { name: 'user', userId: '7' }`  — resolved through the table by getPath
- *   fn-string  `to: (p) => '/users/' + p.id`        — called with the matched params
- *   fn-object  `to: (p) => ({ name: 'user', … })`   — called, then resolved through the table
- *
- * The distinction that matters downstream: an object target goes through `getPath`, so it is
- * basename-aware and the current search/hash ride along; a string target is a literal, so it
- * carries whatever it says and nothing more.
+ * The shapes `RouteRedirect.to` accepts, each a different resolution path in the store:
+ * `string` and `fn-string` are literals, used verbatim; `object` and `fn-object` resolve
+ * through the table by getPath, so they are basename-aware and keep the search and hash.
  */
 export type RedirectForm = 'string' | 'object' | 'fn-string' | 'fn-object';
 
 export type RedirectSpec = {
     form: RedirectForm;
     targetName: string;
-    /** Params for the *target* route. `fromMatch` is only legal for the `fn-*` forms — the
+    /** Params for the TARGET route. `fromMatch` is only legal for the `fn-*` forms — the
      * literal forms are fixed on the route definition, with no match to read. */
     params: Record<string, ParamSource>;
     permanent: boolean;
@@ -75,7 +46,6 @@ export type RouteTable = {
     routes: RouteSpec[];
 };
 
-// ---------------------------------------------------------------------------------------
 // The contract's pure functions.
 
 /** `getPath`'s half of the round-trip: interpolate at the path's `:param` boundaries,
@@ -95,8 +65,8 @@ export function buildPath(
 }
 
 /** The inbound half: a matched segment is percent-decoded, and a malformed escape is handed
- * through raw rather than throwing out of a navigation (RF-01's decision). Generated values
- * are always well-formed, so the fallback states the rule rather than covering a case. */
+ * through raw rather than throwing out of a navigation. Generated values are always
+ * well-formed, so the fallback states the rule rather than covering a case. */
 function decodeParam(raw: string): string {
     try {
         return decodeURIComponent(raw);
@@ -139,10 +109,9 @@ export function matchPath(routePath: string, pathname: string): Record<string, s
     return params;
 }
 
-/** The store's basename strip, mirrored branch for branch. The last one — a pathname that
- * doesn't live under the basename is handed to the matcher as-is — is unreachable from this
- * suite's generated URLs (every one of them is built with the basename on) and is kept only
- * so the model states the whole rule. */
+/** The store's basename strip, mirrored branch for branch. The last — a pathname outside the
+ * basename goes to the matcher as-is — is unreachable from the generated URLs, and kept so the
+ * model states the whole rule. */
 function stripBasename(pathname: string, basename: string): string {
     if (!basename) return pathname;
     if (pathname === basename) return '/';
@@ -175,29 +144,17 @@ function splitUrl(url: string): { pathname: string; search: string; hash: string
     };
 }
 
-// ---------------------------------------------------------------------------------------
-
 /**
- * A history entry, as the model keeps it.
+ * long:2
+ * A history entry, as the model keeps it. `mark` is the stamp a SHALLOW navigation
+ * (`{ keepCurrentRoute: true }`) puts on the entry it creates, given an opaque identity rather
+ * than the engine's spelling. The model states the stamp's two contract facts:
  *
- * `mark` is the suppression stamp a *shallow* navigation (`{ keepCurrentRoute: true }`)
- * puts on the entry it creates. The model gives it an opaque identity of its own rather
- * than mirroring the engine's spelling — the string the store writes embeds a counter and
- * a session id, which is exactly the mechanics the altitude rule keeps out of here. What
- * the model states is the two contract facts the stamp carries:
- *
- *   - it is **one-shot** — honored by the resolution its own navigation triggers, and by
- *     no other, so a later arrival at the entry (a POP back onto it) resolves normally;
- *   - it makes the entry **distinguishable from every other entry**, because the store
- *     keeps it *inside* the entry's `state` and compares whole states to decide whether a
- *     resolution is needed.
- *
- * The second fact is a filed finding, not a design the model would choose (README,
- * 2026-07-16 (RF-03)): it is why two entries that agree on URL *and* on the user's own
- * state can still re-resolve when a traversal steps between them. It is modelled rather
- * than stepped around because the alphabet cannot avoid it — and because the re-resolve it
- * produces is the behavior the shallow design wants (the route on screen is not the one
- * the URL names, so resolving it is right); only the way it is achieved is the finding.
+ *   - it is ONE-SHOT — honored by the resolution its own navigation triggers and no other,
+ *     so a POP back onto the entry resolves normally;
+ *   - it makes the entry DISTINGUISHABLE from every other, since the store keeps it inside
+ *     the entry's `state` and compares whole states — so two entries agreeing on URL and
+ *     user state still re-resolve when a traversal steps between them.
  */
 type Entry = {
     pathname: string;
@@ -210,10 +167,9 @@ type Entry = {
 };
 
 /**
- * What the store's `_state` actually holds for an entry — the caller's state with the
- * shallow stamp merged in, mirroring `pushOrReplace`'s `{ ...skip, ...options.state }`.
- * Only the *comparisons* use this; what the property may assert `router.state` against is
- * `Step.state` (the user's half) plus `Step.stateHasMark`.
+ * What the store's `_state` holds for an entry — the caller's state with the shallow stamp
+ * merged in, as `pushOrReplace` merges it. Only the COMPARISONS use this; the property
+ * asserts `router.state` against `Step.state` and `Step.stateHasMark`.
  */
 function fullState(entry: Entry): unknown {
     if (entry.mark === null) return entry.userState ?? null;
@@ -226,18 +182,9 @@ export type Rendered = { name: string; params: Record<string, string> };
 export type Hop = { from: string; to: string; permanent: boolean };
 
 /**
- * The model's answer after one command — everything the property is allowed to look at.
- *
- * `rendered` is `{ oneOf }` when a redirect cycle ran to the depth cap. The follow *is*
- * deterministic (the cap's parity decides the winner), but which route that leaves on
- * screen is not something the router promises — the deterministic suite makes the same
- * call (`redirect.test.tsx`: "a redirect cycle stops at the depth guard and renders
- * instead" asserts `['a','b']` contains the name). The contract is: following stops, an
- * error is reported, and one of the cycle's routes renders. Pinning the parity here would
- * make a legitimate change to the cap read as a regression.
- *
- * A cycle of *length one* is not weakened that way: no parity is involved, so the route
- * that declared the self-redirect is named exactly (RF-06).
+ * The model's answer after one command — everything the property may look at. `rendered`
+ * is `{ oneOf }` when a redirect cycle ran to the depth cap: the router promises that one of
+ * the cycle's routes renders, never which. A cycle of LENGTH ONE names its route exactly.
  */
 export type Step = {
     /** `null` when nothing matched and the table has no catch-all: the Router renders
@@ -253,13 +200,9 @@ export type Step = {
     search: string;
     hash: string;
     /**
-     * The caller's own per-entry state — `router.state`'s documented contents ("user state
-     * attached to the current history entry via `navigate`/`replace` `{ state }`, or
-     * `null`").
-     *
-     * On an entry a shallow navigation created, the store's getter also carries its
-     * internal stamp (`stateHasMark`) — a filed finding rather than something the model
-     * blesses by predicting a marker string it would have to reach into the engine to know.
+     * The caller's own per-entry state, `router.state`'s documented contents. On an entry a
+     * shallow navigation created, the store's getter also carries its internal stamp
+     * (`stateHasMark`), which the model never predicts.
      */
     state: Record<string, unknown> | null;
     /** Whether the store's `state` additionally carries the shallow stamp. See `Entry`. */
@@ -270,30 +213,23 @@ export type Step = {
      */
     suppressed: boolean;
     /**
-     * Whether this command resolved *at* an entry carrying a stamp that was no longer
-     * armed: the stale-marker arrival (a POP back onto a shallowly-created entry), which
-     * must re-resolve rather than keep the kept route. Carries no assertion of its own —
-     * `remounted` holds the contract — and exists so the property can count the shape.
+     * Whether this command resolved AT an entry whose stamp was no longer armed — a POP back
+     * onto a shallowly-created entry, which re-resolves. No assertion of its own; the property
+     * counts the shape.
      */
     staleShallowPop: boolean;
     /** `router.redirectHops` — the trail this navigation followed. */
     hops: Hop[];
     /**
-     * Whether *this command's* resolution stopped at one of the two redirect guards — the
-     * depth cap, or a target that resolved back to the route declaring it — and so must
-     * have reported the loop it refused to follow.
-     *
-     * Distinct from `rendered` being `{ oneOf }`, which says what is on screen and outlives
-     * the command that put it there: re-navigating to the URL a capped cycle settled on is
-     * a no-op (same path, equal state), so the cycle's route stays rendered while nothing
-     * resolves and nothing is reported.
+     * Whether THIS command's resolution stopped at a redirect guard — the depth cap, or a
+     * target resolving back to its route — and so reported the loop. `rendered` being
+     * `{ oneOf }` outlives the command: re-navigating to a capped cycle's URL is a no-op.
      */
     reportedLoop: boolean;
     /**
-     * Whether the guard that stopped it was the cycle-of-length-one check. Carries no
-     * assertion of its own — `reportedLoop` and `rendered` hold the whole contract — and
-     * exists so the property can count the shape RF-06 lifted the exclusion for, rather
-     * than let the pool quietly stop generating it.
+     * Whether the guard that stopped it was the cycle-of-length-one check. No assertion of its
+     * own — `reportedLoop` and `rendered` hold the contract — so the property can count the
+     * shape the pool generates.
      */
     selfRedirect: boolean;
 };
@@ -323,7 +259,7 @@ export class RouterModel {
     private mounts = 0;
 
     /**
-     * The stamp the *next* resolution is allowed to honor — armed by a shallow navigation,
+     * The stamp the NEXT resolution is allowed to honor — armed by a shallow navigation,
      * consumed by the very next `setPath` whether or not it got that far. One-shot: see
      * `Entry`.
      */
@@ -363,13 +299,9 @@ export class RouterModel {
     }
 
     /**
-     * Traverse the entry stack — `go`/`back`/`forward`.
-     *
-     * `null` is the whole answer for a traversal that had nowhere to go: out of range does
-     * nothing rather than clamping to the ends, and `go(0)` is the host's reload, which a
-     * memory history has no document for. Nothing happens means *nothing* — no resolution,
-     * and so not even a notification, which is a fact the property asserts (a store that
-     * quietly re-emitted here would make every consumer re-read for no reason).
+     * Traverses the entry stack — `go`/`back`/`forward`. `null` answers a traversal with
+     * nowhere to go: out of range never clamps, and `go(0)` has no document in memory. NOTHING
+     * happens — no resolution and no notification, which the property asserts.
      */
     go(delta: number): Step | null {
         const target = this.index + delta;
@@ -386,13 +318,9 @@ export class RouterModel {
     }
 
     /**
-     * `setSearchParams` — the query rewritten on the current URL, defaulting to `replace`.
-     *
-     * Built from the store's *own* `path`/`hash` rather than the entry's, which is the same
-     * thing everywhere except after a shallow navigation (where `_path` has moved on and
-     * the mounted route hasn't). Carries no state, so the entry it writes has none: on an
-     * entry that had some, that is a change, and the route re-resolves because of it — a
-     * filed finding (README, 2026-07-16 (RF-03)), stated here rather than smoothed over.
+     * `setSearchParams` — the query rewritten on the current URL, `replace` by default, built
+     * from the store's OWN `path`/`hash`, which differ from the entry's after a shallow
+     * navigation. It writes no state, so an entry that had some re-resolves.
      */
     setSearchParams(search: string, mode: 'push' | 'replace'): Step {
         const url = this.table.basename + this.path + (search ? '?' + search : '') + this.hash;
@@ -408,7 +336,7 @@ export class RouterModel {
         return this.mounts;
     }
 
-    /** `router.path` — what the *store* reads, which after a shallow navigation is the URL's
+    /** `router.path` — what the STORE reads, which after a shallow navigation is the URL's
      * path rather than the mounted route's. */
     currentPath(): string {
         return this.path;
@@ -480,10 +408,8 @@ export class RouterModel {
     }
 
     /**
-     * `RouterStore.setPath`, mirrored: the route resolution one history update triggers,
-     * including the redirect it may follow (which replaces the entry and re-enters here,
-     * exactly as the store's nested `replace` → listener → `setPath` does).
-     *
+     * `RouterStore.setPath`, mirrored: the resolution one history update triggers, a followed
+     * redirect replacing the entry and re-entering here as the store's nested `replace` does.
      * `trail` carries the redirect routes matched so far, so a cycle can name its members.
      */
     private setPath(depth: number, trail: string[] = []): void {
@@ -518,10 +444,9 @@ export class RouterModel {
         if (this.path === pathname && this.rendered !== null && !stateChanged) return;
         this.path = pathname;
 
-        // The shallow navigation's own resolution: the URL is already updated above (and
-        // `router.path` with it), and the mounted route is deliberately left where it is.
-        // Nothing below runs — including the redirect follow, so a shallow navigation onto
-        // a redirect route lands on that route's URL without following it anywhere.
+        // The shallow navigation's own resolution: the URL is updated above, the mounted route
+        // stays, and nothing below runs — a shallow navigation onto a redirect route lands on
+        // its URL without following it.
         if (entry.mark !== null && entry.mark === armed) {
             this.suppressedNow = true;
             return;
@@ -537,11 +462,9 @@ export class RouterModel {
             const target = this.resolveTarget(redirect, matched.params);
             this.hops.push({ from: pathname, to: target, permanent: redirect.permanent });
 
-            // A target naming the pathname being resolved is a cycle of length one, and is
-            // refused rather than followed: following it could only re-enter the same path,
-            // resolve nothing, and leave the previous route stranded on screen. Search and
-            // hash are not part of the question — a target differing from its own route
-            // only in query re-enters exactly the same way.
+            // A target naming the pathname being resolved is a 1-cycle, refused: following it
+            // re-enters the same path and strands the previous route on screen. Search and
+            // hash stay out of the question.
             if (stripBasename(splitUrl(target).pathname, this.table.basename) === pathname) {
                 // No parity to be coy about, unlike a capped cycle: the route that declared
                 // the redirect is the one left rendering its own component.
@@ -562,10 +485,8 @@ export class RouterModel {
         }
 
         if (matched?.spec.redirect) {
-            // Following stopped at the cap. Name the cycle's members: the routes the trail
-            // visited more than once. (A chain long enough to cap without repeating would
-            // need more redirect routes than the arbitrary builds, but fall back to the
-            // whole trail rather than claim an empty set.)
+            // Following stopped at the cap: the cycle's members are the routes the trail
+            // visited more than once, else the whole trail rather than an empty set.
             const visited = [...trail, matched.spec.name];
             const repeated = [...new Set(visited.filter((n, i) => visited.indexOf(n) !== i))];
             this.rendered = { oneOf: repeated.length > 0 ? repeated : [...new Set(visited)] };
@@ -576,7 +497,7 @@ export class RouterModel {
 
         this.rendered = matched ? { name: matched.spec.name, params: matched.params } : null;
         // Nothing matched means the Router renders nothing, so there is no component to
-        // mount — the route that *was* on screen just unmounts.
+        // mount — the route that WAS on screen unmounts.
         if (matched) this.mounts++;
     }
 

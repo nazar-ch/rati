@@ -5,41 +5,10 @@ import { createHydrationClaims } from './hydrationDiagnostics.js';
 import type { SourceError } from '../scope/source.js';
 
 /*
-    SSR data hydration for mandalas (islands and routes).
-
-    Under a Suspense-awaiting server render (`react-dom/static` `prerender`) a mandala
-    resolves its *promise* entries via `use()` server-side, so the HTML carries the
-    resolved content. Without dehydration the client would re-run those promises on
-    hydration — a wasted re-fetch and, worse, a re-suspend that flashes the loading slot
-    and risks a hydration mismatch.
-
-    This module carries each mandala's resolved promise values across the wire so the
-    client short-circuits them to their server values and hydrates synchronously. The key
-    is the mandala's `useId()` (stable between server render and hydration by tree
-    position) then the scope key — so arbitrarily nested / composed mandalas each own a
-    unique slice with no collisions, and the registry stays flat.
-
-    Three wire sections, one registry shape:
-
-      - `data` — resolved *values*: promise loads, and SSR-marked loader sources
-        (`ssr: true`), which hydrate exactly like promises (the client short-circuits to
-        the value; the loader never runs client-side).
-      - `seeds` — *live-source seeds*: what an `ssr: { dehydrate?, hydrate }` source
-        dehydrated. The client creates the source as usual and feeds the seed to its
-        `hydrate()` before attaching, so the first snapshot is already ready.
-      - `errors` — loads that *failed* server-side, for islands that asked for their
-        failure to cross the wire (`ssrErrors: 'dehydrate'`). The client hydrates that
-        cell straight to its error state, so the error slot the server rendered stays.
-        Empty for everyone else: the default is React's own client retry, and a backend's
-        error text has no business in the HTML unless the island asked for it.
-
-    A plain (unmarked) source is a reactive state machine, not a promise: it stays
-    pending under SSR and resolves on the client after hydration — nothing to carry.
-
-    The mandala engine owns this end to end — it is orthogonal to the router. A route is
-    just a mandala, so route SSR participates for free; a standalone island SSR'd without
-    a router participates the same way. (These are the public SSR surface, re-exported
-    from the `rati/ssr` entry — see ssr/index.ts.)
+    SSR data hydration for mandalas: resolved promise values, live-source seeds and
+    dehydrated failures cross the wire keyed by the mandala's `useId()`, then the scope key, so
+    the client short-circuits them and hydrates synchronously. The design is
+    docs/current/internals.md.
 */
 
 // mandalaId (useId) -> scope key -> dehydrated value (or live-source seed).
@@ -53,12 +22,9 @@ export type HydrationErrors = Record<string, Record<string, SourceError>>;
 export type HydrationSection = 'data' | 'seeds' | 'errors';
 
 /**
- * One promise load that rejected during a collected server render. By default the render
- * degrades gracefully without rati's help (React emits the loading slot with a
- * client-retry marker; the client re-runs the load) — what the record adds is the
- * *server's* knowledge: map `error.code === 'not-available'` to a 404, `failed` to
- * the app's 5xx policy, before the degraded 200 goes out. Every failure is recorded,
- * whichever `ssrErrors` mode the island runs.
+ * One promise load that rejected during a collected server render — the server's input for
+ * mapping `not-available` to a 404 and `failed` to its 5xx policy before the response goes
+ * out. Every failure is recorded, whichever `ssrErrors` mode the island runs.
  */
 export type HydrationError = { mandalaId: string; key: string; error: SourceError };
 
@@ -71,7 +37,7 @@ export type Hydration = {
      * the cell hydrates straight to its error state. */
     errors?: HydrationErrors | undefined;
     /** Server: record a resolved value / live-source seed during the prerender pass.
-     * `kind` defaults to 'value' — a collector predating seeds keeps working. */
+     * `kind` defaults to 'value'. */
     collect?:
         | ((mandalaId: string, key: string, value: unknown, kind?: 'value' | 'seed') => void)
         | undefined;
@@ -85,16 +51,14 @@ export type Hydration = {
     claim?: ((mandalaId: string, key: string, section: HydrationSection) => void) | undefined;
 };
 
-// Default is the empty registry: mandalas rendered with no provider above (jnana's SPA,
-// tests, any non-SSR host) neither collect nor rehydrate — they just resolve.
+// Default is the empty registry: mandalas with no provider above (a client-only app, tests)
+// neither collect nor rehydrate.
 export const HydrationContext = createContext<Hydration>({});
 
 /**
- * Wrap the app at the SSR boundary so mandalas anywhere in the tree participate in
- * dehydration. On the server pass `collect` (from {@link createHydrationCollector}); on
- * the client pass the serialized `data` (and `seeds`, when the app uses SSR-marked live
- * sources). Renders no DOM of its own, so mounting it on both sides keeps the trees
- * identical (and `useId` stable).
+ * Wraps the app at the SSR boundary so mandalas anywhere in the tree take part in
+ * dehydration: the server passes `collect` ({@link createHydrationCollector}), the client
+ * the serialized payload. Renders no DOM, so both sides keep identical trees and `useId`s.
  */
 export function HydrationProvider({
     collect,
@@ -119,10 +83,9 @@ export function HydrationProvider({
 }
 
 /**
- * Server-side collector. Pass `.collect` into a {@link HydrationProvider} wrapping the
- * app, render with a Suspense-awaiting renderer (`react-dom/static` `prerender`), then
- * read `.data` / `.seeds` once the render resolves and embed them in the HTML response.
- * The client passes them back through {@link HydrationProvider}.
+ * Server-side collector: pass `.collect` into a {@link HydrationProvider} wrapping the app,
+ * render with `prerender`, then embed `.data` / `.seeds` in the HTML response for the
+ * client's {@link HydrationProvider}.
  */
 export function createHydrationCollector(): {
     collect: (mandalaId: string, key: string, value: unknown, kind?: 'value' | 'seed') => void;
@@ -132,7 +95,7 @@ export function createHydrationCollector(): {
     /** Loads that rejected during the render — the server's status-code input. Every
      *  failure lands here, whichever `ssrErrors` mode its island runs. */
     errors: HydrationError[];
-    /** The `errors` *wire section*: the subset the islands asked to carry to the client
+    /** The `errors` wire section: the subset the islands asked to carry to the client
      *  (`ssrErrors: 'dehydrate'`), normalized to what survives JSON. Its sibling above is
      *  the flat list the server derives a status from and never leaves the server. */
     dehydratedErrors: HydrationErrors;
@@ -157,17 +120,9 @@ export function createHydrationCollector(): {
 }
 
 /**
- * A `SourceError` reduced to what crosses the wire: `code`, `message`, `retryable`.
- *
- * `cause` is dropped, and that is the whole of it. It is the one field with no wire shape
- * — a live `Error` JSON-stringifies to `{}` (so the client would read a lie), and a cause
- * chain can hold anything the backend threw, functions and request objects included. What
- * the error slot switches on (`code`) and shows (`message`) survives; the server keeps the
- * rest, where the stack that produced it also lives.
- *
- * The message itself *does* travel, which is the trade an island makes by opting in: it is
- * written into the HTML for anyone to read. A load whose failures must not leak backend
- * text should say so in its own `message` before rejecting.
+ * A `SourceError` reduced to what crosses the wire: `code`, `message`, `retryable`. `cause`
+ * is dropped — a live `Error` stringifies to `{}`, and a cause chain holds anything the
+ * backend threw. The message DOES travel into the HTML, the trade an island makes by opting in.
  */
 function wireError(error: SourceError): SourceError {
     const wire: SourceError = { code: error.code };

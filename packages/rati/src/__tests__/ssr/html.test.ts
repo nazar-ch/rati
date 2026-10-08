@@ -49,7 +49,7 @@ describe('fillTemplate', () => {
 
     test('keeps `$&` and friends in rendered markup verbatim', () => {
         // The bug a plain string replacement would have: String.replace reads these in
-        // the *replacement* as capture references, so the price below would come out as
+        // the REPLACEMENT as capture references, so the price below would come out as
         // the placeholder text itself.
         const html = fillTemplate(
             TEMPLATE,

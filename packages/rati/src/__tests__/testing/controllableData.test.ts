@@ -46,7 +46,7 @@ describe('controllableProducer', () => {
         q.reset(); // supersedes call 0
         const second = q.prime();
 
-        // Settle the *newer* call first; the superseded one lands into the void.
+        // Settle the NEWER call first; the superseded one lands into the void.
         server.calls[1]!.resolve('new');
         server.calls[0]!.resolve('old');
         await Promise.all([first, second]);
@@ -156,7 +156,7 @@ describe('controllableQuery', () => {
     });
 
     // `controllableQuery`'s producer reads nothing observable, so `reactive: true`
-    // on it has nothing to track — the tracked read is the *producer's* business.
+    // on it has nothing to track — the tracked read is the PRODUCER'S business.
     // The reactive path is therefore stepped with `controllableProducer` inside a
     // producer that does the reading.
     test('steps the reactive path, the tracked read in the test’s own producer', async () => {
@@ -188,9 +188,8 @@ describe('controllableQuery', () => {
 });
 
 /*
-    The Verify's store-level test: a store as an app would write it (a plain `query`
-    over an injected fetch), tested with nothing hand-rolled — no gate array, no call
-    counter, no `let signal`.
+    A store-level test: a store as an app writes it (a plain `query` over an injected fetch),
+    tested with nothing hand-rolled — no gate array, no call counter, no `let signal`.
 */
 interface Settings {
     retentionDays: number;

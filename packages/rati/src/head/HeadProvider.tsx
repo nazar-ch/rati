@@ -5,14 +5,9 @@ import { applyToDocument, RATI_HEAD_ATTRIBUTE, RATI_HEAD_SERVER } from './domSyn
 import { createHeadStore, type HeadStore } from './store.js';
 
 /**
- * Provides the head store and keeps the live document in sync on the client:
- * `document.title` and the rati-managed `<meta>` tags follow the store's winners —
- * on hydration and on every client-side navigation. The server runs no effects; there
- * the winners are read after prerender with `headTags` (rati/ssr).
- *
- * Pass a `store` when something outside the tree needs to read it — a server entry
- * does, one store per request. A client-only app can omit it and the provider owns one
- * internally.
+ * Provides the head store and keeps `document.title` and the rati-managed `<meta>` tags on
+ * its winners on the client; the server reads them with `headTags` (rati/ssr). Pass a
+ * `store` when something outside the tree reads it — a server entry, one per request.
  */
 export function HeadProvider({
     store,
@@ -25,10 +20,9 @@ export function HeadProvider({
     const activeStore = store ?? ownStore;
 
     useEffect(() => {
-        // No server-written tag in the document → rati didn't render this page's head, so
-        // there is nothing of the server's to preserve and the tree can own it from the
-        // first apply (a client-only app gets `defaultTitle` immediately). Otherwise the
-        // store stays `hydrating` until something removes a declaration — store.ts §phase.
+        // No server-written tag means rati didn't render this page's head, so the tree owns it
+        // from the first apply; otherwise the store stays `hydrating` until a declaration
+        // leaves (store.ts).
         const serverHead = `[${RATI_HEAD_ATTRIBUTE}="${RATI_HEAD_SERVER}"]`;
         if (!document.head.querySelector(serverHead)) activeStore.settle();
 

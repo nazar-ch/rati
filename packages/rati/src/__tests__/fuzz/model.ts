@@ -1,29 +1,16 @@
 /*
-    The reference model — the mandala contract's semantics as plain JS, plus the vocabulary
-    the harness and the commands share (the spec shape, the value formula, the declared
-    state). No React, no engine imports, no `deepEqual` borrowed from `util/` — the file's
-    import list is the altitude rule made structural: the model states the contract, never
-    the engine's mechanism (rati◊MF-01). If a rule here needed engine code to express, it
-    would not be a contract.
+    The mandala's reference model — the contract's semantics as plain JS, importing nothing from
+    the engine (docs/current/internals.md) — plus the vocabulary the harness and commands share.
+*/
 
-    THE VALUE FORMULA. Every key's value is a pure function of three declared things: its
-    own name, its *epoch*, and its reads' current values. The epoch is not a run counter —
-    it is the test's declared intent, bumped by a `refresh` command on a `fresh`-payload key
-    to mean "this re-fetch must produce something new". That indirection is deliberate and
-    load-bearing:
-
-      - It keeps the value independent of *how many times* the engine ran the producer. A
-        run counter would encode exact run counts into every convergence assert through the
-        back door — and an engine that legitimately coalesces two dirty marks into one
-        re-run (a direct refresh landing in the same render as a cascade) would fail while
-        being correct. The altitude rule says an engine that gets lazier must stay green;
-        run counts are asserted separately, as upper bounds.
-      - It makes the expected value at quiesce a **fixpoint** over the declared state —
-        literally "what a from-scratch resolution of the current inputs would produce",
-        which is the convergence invariant's own wording.
-
-    A `stable` payload never bumps, so its re-fetch yields a deep-equal value: the engine's
-    equals gate must hold, keep the old *identity*, and cascade nothing.
+/*
+    long:2
+    THE VALUE FORMULA. A key's value is a pure function of its name, its EPOCH and its reads'
+    current values. The epoch is the test's declared intent — bumped by a `refresh` of a
+    `fresh`-payload key — never a run counter, so an engine coalescing two re-runs stays green
+    (run counts are upper bounds, asserted apart), and the value at quiesce is the fixpoint a
+    from-scratch resolution produces. A `stable` payload never bumps: its re-fetch is deep-equal,
+    so the equals gate keeps the old identity and cascades nothing.
 */
 
 /** The scope head's single input, readable by any level's producer (`reads`). */
@@ -40,7 +27,7 @@ export type KeySpec = {
      * (a cascade reaches through one: `__tests__/mandala/cascadeThroughSource.test.tsx`). */
     reads: string[];
     payload: KeyPayload;
-    /** Settle priority for the MF-01 smoke property (the command suite picks its own). */
+    /** Settle priority for the smoke property (the command suite picks its own). */
     settleOrder: number;
 };
 
@@ -61,12 +48,9 @@ export function formatValue(key: string, epoch: number, readValues: string[]): H
 export const sameValue = (a: HarnessValue | null, b: HarnessValue | null): boolean =>
     a !== null && b !== null && a.v === b.v;
 
-// ---------------------------------------------------------------------------------------
-
 /*
-    The declared state: what the *test* has said should be true. Both the real producers and
-    the model read it — the formula is plumbing, the engine is the subject (MF-01's note).
-    It doubles as the input's external store, so `changeInput` re-renders the island host.
+    The declared state: what the TEST has said is true, read by the real producers and the
+    model alike. It doubles as the input's external store, so `changeInput` re-renders the host.
 */
 
 export type DeclaredState = {
@@ -101,20 +85,16 @@ export function createDeclaredState(): DeclaredState {
     };
 }
 
-// ---------------------------------------------------------------------------------------
-
 export type Slot = 'loading' | 'content' | 'error';
 
 type ModelKey = {
     spec: KeySpec;
     /**
-     * 'unreached' — its level has not resolved yet, so the producer has not run;
-     * 'held'      — the producer ran, the first value is still in flight;
-     * 'ready'     — a value is committed (and rendered, unless a slot rule below hides it);
-     * 'errored'   — the load failed terminally (an initial rejection / a source error).
+     * 'unreached': its level has not resolved, so the producer has not run; 'held': the first
+     * value is in flight; 'ready': a value is committed; 'errored': the load failed terminally.
      */
     status: 'unreached' | 'held' | 'ready' | 'errored';
-    /** The committed (rendered) value — *not* the in-flight one: a re-fetch keeps this
+    /** The committed (rendered) value — NOT the in-flight one: a re-fetch keeps this
      * rendered until it settles, which is the no-blank promise. */
     value: HarnessValue | null;
     /** A re-fetch in flight over a committed value: 'promise' keeps the stale value
@@ -137,7 +117,7 @@ export type ReferenceModel = {
     /** Every key with a producer run outstanding — a first load or a re-fetch. The harness's
      * live-entry frontier must equal this exactly. */
     liveEntries(): string[];
-    /** The subset a `settle` may target *observably* — empty in the error slot, where the
+    /** The subset a `settle` may target OBSERVABLY — empty in the error slot, where the
      * inner tree is gone and a settle reaches nothing until a retry rebuilds it. */
     settleable(): string[];
     /** Would settling `key` now get through the equals gate? Drives the identity-stability
@@ -153,7 +133,7 @@ export type ReferenceModel = {
     repending(): string[];
     /** Keys a `refresh(key)` command may target: rerunnable, committed, non-source. */
     refreshable(): string[];
-    /** Keys a `reject` may target *observably* — see the implementation for why not all. */
+    /** Keys a `reject` may target OBSERVABLY — see the implementation for why not all. */
     rejectable(): string[];
     runBudgetOf(key: string): number;
     totalRunBudget(): number;
@@ -178,11 +158,9 @@ export type ReferenceModel = {
         cascades: number;
         supersededRuns: number;
         sourceValueChanges: number;
-        /** A key that had *already* committed a value committed a different one — the
-         * event a `.provide()` value must rebuild on (its factory read every key). Only a
-         * resolved island can produce one, which is why the rebuild is assertable: the
-         * leaf is mounted exactly when this counter can move. A first settle is not one
-         * (nothing was committed yet, and the leaf does not exist). */
+        /** A key that had ALREADY committed a value committed a different one — the event a
+         * `.provide()` value rebuilds on. Only a resolved island, whose leaf is mounted,
+         * produces one; a first settle is not one. */
         committedChanges: number;
     };
 };
@@ -335,23 +313,18 @@ export function createModel(spec: ScopeSpec, declared: DeclaredState): Reference
         pending: () => someKey((state) => state.inFlight !== null),
         liveEntries: () => someKey(hasLiveEntry),
         /*
-            Two states freeze the tree, and the alphabet steps *through* them rather than
-            into them — it does not stop exercising them, it stops trying to predict a torn
-            -down tree's internals key by key.
+            long:2
+            Two states freeze the tree, and the alphabet steps THROUGH them rather than
+            predicting a torn-down tree key by key:
 
-              - **The error slot** is terminal until a retry: the boundary has replaced the
-                whole inner tree, so an outstanding settle reaches nothing — no cell to
-                write, no Step to re-render, so no `pending` bookkeeping either (that runs in
-                the resolver's render).
-              - **A repending source** (S8) unmounts every level below it, which freezes
-                their in-flight work in the same way: a swapped source's first ready is
-                noticed in render, so its `pending` never clears while its Step is gone, and
-                a cascade into those levels only marks cells dirty — the re-run waits for the
-                remount. (A *promise* re-fetch is unaffected either way: it settles through
-                the controller's own `.then`, not through a render.)
+              - the error slot, terminal until a retry, where an outstanding settle reaches no
+                cell and no `pending` bookkeeping;
+              - a repending source (S8), which unmounts every level below it, freezing their
+                in-flight work until the remount; a PROMISE re-fetch settles through the
+                controller regardless.
 
-            Both resolve the way an app resolves them: retry / input change, or restoring the
-            source — and the property's quiesce tail does exactly that before converging.
+            Both resolve as an app resolves them, and the property's quiesce tail does so
+            before converging.
         */
         settleable: () => (slotOf() === 'error' || anyRepending() ? [] : someKey(hasLiveEntry)),
         willChange(key) {
@@ -378,29 +351,19 @@ export function createModel(spec: ScopeSpec, declared: DeclaredState): Reference
                 ? []
                 : someKey((state) => state.spec.kind === 'source' && state.inFlight === null),
         repending: () => someKey((state) => state.repending),
-        // Content must be showing: `refresh` reaches a cell through its *built* bucket, and
-        // a level whose Step is unmounted (a source above it repending) never re-runs the
-        // producer — the returned waiter would simply never settle.
+        // Content must be showing: `refresh` reaches a cell through its BUILT bucket, and a
+        // level whose Step is unmounted never re-runs the producer, so the waiter never settles.
         refreshable: () =>
             slotOf() !== 'content' ? [] : someKey((state) => state.spec.kind !== 'source'),
         /*
-            A failure is only observable once the resolve loop actually reaches it, and a
-            Step that suspends on a pending promise never finishes its loop — never commits,
-            so its level's sources never even attach. Two consequences, both latent rather
-            than wrong: an errored source in a level that still has a promise in flight
-            changes nothing on screen, and a rejected promise sitting behind an unsettled
-            one is not reached either. Both surface later, when the loop gets that far.
+            long:2
+            A failure is observable only once the resolve loop reaches it, and a Step suspended
+            on a pending promise never finishes its loop. WHEN the engine notices is loop
+            order, below the altitude line, so the alphabet rejects only where the answer is
+            unambiguous:
 
-            *When* the engine notices is loop order — mechanism, below the altitude line
-            (docs/archive/mandala-testing.md). So rather than model it, the alphabet only
-            rejects where the answer is unambiguous:
-
-              - a re-fetch in flight — content is showing, so the Step is committed and
-                subscribed, and a promise re-fetch fails through the controller rather than
-                through `use()`;
-              - the *last* held load of an initial resolution. Held keys all sit at one
-                level (the waterfall reaches a level only once every earlier one is ready),
-                so being alone means nothing else in the level can mask it.
+              - a re-fetch in flight, which fails through the controller rather than `use()`;
+              - the LAST held load of an initial resolution, alone in its level.
         */
         rejectable() {
             if (slotOf() === 'error' || anyRepending()) return [];
@@ -440,7 +403,7 @@ export function createModel(spec: ScopeSpec, declared: DeclaredState): Reference
                 state.inFlight = null;
                 return;
             }
-            // A failed promise *re-fetch* keeps the previous value and resolves (it logs).
+            // A failed promise RE-FETCH keeps the previous value and resolves (it logs).
             state.inFlight = null;
         },
 

@@ -4,11 +4,9 @@ import { route } from '../../router/route.js';
 import { useRouteContext } from '../../router/useRouteContext.js';
 import { scope, input, type ScopeComponent } from '../../scope/scope.js';
 
-// Register the app's route table the way an app does — `RatiUserTypes['routes'] =
-// typeof routes`, the same augmentation `Link`'s `to` reads. `useRouteContext(name)`
-// then types itself off these definitions, with no separate context registration.
-// This augmentation is program-global, so it also types `useRouteContext('product')`
-// in the sibling `routerIsland.test.tsx` runtime test.
+// Register the route table as an app does, `RatiUserTypes['routes'] = typeof routes`, so
+// `useRouteContext(name)` types itself off it. The augmentation is program-global, so it also
+// types routerIsland.test.tsx.
 
 // A providing route: its scope ends in `.provide()`, so the carried context is the
 // provided value.

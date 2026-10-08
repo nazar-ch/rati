@@ -14,23 +14,15 @@ import { NotAvailableError, type SourceError } from '../../scope/source.js';
 import { flush, renderIsland, ssrRender, cleanup } from '../../testing/index.js';
 
 /*
-    `retry` — the island takes another go at a failed resolution before it gives up.
+    long:2
+    `retry` — the island takes another go at a failed resolution. An accepted failure is NOT an
+    error state: the island keeps showing what it shows while resolving, the error slot never
+    mounts, and `retrying` names the attempt. A spent budget or a terminal failure puts the
+    error slot up, and its manual `retry` starts over.
 
-    The shape the pins hold: an accepted failure is *not* an error state. The island keeps
-    showing what it shows while resolving (the loading slot, or the kept run under
-    `keepStale`), the error slot never mounts, and `retrying` says which attempt is in
-    flight. Only a spent budget — or a failure that was never a transient fault — puts the
-    error slot up, and the manual `retry` on it starts over.
-
-    Who is retried at all is the two-level error's business (DATA-10). The policy is **on by
-    default** and reads `retryable`: a classified transient failure is retried with no
-    config at all, a terminal one never is. An island that asks for a policy explicitly gets
-    a broader reach — the unclassified `failed` a bare `throw new Error` produces — and
-    `retry: false` opts out of the whole thing.
-
-    The cadence is exponential from `backoffMs`, drawn with **full jitter**: each wait is a
-    random point in `[0, ceiling]`. `Math.random` is stubbed at 1 below so the pins can name
-    an exact tick — that is the ceiling itself, the longest wait the schedule can produce.
+    The policy is ON BY DEFAULT and reads `retryable`; an explicit policy also retries an
+    unclassified `failed`, and `retry: false` opts out. Waits are exponential with full jitter;
+    `Math.random` is stubbed at 1 below, so a wait is its ceiling and a pin names an exact tick.
 */
 
 const BACKOFF = 500;
@@ -129,7 +121,7 @@ describe('retry — the client', () => {
             { props: { id: 'a' } },
         );
 
-        // The whole reason the decision is made in the boundary's *render*: a slot that
+        // The whole reason the decision is made in the boundary's RENDER: a slot that
         // mounted and unmounted would have run its effects — the toast, the Sentry report.
         expect(errorRenders).toBe(0);
         await advance(BACKOFF);
@@ -245,7 +237,7 @@ describe('retry — the client', () => {
         await handle.rerender({ id: 'b' });
 
         // The countdown was about a screen that no longer exists; letting it fire would
-        // re-resolve the *new* inputs for no reason.
+        // re-resolve the NEW inputs for no reason.
         expect(vi.getTimerCount()).toBe(before);
         expect(handle.text()).toBe('page b');
         expect(handle.controls().retrying).toBe(0);
@@ -295,11 +287,10 @@ describe('retry — the client', () => {
 
 describe('retry — live-shaped timing', () => {
     /*
-        The pins above throw in a microtask under a jitter pinned at its ceiling — one corner
-        of the timing square. A real fetch settles on a later macrotask, and full jitter
-        legally draws near zero; that corner is where the boundary's stale-error render used
-        to spend the next attempt before its load ran and arm the backoff concurrently with
-        it (FND-07). These pins hold the other corners.
+        The pins above throw in a microtask under a jitter pinned at its ceiling — one corner of
+        the timing square. A real fetch settles on a later macrotask, and full jitter draws near
+        zero; these pins hold those corners, where a stale-error render can spend an attempt
+        before its load ran.
     */
     beforeEach(() => {
         vi.useFakeTimers();
@@ -357,7 +348,7 @@ describe('retry — live-shaped timing', () => {
         await run(clock, 1);
         expect(calls).toEqual([0, LATENCY + BACKOFF]);
 
-        // Attempt 2 fails LATENCY later; the doubled wait runs from *that* failure — armed
+        // Attempt 2 fails LATENCY later; the doubled wait runs from THAT failure — armed
         // when the attempt started, the third would land BACKOFF*2 early, mid-flight.
         await run(clock, LATENCY + BACKOFF * 2 - 1);
         expect(calls).toHaveLength(2);
@@ -370,10 +361,8 @@ describe('retry — live-shaped timing', () => {
     });
 
     test('a near-zero jitter draw still walks the whole schedule to the error slot', async () => {
-        // A draw of 0 is a legal full-jitter outcome. Before the fix it fired the
-        // prematurely-armed timer while the attempt was still in flight: the in-flight
-        // generation was discarded unjudged, an unbudgeted extra load ran after the budget
-        // was spent, and the error slot mounted transiently on the way.
+        // A draw of 0 is a legal full-jitter outcome: the timer must not fire while the attempt
+        // is in flight, discarding it unjudged or running a load past the budget.
         vi.spyOn(Math, 'random').mockReturnValue(0);
         let errorRenders = 0;
         const calls: number[] = [];
@@ -452,7 +441,7 @@ describe('retry — default-on, no config at all', () => {
         const attempts: Attempts = {
             calls: [],
             failing: true,
-            // The 403 shape: FND-02's acceptance check, on an island with no retry config.
+            // The 403 shape, on an island with no retry config.
             throws: classified('forbidden', false),
         };
         const before = vi.getTimerCount();
@@ -470,8 +459,8 @@ describe('retry — default-on, no config at all', () => {
         const before = vi.getTimerCount();
         const handle = await renderIsland(unconfigured(attempts), { props: { id: 'a' } });
 
-        // An app that never classifies is exactly where default-on retry would hammer its
-        // 404s, so it gets the behavior it had before the default existed.
+        // An app that never classifies is where default-on retry would hammer its 404s, so its
+        // failures go straight to the error slot.
         expect(handle.slot()).toBe('error');
         expect(attempts.calls).toHaveLength(1);
         expect(handle.controls().retrying).toBe(0);
@@ -501,7 +490,7 @@ describe('retry — default-on, no config at all', () => {
         const before = vi.getTimerCount();
         const handle = await renderIsland(flakyConfig(attempts), { props: { id: 'a' } });
 
-        // The configured island used to hammer this one `count` times over.
+        // A configured island declines a terminal failure too.
         expect(handle.slot()).toBe('error');
         expect(attempts.calls).toHaveLength(1);
         expect(vi.getTimerCount()).toBe(before);
@@ -544,14 +533,14 @@ describe('retry — the backoff schedule', () => {
             expect(wait).toBeGreaterThanOrEqual(0);
             expect(wait).toBeLessThanOrEqual(ceiling);
         });
-        // The cap binds well before the last attempt — an un-capped schedule would ask for
-        // 128s here, which is a hang wearing a spinner.
+        // The cap binds before the last attempt: an uncapped schedule is a hang wearing a
+        // spinner.
         expect(Math.max(...waits)).toBeLessThanOrEqual(MAX_BACKOFF_MS);
     });
 
     test('the draws differ — the schedule is a ceiling, not an appointment', () => {
-        // Un-jittered, every island that failed in the same blip comes back on the same
-        // tick. 8 identical draws off a 10s ceiling is not something to see in a lifetime.
+        // Un-jittered, every island that failed in the same blip returns on the same tick;
+        // identical draws across the whole schedule never happen by chance.
         const waits = waitsFor({ count: 8, backoffMs: MAX_BACKOFF_MS });
         expect(new Set(waits).size).toBeGreaterThan(1);
     });

@@ -55,9 +55,8 @@ describe('query.source()', () => {
 });
 
 describe('collection.source()', () => {
-    // DATA-15 decision: no `ReadyCollection`. `items` is `readonly Item[]` in
-    // every phase (empty before the first fetch), so there is no undefined to
-    // strip — the brand would carry no information.
+    // No `ReadyCollection`: `items` is `readonly Item[]` in every phase (empty before the
+    // first fetch), so a brand carries no information.
     test('resolves the instance itself, unbranded', () => {
         const rows = collection({
             fetch: async (): Promise<Row[]> => [],

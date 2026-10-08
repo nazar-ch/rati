@@ -9,21 +9,9 @@ import { RouterProvider } from '../router/RouterProvider.js';
 import { RouterStore, type RouterHydratedState } from '../router/store.js';
 
 /*
-    createTestRouter — memory history + router + the RouterProvider wiring, rendered and
-    disposed for you. Replaces the `createMemoryHistory` / `createRouter` / provider /
-    `<RouterOutlet>` dance inlined across ~20 router test files (and the fuzz
-    routerHarness's core), and gives a real router so `<Link>` works under test with no
-    `vi.mock('rati')`.
-
-    Memory history, not the browser's: back()/forward() traverse its real entry stack and emit
-    synchronously (matching SSR and the fuzz model). Scroll restoration is off — jsdom has no
-    layout, and it would fire a rAF + window.scrollTo per navigation. The history leaks
-    listeners if nobody disposes it (the RF-01 lesson), so cleanup() detaches it through the
-    mount's dispose hook.
-
-    App stores are not this helper's business (rati has no stores container — an app's store
-    graph is app code): a suite whose components read app stores passes its own provider via
-    `wrapper`, and it renders inside the router context.
+    createTestRouter — memory history, router and RouterProvider wiring, rendered and disposed,
+    so `<Link>` works under test with no `vi.mock('rati')`. Scroll restoration is off, jsdom
+    having no layout; cleanup() detaches the history. App stores ride `wrapper`.
 */
 
 /** Options for {@link createTestRouter}. */
@@ -39,7 +27,7 @@ export interface CreateTestRouterOptions {
      */
     ui?: ReactNode;
     /**
-     * App-provided context around `ui`, rendered *inside* the router provider — the seam
+     * App-provided context around `ui`, rendered INSIDE the router provider — the seam
      * for an app's own stores/DI provider (`wrapper: AppStoresWrapper`).
      */
     wrapper?: ComponentType<{ children?: ReactNode }>;

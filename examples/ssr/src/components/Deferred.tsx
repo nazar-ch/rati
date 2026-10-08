@@ -2,11 +2,10 @@ import { island, scope } from 'rati';
 
 import { sleep } from '../util';
 
-// Where the load actually ran. The one-word, honest answer to "did this gate the
-// document?" — and the thing the two islands below disagree about.
+// Where the load ran: the answer to "did this gate the document?", on which the two
+// islands below disagree.
 const ranOn = () => (typeof window === 'undefined' ? 'the server' : 'the client');
 
-// ---------------------------------------------------------------------------------
 // The default: `prerender` is all-or-nothing, so this load is awaited before a single
 // byte goes out, and its value ships in the HTML payload.
 
@@ -31,15 +30,14 @@ const HeadlineIsland = island({
     loading: () => <div className="note">resolving the headline…</div>,
 });
 
-// ---------------------------------------------------------------------------------
 // The same island with one option flipped. Nothing about the scope changes — the load
 // is just as async — but the server never starts it: it renders the loading slot into
 // the HTML and the browser picks the work up after hydration.
 
 const feedScope = scope().load({
     feed: async () => {
-        // Deliberately slow. On the default path this would be 700ms of TTFB that every
-        // visitor pays before seeing anything at all.
+        // Slow on purpose: on the default path, every visitor pays it in TTFB before seeing
+        // anything.
         await sleep(700);
         return { where: ranOn(), at: new Date().toISOString() };
     },

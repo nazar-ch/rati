@@ -10,20 +10,16 @@ import { RouterProvider } from '../../router/RouterProvider.js';
 import { RouterStore } from '../../router/store.js';
 
 /**
- * RF-07's pins: `<Link>` navigates to the URL the *anchor* resolved, and decides active
- * state against the same resolution.
+ * long:2
+ * `<Link>` navigates to the URL the ANCHOR resolved, and decides active state against the
+ * same resolution. Kills:
  *
- * Kills executed once, 2026-07-17, each reverted after:
- *   - click handler back to `router.navigate(href)`: the five pins whose resolution
- *     differs from the spelling go red ('..', 'sub', '?q=1', '#h', and the absolute URL —
- *     that last one because navigating the full URL now hits the router's refusal guard).
- *     `href="/x"` stays green: an already-absolute path resolves to itself, which is the
- *     point — this changes nothing for the input class that always worked.
- *   - `isHrefActive` back to `router.isPath(href)`: only `href="c"` goes red.
+ *   - the click handler as `router.navigate(href)` → every pin whose resolution differs from
+ *     its spelling goes red; `href="/x"` stays green, resolving to itself;
+ *   - `isHrefActive` as `router.isPath(href)` → only `href="c"` goes red.
  *
- * The `..`/`sub`/external *inactive* pins pass under both engines — `isPath` said false for
- * the raw spelling too, by accident. They pin the other direction (resolution must not
- * start marking things active) and are honest regression cover, not evidence for this fix.
+ * The `..`/`sub`/external INACTIVE pins pass under both: regression cover in the other
+ * direction.
  */
 
 const NoopComponent: FC = () => null;
@@ -114,8 +110,7 @@ describe('<Link> active state resolves before comparing', () => {
         ['/a/b/c', 'c', true],
         ['/a/b/c', '/a/b/c', true],
         // An empty href is the current document (the parser returns the base), so it is
-        // active — under the old spelling comparison it never was. Deliberate: resolution
-        // decides, not the raw string.
+        // active: resolution decides, not the raw string.
         ['/a/b/c', '', true],
         ['/a/b/c', '..', false],
         ['/a/b/c', 'sub', false],

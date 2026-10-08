@@ -49,47 +49,9 @@ import { navTrace, navTraceEnabled } from '../util/navTrace.js';
 import { is, deepEqual } from '../util/utils.js';
 
 /*
-    The mandala's resolution mechanics: compile a scope's levels into a nested tree of
-    `Step` components — one per level — and let React be the resolver.
-
-      - Waterfall = nesting. Each `Step` resolves its level and renders the next once
-        ready; the leaf provides the value to the subtree and renders the component.
-      - every entry ready  → the main component, fed each entry's value;
-      - any entry errored  → the error slot (one slot: not-available / forbidden /
-                             failed all arrive as a SourceError, switch on `code`);
-      - otherwise          → the loading slot.
-
-    Resolution runs on React mechanics so it works under SSR:
-
-      - a *promise* entry is unwrapped with `use()` — it suspends while pending (the
-        Suspense fallback is the loading slot) and a Suspense-aware server render
-        (react-dom/static `prerender`) awaits it. Rejections throw to the mandala's
-        ErrorBoundary → the error slot. Server-side there is no such boundary (React runs
-        none), so an island asking for its failures to be dehydrated
-        (`ssrErrors: 'dehydrate'`) has the throw taken here instead — see Shared.ssrErrors.
-      - a *source* entry (a reactive `pending | ready | error` state machine) is read
-        observably; pending renders the loading slot, error throws to the slot. A ready
-        source returning to pending drops back to loading, live. Under SSR an unmarked
-        source stays pending (no server resolution); a source carrying the `ssr` marker
-        is resolved server-side through the promise path (see `firstSettle`) and its
-        value dehydrated — as a plain value for a loader (`ssr: true`), or as a seed the
-        client feeds to `source.ssr.hydrate` before attaching (a live source).
-      - a *hook* load (`hook(fn)`) runs every render so `fn` may call any React hook;
-        it's the seam that lets a level read its own deps (`use(StoresContext)`) — the
-        reason `env` is gone. Its result is classified like a function load. rati never
-        attaches/detaches a hook source; the hook owns its own subscription.
-
-    Lifetime is React's: each `Step` attaches its level's *data* sources in an effect
-    and detaches on unmount; a param change remounts the inner tree, so React tears the
-    old one down (children first → the leaf's `.provide()` value disposes before the
-    sources it was built over detach) and mounts a fresh one.
-
-    Selective refresh (`useScopeControls().refresh(key)`) re-runs single cells in place —
-    the model and controller live in refresh.ts; the render-side halves (dirty re-runs,
-    stale rendering, source swaps) live here.
+    The mandala's resolution mechanics: a scope's levels compile into nested `Step` components,
+    one per level, and React is the resolver. The design is docs/current/internals.md.
 */
-
-// ---------------------------------------------------------------------------------------
 
 // Flatten the scope's prevScope links into ordered levels (level 0 first).
 export function flattenLevels(scope: Scope): Scope['definition'][] {
@@ -100,10 +62,9 @@ export function flattenLevels(scope: Scope): Scope['definition'][] {
     return levels;
 }
 
-// What a level compiles to, memoized once per level object (a level is frozen at build
-// time): the hook/data key split — `hook()` loads run every render, everything else
-// (props, functions, promises, sources, classes, values) is a cached data load — plus the
-// level's own `Step` identity, named for its keys.
+// What a level compiles to, memoized once per frozen level object: the hook/data key split —
+// `hook()` loads run every render, every other entry is a cached data load — and the level's
+// own `Step`, named for its keys.
 type CompiledLevel = {
     keys: string[];
     hookKeys: string[];
@@ -127,14 +88,10 @@ function compileLevel(level: Scope['definition']): CompiledLevel {
     return compiled;
 }
 
-// A per-level alias of `Step` carrying the level's keys as its displayName, so the React
-// DevTools tree reads `Island(Prefs) → Step(user,prefs) → Step(tree)` instead of a stack
-// of anonymous `Step`s. A *bound copy*, not a wrapper component: no extra fiber, no extra
-// hook context — and memoized on the frozen level object above, so a level's component
-// identity is stable across renders and React reconciles the tree exactly as before. The
-// island's own label sits right above it in the tree, so it isn't repeated here (and a
-// level object is shared by every mandala built from the same scope, which would make one
-// island's name wrong anyway).
+// A per-level alias of `Step` whose displayName is the level's keys, for DevTools
+// (`Island(Prefs) → Step(user,prefs)`). A bound copy, never a wrapper: no extra fiber, and
+// memoized on the frozen level, so its identity is stable. A level object is shared across
+// mandalas, so it carries no island label.
 function namedStep(keys: string[]): typeof Step {
     const named = Step.bind(null) as typeof Step & { displayName?: string };
     const label = keys.join(',');
@@ -145,11 +102,10 @@ function namedStep(keys: string[]): typeof Step {
     return named;
 }
 
-// Classify a *data entry* (the value written in the scope definition) into a cell.
-// Function/class producers run against a read-tracking proxy of the prior levels'
-// values — the recorded read-set is what a selective refresh cascades along. A function
-// load additionally gets the level's `LoadContext` (its abort signal); a class load
-// doesn't — it constructs a value, and what it starts it owns.
+// Classifies a data entry into a cell. Function and class producers run against a
+// read-tracking proxy of the prior levels' values, the read-set a selective refresh cascades
+// along; a function load also gets the level's `LoadContext`, and a class load owns what it
+// starts.
 function classifyEntry(
     entry: unknown,
     prev: Record<string, unknown>,
@@ -183,14 +139,12 @@ function classifyEntry(
     return makeStaticCell({ kind: 'value', value: entry });
 }
 
-// Classify the *result* of a function/class/hook load (already called).
+// Classify the result of a function/class/hook load (already called).
 function classifyResult(result: unknown): ProducedBody {
     if (is.promise(result)) return { kind: 'promise', promise: result };
     if (isSource(result)) return { kind: 'source', source: result };
     return { kind: 'value', value: result };
 }
-
-// ---------------------------------------------------------------------------------------
 
 // Shared, render-stable inputs threaded down the Step tree.
 export type Shared = {
@@ -222,13 +176,10 @@ export type Shared = {
     // The promises this run has already handed to `collectError` (see recordRejection).
     // Lives on the run, next to the collector it feeds — present exactly when that is.
     recordedRejections: WeakSet<Promise<unknown>> | undefined;
-    // Server + `ssrErrors: 'dehydrate'` only; undefined everywhere else, which is the
-    // whole default path. React runs no error boundary during a server render, so a
-    // rejected load would reach nobody and the HTML would degrade to the loading slot —
-    // this is the resolver's own error path instead. `guard` hands back a promise that
-    // cannot reject (see ssrErrors.ts) and `slot` builds the island's error slot for the
-    // Step to render where it stands; `slot` is null when the island declares none, which
-    // leaves the throw — and the degradation — exactly as it is by default.
+    // Server with `ssrErrors: 'dehydrate'` only. React runs no error boundary during a server
+    // render, so this is the resolver's own error path: `guard` hands back a promise that
+    // cannot reject (ssrErrors.ts), and `slot` builds the island's error slot, null when it
+    // declares none.
     ssrErrors:
         | {
               guard: (promise: Promise<unknown>) => Promise<unknown>;
@@ -273,10 +224,9 @@ function buildCell(
     shared: Shared,
     context: LoadContext,
 ): Cell {
-    // A value dehydrated from the server short-circuits the entry: skip the load (no
-    // re-fetch) and `use()` (no re-suspend), so hydration renders the server HTML
-    // synchronously. Promise loads and loader sources (`ssr: true`) land here — for the
-    // latter the producer never runs client-side either: promise semantics end to end.
+    // A value dehydrated from the server short-circuits the entry, skipping the load and
+    // `use()`, so hydration renders the server HTML synchronously. Promise loads and loader
+    // sources (`ssr: true`) land here, and a loader's producer never runs client-side.
     if (shared.hydration && key in shared.hydration) {
         const entry = level[key];
         shared.claim?.(key, 'data');
@@ -295,11 +245,9 @@ function buildCell(
         };
     }
 
-    // ...and a failure dehydrated from the server (`ssrErrors: 'dehydrate'`) short-circuits
-    // it the same way, to the other outcome: the cell lands in its error state, the resolve
-    // pass throws it to the boundary, and the error slot the server already rendered stays
-    // — with `retry` armed, and without the load running here at all. Read after the values
-    // above only because a key cannot be in both sections.
+    // ...and a failure dehydrated from the server (`ssrErrors: 'dehydrate'`) short-circuits it
+    // to the error state: the resolve pass throws it to the boundary, and the server's error
+    // slot stays with `retry` armed, the load never running here.
     if (shared.errors && key in shared.errors) {
         shared.claim?.(key, 'errors');
         return makeStaticCell({ kind: 'error', error: shared.errors[key]! });
@@ -325,12 +273,10 @@ function buildCell(
         }
     }
 
-    // Server + `ssr` marker: resolve the source through React's own wait mechanics —
-    // its first settle wrapped into a promise (attached during render, which is what
-    // the marker authorizes). Dehydrates as a plain value for a loader (`ssr: true`),
-    // or through `dehydrate` as a seed for a live source. Gated on the collector: a
-    // prerender without a HydrationProvider couldn't carry the value over, and a
-    // server-resolved-but-unhydratable source would mismatch on the client.
+    // Server with the `ssr` marker: the source's first settle becomes a promise, attached
+    // during render as the marker authorizes. Gated on the collector: without a
+    // HydrationProvider the value cannot cross, and a server-resolved source mismatches on the
+    // client.
     if (cell.kind === 'source' && shared.collect && cell.source.ssr) {
         const ssr = cell.source.ssr;
         return {
@@ -366,11 +312,9 @@ function traceCell(
     }
 }
 
-// Render-time halves of a selective refresh: re-run dirty cells against the current
-// `prev` (fresh upstream values — including values a cascade swapped in this very
-// pass, since levels render top-down). A promise re-run keeps the old value rendered
-// and settles through the controller; a sync value re-run gates and swaps here; a
-// source re-run swaps the source (new `sources` identity re-keys the Step's effects).
+// Render-time halves of a selective refresh: dirty cells re-run against the current `prev`,
+// a cascade's values included. A promise re-run settles through the controller, a sync value
+// gates and swaps here, and a source re-run swaps the source, re-keying the Step's effects.
 function processDirtyCells(
     level: Scope['definition'],
     dataKeys: string[],
@@ -388,7 +332,7 @@ function processDirtyCells(
 
         traceCellRefresh(trace, index, key);
         // The re-run gets the same bucket signal the first run did: a selective refresh
-        // replaces a load *within* the run, it doesn't discard the run.
+        // replaces a load WITHIN the run, it doesn't discard the run.
         const next = classifyEntry(level[key], prev, key, { signal: bucketSignal(bucket) });
         traceCell(trace, index, key, next);
         cell.reads = next.reads;
@@ -437,16 +381,9 @@ function processDirtyCells(
     }
 }
 
-// Hand a rejecting promise load to the render's error collector, once per promise: a
-// suspended level re-renders on resume and its cached cell (same promise identity) passes
-// through here again — without the guard every pass would stack another handler.
-//
-// The ledger is the *run's* (created with its bucket cache, dies with it), not the
-// module's. A module-global WeakSet guards one render just as well but outlives it: a
-// second collected render of a tree that reuses the same promise instance — a module-level
-// promise, or one promise captured across two `ssrRender`s — found it already recorded and
-// skipped `collectError` entirely, so that render's `errors` came back empty and the
-// server's 404/5xx signal went quiet with nothing to say so.
+// Hands a rejecting promise load to the render's error collector once per promise per RUN: a
+// suspended level re-renders on resume with the same cached promise, and a module-global
+// ledger silences a second render reusing that promise.
 function recordRejection(shared: Shared, key: string, promise: Promise<unknown>): void {
     const { collectError, recordedRejections } = shared;
     if (!collectError || !recordedRejections || recordedRejections.has(promise)) return;
@@ -468,11 +405,9 @@ type StepProps = {
 };
 
 /*
-    One level of the waterfall. Hook loads run every render in stable order (never
-    cached); data loads are built once for this mount (cached identity, so a promise
-    handed to `use()` / a source handed to the reactive read stay stable across the
-    source-transition re-renders), and attached/detached in an effect. The hooks pass
-    runs before any `use()` so an early `<Loading/>` return is hook-order safe.
+    One level of the waterfall. Hook loads run every render in stable order, before any
+    `use()`, so an early `<Loading/>` return is hook-order safe; data loads are built once per
+    mount, with stable identity, and attached in an effect.
 */
 function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }: StepProps) {
     // Data cells for this level, built once into the mandala-held bucket (survives a
@@ -483,7 +418,7 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
     if (!bucket.built) {
         traceLevelStart(trace, index, keys);
         // What this level's function loads receive as their second argument — one bag
-        // for the level, carrying the *bucket's* signal: cancellation lives with the run,
+        // for the level, carrying the BUCKET'S signal: cancellation lives with the run,
         // not with the individual load (see bucketSignal).
         const context: LoadContext = { signal: bucketSignal(bucket) };
         for (const key of dataKeys) {
@@ -509,25 +444,9 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
     const dataCells = bucket.cells;
     const sources = bucket.sources;
 
-    // Attach (layout) and detach (passive) are split across two effects on purpose.
-    //
-    // ATTACH in a *layout* effect so a synchronously-ready source (an already-cached
-    // resource) flips ready before the browser paints: the attach runs in the commit's
-    // layout phase, its reactive read re-renders the Step before paint, and the loading
-    // slot below — though rendered for one pass — is replaced with content in the same
-    // frame (no visible flash). A passive attach ran after paint, so even cached data
-    // showed the loading slot for a frame. A genuinely pending source still renders the
-    // loading slot (its state stays pending after attach); only the wasted cached-data
-    // frame is removed.
-    //
-    // DETACH in a *passive* effect's cleanup so it stays ordered after the leaf's
-    // `.provide()` dispose, which is a layout cleanup: React flushes every layout
-    // cleanup before any passive cleanup, so the provided value (built over these
-    // grabbed sources) is disposed while the sources are still attached — the
-    // load-bearing dispose-before-detach order. (Keeping detach in the layout effect's
-    // own cleanup would make it a layout cleanup too, and layout cleanups run
-    // parent-first, so this level's detach would run before the deeper leaf's dispose —
-    // the exact inversion this split avoids.)
+    // ATTACH in a LAYOUT effect, so a synchronously-ready source flips to content before paint.
+    // DETACH in a PASSIVE cleanup, which React flushes after every layout cleanup, so the leaf's
+    // `.provide()` dispose runs while the sources are still attached (docs/current/internals.md).
     useLayoutEffect(() => {
         if (sources.length && navTraceEnabled()) {
             navTrace(`level ${index} source attach (pre-paint) [${dataKeys.join(',')}]`);
@@ -537,12 +456,9 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
 
     useEffect(() => {
         return () => {
-            // A source swap replaces the array ([sources] re-keys this effect): the
-            // swap's leavers detach here, but entries the live bucket still holds must
-            // stay attached. A stale bucket (inner-tree remount) detaches everything;
-            // plain unmount leaves the live entries to the mandala's sweep (a cleanup
-            // can't tell deps-change from unmount). A run `keepStale` is holding on
-            // screen counts as live for exactly the same reason: it is still rendering.
+            // A source swap re-keys this effect: its leavers detach here, and entries the live
+            // bucket holds stay. A stale bucket detaches everything; an unmount leaves the live
+            // entries to the mandala's sweep, and a kept run counts as live.
             const bucketIsLive = shared.bucketRetained(index, bucket);
             for (let i = sources.length - 1; i >= 0; i--) {
                 const entry = sources[i]!;
@@ -559,14 +475,9 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
         };
     }, [sources]);
 
-    // Re-render this level when any of its data sources transitions. One uSES per Step
-    // subscribes to all the level's sources at once (the array identity changes only on
-    // a source swap, which re-keys the subscription). The snapshot is the array of
-    // source states, rebuilt only when one changes identity — so it stays referentially
-    // stable between transitions (uSES requires that). Sources only emit from
-    // `attach()` (the effect above), so the subscription is live before any transition.
-    // Hook sources aren't here: a hook owns its own subscription (it runs every render
-    // and may call its own hooks).
+    // One uSES per Step subscribes to the level's sources, re-keyed when a swap replaces the
+    // array; the snapshot is the array of source states, rebuilt only on a change, as uSES
+    // requires. Hook sources own their subscription.
     const sourceStore = useMemo(() => {
         let snapshot = sources.map((entry) => entry.source.getSnapshot());
         const changed = () => {
@@ -615,11 +526,9 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
             const ssrErrors = shared.ssrErrors;
             const value = use(ssrErrors ? ssrErrors.guard(cell.promise) : cell.promise);
             if (ssrErrors && value instanceof SsrRejection) {
-                // Render the island's error slot from here — the deterministic first paint
-                // this mode exists for. With no slot to render there is nothing to be
-                // deterministic about, so the throw takes the default path: React degrades
-                // the boundary to the loading slot, and the client (which still receives
-                // the dehydrated failure) surfaces it through the app's own boundary.
+                // Renders the island's error slot here, the deterministic first paint this mode
+                // exists for. With no slot the throw takes the default path: React degrades the
+                // boundary to the loading slot.
                 if (!ssrErrors.slot) throw value.error;
                 return ssrErrors.slot(value.error);
             }
@@ -661,8 +570,8 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
             if (state.status === 'pending') {
                 // A cascade-swapped source still warming up keeps the pre-swap value
                 // rendered instead of dropping the level to the loading slot. A live
-                // source that itself returns to pending still drops to loading — that
-                // behavior is the source's own contract, unchanged.
+                // source that itself returns to pending still drops to loading — the source's
+                // own contract.
                 if ('swapped' in cell && cell.swapped && cell.hasValue) {
                     resolved[key] = cell.lastValue;
                 } else {
@@ -673,13 +582,10 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
                     cell.swapped = false;
                     shared.controller?.sourceReady(key);
                 }
-                // A source's value moving must reach the loads that read it, exactly like a
-                // promise settle or a sync re-run — a swap settling on a new value, or a
-                // live source simply transitioning. Gated on `hasValue`, so a *first* ready
-                // cascades nothing: the levels below have not run yet and the waterfall
-                // feeds them this value on its way down. Through the same equals gate as
-                // every other path, so an unchanged snapshot (an S8 pending/ready blip
-                // recovering onto its old value) moves nothing.
+                // A source's value moving reaches the loads that read it, as a promise settle
+                // does. Gated on `hasValue`, so a FIRST ready cascades nothing — the waterfall
+                // feeds the levels below on its way down — and through the equals gate, so a
+                // pending/ready blip onto the old value moves nothing.
                 if ('rerunnable' in cell && cell.hasValue) {
                     const equals = cell.equals ?? deepEqual;
                     if (!equals(cell.lastValue, state.value)) {
@@ -707,10 +613,9 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
     return children(resolved);
 }
 
-// The waterfall's tail: provide the value to the subtree (the resolved props by
-// default, or the `.provide()` value) and render the component. A `.provide()` value
-// is built in an effect (its factory has side effects) and disposed on unmount —
-// before the sources it was built over detach (see Step's effect comment).
+// The waterfall's tail: provides the resolved props or the `.provide()` value to the subtree
+// and renders the component. A `.provide()` value is built in an effect, its factory having
+// side effects, and disposed before the sources it was built over detach.
 type LeafProps = { resolved: Record<string, unknown>; shared: Shared };
 
 function Leaf({ resolved, shared }: LeafProps) {
@@ -723,7 +628,7 @@ function Leaf({ resolved, shared }: LeafProps) {
     const Component = shared.component;
     const channel = shared.channel;
 
-    // Provide-by-default: this render *is* the output, so the commit is the whole story
+    // Provide-by-default: this render IS the output, so the commit is the whole story
     // (a `.provide()` scope waits for its value — see ProvideLeaf). A layout effect, so
     // the baseline `keepStale` keeps is one that actually reached the screen.
     const commit = shared.commit;
@@ -769,10 +674,9 @@ type ProvideLeafProps = {
     commit: Shared['commit'];
     swap: Shared['swap'];
     retainProvided: Shared['retainProvided'];
-    // The mandala's bucket array — a new identity whenever the cache is rebuilt (param
-    // change / StrictMode remount), and stable across plain re-renders + live source
-    // updates. Used as the rebuild key so the provided value tracks the surviving run
-    // without deep-comparing `resolved` (which holds live store instances).
+    // The mandala's bucket array, a new identity only when the cache is rebuilt — the rebuild
+    // key, so the provided value tracks the surviving run without deep-comparing `resolved`,
+    // which holds live store instances.
     cacheToken: unknown;
     controller: RefreshController | undefined;
 };
@@ -795,13 +699,9 @@ function ProvideLeaf({
     const [version, bumpVersion] = useReducer((count: number) => count + 1, 0);
     const readsRef = useRef<ReadonlySet<string> | null>(null);
 
-    // Build the value, dispose it on teardown / rebuild. A *layout* effect so that, on
-    // unmount, this dispose runs in the commit's layout phase — before the *passive*
-    // effect that detaches the sources it was built over (React flushes all layout
-    // cleanups before any passive cleanup). That's the load-bearing dispose-before-detach
-    // order. Keyed by `cacheToken`: rebuilds for a new run (param change / StrictMode
-    // remount), not on per-render churn — plus `version` for selective refresh.
-    // `resolved` is read from the rebuild render.
+    // Builds the value and disposes it on teardown or rebuild, in a LAYOUT effect: its unmount
+    // dispose runs before the PASSIVE detach of the sources it was built over. Keyed by
+    // `cacheToken` (a new run) and `version` (a selective refresh), never per-render churn.
     useLayoutEffect(() => {
         navTrace('leaf .provide() built — component renders next');
         const { proxy, reads } = trackReads(resolved);
@@ -822,7 +722,7 @@ function ProvideLeaf({
             // A run `keepStale` is holding on screen is still publishing this value, so the
             // mandala takes the dispose and runs it at the swap — before it detaches the
             // sources the value was built over, which is the order that matters. Everything
-            // else (a rebuild, a discarded run, unmount) disposes right here, as always.
+            // else (a rebuild, a discarded run, unmount) disposes right here.
             if (retainProvided?.(cacheToken as Bucket[], disposeValue)) return;
             disposeValue();
         };
@@ -836,7 +736,7 @@ function ProvideLeaf({
         });
     }, [controller]);
 
-    // The output of a `.provide()` run is its props *and* the value it publishes, so the
+    // The output of a `.provide()` run is its props AND the value it publishes, so the
     // commit waits for the build above — which is also why it can't ride the same effect.
     useLayoutEffect(() => {
         if (built) commit?.(cacheToken as Bucket[], resolved, { value: built.value });
@@ -888,6 +788,5 @@ export function buildTree(
     );
 }
 
-// Bucket re-export: the model moved to refresh.ts with the controller; mandala.tsx and
-// the tests import it from here, the resolver's home turf.
+// Re-exported for mandala.tsx and the tests, which import the bucket model from the resolver.
 export type { Bucket } from './refresh.js';

@@ -16,22 +16,13 @@ import { awayUrl, buildHarness, commandCaseArb, type Harness } from './routerHar
 import { RouterModel } from './routerModel.js';
 
 /*
-    The RF-03 model-based property: a generated route table meets a generated *command
-    sequence* — pushes and replaces by reference and by URL, shallow navigations, per-entry
-    state, query rewrites, redirects, and the back/forward/go traversal — driven against a
-    real RouterStore over a memory history and mirrored in the reference model.
-
-    Each command asserts the contract after itself (routerCommands.ts). This file owns the
-    two things only the whole run can say: the **catch-all** at quiesce (nothing above left
-    a stale route on screen), and the **teardown tail** — that a disposed store has actually
-    let go of the history it was given.
-
-    Where the smoke property (RF-02) searches forward navigation over generated tables, this
-    one searches the interleavings: a POP landing on a shallowly-created entry, a redirect
-    reached by going back to it, state-only entries stepped through, shallow navigations
-    stacked on each other. Route components are plain — data resolution under navigation is
-    the mandala suite's ground, and folding an island in would put two engines in one
-    property.
+    long:2
+    The router's model-based property: a generated route table meets a generated COMMAND
+    SEQUENCE — pushes and replaces by reference and by URL, shallow navigations, per-entry state,
+    query rewrites, redirects, back/forward/go — against a real RouterStore over a memory history,
+    mirrored in the model. Each command asserts the contract after itself (routerCommands.ts);
+    this file owns the catch-all at quiesce and the teardown tail, that a disposed store let go
+    of its history. It searches the interleavings the smoke property's forward navigation misses.
 */
 
 afterEach(cleanup);
@@ -43,19 +34,9 @@ beforeEach(() => {
 });
 
 /**
- * The tail RF-03.4 asks for: after `dispose()`, the store has detached from the history it
- * was handed — driving that history reaches nothing.
- *
- * Driven while the tree is still mounted, which is the whole point: a store that never
- * unhooked its listener would resolve the new URL, re-key the route, and remount it, and
- * none of that is observable in a tree that has already been thrown away. The URL is chosen
- * to always resolve to *something* other than where the router is (`awayUrl`), so the
- * tripwire cannot come up vacuous.
- *
- * Deliberately not asserted here: the created-history DOM detach (RF-01's finding 4). This
- * harness injects its history, so `dispose()` never reaches `history.dispose()` — and that
- * leak has no store-level shadow anyway, which is why its pin lives at the History surface
- * in `webRouterCore.test.ts`, where it bites.
+ * The teardown tail: after `dispose()` the store has detached from its history, so driving
+ * the history reaches nothing — driven while the tree is still mounted, where a store still
+ * listening re-keys the route. A created history's DOM detach is `webRouterCore.test.ts`'s.
  */
 async function assertDetachedAfterDispose(
     harness: Harness,
@@ -105,7 +86,7 @@ describe('router fuzz — commands (navigation interleavings over generated rout
 
                             // The catch-all: nothing above left a stale route on screen. Every
                             // command was checked, so this restates the end state as one fact —
-                            // the Router is showing what the *current* URL resolves to.
+                            // the Router is showing what the CURRENT URL resolves to.
                             assertRenderedState(harness, model.current(), 'final');
                         } finally {
                             await assertDetachedAfterDispose(harness, model, routerCase.table);
@@ -116,15 +97,9 @@ describe('router fuzz — commands (navigation interleavings over generated rout
                 fuzz(25),
             );
 
-            // The counters accumulate at every budget (routerCommands.ts `note`), but this
-            // sixteen-shape guard only *asserts* at the deep budget the `fuzz` stage always
-            // runs (FUZZ_RUNS=500) — the one place every shape is reliably reached. Two of
-            // them need a multi-step conspiracy (a shallow entry armed, navigated away from,
-            // then traversed back onto) that the default `fuzz(25)` budget reaches only
-            // ~86% of runs, so asserting there cried wolf ~14% of the time — the failure
-            // mode this guard exists to prevent, inverted (RF-09). At the deep budget it
-            // still bites: a harness that stopped generating a shape fails here, loudly, on
-            // every gate run. The first three are RF-03.3's by name.
+            // The counters accumulate at every budget, but this shape guard ASSERTS only at
+            // the deep budget the `fuzz` stage runs: a multi-step shape (a shallow entry armed,
+            // left, then traversed back onto) is not reliably reached at the default one.
             if (atDeepFuzzBudget()) {
                 for (const what of [
                     'a traversal ran',

@@ -7,38 +7,20 @@ import { type Source } from '../scope/source.js';
 
 /*
     long:2
-    `pagedCollection` — pages are queries.
+    `pagedCollection` — pages are queries: a page IS a `query`, so per-page phase,
+    stale-on-refresh, abort and `SourceError` come with it. One identity map sits under all
+    pages, so an item moving across a page boundary keeps its instance.
 
-    The page, not the list, is the unit of load state, and a page *is* a
-    `query` — so per-page phase, stale-on-refresh, abort and `SourceError` come
-    for free instead of forming a third state machine. One identity map (the shared reconciler) sits under all pages:
-    pages own fetch topology; the map owns item identity, so an item that moves
-    across a page boundary on refresh keeps its instance.
+    "Has more" is structural: a `nextCursor` materializes an unloaded tail page, whose `loading`
+    phase is the load-more row and whose `error` is an inline retry row.
 
-    "Has more" is structural: a page result carrying a `nextCursor`
-    materializes an unloaded tail page, and `hasMore` derives from its
-    existence. The tail's `loading` phase is the load-more spinner row; a
-    failed `loadMore()` is that page's `error` — an inline retry row
-    (`loadMore()` again — ensure re-fetches from error) that doesn't poison the
-    rest of the list.
+    Page k anchors on page k−1's `nextCursor` AT FETCH TIME, so `refresh()`, a sequential walk,
+    re-anchors as it goes; a refreshed page whose `nextCursor` turns null truncates its
+    successors. Cursor drift under heavy concurrent mutation is bounded, not eliminated.
 
-    Page k anchors on page k−1: its producer reads the predecessor's
-    `nextCursor` *at fetch time*, so `refresh()` — a sequential walk over the
-    loaded pages — re-anchors as it goes; depth, scroll position and item
-    identities survive, and the reconciler absorbs rows that moved across page
-    boundaries. A refreshed page whose `nextCursor` becomes null truncates its
-    successors (the list shrank). Cursor drift under heavy concurrent mutation
-    is bounded, not eliminated.
-
-    `reactive: true` is *reset*, not refresh: a tracked filter-param change
-    invalidates every cursor (each page anchors on its predecessor's now-defunct
-    `nextCursor`), so re-anchoring is impossible. The reaction tracks page 0's
-    producer (it reads the params at `cursor === null`); on change the whole list
-    resets to a fresh first page and reloads — so a mounted island drops to its
-    loading slot (an honest "new query", unlike a flat `collection`'s
-    stale-while-refetch; rati◊DATA-01). Debounce is not wired for the paged reset (the
-    reactive paged case is the infrequent dropdown filter; a keystroke filter uses
-    the flat `collection`).
+    `reactive: true` RESETS rather than refreshes: a filter-param change invalidates every
+    cursor, so the list reloads from a fresh first page and an island drops to loading
+    (rati◊DATA-01). The paged reset takes no debounce.
 */
 
 export interface PageResult<T, C> {
@@ -58,7 +40,7 @@ export interface PagedCollection<T, C = string, Item = T> {
     /** Re-fetch the loaded pages sequentially, re-anchoring cursor by cursor. */
     refresh(): Promise<void>;
     reset(): void;
-    /** Same contract as `Query.source()`: ready with **this instance** on the first page. */
+    /** Same contract as `Query.source()`: ready with THIS instance on the first page. */
     source(): Source<PagedCollection<T, C, Item>>;
 }
 
@@ -66,9 +48,8 @@ export interface PagedCollectionOptions<T, C, Item> extends ItemMapOptions<T, It
     fetchPage: (cursor: C | null, signal: AbortSignal) => Promise<PageResult<T, C>>;
     /**
      * Opt-in: reset to the first page when the observables `fetchPage` reads at
-     * `cursor === null` change (a filter/sort param). Cursors can't survive a
-     * param change, so this resets rather than refreshes. See the file header and
-     * `QueryOptions.reactive` for the tracked-read boundary.
+     * `cursor === null` change; no cursor survives a param change. `QueryOptions.reactive`
+     * holds the tracked-read boundary.
      */
     reactive?: boolean;
 }
@@ -102,7 +83,7 @@ export function pagedCollection<T, C = string, Item = T>(
         record.query = createQuery<PageResult<T, C>>(
             (signal) => {
                 // Anchor at fetch time: a refresh walk hands each page its
-                // predecessor's *fresh* cursor.
+                // predecessor's FRESH cursor.
                 const cursor = index === 0 ? null : state.records[index - 1]!.nextCursor;
                 return options.fetchPage(cursor, signal);
             },

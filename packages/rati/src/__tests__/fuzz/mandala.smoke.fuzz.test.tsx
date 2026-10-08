@@ -12,20 +12,14 @@ import { buildHarness, readContent, readSlot, scopeSpecArb } from './scopeHarnes
 
 /*
     long:2
-    The smoke property (rati◊MF-01): a generated scope mounts, its held loads settle one by one in a
-    generated order, and at every step the island shows exactly what the reference model says —
-    the loading slot until the last key, then content carrying the model's values (convergence).
-    Teardown balance is asserted in a `finally`, so a lifecycle leak fails the run even when
-    every mid-run assert passed. Every assert reads the contract — what a component, a user or
-    an attached source can tell — never the mechanism.
+    The smoke property: a generated scope mounts, its held loads settle one by one in a
+    generated order, and at every step the island shows what the model says — the loading slot
+    until the last key, then content carrying the model's values. Teardown balance is asserted
+    in a `finally`, so a leak fails the run even when every mid-run assert passed. Initial
+    resolution only; the event alphabet is the command property's.
 
-    Initial resolution only — the event alphabet (refreshes, rejections, source transitions,
-    remounts) is the command property next door (rati◊MF-02).
-
-    The same property runs a second time under `<StrictMode>` (see `runCountBound`, rati◊MF-03): the
-    contract must not depend on React's dev double-mount, and the ledger must balance through
-    the mount → cleanup → mount sequence — the one place a source can be attached by a run
-    whose cells were already thrown away.
+    The property runs again under `<StrictMode>`: the contract must not depend on React's dev
+    double-mount, and the ledger balances through mount → cleanup → mount.
 */
 
 afterEach(cleanup);
@@ -38,14 +32,9 @@ function nextToSettle(spec: ScopeSpec, held: string[]): string {
 }
 
 /*
-    Producer runs per key, as generations rather than a raw count (the altitude rule's
-    wording for run counts). Plain: one generation, so exactly one run each. StrictMode: the
-    dev double-mount drops the mandala's cell cache and rebuilds it, which is a second
-    generation for every level the mount reached — so the level-0 producers run twice, and a
-    level only the settles reach still runs once. Hence a *range*, not an equality: which
-    levels the double-mount got to depends on the generated shape (a scope of plain values
-    resolves the whole waterfall before the first settle), and that is not the contract's
-    business.
+    Producer runs per key, as generations. Plain: one run each. StrictMode's double-mount
+    rebuilds the cell cache, a second generation for every level the mount reached — so a
+    RANGE, since which levels it reached depends on the generated shape.
 */
 const runCountBound = (strict: boolean) => (strict ? { min: 1, max: 2 } : { min: 1, max: 1 });
 
@@ -56,13 +45,11 @@ function smokeProperty(strict: boolean) {
         const declared = createDeclaredState();
         const harness = buildHarness(spec, declared);
         const model = createModel(spec, declared);
-        // Mount inside an *async* act: under the sync act RTL wraps render() in,
-        // React never delivers the Suspense retry for a promise resolved later —
-        // the island stays on the loading slot forever (found by this property's
-        // first run; the deterministic suites mount this way throughout).
+        // Mount inside an ASYNC act: under a sync act React never delivers the Suspense
+        // retry for a promise resolved later, and the island stays loading.
         let view!: ReturnType<typeof render>;
         await act(async () => {
-            // `<StrictMode>` has to be the *root* element `render` gets: nested one
+            // `<StrictMode>` has to be the ROOT element `render` gets: nested one
             // component deeper React still double-renders but skips the double-mount
             // (no cleanup/re-run of effects) — which would leave this variant asserting
             // nothing about the lifecycle it exists for.
@@ -75,11 +62,9 @@ function smokeProperty(strict: boolean) {
                 // (all-or-nothing resolution), the loading slot otherwise.
                 expect(readSlot(view.container)).toBe(model.slot());
 
-                // The held frontiers agree: exactly the model-predicted loads are
-                // in flight (a producer running early or late shows up here). Under
-                // StrictMode the first generation's loads are held too, but its
-                // producers superseded them on the rebuild — so the *live* frontier
-                // is one entry per key either way.
+                // The held frontiers agree: exactly the predicted loads are in flight.
+                // StrictMode's first-generation loads are superseded on the rebuild, so
+                // the LIVE frontier is one entry per key either way.
                 expect(harness.held()).toEqual(model.held());
 
                 assertLedgerBounds(harness, model.slot(), 'smoke');

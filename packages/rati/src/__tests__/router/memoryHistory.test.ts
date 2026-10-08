@@ -99,11 +99,8 @@ describe('createMemoryHistory', () => {
 });
 
 /*
-    The entry stack. `createMemoryHistory` used to hold a single location — its doc said
-    "back/forward navigation is not modeled" — so every POP test in this suite's siblings
-    hand-rolled `replaceState` + a `PopStateEvent` against the *browser* history. These pin
-    the stack that replaced it (RF-02): the semantics are the browser's, so they are worth
-    stating as their own contract rather than leaving to the fuzz suite that drives them.
+    The entry stack: its semantics are the browser's, stated here as their own contract rather
+    than left to the fuzz suite that drives them.
 */
 describe('createMemoryHistory — the entry stack', () => {
     test('go() moves the index and reports POP', () => {
@@ -162,7 +159,7 @@ describe('createMemoryHistory — the entry stack', () => {
         // Lands on the entry we branched from. Asserting through `back` is what makes
         // this bite: a push that appends without truncating still leaves the index at
         // the tip, so `forward` is a no-op either way and the orphaned `/b` hides
-        // *behind* the new entry — where only a back step finds it.
+        // BEHIND the new entry — where only a back step finds it.
         expect(history.location.pathname).toBe('/a');
     });
 
@@ -220,9 +217,8 @@ describe('createMemoryHistory — the entry stack', () => {
 
 describe('createMemoryHistory — hostlessness', () => {
     test('does not touch window or document', () => {
-        // Smoke-check: constructing and using memory history with window
-        // temporarily shadowed should still work. If the implementation reaches
-        // for `window.*` anywhere, this throws.
+        // Smoke-check: memory history works with `window` and `document` shadowed; an
+        // implementation reaching for `window.*` throws here.
         const realWindow = globalThis.window;
         const realDocument = globalThis.document;
         try {

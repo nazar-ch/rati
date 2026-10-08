@@ -10,12 +10,9 @@ import { scope, type ScopeComponent } from '../../scope/scope.js';
 import { ssrRender, cleanup } from '../../testing/index.js';
 
 /*
-    Route-level SSR round-trips, through the testing kit's `ssrRender` / `.hydrate()` — with
-    the router wiring as a *documented composition* rather than a kit helper (the kit owns the
-    prerender→collect→hydrate mechanics; the router-SSR shape stays the app's to assemble, so
-    the entry doesn't freeze it). The composition: a memory-history router on the server, a
-    browser-history router on the client seeded from `prepareRoute`'s snapshot, and the two
-    trees handed to `ssrRender` / `.hydrate`.
+    Route-level SSR round-trips through `ssrRender` / `.hydrate()`, the router wiring a
+    documented composition the app assembles: a memory-history router on the server, a
+    browser-history one on the client seeded from `prepareRoute`'s snapshot.
 */
 
 function Home() {
@@ -41,28 +38,21 @@ afterEach(() => {
 });
 
 /**
- * The console.error calls React meant. One message is tolerated: running two react-dom
- * renderers (static/server for the prerender, client for the hydrate) in a single process
- * shares the module-level store context, which cannot happen where the server and the browser
- * are separate processes.
- *
- * This is the weaker of the two checks each round-trip makes, and deliberately not the only
- * one — see `client.recovered` below: a mismatch React client-renders through is reported to
- * `onRecoverableError`, which the round-trip's guard turns into a thrown failure (so a
- * mismatched route never even reaches these assertions).
+ * The console.error calls React meant, tolerating one: two react-dom renderers in one process
+ * share the module-level store context, impossible across a real server and browser. The
+ * weaker check — a mismatch reaches `onRecoverableError`, which the round-trip throws on.
  */
 function reactErrors(calls: unknown[][]): unknown[][] {
     return calls.filter((args) => !String(args[0]).includes('multiple renderers concurrently'));
 }
 
 /**
- * The documented route round-trip: prerender the server tree (memory history) collecting its
- * payload, then hydrate the client tree (browser history) seeded from `prepareRoute`. The
- * client mount (and its router disposal) is tracked by `cleanup()`; the server router is
- * disposed inline once its render is done.
+ * The documented route round-trip: prerender the server tree collecting its payload, then
+ * hydrate the client tree seeded from `prepareRoute`. `cleanup()` tracks the client mount; the
+ * server router is disposed once its render is done.
  */
 async function ssrThenHydrate(url: string, routes: readonly GenericRouteType[]) {
-    // ----- Server: memory history, collect the dehydration payload -----
+    // Server: memory history, collecting the dehydration payload.
     const serverRouter = new RouterStore(routes, { history: createMemoryHistory({ url }) });
     const prepared = await prepareRoute(serverRouter);
     const server = await ssrRender(
@@ -72,7 +62,7 @@ async function ssrThenHydrate(url: string, routes: readonly GenericRouteType[]) 
     );
     serverRouter.dispose();
 
-    // ----- Client: browser history seeded from the routing snapshot, hydrate -----
+    // Client: browser history seeded from the routing snapshot.
     window.history.replaceState(null, '', url);
     const clientRouter = new RouterStore(routes, {
         history: createBrowserHistory(),

@@ -36,11 +36,9 @@ export class MandalaErrorBoundary extends Component<ErrorBoundaryProps, Boundary
         return { error: error ?? new Error('Mandala error') };
     }
 
-    // A new tree (retry or param change) clears the caught error *in the same render pass*.
-    // Clearing from componentDidUpdate instead leaves one committed render holding the old
-    // error under the new resetKey — which the policy would read as the new generation
-    // already failing: an attempt spent before its load ran, and a backoff counting down
-    // concurrently with the attempt instead of after its failure.
+    // A new tree clears the caught error IN THE SAME RENDER PASS: cleared from
+    // componentDidUpdate, one committed render holds the old error under the new resetKey,
+    // which the policy reads as the new generation failing.
     static getDerivedStateFromProps(props: ErrorBoundaryProps, state: BoundaryState) {
         if (state.resetKey !== props.resetKey) return { error: null, resetKey: props.resetKey };
         return null;
@@ -54,10 +52,8 @@ export class MandalaErrorBoundary extends Component<ErrorBoundaryProps, Boundary
     }
 
     override componentDidCatch(_error: unknown, _info: ErrorInfo) {
-        // The error itself is swallowed: it is surfaced through the slot (or rethrown in
-        // render). The one thing that happens here is the automatic retry's countdown —
-        // commit-phase, which is what makes the policy client-only: a server render has no
-        // commit, so it takes its one attempt and reports the failure like always.
+        // The error itself is swallowed: the slot surfaces it, or render rethrows it. Arming
+        // here is commit-phase, which keeps the policy client-only.
         this.props.policy?.arm();
     }
 
@@ -68,15 +64,14 @@ export class MandalaErrorBoundary extends Component<ErrorBoundaryProps, Boundary
             // transient/terminal level) and falls back to the code only for a failure the
             // app never classified.
             const error = asSourceError(this.state.error);
-            // An automatic attempt is not an error state — the island is still resolving —
-            // so it shows what it shows while resolving. Decided here rather than from an
-            // effect: the error slot would otherwise mount for a commit (running its
-            // effects: the log, the toast, the Sentry report) before anything took it back.
+            // An automatic attempt is not an error state, so the island shows what it shows
+            // while resolving. Decided in render: from an effect, the error slot mounts for a
+            // commit, its effects included.
             if (policy?.accept(error, this.props.resetKey)) {
                 return this.props.slot;
             }
-            // The slot replaces the whole inner tree, kept content included — an error is
-            // not something stale content should sit in front of.
+            // The slot replaces the whole inner tree, kept content included: stale content
+            // never sits in front of an error.
             this.props.controller.reportPhase('error', false);
             if (!ErrorSlot) {
                 // No slot — propagate to the nearest outer ErrorBoundary.

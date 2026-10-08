@@ -14,16 +14,9 @@ import {
 } from '../../testing/index.js';
 
 /*
-    `loadingDelayMs` — the island holds its loading slot back, so a resolution that settles
-    in tens of milliseconds never flashes one.
-
-    Two halves, one deadline. A first load has nothing to show, so it shows nothing; a
-    re-resolve borrows `keepStale`'s mechanism and shows the previous content — for the
-    length of the window only, which is what separates the option from `keepStale` itself.
-    The pins below walk both, plus the two edges the deadline is measured by: it counts a
-    stretch *without content* (a superseding re-resolve doesn't push it out, and never blanks
-    a slot that is already up), and it is inert wherever there are no timers to run at all —
-    the server and the hydration pass.
+    `loadingDelayMs` — the island holds its loading slot back. A first load shows nothing; a
+    re-resolve shows the previous content for the window only. The deadline counts a stretch
+    WITHOUT CONTENT, and is inert where no timers run — the server and the hydration pass.
 */
 
 const DELAY = 200;
@@ -313,7 +306,7 @@ describe('loadingDelayMs — SSR', () => {
 
     test('a slot that belongs in the HTML is rendered, and not taken back on hydration', async () => {
         const gate = deferred<string>();
-        // `ssr: false` is the island whose slot *is* its server output — the case a delay
+        // `ssr: false` is the island whose slot IS its server output — the case a delay
         // could quietly blank, on the server and again on the first post-hydration render.
         const Island = island({
             scope: scope().load({ note: () => gate.promise }),

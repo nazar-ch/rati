@@ -4,11 +4,9 @@ import { useHeadStore } from './context.js';
 import type { HeadTag } from './store.js';
 
 /**
- * The shared half of `useTitle` / `<Title>` / `<Meta>`: declare one head tag, keyed by
- * this hook instance's `useId`. Registration happens in the render phase so a server
- * prerender (which runs no effects) sees it; on the client an effect commits the value
- * (only committed entries count as winners there — see store.ts) and removes it on
- * unmount. `null` declares nothing and withdraws an uncommitted registration.
+ * The shared half of `useTitle` / `<Title>` / `<Meta>`: declares one head tag keyed by this
+ * hook's `useId`, in the render phase so a prerender sees it; on the client an effect commits
+ * it and removes it on unmount. `null` declares nothing and withdraws an uncommitted one.
  */
 export function useHeadTag(tag: HeadTag | null, caller: string): void {
     const store = useHeadStore(caller);

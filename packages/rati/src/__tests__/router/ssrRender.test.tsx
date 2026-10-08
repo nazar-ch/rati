@@ -11,7 +11,7 @@ import { RouterStore } from '../../router/store.js';
 import { scope, type ScopeComponent } from '../../scope/scope.js';
 // The island route below resolves its scope through `react-dom/static` `prerender`
 // (renderToString, which the contrast tests use, does not await Suspense) — the drain loop
-// is now rati/testing's `prerenderToString`.
+// is rati/testing's `prerenderToString`.
 import { prerenderToString } from '../../testing/index.js';
 
 function Home() {

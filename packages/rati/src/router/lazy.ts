@@ -21,21 +21,14 @@ export type PreloadableLazyComponent<T extends ComponentType<any>> = LazyExoticC
 };
 
 /**
- * Like `React.lazy`, but the returned component carries a `preload()` method.
- * Pair with `<Link prefetch>` (or any hover/intent signal) to start the
- * import before the user actually navigates.
+ * Like `React.lazy`, with a `preload()` for `<Link prefetch>` or any intent signal. The
+ * `rati/vite` transform appends {@link moduleId} at each call site, for the server's chunk
+ * preload.
  *
  * ```ts
  * const ProductPage = lazy(() => import(`./ProductPage`));
- * route('/products/:id', 'product', ProductPage);
- *
- * // Elsewhere:
- * ProductPage.preload(); // begin fetching the chunk early
+ * ProductPage.preload();
  * ```
- *
- * You never write {@link moduleId}: the `rati/vite` plugin's transform appends it at
- * each call site, so a server render can name the route's client chunk. Without the
- * plugin it stays undefined and nothing else changes.
  */
 export function lazy<T extends ComponentType<any>>(
     factory: () => Promise<{ default: T }>,

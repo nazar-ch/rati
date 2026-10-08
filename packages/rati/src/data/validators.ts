@@ -1,11 +1,9 @@
 import { type Validator } from './field.js';
 
 /*
-    The shipped validator kit — deliberately tiny; a validator is just a
-    function. `required()` says what it does (there is no required-by-default
-    magic); every other validator skips empty values (null / undefined / ''), so
-    `[required(), minLength(3)]` composes without double-reporting emptiness and
-    an optional field stays optional.
+    The shipped validator kit; a validator is a function. `required()` is explicit, with no
+    required-by-default, and every other validator skips empty values (null, undefined, ''), so
+    `[required(), minLength(3)]` never double-reports emptiness.
 */
 
 const isEmpty = (value: unknown): boolean => value === null || value === undefined || value === '';

@@ -24,7 +24,7 @@ async function evaluate(code: string): Promise<{
 /*
     An entry with CSS, and one route split out with CSS of its own. The route imports
     two chunks: one it shares with the entry, one only it has — the shape that decides
-    what a preload should and shouldn't repeat.
+    what a preload repeats.
 */
 const MANIFEST: Manifest = {
     'src/entry-client.tsx': {

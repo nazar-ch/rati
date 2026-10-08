@@ -6,33 +6,14 @@ import { type Source, type SourceError } from '../scope/source.js';
 
 /*
     long:2
-    `collection` — keyed items, reconciliation, nested reactivity.
+    `collection` — keyed items, reconciliation, nested reactivity: the shared `itemMap` keeps
+    object identity across a refresh's fresh JSON. Optimistic patches and server pushes share
+    `patchItem`/`upsert`, and a patched item is marked so the next reconcile reapplies server
+    truth — what makes `onError: 'refresh'` recover.
 
-    A refresh returns fresh JSON; naive replacement destroys object identity, so
-    rows re-render wholesale and selection/DnD/refs churn. The reconciler (the
-    shared `itemMap`) solves it once, underneath every view.
-
-    Optimistic patches and server-push updates go through the same two entry
-    points (`patchItem`/`upsert`), so there is one identity story. A patched item
-    is marked so the next reconcile reapplies server truth over it even when the
-    server row itself didn't change — that is what makes `onError: 'refresh'`
-    recovery actually recover.
-
-    Structurally this is the **sugar case**: a `query` whose response *is* the
-    array, plus a `reconciled` view over it, pre-wired. When the response isn't
-    the array (a composite payload), reach for those two directly — `query` for
-    the fetch, `reconciled` for the list half. Nothing here is a third mechanism.
-
-    The surface is **flat**: fetch state (`phase`/`error`/`isPending`/`prime`/
-    `refresh`/`reset`) and item state (`items` + the keyed ops) sit side by side,
-    so nothing has to be asked "is this on the collection or the query?". The
-    backing query is not exposed, and neither is the raw pre-reconcile array —
-    `items` *is* the value surface.
-
-    `debounce` and `reactive` pass straight through to the underlying `query`, so
-    a keystroke-driven filter over a flat list is `collection({ fetch, key,
-    reactive: true, debounce: { waitMs } })` — the fetch reads the store's search
-    term, a change re-runs it, coalesced.
+    Structurally the sugar case: a `query` whose response IS the array plus a `reconciled` view,
+    behind one flat surface — no `.query`, no raw array. A composite payload takes the two
+    directly. `debounce` and `reactive` pass through to the `query`.
 */
 
 export interface Collection<T, Item = T> {
@@ -62,7 +43,7 @@ export interface Collection<T, Item = T> {
     /** Local insert (defaults to the end); an existing key upserts in place. */
     insert(raw: T, at?: number): void;
     remove(key: string): void;
-    /** Same contract as `Query.source()`: ready with **this instance** on first fetch. */
+    /** Same contract as `Query.source()`: ready with THIS instance on first fetch. */
     source(): Source<Collection<T, Item>>;
 }
 

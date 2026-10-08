@@ -5,12 +5,9 @@ import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
 import { withActEnvironment, withActEnvironmentSync } from './actEnvironment.js';
 
 /*
-    The shared mount plumbing behind renderIsland / createTestRouter / renderWithStores / the
-    SSR round-trip kit: a `react-dom/client` mount (or `hydrateRoot`) into document.body, an
-    async-act render (so a self-settling load reaches content), a per-mount dispose hook (the
-    router harness detaches its history through it), and one `cleanup()` that tears them all
-    down. It does not depend on `@testing-library/react`. The act flag is scoped around each
-    of its own `act` calls (see ./actEnvironment) — the consuming suite's policy is untouched.
+    The shared mount plumbing behind the harnesses: a `react-dom/client` mount or `hydrateRoot`
+    into document.body under an async act, a per-mount dispose hook, and one `cleanup()`. No
+    `@testing-library/react`; the act flag is scoped around its own calls (./actEnvironment).
 */
 
 interface Mount {
@@ -22,11 +19,9 @@ interface Mount {
 const mounts = new Set<Mount>();
 
 /**
- * Render `node` into `root` under one async `act`, which drives React's Suspense retries so
- * a self-resolving load reaches content. A load still pending (a `deferred`, an un-driven
- * `controllableSource`) simply stays on its loading slot. One caveat rides along: React skips
- * StrictMode's mount/unmount/remount double-invoke under an async act, so a test pinning that
- * discard-the-first-run behavior must render synchronously instead.
+ * Renders `node` into `root` under one async `act`, which drives Suspense retries so a
+ * self-resolving load reaches content. React skips StrictMode's double-invoke under an async
+ * act, so a test pinning it renders synchronously.
  */
 async function settleRender(root: Root, node: ReactNode): Promise<void> {
     await withActEnvironment(() =>
@@ -37,12 +32,9 @@ async function settleRender(root: Root, node: ReactNode): Promise<void> {
 }
 
 /**
- * What a container *says* — its trimmed `textContent` with React's hidden subtrees left out.
- *
- * A Suspense boundary that re-suspends after having shown content keeps the old children in
- * the DOM at `display: none` beside its fallback, so a plain `textContent` reads the page
- * twice: once dead, once live. Every `text()` in this entry reads through here, which is the
- * container-wide twin of the per-slot rule `renderIsland` already follows.
+ * What a container SAYS: its trimmed `textContent` without React's hidden subtrees. A
+ * re-suspended boundary keeps its old children at `display: none` beside the fallback, so a
+ * plain `textContent` reads the page twice.
  */
 export function visibleText(container: HTMLElement): string | null {
     const clone = container.cloneNode(true) as HTMLElement;
@@ -79,12 +71,9 @@ export async function mountTree(node: ReactNode, onDispose?: () => void): Promis
 }
 
 /**
- * Hydrate `html` (a prior server render) with `node` under one async `act` — the client
- * half of an SSR round-trip. The container is pre-filled with `html` before `hydrateRoot`,
- * so React attaches to the existing markup instead of re-creating it. `onRecoverableError`
- * observes the mismatches React recovers from (the round-trip kit turns them into failures);
- * `onDispose` runs at unmount, after teardown (the route round-trip disposes its client
- * router here). Tracked for {@link cleanup}, exactly like {@link mountTree}.
+ * Hydrates `html`, a prior server render, with `node` under one async `act`; the container is
+ * pre-filled, so React attaches to the markup. `onRecoverableError` observes the mismatches
+ * React recovers from; `onDispose` runs after teardown. Tracked for {@link cleanup}.
  */
 export async function hydrateTree(
     html: string,
@@ -133,10 +122,8 @@ function teardown(mount: Mount): void {
 }
 
 /**
- * Unmount every tree the testing harness mounted — islands (`renderIsland`), routers
- * (`createTestRouter`) — and remove its container. The
- * RTL `cleanup` analogue for this entry, and the seam where a router's history is detached
- * (the RF-01 leak lesson). Wire it up as `afterEach(cleanup)`.
+ * Unmounts every tree the harness mounted, removing its containers and detaching a router's
+ * history — the RTL `cleanup` analogue. Wire it as `afterEach(cleanup)`.
  */
 export function cleanup(): void {
     // `teardown` deletes only the current entry, which Set iteration tolerates.

@@ -1,10 +1,6 @@
 /*
-    Types for the modules `rati/vite` generates. An app pulls them in the way it pulls
-    Vite's own — from its env.d.ts:
-
-    ```ts
-    /// <reference types="rati/vite/client" />
-    ```
+    Types for the modules `rati/vite` generates, pulled in from an app's env.d.ts as
+    `/// <reference types="rati/vite/client" />`.
 */
 
 declare module 'virtual:rati/assets' {

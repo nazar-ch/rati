@@ -47,7 +47,7 @@ describe('settleTimeout — the hung-render diagnostic', () => {
     test('a marked source nobody drives fails with the budget, the census, and where', async () => {
         // No `loads`, so the source never leaves pending; under a collector the SSR marker
         // promotes it to the promise path, and the prerender waits forever. Without the
-        // budget this test would end at the *runner's* timeout, saying nothing.
+        // budget this test would end at the RUNNER'S timeout, saying nothing.
         const Island = island({
             scope: scope().load({ live: () => controllableSource({ ssr: true }) }),
             component: ({ live }) => <div>value {String(live)}</div>,

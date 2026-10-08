@@ -1,10 +1,6 @@
 /*
-    A server entry that implements the Layer-1 contract by hand: canned results per URL.
-
-    Deliberately not a real rati app. The plugin's job is mapping a `RenderAppResult`
-    onto a response and assembling HTML around it — the contract is the whole coupling,
-    so driving it directly tests exactly that, and keeps a dev-server test off React and
-    off `renderApp` (which renderApp.test.tsx already covers).
+    A server entry implementing the `render(url)` contract by hand — canned results per URL, so
+    a dev-server test drives the plugin's mapping without React or `renderApp`.
 */
 import type { RenderAppResult } from '../../../ssr/renderApp.js';
 

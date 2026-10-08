@@ -19,7 +19,3 @@ export type IslandConfig<S extends Scope<any>> = MandalaConfig<S>;
 export function island<S extends Scope<any>>(config: IslandConfig<S>): IslandComponent<S> {
     return createMandala(config, 'Island');
 }
-
-// The SSR-dehydration surface (`HydrationProvider`, `createHydrationCollector`) lives in
-// the `rati/ssr` entry — it is orthogonal to islands (route islands use it too), so it
-// carries no `Island` prefix. See ssr/index.ts and mandala/hydration.tsx.
