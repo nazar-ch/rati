@@ -10,18 +10,9 @@ function escapeAttribute(value: string): string {
 }
 
 /**
- * The head store's winners as HTML for `<head>` — the server-side read-back. Call
- * *after* the prerender resolved: a `<Title>`/`<Meta>` inside a route registers during
- * the prerender's Suspense resolution, so reading earlier misses it. Inject the result
- * outside the React tree (spliced before `</head>`, or via an HTML-template slot) so
- * React doesn't try to reconcile it during hydration.
- *
- * Every tag is marked `data-rati-head="server"`. On the metas the marker is bookkeeping
- * — HeadProvider's client sync adopts and updates them on navigation instead of
- * duplicating. Its `server` value, on every tag, is evidence: it is how the client tells
- * that this document's head came from rati's server and must not be overwritten before
- * the page that declares it has hydrated (head/store.ts §phase). That is also why the
- * `<title>` carries it, though `document.title` writes to the same node either way.
+ * The head store's winners as HTML for `<head>`. Call AFTER the prerender resolved, and
+ * inject the result outside the React tree. Every tag is marked `data-rati-head="server"`:
+ * the client sync adopts the metas, and the value says the head came from rati's server.
  */
 export function headTags(store: HeadStore): string {
     const { title, metas } = store.snapshot('server');

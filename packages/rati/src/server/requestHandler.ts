@@ -9,39 +9,25 @@ import {
 import type { RenderAppResult, RenderAssets } from '../ssr/renderApp.js';
 
 /*
-    The production request handler: `render`'s result kinds become HTTP, for good.
-
-    Fetch is the whole interface. Not because edge runtimes are a goal, but because it
-    is the one shape the real hosts already speak — Hono passes `c.req.raw`, Vercel
-    functions take a fetch handler natively, and the Node listener next door is a
-    ~40-line adapter. Nothing here is platform-specific, so nothing here needs a
-    platform.
-
-    What it is not: a router, a static file server, a middleware stack. The app's route
-    table already routes; a CDN already serves files. This maps three result kinds and a
-    failure onto four responses.
+    The production request handler: `render`'s result kinds become HTTP. Fetch is the whole
+    interface, the shape Hono, Vercel and the Node adapter already speak — never a router, a
+    static file server or a middleware stack.
 */
 
 export interface RequestHandlerOptions {
     /**
-     * The server entry's `render(url)` — the Layer-1 contract (`renderApp`'s result).
-     * In production that is the app's built entry —
-     * `await import('./dist/server/entry-server.js')`.
+     * The server entry's `render(url)`, returning `renderApp`'s result — in production, the
+     * app's built entry.
      */
     render: (url: string) => Promise<RenderAppResult>;
     /**
-     * The HTML shell, as a string — the file is yours to read (it is source, not a
-     * build output, so nothing about it is hashed). Whole-document apps have none: if
-     * `render` returns a full `<html>`, the parts splice into it instead. Unset is also
-     * how the CSR fallback below knows it is serving one — there is nothing else it
-     * could mean.
+     * The HTML shell as a string, read by the caller — source, nothing hashed. A
+     * whole-document app has none, and unset is how the CSR fallback knows it serves one.
      */
     template?: string;
     /**
-     * The same `virtual:rati/assets` the server entry hands `renderApp` — re-export it
-     * from the entry to reach it here. Only the CSR fallback below reads it (a rendered
-     * page carries its own tags, folded in by `renderApp`), so an app that would rather
-     * answer a failed render with a bare 500 leaves it out.
+     * The `virtual:rati/assets` the server entry hands `renderApp`, re-exported from the
+     * entry. Only the CSR fallback reads it; without it a failed render answers a bare 500.
      */
     assets?: RenderAssets;
     /** The comments the template carries — match `ratiSsr({ placeholders })`. */
@@ -90,13 +76,9 @@ export function createRequestHandler(
             return html(result.status, assemble(options, placeholders, result));
         } catch (error) {
             onError(error, request);
-            // The fallback answers a *render* failure — an app that may still be fine in
-            // a browser. `Unservable` is the other thing: the handler's own
-            // configuration is wrong, and the fallback cannot read it right either. It
-            // branches on `template === undefined`, which is the same signal that got us
-            // here meaning something else, so it would answer a fragment app with a
-            // whole-document app's shell. A 500 the developer can read beats a page that
-            // cannot boot.
+            // The fallback answers a RENDER failure. `Unservable` is a misconfigured handler
+            // instead, and the fallback reads `template === undefined` as a whole-document
+            // app, so it answers plain text.
             if (error instanceof Unservable) return text(500, 'Internal Server Error');
             return fallback(options, placeholders);
         }
@@ -137,15 +119,9 @@ function assemble(
 }
 
 /**
- * A render that threw is a server-side bug (a failing load is not — the island catches
- * that one and the status carries it). The app itself may still be fine in a browser,
- * so rather than an error page, serve the shell it would have hydrated: same assets, no
- * payload, so the client boots and resolves from scratch. The status stays 500 — the
- * render did fail, and a crawler should be told so.
- *
- * It needs a script to boot and somewhere to put it. A template is the somewhere where
- * there is one; a whole-document app has none by definition, so its shell is synthesized
- * below. Without a client entry there is nothing to serve but the truth.
+ * A render that threw is a server-side bug; the app may still work in a browser, so this
+ * serves the shell it would have hydrated — same assets, no payload — at 500. A
+ * whole-document app gets a synthesized shell; without a client entry it answers plain text.
  */
 function fallback(options: RequestHandlerOptions, placeholders: Placeholders): Response {
     const modules = options.assets?.bootstrapModules;
@@ -156,19 +132,15 @@ function fallback(options: RequestHandlerOptions, placeholders: Placeholders): R
         .map((src) => `<script type="module" src="${src}"></script>`)
         .join('');
 
-    // No template *is* the whole-document app — the option means the shell, and there is
+    // No template IS the whole-document app — the option means the shell, and there is
     // no shell to fill. Synthesize the minimal one the entry needs.
     if (options.template === undefined) {
         return html(500, synthesizeDocument(styleTags, scriptTags));
     }
     try {
-        // The scripts go in the *head* slot, where `synthesizeDocument` puts them at the
-        // end of the body. The asymmetry is the template's, not a preference: the head
-        // slot is the only one that can hold them. `<!--app-html-->` sits inside `#root`
-        // by construction, which the client entry clears on mount; `<!--app-state-->` is
-        // the payload's, and the payload is precisely what a fallback has none of.
-        // Nothing is lost — a module script defers, so it runs after parsing from either
-        // place, which is also why the synthesized document is free to be conventional.
+        // The scripts take the HEAD slot, the only one that can hold them: `<!--app-html-->`
+        // sits in `#root`, which the client entry clears, and `<!--app-state-->` is the
+        // payload's. A module script defers, so it runs after parsing from either place.
         return html(
             500,
             fillTemplate(
@@ -187,15 +159,9 @@ function fallback(options: RequestHandlerOptions, placeholders: Placeholders): R
 }
 
 /**
- * The fallback's shell for a whole-document app: the assets, and deliberately nothing
- * else. There is no `#root` to leave empty — the client entry renders `<html>` itself,
- * onto `createRoot(document)`, and React clears a document container *sparingly*:
- * `SCRIPT`, `STYLE` and `LINK rel="stylesheet"` survive, everything else goes. A
- * document holding only those therefore survives its own mount — the entry that is
- * running the render cannot be swept away by it. Adding markup here would break that
- * quietly (it would simply vanish), which is why this stays as bare as it looks.
- *
- * `charset` rides the Content-Type header, so the document needs no meta of its own.
+ * The fallback's shell for a whole-document app: the assets and nothing else. React clears
+ * a document container SPARINGLY, keeping `SCRIPT`, `STYLE` and `LINK rel="stylesheet"`, so
+ * any other markup vanishes on mount. `charset` rides the Content-Type header.
  */
 function synthesizeDocument(styleTags: string, scriptTags: string): string {
     return `<!doctype html><html><head>${styleTags}</head><body>${scriptTags}</body></html>`;

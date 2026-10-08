@@ -3,26 +3,16 @@ import type { RouterHydratedState } from '../router/store.js';
 import { deepEqual } from '../util/utils.js';
 
 /*
-    The hydration payload: one versioned state object carried from the server render to
-    the client in an *inert* JSON script tag.
-
-    `<script type="application/json">` never executes, which buys two things over the
-    classic `window.__STATE__ =` inline script: a strict Content-Security-Policy needs
-    no unsafe-inline/nonce for it, and there is no ordering contract — the client entry
-    is a deferred module, so the whole document (tag included) is parsed before
-    readHydration runs, wherever the tag sits. Escaping is still required: a literal
-    `</script>` (or `<!--`) inside the JSON would end the tag early, so `<` `>` `&` are
-    escaped as \uXXXX (valid JSON, transparent to JSON.parse). U+2028/29 are legal in
-    JSON but stay escaped so the payload also survives if an app ever inlines it into a
-    JavaScript context.
+    The hydration payload: one versioned state object in an INERT JSON script tag — no CSP nonce,
+    no ordering contract. `<` `>` `&` are escaped as \uXXXX so a literal `</script>` cannot end
+    the tag, and `U+2028`/`U+2029` so the JSON survives a JavaScript context.
 */
 
 /**
  * Everything a server render dehydrates, in one versioned shape: the routing snapshot
  * plus the island registries (`data` values, live-source `seeds`, dehydrated `errors`).
  * `v` guards against a stale cached HTML page meeting a newer client bundle: on a
- * mismatch the client falls back to resolving from scratch rather than misreading the
- * payload.
+ * mismatch the client resolves from scratch.
  */
 export interface HydrationState {
     v: 1;
@@ -30,11 +20,8 @@ export interface HydrationState {
     data: HydrationData;
     seeds: HydrationData;
     /**
-     * Loads that failed server-side on islands running `ssrErrors: 'dehydrate'`. Omitted
-     * when there are none — which is every page of an app that never sets the option, so
-     * the default payload is byte-identical to one written before this section existed.
-     * A client that predates it ignores the field and falls back to re-running the load,
-     * which is exactly the default behavior: no version bump needed either way.
+     * Loads that failed server-side on islands running `ssrErrors: 'dehydrate'`, omitted
+     * when there are none; a client ignoring the field re-runs the load, the default.
      */
     errors?: HydrationErrors;
 }
@@ -51,10 +38,9 @@ const ESCAPES: Record<string, string> = {
 };
 
 /**
- * Serialize the dehydrated state into the script tag readHydration() reads. Splice the
- * result anywhere in the document — before `</body>` by convention. Outside production
- * it also warns about values that don't survive JSON (a `Date` resolves fine on the
- * server and arrives as a string on the client, silently).
+ * Serializes the dehydrated state into the script tag readHydration() reads, spliced
+ * anywhere — before `</body>` by convention. Outside production it warns about a value that
+ * doesn't survive JSON (a `Date` arrives on the client as a string).
  */
 export function serializeHydration(
     state: Omit<HydrationState, 'v'>,
@@ -62,7 +48,7 @@ export function serializeHydration(
 ): string {
     const full: HydrationState = { v: 1, ...state };
     // globalThis-based so the module needs no Node types and stays importable in
-    // browser bundles (where the whole check simply short-circuits).
+    // browser bundles (where the whole check short-circuits).
     const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
         ?.env;
     if (env && env['NODE_ENV'] !== 'production') {
@@ -91,7 +77,7 @@ export function readHydration(options: { id?: string } = {}): HydrationState | n
         console.error(`[rati] hydration payload #${id} is not valid JSON`, error);
         return null;
     }
-    // Validate the version against the *unnarrowed* shape — the JSON is runtime input,
+    // Validate the version against the UNNARROWED shape — the JSON is runtime input,
     // whatever HydrationState's literal type claims.
     const version = (parsed as { v?: unknown }).v;
     if (version !== 1) {

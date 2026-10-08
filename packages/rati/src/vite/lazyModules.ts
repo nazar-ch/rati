@@ -1,19 +1,9 @@
 import { parseSync } from 'vite';
 
 /*
-    The specifier-recording transform: `lazy(() => import('./Settings'))` becomes
-    `lazy(() => import('./Settings'), "src/Settings.tsx")`.
-
-    Preloading a lazy route's chunk needs both ends, and only the plugin holds them:
-    which module the route imports (here) and which chunk the client build made of it
-    (the manifest). The second argument is the join — it survives into the server
-    bundle as a plain string, where `prepareRoute` reads it off the matched component
-    and the assets module turns it into tags.
-
-    The recorded value is the module's path relative to the Vite root, which is exactly
-    how the client manifest keys it. It is metadata only: `lazy()` ignores an id it
-    doesn't get, so a consumer without this plugin is unaffected, and the import itself
-    is untouched — the bundler still sees the literal specifier it splits on.
+    The specifier-recording transform: `lazy(() => import('./Settings'))` gains
+    `"src/Settings.tsx"`, the root-relative path the client manifest keys the chunk by, as its
+    second argument, so `prepareRoute` can name the chunk. The import itself is untouched.
 */
 
 interface Node {
@@ -38,7 +28,7 @@ export interface LazyCall {
 export function findLazyCalls(code: string, filename: string, source: string): LazyCall[] {
     const ast = parseSync(filename, code).program as unknown as { body: Node[] };
 
-    // Only the local names bound to *rati's* `lazy`. A module that imports React's
+    // Only the local names bound to RATI'S `lazy`. A module that imports React's
     // (or defines its own) must be left alone: same name, different function.
     const locals = new Set<string>();
     for (const node of ast.body) {

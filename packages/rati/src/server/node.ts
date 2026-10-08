@@ -7,16 +7,9 @@ import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 
 /*
-    The Node adapter — the only platform-specific code in the kit, and the reason the
-    rest of it isn't. Hosts that speak fetch (Vercel, Hono, Bun, Deno) take the handler
-    directly; `node:http` is the one that needs a translator, so here is the translator.
-
-    Static files are here rather than in the handler for the same reason: nobody else
-    needs them. Vercel serves `dist/client` off its CDN, Hono has serve-static, and a
-    real deployment of this puts something in front anyway. What is left is the MIME
-    table, which every consumer had copy-pasted — a browser rejects a
-    `<script type="module">` served without a JavaScript type, so nobody got to skip it.
-    It lives here now, once.
+    The Node adapter, the only platform-specific code in the kit: `node:http` is the one host
+    needing a translator from fetch. Static files and the MIME table live here, since a CDN or
+    serve-static covers every other host.
 */
 
 export interface ServeOptions {
@@ -29,7 +22,7 @@ export interface ServeOptions {
      * proxy is already serving the assets.
      */
     staticDir?: string | URL;
-    /** Default: `$PORT`, or 3000 — the hosts that pick the port announce it that way. */
+    /** Default: `$PORT`, or `3000` — the hosts that pick the port announce it that way. */
     port?: number;
 }
 
@@ -101,13 +94,9 @@ async function trySendStatic(
 }
 
 /**
- * The file a request path names, or `undefined` for anything that isn't one of ours.
- * The check is containment after resolving, not a prefix test on the request: `join`
- * folds the `..` away first, and `/../client-secrets/x` under `dist/client` resolves to
- * a sibling that a `startsWith(dir)` would happily call a match.
- *
- * Internal, but exported for the test: a browser's fetch folds `..` away before it
- * sends, so a request that tries this can only be built by hand.
+ * The file a request path names, or `undefined` for anything not ours: containment is
+ * checked after resolving, so a sibling like `dist/client-secrets` never passes a prefix
+ * test. Exported for the test, since a browser's fetch folds `..` away before sending.
  */
 export function staticPath(staticDir: string, url: string): string | undefined {
     let pathname: string;

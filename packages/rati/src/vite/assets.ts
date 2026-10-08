@@ -1,18 +1,9 @@
 import type { Manifest, ManifestChunk } from 'vite';
 
 /*
-    `virtual:rati/assets` — what the built client needs from the page, as a module the
-    server entry imports.
-
-    Production consumers used to read `.vite/manifest.json` themselves to name the
-    hashed entry script and its CSS. That read is the same code everywhere and it is
-    where serverless deployments go wrong: the manifest is a *build* artifact, so a
-    function resolving it at runtime fights `/var/task` vs `import.meta.url` and ships
-    a file it only needs for two strings. The plugin holds the manifest at build time,
-    so the values are inlined into the server bundle and nothing is read at runtime.
-
-    In dev the same module resolves to the source entry and no CSS (Vite injects styles
-    through JS), so a server entry imports one module and never branches on the mode.
+    `virtual:rati/assets` — what the built client needs from the page, as a module the server
+    entry imports. The plugin holds the manifest at build time and inlines the values, so a
+    serverless function reads no manifest at runtime; in dev it is the source entry and no CSS.
 */
 
 export const ASSETS_MODULE = 'virtual:rati/assets';
@@ -50,13 +41,9 @@ export function buildAssets(manifest: Manifest, clientEntry: string, base: strin
 }
 
 /**
- * The preload tags for every route module the client build split out — a route's chunk
- * is discoverable only after the entry runs and React resolves the `lazy()`, which is
- * one round trip too late. Naming it in the HTML lets the browser fetch it while it is
- * still parsing the page.
- *
- * Everything the entry already brings is left out: the page loads that either way, and
- * a preload for a file that is already coming is bytes spent to say nothing.
+ * The preload tags for every route module the client build split out: a `lazy()` chunk is
+ * otherwise found one round trip late, after the entry runs. What the entry already brings
+ * is left out.
  */
 function preloads(manifest: Manifest, clientEntry: string, base: string): Record<string, string> {
     const loaded = new Set(collectJs(manifest, clientEntry));
@@ -82,9 +69,8 @@ function preloads(manifest: Manifest, clientEntry: string, base: string): Record
 }
 
 function generate(assets: Assets): string {
-    // A frozen literal, not a lookup over the manifest: everything is decided here, so
-    // the server bundle carries three values instead of the manifest and the code to
-    // read it.
+    // A frozen literal: everything is decided here, so the server bundle carries the values
+    // rather than the manifest and the code to read it.
     return [
         `export const bootstrapModules = ${JSON.stringify(assets.bootstrapModules)};`,
         `export const styleTags = ${JSON.stringify(assets.styleTags)};`,

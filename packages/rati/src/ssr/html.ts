@@ -1,22 +1,7 @@
 /*
-    HTML assembly: a `rendered` result and a shell in, a page out — the two patterns
-    docs/current/public/ssr.md describes, and nothing else.
-
-    It sits here, next to the render loop, because both things that assemble compose it:
-    `rati/vite`'s dev middleware and `rati/server`'s request handler. Neither owns it,
-    and a page must not come out of dev one way and out of production another.
-
-    Template: an index.html carrying `<!--app-head-->` / `<!--app-html-->` /
-    `<!--app-state-->`, React rendering into #root.
-
-    Whole document: React rendered `<html>` itself, so there is no template — the head
-    tags and the payload script splice into the rendered document string, outside the
-    React tree, so React neither reconciles nor duplicates them on hydration.
-
-    Both refuse to drop content. A value with nowhere to go means a page that looks
-    plausible and is broken — a template missing `<!--app-state-->` hydrates from
-    scratch, and SSR quietly stops paying for itself — so assembly throws with the fix
-    instead of serving it.
+    HTML assembly: a `rendered` result and a shell in, a page out — the template and whole-document
+    patterns docs/current/public/ssr.md describes. `rati/vite` dev and `rati/server` share it, so
+    dev and production pages match; a value with nowhere to go throws with the fix.
 */
 
 /** The parts of a `rendered` result that assembly places. */
@@ -104,9 +89,8 @@ function fill(
                 `Add the placeholder, or name your own with ${by.option}.`,
         );
     }
-    // A replacer function, not the value directly: String.replace reads `$&`, `$1` and
-    // friends in a *replacement string* as capture references, and rendered markup can
-    // contain them (a price, a query string).
+    // A replacer function: String.replace reads `$&` and `$1` in a replacement STRING as
+    // capture references, and rendered markup can contain them (a price, a query string).
     return html.replace(placeholder, () => value);
 }
 

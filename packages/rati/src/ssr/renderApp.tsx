@@ -15,10 +15,9 @@ import { prepareRoute, redirectFromHops } from '../router/prepareRoute.js';
 import { toRouterStore, type AnyRouter } from '../router/store.js';
 
 /*
-    renderApp — the whole per-request loop in one call: memory history → the app
-    factory → prepareRoute → prerender → dispose, returning a decision object the
-    server (or an SSG script — the loop is identical per URL) maps onto a response.
-    Every piece stays public; an app with a nonstandard flow drops down to them.
+    renderApp — the whole per-request loop in one call: memory history → the app factory →
+    prepareRoute → prerender → dispose, returning the decision a server or an SSG script maps
+    onto a response. Every piece stays public for a nonstandard flow.
 */
 
 export interface RenderAppSetup {
@@ -36,11 +35,9 @@ export interface RenderAppInstance {
 }
 
 /**
- * What the built client needs from the page: the hashed entry script, its stylesheets,
- * and a route chunk's preload. `rati/vite` generates exactly this shape as
- * `virtual:rati/assets` — hashed URLs in production, source paths in dev — so a server
- * entry hands the module straight to {@link renderApp} and never reads a manifest. A
- * hand-rolled build passes the same shape by hand; every field is optional.
+ * What the built client needs from the page — entry script, stylesheets, a route chunk's
+ * preload. `rati/vite` generates this shape as `virtual:rati/assets`, so a server entry hands
+ * the module to {@link renderApp} without a manifest; every field is optional.
  */
 export interface RenderAssets {
     /**
@@ -108,10 +105,8 @@ function deriveStatus(matchedCatchAll: boolean, errors: HydrationError[]): numbe
 }
 
 /**
- * The built client's `<head>` tags for this request: the entry's stylesheets, plus the
- * matched route's chunk preload. They ride in `headTags` rather than a part of their
- * own — assembly already has one head slot, and a second would mean a new placeholder
- * in every template and a new splice point in every server.
+ * The built client's `<head>` tags for this request: the entry's stylesheets and the matched
+ * route's chunk preload, riding `headTags` so assembly keeps one head slot.
  */
 function assetTags(assets: RenderAssets | undefined, moduleId: string | undefined): string {
     if (!assets) return '';
@@ -129,11 +124,8 @@ export async function renderApp(options: RenderAppOptions): Promise<RenderAppRes
 
     try {
         const prepared = await prepareRoute(router);
-        // A null prepare can still carry a redirect: when a followed hop lands outside
-        // the route table (a static file, a legacy app, another SPA), nothing matches,
-        // so there is no route to describe — but the author's declared 30x stands, and
-        // serving the target is someone else's job. The hops are the router's own;
-        // prepareRoute reads the same ones when it has a route to attach them to.
+        // A null prepare can still carry a redirect: a hop landing outside the route table
+        // matches nothing, but the declared 30x stands. The hops are the router's own.
         const redirect = prepared
             ? prepared.redirect
             : redirectFromHops(toRouterStore(router).redirectHops);
