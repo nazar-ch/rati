@@ -7,28 +7,12 @@ import { scope, input } from '../../scope/scope.js';
 import { controllableSource, flush } from '../../testing/index.js';
 
 /*
-    A source must not leak when an inner-tree teardown is followed by a new generation —
-    found by the MF-02 command property on its first run (it shrank to `reject(k3_1),
-    changeInput` on a 4-level scope), then reduced to the two repros below and fixed.
-
-    The mechanism the fix closes (resolver.tsx + mandala.tsx):
-
-      1. A Step's detach effect deliberately keeps entries the *live* bucket still holds —
-         it cannot tell a source swap from an unmount, so it defers to the mandala's sweep
-         (`bucketIsLive && bucket.sources.includes(entry)` -> continue).
-      2. So a Step torn down while its bucket is still current leaves its sources attached.
-         Two ways in with no remount involved: a source erroring (the boundary swaps the
-         subtree for the error slot), and a mid-tree source dropping to pending (S8 — the
-         levels below unmount for real).
-      3. A following generation (retry / input change) makes `cacheRef.current` a fresh
-         bucket array. Before the fix the old buckets — still holding attached sources —
-         were dropped on the floor, and `sweepDetach` on unmount only ever saw
-         `cacheRef.current`. Nothing detached them, ever.
-
-    The mandala now queues each replaced bucket array and sweeps it from the `treeCommitted`
-    effect. The ordinary remount path never needed it: the mandala re-renders before the old
-    Steps' cleanups run, so `currentBuckets()` already points at the new array, `bucketIsLive`
-    is false, and everything detaches through the Steps themselves.
+    long:2
+    A source must not leak when an inner-tree teardown is followed by a new generation. A Step's
+    detach keeps entries its LIVE bucket holds, deferring to the mandala's sweep, so a Step torn
+    down with its bucket current — a source erroring, or a mid-tree source dropping to pending
+    (S8) — leaves its sources attached. A following generation replaces the bucket array, so the
+    mandala queues each replaced array and sweeps it from the `treeCommitted` effect.
 */
 
 afterEach(cleanup);

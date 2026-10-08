@@ -72,10 +72,9 @@ describe('a cascade reaches through a source key', () => {
         expect(screen.getByText('c(b(a2))')).toBeTruthy();
     });
 
-    // The same rule with no refresh involved: a live source transitioning ready → ready is a
-    // changed value like any other, so the loads that derived from it re-run. The waterfall
-    // reads as a derivation, and now behaves as one — deriving in a dependent load is not
-    // second-class next to deriving inside the source.
+    // The same rule with no refresh: a live source transitioning ready → ready is a changed
+    // value, so the loads derived from it re-run — deriving in a dependent load is as good as
+    // deriving inside the source.
     test('a live source value change re-runs the loads that read it', async () => {
         const source = controllableSource<string>();
         const testScope = scope()

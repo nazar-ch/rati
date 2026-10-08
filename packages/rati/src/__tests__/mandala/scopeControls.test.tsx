@@ -22,9 +22,8 @@ const Loading: FC = () => <div>loading...</div>;
 afterEach(cleanup);
 
 // A hand-driven source keyed into a shared attach/detach log, so a cascade's source swap is
-// observable per generation (attach:s1 / detach:s1 / attach:s2). Built on the entry's
-// controllableSource — the id-keyed log is the test-specific part, wired through its
-// lifecycle hooks; drive it with `act(() => src.setReady(v))` / `act(() => src.setError(e))`.
+// observable per generation (attach:s1 / detach:s1 / attach:s2): controllableSource with an
+// id-keyed log wired through its lifecycle hooks.
 function testSource<T>(log: string[], id: string): ControllableSource<T> {
     return controllableSource<T>({
         onAttach: () => log.push(`attach:${id}`),
@@ -457,14 +456,14 @@ describe('useScopeControls — selective refresh', () => {
 });
 
 /*
-    The deterministic pins for the refresh machinery (rati◊MF-05). Each carries a *kill note*:
-    the one-line source mutation that must make it fail. They guard the contract
-    docs/current/public/reference.md states for `useScopeControls`, never the mechanism.
+    The deterministic pins for the refresh machinery, each with a KILL note: the one-line source
+    mutation that must make it fail. They guard the contract docs/current/public/reference.md
+    states for `useScopeControls`, never the mechanism.
 */
 
 describe('selective refresh — races', () => {
-    // Pin 1. The race guard: the newest re-run of a key wins, whenever the older one
-    // lands. `refresh(key)`'s promise "resolves when the key settles" for both callers.
+    // Pin 1. The race guard: the newest re-run of a key wins, whenever the older one lands,
+    // and `refresh(key)` resolves for both callers.
     //
     // Kill: refresh.ts `settled()` — drop `cell.refreshing?.token !== token` from the
     // guard → the superseded run applies and 'stale' renders over 'v3'.
@@ -526,9 +525,8 @@ describe('selective refresh — races', () => {
         expect(captured.current!.pending.size).toBe(0);
     });
 
-    // Pin 2. A remount (inputs change / retry) discards the cells a refresh was
-    // re-running: the bookkeeping settles wholesale rather than waiting for a settle
-    // that can no longer apply, and the late settle finds a tree it must not touch.
+    // Pin 2. A remount discards the cells a refresh was re-running: the bookkeeping settles
+    // wholesale, and the late settle touches nothing.
     //
     // Kill: refresh.ts `treeCommitted()` — drop the `this.pendingKeys.clear()` branch →
     // the discarded refresh stays in `pending` for the fresh tree's lifetime.
@@ -587,7 +585,7 @@ describe('selective refresh — races', () => {
         expect(screen.getByText('value b1')).toBeTruthy();
         // Read at a quiesce point, once the fresh tree is on screen: the probe renders
         // inside the island's content, so while the remount is suspended it is still the
-        // *old* tree's last render, holding a snapshot from before the remount (S11).
+        // OLD tree's last render, holding a snapshot from before the remount (S11).
         expect(captured.current!.pending.size).toBe(0);
 
         // The discarded generation's re-fetch lands last: it belongs to cells that no
@@ -603,9 +601,8 @@ describe('selective refresh — races', () => {
     // Pin 6. Two keys re-fetching at once are tracked independently — `pending` holds
     // both, and neither settle order loses an update.
     //
-    // Kill: refresh.ts `settled()` — make the guard global instead of per cell
-    // (`cell.refreshing?.token !== this.tokens`) → the later refresh supersedes the
-    // earlier *key* and x never leaves 'x1'.
+    // Kill: refresh.ts `settled()` — a global guard (`cell.refreshing?.token !==
+    // this.tokens`) → the later refresh supersedes the earlier KEY; x stays 'x1'.
     test('concurrent refreshes of different keys: pending holds both; either settle order converges', async () => {
         const xRuns: ReturnType<typeof deferred<string>>[] = [];
         const yRuns: ReturnType<typeof deferred<string>>[] = [];
@@ -662,7 +659,7 @@ describe('selective refresh — races', () => {
         expect(captured.current!.pending.size).toBe(0);
     });
 
-    // A cascade-swapped source that errors settles its swap like a first ready (rati◊MF-02):
+    // A cascade-swapped source that errors settles its swap like a first ready:
     // the key leaves `pending` before the boundary shows the error slot.
     //
     // Kill: resolver.tsx, the source error branch — drop the `sourceErrored` call → 'live'
@@ -790,13 +787,11 @@ describe('selective refresh — cascade semantics', () => {
         expect(screen.getByText('c even')).toBeTruthy();
     });
 
-    // Pin 4. Read-sets are re-recorded on every run, so a producer that reads lazily
-    // (`(bag) => bag.x`, not destructuring) cascades from whatever it *currently*
-    // reads — a key it stopped reading drops out, a key it started reading joins.
-    // Both dependent kinds are here because they re-record by different means: a
-    // promise re-run rewrites the read-set on the cell it keeps, a sync value re-run
-    // swaps in a whole new cell that carries it. A pin on one kind alone passes while
-    // the other is frozen (found by executing the kill below against a sync-only pin).
+    // long:2
+    // Pin 4. Read-sets re-record on every run, so a lazily-reading producer cascades from
+    // what it CURRENTLY reads. Both dependent kinds are here: a promise re-run rewrites its
+    // cell's read-set and a sync re-run swaps in a new cell, so a pin on one kind passes
+    // while the other is frozen.
     //
     // Kill: resolver.tsx `processDirtyCells()` — drop `cell.reads = next.reads` → the
     // promise dependent's first read-set is frozen, so after the flip `refresh('b')`
@@ -882,9 +877,8 @@ describe('selective refresh — cascade semantics', () => {
         expect(screen.getByText('pick b3/b3')).toBeTruthy();
     });
 
-    // Pin 9. `data(fn, { equals })` is the gate on *that load's* value, wherever the
-    // re-run came from — a cascade re-run of the dependent goes through its own
-    // comparer exactly like a direct `refresh(key)` does.
+    // Pin 9. `data(fn, { equals })` gates THAT LOAD's value wherever the re-run came from,
+    // a cascade included.
     //
     // Kill: refresh.ts `settled()` — `const equals = deepEqual` (ignore `cell.equals`)
     // → the deep comparer sees body 1 → 3, calls it changed, and `formatted` re-runs.
@@ -929,7 +923,7 @@ describe('selective refresh — cascade semantics', () => {
         expect(runs).toEqual({ doc: 1, formatted: 1 });
 
         // a: 1 → 3 cascades into `doc`, whose re-run keeps its etag: the cascade dies
-        // on *doc's own* comparer, and `formatted` keeps the old value and identity.
+        // on DOC'S OWN comparer, and `formatted` keeps the old value and identity.
         aValue = 3;
         await act(async () => {
             await captured.current!.refresh('a');
@@ -951,7 +945,7 @@ describe('selective refresh — cascade semantics', () => {
 
 describe('selective refresh — hydrated cells', () => {
     // Pin 5. A hydrated cell never ran its producer, so it has no read-set: it answers a
-    // *direct* refresh and joins the cascade only from that run on (rati◊MF-05).
+    // DIRECT refresh and joins the cascade only from that run on.
     //
     // Kill: resolver.tsx `buildCell()` — `rerunnable: false` on the hydration
     // short-circuit → the hydrated cell never re-runs.

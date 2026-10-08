@@ -7,13 +7,9 @@ import { controllableSource, renderIsland, ssrRender, cleanup } from '../../test
 afterEach(cleanup);
 
 /*
-    Per-island `ssr: false` — the opt-out that keeps one island from gating TTFB, and the
-    other half of the SSR matrix from the source-side `ssr: true` marker.
-
-    What the pins are really guarding is the *hydration* contract. The server ships the
-    loading slot; the client's first render must ship the same slot, and only then resolve.
-    `ssrRender().hydrate()` throws on any recoverable error by default — so every clean
-    `.hydrate()` below is itself the no-mismatch assertion, not decoration around one.
+    Per-island `ssr: false`, which keeps one island from gating TTFB. The pins guard the
+    HYDRATION contract: the client's first render ships the loading slot the server did, then
+    resolves, and every clean `.hydrate()` below is itself the no-mismatch assertion.
 */
 
 // The island under test: one async load, counted, so "did this run server-side / twice?"
@@ -91,7 +87,7 @@ describe('island ssr: false — the server render', () => {
         const server = await ssrRender(<Island />);
 
         expect(server.html).toContain('loading slot');
-        // The marker authorizes an attach *during render*; the island never rendered the
+        // The marker authorizes an attach DURING RENDER; the island never rendered the
         // level, so there was nothing to authorize.
         expect(log).toEqual([]);
         expect(server.data).toEqual({});

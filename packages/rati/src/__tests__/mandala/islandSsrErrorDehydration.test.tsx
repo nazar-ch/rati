@@ -11,22 +11,10 @@ import { cleanup, flush, prerenderToString, ssrRender } from '../../testing/inde
 afterEach(cleanup);
 
 /*
-    `ssrErrors: 'dehydrate'` — the island that would rather paint its error slot than a
-    spinner it doesn't mean.
-
-    The default (`'retry'`, pinned next door in islandSsrErrors.test.tsx) is React's own
-    degradation: the failing Suspense boundary is abandoned, the HTML carries the *loading*
-    slot with a client-retry marker, and the client re-runs the load. Self-healing, and
-    non-deterministic.
-
-    This mode takes the throw at the resolver instead — React runs no error boundary during
-    a server render, so nobody else can — renders the error slot into the HTML, and carries
-    the failure over in the payload's third section. The client hydrates that cell straight
-    to its error state: same slot, no re-run, no spinner in between.
-
-    Two things every `.hydrate()` below asserts for free: the round trip produces no
-    recoverable error (the harness throws on one), and the load counters say whether
-    anything re-ran.
+    `ssrErrors: 'dehydrate'`: the throw is taken at the resolver, the error slot renders into the
+    HTML, and the client hydrates the cell straight to its error state — no re-run, no spinner.
+    The default, `'retry'`, is islandSsrErrors.test.tsx's. Every `.hydrate()` below asserts no
+    recoverable error.
 */
 
 /** An island whose one load fails while `state.failing` is set, counting every call. */
@@ -195,11 +183,9 @@ describe('ssrErrors: dehydrate — the server render', () => {
     });
 
     test('without a collector the mode is inert — the wire is what makes it honest', async () => {
-        // A bare `prerender` with no HydrationProvider above it: the error slot could still
-        // be painted, but nothing would carry the failure over, so the client would re-run
-        // the load and paint something else. Deterministic-until-hydration is worse than
-        // the default, which is designed for exactly this case. Same gate, and the same
-        // reasoning, as the source-side `ssr` marker.
+        // A bare `prerender` with no HydrationProvider: nothing carries the failure over, so
+        // the client re-runs the load and paints something else — worse than the default. The
+        // source-side `ssr` marker gates the same way.
         const state = { calls: 0, failing: true };
         const Island = failingIsland(state);
 
@@ -265,7 +251,7 @@ describe('ssrErrors: dehydrate — the round trip', () => {
 
         expect(client.text()).toContain('content: post x');
         // Two: the server's, and the one the human asked for. The dehydrated error is a
-        // *first* resolution's, so the retry's generation reads no payload slice.
+        // FIRST resolution's, so the retry's generation reads no payload slice.
         expect(state.calls).toBe(2);
     });
 
@@ -310,12 +296,9 @@ describe('ssrErrors: dehydrate — the round trip', () => {
 
 describe('ssrErrors: dehydrate — composed with retry', () => {
     /*
-        The interaction SI-06 had to rule on: does a client-side `retry` policy pick up a
-        failure that came off the wire? It does. The policy asks one question — is this a
-        `failed` I still have budget for — and where the failure came from is not part of
-        it. The consequence is worth knowing, and is what these two pin: the deterministic
-        first paint is the *server's*, and configuring a policy on top means the client
-        trades it for another attempt.
+        Does a client-side `retry` policy pick up a failure that came off the wire? It does: the
+        policy asks only whether this is a `failed` it has budget for. So the deterministic first
+        paint is the SERVER's, and a policy on top trades it for another attempt.
     */
     test('the policy retries a dehydrated failure, and the error slot never mounts', async () => {
         vi.useFakeTimers();
@@ -328,7 +311,7 @@ describe('ssrErrors: dehydrate — composed with retry', () => {
 
             state.failing = false;
             const client = await server.hydrate();
-            // The error boundary rules during *render*, so the slot the HTML shipped is
+            // The error boundary rules during RENDER, so the slot the HTML shipped is
             // replaced on the first client pass — the island is resolving, not failing.
             expect(client.text()).toContain('LOADING-SLOT');
 

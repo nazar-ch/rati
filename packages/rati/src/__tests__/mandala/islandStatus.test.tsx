@@ -9,16 +9,12 @@ import { controllableSource, deferred, flush, renderIsland, cleanup } from '../.
 afterEach(cleanup);
 
 /*
-    The status surface on `useScopeControls` — `phase`, `isStale`, `retry`.
-
-    `phase` is the island's *aggregate* phase, which in practice means "which slot is on
-    screen". No single piece of bookkeeping knows that: a level can be suspended on a
-    promise, pending on a source, or thrown to the boundary, and in none of those cases does
-    the mandala itself re-render. So whatever renders reports, and these pins walk a full
-    pending → ready → stale → ready → error cycle to hold that reporting honest.
+    The status surface on `useScopeControls` — `phase`, `isStale`, `retry`. `phase` is the
+    island's AGGREGATE phase, which slot is on screen, reported by whatever renders; these pins
+    walk a full pending → ready → stale → ready → error cycle.
 */
 
-// The harness reads controls from a probe rendered in *every* slot, so `handle.controls()`
+// The harness reads controls from a probe rendered in EVERY slot, so `handle.controls()`
 // works whichever one is up — including the error slot.
 function statusOf(handle: { controls: () => { phase: string; isStale: boolean } }) {
     const { phase, isStale } = handle.controls();

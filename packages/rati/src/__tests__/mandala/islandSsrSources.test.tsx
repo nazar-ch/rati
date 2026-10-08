@@ -9,11 +9,9 @@ import { controllableSource, prerenderToString, ssrRender, cleanup } from '../..
 
 afterEach(cleanup);
 
-// The SSR-source shapes, built on the entry's `controllableSource`. The attach/detach (and
-// hydrate) *string log* they push into is what the pins below assert against — an ordering
-// between lifecycle events that the source's own numeric ledger deliberately doesn't model —
-// so it is wired through the `onAttach`/`onDetach` hooks (and the seed's `hydrate`), not
-// hand-rolled onto a bespoke source.
+// The SSR-source shapes, on `controllableSource`, push into a STRING LOG the pins assert
+// ordering against — which the source's numeric ledger does not model — wired through
+// `onAttach`/`onDetach` and the seed's `hydrate`.
 
 // The loader shape (`ssr: true`): a promise in source clothing that settles with `value` on
 // attach.
@@ -135,7 +133,7 @@ describe('SSR sources — live (ssr: { dehydrate, hydrate })', () => {
         expect(created).toBe(2);
         expect(clientLog).toEqual(['hydrate:1', 'attach']);
         expect(client.text()).toContain('n is 1');
-        // The seed's whole purpose, asserted where it shows: seeding *before* attach is
+        // The seed's whole purpose, asserted where it shows: seeding BEFORE attach is
         // what makes the first client render match the server's. Pin 7b below is the
         // same source with a failing seed, and it mismatches (`.hydrate()` would throw).
         expect(client.recovered).toEqual([]);
@@ -147,9 +145,8 @@ describe('SSR sources — live (ssr: { dehydrate, hydrate })', () => {
 });
 
 /*
-    Pin 7 (rati◊MF-05): what the two SSR-source failure modes do. Both pin the *degraded*
-    behavior on purpose — an SSR source that fails must cost the server render, never the
-    page.
+    Pin 7: the two SSR-source failure modes, both pinned DEGRADED on purpose — a failing SSR
+    source costs the server render, never the page.
 */
 
 // The loader shape's error path: attach starts work that fails instead of resolving —
@@ -173,7 +170,7 @@ describe('SSR sources — error paths', () => {
     // experiment: `prerender` resolves, React emits the loading slot behind its
     // "switched to client rendering" marker, and the error slot never enters the HTML.
     // What rati adds is the `collectError` record (the server's 404/5xx signal) — reached
-    // here through a *source*, and the client then makes its own attempt against a fresh
+    // here through a SOURCE, and the client then makes its own attempt against a fresh
     // instance.
     //
     // Kill: ssrSource.ts `firstSettle()` — `reject(state.error)` → `reject(new
@@ -216,10 +213,9 @@ describe('SSR sources — error paths', () => {
         expect(server.errors[0]!.key).toBe('feed');
         expect(server.errors[0]!.error.code).toBe('not-available');
 
-        // The server's boundary errored, so its HTML carries React's client-retry marker
-        // and hydration reports the switch as a recoverable error. That report *is* the
-        // degradation being visible; `allowMismatch` collects it on `.recovered` instead
-        // of throwing, so it doesn't leak out of the run as an unhandled error.
+        // The server's boundary errored, so the HTML carries React's client-retry marker and
+        // hydration reports the switch as a recoverable error — the degradation made visible,
+        // which `allowMismatch` collects on `.recovered`.
         const client = await server.hydrate(undefined, { allowMismatch: true });
 
         // The failure did not travel: the client created and attached its own instance
@@ -229,14 +225,11 @@ describe('SSR sources — error paths', () => {
         expect(client.text()).toContain('feed live');
     });
 
-    // Pin 7b. A seed the client cannot apply (a `hydrate()` that throws — a store shape
-    // that drifted from the server's) is logged and dropped, and the source resolves
-    // live from its own attach: degraded, not broken. The page's cost is the pending
-    // window the seed was there to skip.
+    // Pin 7b. A seed the client cannot apply — a throwing `hydrate()` — is logged and
+    // dropped, and the source resolves live.
     //
-    // Kill: resolver.tsx `buildCell()`, the seed branch — replace the catch body's
-    // `console.error(...)` with `throw error` → a seed it cannot apply takes the
-    // hydration render down instead of degrading to a live resolve.
+    // Kill: resolver.tsx `buildCell()`, the seed branch — `throw error` in place of the
+    // catch's `console.error(...)` → the hydration render goes down.
     test('a seed whose hydrate() throws is logged, and the source resolves live anyway', async () => {
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         const serverLog: string[] = [];
@@ -261,11 +254,9 @@ describe('SSR sources — error paths', () => {
         const server = await ssrRender(<Island id="ssr" />);
         expect(Object.values(server.seeds)).toEqual([{ counter: 1 }]);
 
-        // A seed that fails to apply *guarantees* a hydration mismatch: the server shipped
-        // ready HTML over a source the client now renders pending. React recovers by
-        // client-rendering the boundary — the second half of this degradation's cost, and
-        // the reason a seedable source's `hydrate` must be total. `allowMismatch` observes
-        // the recovery instead of throwing.
+        // A seed that fails to apply GUARANTEES a mismatch: the server shipped ready HTML over
+        // a source the client renders pending, and React client-renders the boundary — why a
+        // seedable source's `hydrate` must be total.
         const client = await server.hydrate(undefined, { allowMismatch: true });
 
         expect(

@@ -15,14 +15,10 @@ import {
 afterEach(cleanup);
 
 /*
-    `keepStale` — the island keeps its last committed output on screen while the next one
-    resolves, instead of blanking to the loading slot.
-
-    What the engine actually keeps is the *run*, not a copy of its props: its buckets stay
-    out of the discard path, so its sources stay attached and its `.provide()` value stays
-    alive and published until the successor commits. The pins below are as much about that
-    lifetime as about the pixels — a snapshot rendered over torn-down resources would pass
-    the first two tests and fail the rest.
+    `keepStale` — the island keeps its last committed output on screen while the next resolves.
+    The engine keeps the RUN, not a copy of its props: its sources stay attached and its
+    `.provide()` value stays published until the successor commits, so these pins hold that
+    lifetime as much as the pixels.
 */
 
 // A scope whose one load is a gate the test opens by hand, so the stale window has a

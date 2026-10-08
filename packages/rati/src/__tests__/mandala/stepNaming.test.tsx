@@ -7,13 +7,10 @@ import { scope, input } from '../../scope/scope.js';
 import { controllableSource, flush, renderIsland, cleanup } from '../../testing/index.js';
 
 /*
-    The resolver names each level's `Step` for its keys (`Step(user,prefs)`), so the React
-    DevTools tree is self-describing instead of a stack of anonymous `Step`s.
-
-    DevTools names a fiber `type.displayName || type.name`, and React hangs a DOM node's
-    fiber on the node itself — so walking up from the island's own DOM reads exactly what
-    the DevTools tree draws (minus the host elements). That walk is white-box by nature;
-    it is the only way to assert the thing the feature is *for*.
+    The resolver names each level's `Step` for its keys (`Step(user,prefs)`). DevTools names a
+    fiber `type.displayName || type.name`, and React hangs a DOM node's fiber on the node, so
+    walking up from the island's DOM reads what DevTools draws — white-box, and the only way
+    to assert it.
 */
 
 type Fiber = { type: unknown; return: Fiber | null };
@@ -84,9 +81,8 @@ describe('Step displayName', () => {
         ).toEqual(['Step(page)', 'Step']);
     });
 
-    // The naming is a bound copy of `Step` memoized on the (frozen) level object, so a
-    // level's component identity is stable across renders — React reconciles the tree
-    // exactly as it did before the names existed, and nothing remounts.
+    // The naming is a bound copy of `Step` memoized on the frozen level object, so a level's
+    // component identity is stable across renders and nothing remounts.
     test('a level keeps one component identity across re-renders', async () => {
         const feed = controllableSource<string>();
         const Live = island({

@@ -7,27 +7,13 @@ import { controllableSource, deferred, flush, renderIsland, cleanup } from '../.
 
 /*
     long:2
-    The Suspense-produced situations React makes possible around a committed island —
-    pins 10-12 (rati◊MF-05), one per situation in
-    packages/rati/src/__tests__/suspense-situations.md (S4, S5, S8). Each carries a *kill
-    note*: the one-line source mutation that must make it fail.
+    The Suspense-produced situations React makes possible around a committed island — pins
+    10-12, one per situation in packages/rati/src/__tests__/suspense-situations.md (S4, S5, S8),
+    each with a KILL note. They assert the contract, never the mechanism: the ledger's BOUNDS —
+    no second attach of a live entry, balance at teardown — not its event sequence.
 
-    They live here rather than in scopeControls.test.tsx because none of them involves the
-    controls: what they share is the catalog, and reading them next to it is what makes
-    them legible.
-
-    The altitude these assert at is deliberately low-commitment, the contract and never
-    the mechanism: the ledger's *bounds* (never a second attach of a live entry; balanced
-    at teardown), not its exact event sequence. Whether the engine keeps a source attached
-    through a hide or cycles it is its own business — S4/S8 say so explicitly — so pinning
-    the sequence would freeze an implementation nicety into a promise.
-
-    A `controllableSource`'s transitions must drive an **async** act (`act(async () =>
-    source.setReady(v))`) and be awaited: S2's rule for the mount is really about any act
-    that (re-)suspends, and a source transition can be one — here a ready source lets the
-    waterfall reach a level whose hook load `use()`es a promise React has not seen, which
-    suspends. Under a sync act that retry is never delivered and the island sits on the
-    loading slot forever.
+    A `controllableSource` transition drives an ASYNC act and is awaited: a transition can
+    re-suspend, and under a sync act React never delivers the retry.
 */
 
 const Loading: FC = () => <div>loading...</div>;
@@ -35,10 +21,9 @@ const Loading: FC = () => <div>loading...</div>;
 afterEach(cleanup);
 
 /*
-    The attach/detach ledger read off the source's own counters, as *bounds* rather than a
-    transcript: `live` is what is attached right now, `peak` the most that was ever attached
-    at once. For a single source, `peak > 1` is a double attach of a live entry (the
-    contract's line), and `live > 0` after teardown is a leak.
+    The attach/detach ledger off the source's own counters, as BOUNDS: `live` is attached now,
+    `peak` the most attached at once. For one source, `peak > 1` is a double attach of a live
+    entry, and `live > 0` after teardown is a leak.
 */
 function ledger(source: { attachCount: number; detachCount: number; peakAttached: number }) {
     return { live: source.attachCount - source.detachCount, peak: source.peakAttached };
@@ -65,17 +50,14 @@ function promiseStore(initial: Promise<string>) {
 }
 
 describe('S4 — re-suspension of committed content', () => {
-    // Pin 10. A hook load returning a fresh pending promise re-suspends a *committed*
-    // Step. React does not unmount the content — it hides it (Offscreen), destroys the
-    // subtree's effects and re-runs them on reveal. What must survive that cycle: the
-    // ledger's bounds, the content, and the data cells (only the hook load re-ran —
-    // the producers are cached on the mandala's buckets).
+    // long:2
+    // Pin 10. A hook load returning a fresh pending promise re-suspends a COMMITTED Step,
+    // which React hides (Offscreen) and reveals, re-running the subtree's effects. The
+    // ledger's bounds, the content and the cached data cells survive.
     //
     // Kill: resolver.tsx, the Step's layout attach — drop the `if (!entry.detach)`
     // guard → a reveal re-runs the attach loop over an entry that never detached, and
-    // `peak` is 2: a double attach of a live entry. (It dies on the *first* hide/reveal,
-    // the one the label's initial suspension causes on the way to content — the explicit
-    // re-suspension below is the second.)
+    // `peak` is 2. It dies on the FIRST hide/reveal, the label's initial suspension.
     test('a hook load re-suspending hides and reveals content without double-attaching or re-running producers', async () => {
         const feed = controllableSource<string>();
         let itemRuns = 0;
@@ -144,11 +126,10 @@ describe('S4 — re-suspension of committed content', () => {
 });
 
 describe('S5 — unmount while suspended', () => {
-    // Pin 11. The island unmounts (navigation) with a load still in flight; the promise
-    // settles into a tree that no longer exists. That late settle must be inert — no
-    // throw, no log noise, nothing written anywhere observable — and the level's source,
-    // which was *created* at bucket build but never attached (the Step suspended before
-    // the resolve loop reached it, so it never committed — S12), is balanced at 0/0.
+    // long:2
+    // Pin 11. The island unmounts with a load in flight, whose late settle must be inert —
+    // no throw, no log — and the level's source, CREATED but never attached (S12), is
+    // balanced at 0/0.
     //
     // Kill: refresh.ts `sweepDetach()` — `if (entry.detach) {` → `if (true) {` (the
     // sweep assuming every source in a bucket attached) → it calls a null detach on the
@@ -197,7 +178,7 @@ describe('S8 — a mid-tree source dropping to pending', () => {
     // Pin 12. Unlike S4's hide, a committed source going ready → pending renders the
     // loading slot as ordinary children: the levels below unmount for real. Their data
     // cells stay cached on the mandala's buckets, so recovering onto the same value
-    // renders them again with **no producer re-runs**, as docs/current/public/reference.md
+    // renders them again with NO PRODUCER RE-RUNS, as docs/current/public/reference.md
     // states for sources. The deeper source's attach/detach churn through the window is
     // the engine's choice — only the bounds are asserted (S8).
     //
@@ -253,18 +234,11 @@ describe('S8 — a mid-tree source dropping to pending', () => {
         expect(ledger(feed)).toEqual({ live: 0, peak: 1 });
     });
 
-    // The mandala's unmount sweep, tested where it is the only thing that can work — the
-    // sweep half of pin 8, which has nothing to do with StrictMode. A Step torn down
-    // while its bucket is still live keeps its sources attached on purpose (it cannot
-    // tell a source swap from an unmount, so it defers to the sweep). Unmount *during*
-    // the pending window and those Steps are already gone: no cleanup of theirs will
-    // ever run again, and `deep` is attached with nobody but the sweep to release it.
-    //
-    // (Every other unmount path is redundant with the Step's own cleanup, which is why
-    // the pin was originally written against one and the kill below did not fire: the
-    // mandala's cleanup nulls the cache *before* the children's cleanups run, so a
-    // still-mounted Step sees `currentBuckets() === null`, calls its bucket dead, and
-    // detaches everything itself.)
+    // long:2
+    // The mandala's unmount sweep, tested where it alone can work: a Step torn down while
+    // its bucket is live defers its sources to the sweep, so an unmount DURING the pending
+    // window leaves `deep` attached with only the sweep to release it. On every other path
+    // a still-mounted Step sees a null cache and detaches everything itself.
     //
     // Kill: mandala.tsx, the unmount effect's cleanup — drop
     // `sweepDetach(cacheRef.current?.buckets)` → `deep` is never detached: live 1.

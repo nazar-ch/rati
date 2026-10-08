@@ -80,12 +80,9 @@ describe('island SSR dehydration', () => {
         expect(server.html).toContain('hello ssr');
         expect(calls).toBe(1);
 
-        // Client: hydrate the server HTML, feeding the collected data back. The island's
-        // useId matches the server's (same tree position), so its slice is found and the
-        // promise is short-circuited — not run again, no loading flash. "No loading flash"
-        // is a claim about mismatches, and the round-trip's guard is exactly that channel: a
-        // client that re-ran the promise would render the loading slot over the server's
-        // ready HTML, React would report the recovery, and `.hydrate()` would have thrown.
+        // Client: hydrate the server HTML with the collected data. The island's useId matches
+        // the server's, so its slice short-circuits the promise; a re-run renders the loading
+        // slot over the ready HTML, a recovery `.hydrate()` throws on.
         const client = await server.hydrate();
 
         expect(calls).toBe(1);

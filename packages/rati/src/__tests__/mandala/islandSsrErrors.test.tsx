@@ -6,12 +6,10 @@ import { NotAvailableError } from '../../scope/source.js';
 import { deferred, ssrRender } from '../../testing/index.js';
 
 /*
-    What a rejecting promise load does under a collected server render — pinned by
-    experiment: `prerender` RESOLVES (it does not reject), React emits the loading slot
-    wrapped in its "switched to client rendering" marker, and the client re-runs the
-    load on hydration. The error boundary/slot never participates server-side. The
-    collector's `errors` is the piece rati adds: the server's input for the response
-    status (not-available → 404) before that degraded 200 goes out.
+    What a rejecting promise load does under a collected server render, pinned by experiment:
+    `prerender` RESOLVES, React emits the loading slot inside its "switched to client rendering"
+    marker, and the client re-runs the load. rati adds the collector's `errors`, the server's
+    status input.
 */
 
 describe('island SSR error collection', () => {
@@ -77,9 +75,8 @@ describe('island SSR error collection', () => {
         expect(dehydrated).toEqual({ user: { name: 'Ada' } });
     });
 
-    // The recording guard's two halves — it must fire once *within* a render and once
-    // *per* render. Both directions are load-bearing: the first keeps a resumed level from
-    // stacking handlers, the second is what a module-global guard silently broke (DX-08).
+    // The recording guard fires once WITHIN a render and once PER render: the first keeps a
+    // resumed level from stacking handlers, the second keeps a reused promise reported.
     test('one render records a rejection once, however often the suspended level resumes', async () => {
         const gate = deferred<string>();
         const Island = island({
@@ -88,7 +85,7 @@ describe('island SSR error collection', () => {
             loading: () => <div>loading</div>,
         });
 
-        // Rejected *after* the level suspended, so the Step renders a second time on
+        // Rejected AFTER the level suspended, so the Step renders a second time on
         // resume and passes the same cached promise cell through the recorder again.
         setTimeout(() => gate.reject(new Error('backend exploded')), 0);
         const server = await ssrRender(<Island />, { onError: () => {} });
@@ -98,10 +95,8 @@ describe('island SSR error collection', () => {
     });
 
     test('a promise reused across two renders is recorded by both collectors', async () => {
-        // One promise instance, two server renders — the shape of a module-level load, or
-        // of a promise a test builds once and renders twice. The rejection ledger is the
-        // run's, so the second render's collector sees the rejection too; when it was the
-        // module's, `errors` came back empty and the 404 signal went quiet.
+        // One promise instance, two server renders — a module-level load's shape. The
+        // rejection ledger is the run's, so the second render's collector sees it too.
         const failing = Promise.reject(new NotAvailableError('gone'));
         // The resolver attaches its handler mid-render, later than node's
         // unhandled-rejection watch — this keeps the runner quiet, nothing else.
