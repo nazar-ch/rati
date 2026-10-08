@@ -77,10 +77,9 @@ describe('RouterStore basename', () => {
         router.dispose();
     });
 
-    // Kill: return '/' from stripBasename's third branch instead of the pathname —
-    // the URL then reads as the app's root and 'home' renders for an address the app
-    // was never mounted at. Executed once, red. The catch-all must be last, so this
-    // table is local rather than the shared one above.
+    // Kill: return '/' from stripBasename's third branch instead of the pathname → the URL
+    // reads as the app's root and 'home' renders. The catch-all must be last, so this table
+    // is local rather than the shared one above.
     test('a pathname outside the basename falls through to the catch-all', async () => {
         const routesWithCatchAll = [
             route('/', 'home', NoopComponent),

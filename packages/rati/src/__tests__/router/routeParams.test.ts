@@ -4,19 +4,15 @@ import { createMemoryHistory } from '../../router/history.js';
 import { route } from '../../router/route.js';
 import { RouterStore } from '../../router/store.js';
 
-// Every pin below was run once against the unfixed engine and observed red: raw
-// interpolation put `hello world` and `a/b` into the URL unencoded and handed the
-// browser's `hello%20world` back to the component, the substring scan turned
-// `/x/:idx/:id` into `/x/7x/:id`, the malformed case threw a URIError out of setPath,
-// and the dot-only pins (RF-08) built `/pages/.` and `/pages/..` instead of throwing.
-// The base64url pin is the deliberate exception — it passes either way, and exists to
-// hold that jnana's URL shape does not move under the codec.
+// Every pin below holds a codec break: raw interpolation, a substring scan corrupting
+// `/x/:idx/:id`, a URIError out of setPath, a dot-only value built into a URL. The
+// base64url pin passes either way, holding a consumer's URL shape still under the codec.
 
 const NoopComponent = () => null;
 
 const routes = [
     route('/pages/:pageId', 'page', NoopComponent),
-    // `:id` is a prefix of `:idx`, and its segment *follows* — the shape a
+    // `:id` is a prefix of `:idx`, and its segment FOLLOWS — the shape a
     // substring scan corrupts.
     route('/x/:idx/:id', 'prefixCollision', NoopComponent),
     route('*', 'notFound', NoopComponent),
@@ -147,8 +143,7 @@ describe('getPath param substitution', () => {
     test('a param name that prefixes another is substituted at its own boundary', () => {
         const router = new RouterStore(routes);
 
-        // `id` first is the order a substring scan corrupts: `:id` matches inside
-        // `:idx`, so `/x/:idx/:id` came out as `/x/7x/:id`.
+        // `id` first is the order a substring scan corrupts: `:id` matches inside `:idx`.
         expect(router.getPath({ name: 'prefixCollision', id: '7', idx: '9' })).toBe('/x/9/7');
         // The result must not depend on the caller's key order.
         expect(router.getPath({ name: 'prefixCollision', idx: '9', id: '7' })).toBe('/x/9/7');
@@ -170,13 +165,9 @@ describe('getPath param substitution', () => {
 });
 
 describe('getPath dot-only param refusal', () => {
-    // RF-08: no URL carries a param value of exactly '.' or '..' (the parser resolves the
-    // segment away, and '%2E' is read as a dot for the same reason) — getPath refuses the
-    // value instead of building a URL that lands somewhere else. 'a.b'/'..x' round-trip
-    // unchanged (routeParams.test.ts above) — the boundary is "the whole segment is dots".
-    // Kill executed once: with the throw commented out, both tests below went red
-    // ("expected [Function] to throw an error"); the other 8 pins in this file, including
-    // the dot-carrying ones, stayed green. Throw restored afterward.
+    // No URL carries a param value of exactly '.' or '..', so getPath refuses one rather
+    // than building a URL that lands elsewhere; 'a.b' and '..x' round-trip. Kill: comment
+    // the throw out → both tests below go red, the dot-carrying pins stay green.
     test('a param value of exactly "." throws, naming the route', () => {
         const router = new RouterStore(routes);
 

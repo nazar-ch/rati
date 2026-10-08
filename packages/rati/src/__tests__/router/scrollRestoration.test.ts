@@ -16,7 +16,7 @@ beforeEach(() => {
 afterEach(() => {
     vi.useRealTimers();
     // Anchor targets are looked up by id, and getElementById answers with the first
-    // match — so a test that fails before its inline cleanup hands the *next* anchor
+    // match — so a test that fails before its inline cleanup hands the NEXT anchor
     // test a stale element and a second, spurious failure. Clear the DOM here rather
     // than trusting each test to reach the end.
     document.body.innerHTML = '';
@@ -77,19 +77,12 @@ describe('installScrollRestoration', () => {
         uninstall();
     });
 
-    // The three POP branches below are pinned as key bookkeeping — which branch ran,
-    // not where the viewport ended up (jsdom has no layout, so the pixels are ours
-    // either way). A memory history is what makes them writable: it restores the
-    // entry's own key on traversal, which is the whole input to the position lookup.
-    // The suite previously forged POP by dispatching a bare popstate event, which
-    // changes neither the URL nor `window.history.state` — so `readLocation` handed
-    // back the key of the entry the test had just pushed *to*, the saved position was
-    // never looked up, and the assertion (scrollTo was called at all) held whatever
-    // the module did. Deleting the entire restore branch left that test green.
+    // The POP branches below are pinned as key bookkeeping — which branch ran — since jsdom
+    // has no layout. A memory history restores the entry's own key on traversal, the whole
+    // input to the position lookup.
 
-    // Kill: delete the `if (action === 'POP')` restore block — the POP then takes the
-    // PUSH path and this reads (0, 0), which is exactly what the old forged-popstate
-    // test could not tell apart from a restore. Executed once, red.
+    // Kill: delete the `if (action === 'POP')` restore block → the POP takes the PUSH path
+    // and this reads (0, 0).
     test('POP restores the position saved for the entry being returned to', () => {
         const history = createMemoryHistory({ url: '/a' });
         const uninstall = installScrollRestoration(history);
@@ -110,18 +103,15 @@ describe('installScrollRestoration', () => {
         uninstall();
     });
 
-    // Kill: drop the `if (saved)` guard — the unguarded read throws on the entry that
-    // has no saved position. Executed once, red. Note the guard is all this pin can
-    // catch: a mutant defaulting the lookup to (0, 0) lands on the same call and is
-    // caught by the anchor pin below instead, which is the branch that can tell a
-    // fall-through from a restore-to-top.
+    // Kill: drop the `if (saved)` guard → the unguarded read throws on the entry with no
+    // saved position. A mutant defaulting the lookup to (0, 0) is the anchor pin's to catch.
     test('POP to an entry with no saved position falls through to the top', () => {
         const history = createMemoryHistory({ url: '/a' });
         history.push('/b');
         history.back();
 
         // Install only now, so the stack outlives the bookkeeping: /b is reachable by
-        // forward but was never left in *this* session. Saved positions live in memory
+        // forward but was never left in THIS session. Saved positions live in memory
         // for the session while the entries do not — the shape a reload leaves behind.
         const uninstall = installScrollRestoration(history);
         setScroll(0, 300);
@@ -133,8 +123,8 @@ describe('installScrollRestoration', () => {
     });
 
     // Kill: return after the POP lookup instead of falling through (`if (saved) {…}
-    // scrollToTop(); return;` — the plausible "restore or top" simplification) — the
-    // anchor is then never consulted and this reads red. Executed once.
+    // scrollToTop(); return;` — the plausible "restore or top" simplification) → the
+    // anchor is never consulted and this reads red.
     test('POP to an unvisited entry with a hash scrolls to the anchor, not the top', () => {
         const target = document.createElement('div');
         target.id = 'section';
@@ -172,9 +162,8 @@ describe('installScrollRestoration', () => {
         flushScrollRestoration();
 
         expect(target.scrollIntoView).toHaveBeenCalled();
-        // The anchor *wins*, rather than merely also running. Kill: drop the `return`
-        // after scrollIntoView — the fall-through then scrolls to top as well, landing
-        // the reader at the top of the page they deep-linked into. Executed once, red.
+        // The anchor WINS, rather than merely also running. Kill: drop the `return` after
+        // scrollIntoView → the fall-through scrolls to top as well.
         expect(window.scrollTo).not.toHaveBeenCalled();
         document.body.removeChild(target);
         uninstall();

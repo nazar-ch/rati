@@ -104,7 +104,7 @@ describe('group', () => {
         const [refolded] = group({ loading: () => <div>group loading</div> }, [original]);
         expect(refolded.component).not.toBe(original.component);
 
-        // A *collected* render, which is what the mode needs to be honest — see the
+        // A COLLECTED render, which is what the mode needs to be honest — see the
         // dehydration pins. The group's own re-fold is what is under test here.
         const Refolded = refolded.component as FC;
         const server = await ssrRender(<Refolded />);

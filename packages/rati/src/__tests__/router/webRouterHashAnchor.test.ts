@@ -57,7 +57,7 @@ describe('RouterStore hash anchor navigation', () => {
         router.history.push('/article#part-2');
         await Promise.resolve();
 
-        // Same route object — hash change shouldn't trigger a re-resolve.
+        // Same route object — a hash change triggers no re-resolve.
         expect(router.activeRoute).toBe(routeBefore);
         expect(router.hash).toBe('#part-2');
         router.dispose();

@@ -8,10 +8,9 @@ beforeEach(() => {
 });
 
 /**
- * Resolve on the next `popstate`. jsdom queues a real traversal like a browser does,
- * so a `go`/`back`/`forward` test has to wait for it rather than read the next line.
- * Register before calling: the history's own listener was added first (in its
- * constructor), so by the time this resolves, it has already run.
+ * Resolves on the next `popstate`: jsdom queues a real traversal as a browser does. Register
+ * before calling — the history's own listener, added in its constructor, has run by the time
+ * this resolves.
  */
 function nextPopState(): Promise<void> {
     return new Promise((resolve) => {

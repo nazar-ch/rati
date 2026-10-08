@@ -101,11 +101,9 @@ describe('RouterStore.getPath', () => {
         router.dispose();
     });
 
-    // Observed red once against the unfixed engine, which threw the TypeError below.
     test('throws a named error for a route that is not in the table', () => {
         const router = new RouterStore(routes);
-        // A typo in a route name used to surface as `Cannot read properties of
-        // undefined (reading 'path')` from the non-null assertion on `find`.
+        // A typo in a route name throws a named error, never a TypeError out of `find`.
         expect(() => router.getPath({ name: 'dashbaord' } as never)).toThrow(
             '[rati] getPath: no route named "dashbaord"',
         );
@@ -284,13 +282,9 @@ describe('RouterStore navigation', () => {
 });
 
 /**
- * RF-07: the router's string vocabulary is absolute paths. A relative one would mean two
- * different places on the two histories, so it is refused at the choke point instead.
- *
- * Kill executed once (2026-07-17, reverted after): dropping the `assertAbsolutePathTarget`
- * call from `pushOrReplace` turns all nine refusal pins red — the string is pushed
- * verbatim, and where it lands then depends on which history is underneath, which is the
- * whole reason for the rule. The absolute and object pins stay green.
+ * The router's string vocabulary is absolute paths: a relative one means two places on the
+ * two histories, so it is refused at the choke point. Kill: drop `assertAbsolutePathTarget`
+ * from `pushOrReplace` → every refusal pin goes red, the absolute and object pins green.
  */
 describe('RouterStore refuses a non-absolute string target', () => {
     test.each([
@@ -312,14 +306,9 @@ describe('RouterStore refuses a non-absolute string target', () => {
         router.dispose();
     });
 
-    // A leading '/' can still name another origin: the parser reads a second authority
-    // introducer ('//host') out of every one of these spellings — backslashes become
-    // slashes and tabs/newlines are stripped before it looks. The two histories split on
-    // exactly this class (pushState refuses cross-origin, memory lands on the parsed
-    // pathname), so the guard refuses it with the memory history's own parse.
-    // Kill executed once (2026-07-17, reverted after): with the origin check dropped from
-    // `assertAbsolutePathTarget` all four pins here and both redirect.test.tsx pins go
-    // red — each string is pushed verbatim; the nine not-absolute pins stay green.
+    // A leading '/' can still name another origin: the parser reads `//host` out of each of
+    // these spellings, so the guard refuses with the memory history's own parse. Kill: drop
+    // the origin check → these pins and both redirect.test.tsx pins go red.
     test.each([
         ['a protocol-relative URL', '//example.com/x'],
         ['a backslash authority', '/\\example.com/x'],
@@ -378,7 +367,7 @@ describe('RouterStore.dispose', () => {
         await Promise.resolve();
         router.dispose();
 
-        // Manually push past dispose — router should not pick it up.
+        // Manually push past dispose — the router never picks it up.
         const pathBefore = router.path;
         window.history.pushState(null, '', '/dashboard');
         window.dispatchEvent(new PopStateEvent('popstate'));
@@ -386,11 +375,9 @@ describe('RouterStore.dispose', () => {
         expect(router.path).toBe(pathBefore);
     });
 
-    // Observed red once against the unfixed engine: the created history kept its
-    // popstate subscription past dispose. Note the listener goes on *after* dispose —
-    // registering it before would pass either way, since unlistening the store already
-    // empties that set. The leak is only visible to a listener the disposed history
-    // should no longer be able to reach.
+    // The created history's popstate subscription must not survive dispose. The listener
+    // goes on AFTER dispose: registered before, it passes either way, since unlistening the
+    // store already empties that set.
     test('dispose() detaches the history the store created from the DOM', async () => {
         const router = new RouterStore(routes);
         await Promise.resolve();
@@ -404,9 +391,8 @@ describe('RouterStore.dispose', () => {
         expect(listener).not.toHaveBeenCalled();
     });
 
-    // The mirror image, and green from the start: it guards the ownership rule against
-    // the over-eager fix. The listener must be registered *before* dispose — a store
-    // that wrongly disposed an injected history would clear this set.
+    // The mirror image, guarding the ownership rule against an over-eager fix: the listener
+    // is registered BEFORE dispose, and a store disposing an injected history clears this set.
     test('dispose() leaves an injected history alone — it belongs to the caller', async () => {
         const history = createMemoryHistory({ url: '/' });
         const listener = vi.fn();
