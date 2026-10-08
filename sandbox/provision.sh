@@ -16,10 +16,8 @@ cd "${REPO}"
 
 echo "==> provisioning rati at ${REPO}"
 
-# Make the checkout runnable — the same command the manifest declares as `bootstrap`
-# (.claude/kit.json). Installs the monorepo (packages/rati + examples/{demo,ssr}) under Node 26 and
-# Yarn 4.17.1; idempotent, so a re-provision on every `up` is a no-op once deps are current. Expect
-# the non-fatal Yarn YN0066 compat warning from the released TypeScript 7 devDependency.
+# The manifest's `bootstrap` command (.claude/kit.json), a no-op on every `up` once deps are
+# current. Yarn's YN0066 compat warning from the TypeScript 7 devDependency is non-fatal.
 yarn install
 
 echo "==> rati: provisioned"

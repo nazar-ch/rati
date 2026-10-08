@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# why-shell: none of the kit's six shell licenses fits this file, and it claims none — it is a
-# batch of CLI calls with an exit-code roll-up (kit◊KC-53's wording for what is NOT
-# `process-wrap`), which the family's rule calls a TypeScript program that happens to be written in
-# shell. It survives on the convert-on-change lane alone, so it converts the next time it changes
-# for a reason of its own rather than for a sweep.
+# why-shell: no shell license fits this batch of CLI calls with an exit-code roll-up (kit◊KC-53),
+# so it converts to TypeScript the next time it changes for a reason of its own.
 #
 # Release script for the `rati` package.
 #
@@ -17,12 +14,11 @@
 
 set -euo pipefail
 
-# --- config ---------------------------------------------------------------
 PACKAGE="rati"
 KEYCHAIN_SERVICE="npm_token_rati"
 RELEASE_BRANCH="main"
-# yarn's default registry is its read-only mirror, so publishing must be pointed
-# explicitly at npmjs (see the YARN_NPM_PUBLISH_REGISTRY export below).
+# yarn's default registry is its read-only mirror, so publishing points at npmjs
+# through the YARN_NPM_PUBLISH_REGISTRY export.
 PUBLISH_REGISTRY="https://registry.npmjs.org"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PKG_DIR="${REPO_ROOT}/packages/${PACKAGE}"
@@ -30,9 +26,7 @@ PKG_DIR="${REPO_ROOT}/packages/${PACKAGE}"
 die()  { echo "✗ $*" >&2; exit 1; }
 info() { echo "→ $*"; }
 
-# --- args -----------------------------------------------------------------
-# The bump defaults to `patch`. Only a *non-flag* first argument is read as one,
-# so `release.sh --dry-run` doesn't consume its own flag as the bump.
+# Only a NON-FLAG first argument is the bump, so `release.sh --dry-run` keeps its flag.
 BUMP="patch"
 if [[ $# -gt 0 && "$1" != -* ]]; then
   BUMP="$1"
@@ -51,7 +45,6 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-# --- preflight ------------------------------------------------------------
 command -v node     >/dev/null || die "node not found"
 command -v yarn     >/dev/null || die "yarn not found"
 command -v security >/dev/null || die "macOS 'security' tool not found (Keychain unavailable)"
@@ -68,18 +61,15 @@ if UPSTREAM="$(git rev-parse --abbrev-ref '@{u}' 2>/dev/null)"; then
     || die "Local '${RELEASE_BRANCH}' is not in sync with ${UPSTREAM}. Pull/push first."
 fi
 
-# --- token from Keychain --------------------------------------------------
 info "Reading npm token from Keychain (service: ${KEYCHAIN_SERVICE})…"
 NPM_TOKEN="$(security find-generic-password -a "${USER}" -s "${KEYCHAIN_SERVICE}" -w 2>/dev/null || true)"
 [[ -n "${NPM_TOKEN}" ]] || die "No token in Keychain. Run the one-time setup in docs/current/RELEASING.md."
 
-# Hand the token + publish target to `yarn npm …` via env (yarn reads these as
-# the npmAuthToken / npmPublishRegistry config). Passing them through the
-# environment keeps the secret off disk, and scopes it to this process only.
+# yarn reads these as its npmAuthToken / npmPublishRegistry config; the environment
+# keeps the secret off disk and inside this process.
 export YARN_NPM_AUTH_TOKEN="${NPM_TOKEN}"
 export YARN_NPM_PUBLISH_REGISTRY="${PUBLISH_REGISTRY}"
 
-# Run a command in the $PACKAGE workspace from anywhere in the repo.
 yarn_pkg() { yarn workspace "${PACKAGE}" "$@"; }
 
 # Gate on the exit code, not the output: `yarn npm whoami` prints its error to
@@ -87,16 +77,13 @@ yarn_pkg() { yarn workspace "${PACKAGE}" "$@"; }
 if ! WHO="$(yarn npm whoami --publish 2>/dev/null)"; then
   die "Token failed to authenticate (expired?). Rotate it — see docs/current/RELEASING.md."
 fi
-# The username is on the FIRST line; `yarn npm whoami` then adds its own "Done in 0s
-# 273ms" report line, which also carries a "➤ YN0000: " prefix. Stripping to the LAST
-# such prefix across the whole capture therefore printed the timing line as the publisher
-# — a confirmation prompt naming nobody, on the one command that must not be run against
-# the wrong account. Take the first line, then strip.
+# The username is the FIRST line: `yarn npm whoami` appends a timing line carrying the
+# same "➤ YN0000: " prefix.
 WHO="${WHO%%$'\n'*}"
 WHO="${WHO##*: }"
 info "Authenticated as: ${WHO}"
 
-# --- test + build (fail before bumping) -----------------------------------
+# Before the bump, so a failing test or build leaves package.json alone.
 info "Running tests…"
 yarn_pkg test
 info "Building…"
@@ -114,7 +101,6 @@ derive_tag() { # $1 = version -> echoes dist-tag
   fi
 }
 
-# --- dry run: bump package.json only, publish --dry-run, then revert -------
 if [[ ${DRY_RUN} -eq 1 ]]; then
   yarn_pkg version "${BUMP}" >/dev/null
   NEW_VERSION="$(node -p "require('${PKG_DIR}/package.json').version")"
@@ -126,13 +112,8 @@ if [[ ${DRY_RUN} -eq 1 ]]; then
   exit 0
 fi
 
-# --- resolve the version, then confirm ------------------------------------
-# The number worth confirming is the *new* one, and only `yarn version` knows
-# how a keyword resolves (prerelease ids especially) — so the bump is written to
-# package.json here to read it back. Nothing irreversible has happened yet: the
-# commit, tag, publish and push all sit behind the prompt, and the trap puts
-# package.json back on any exit before the commit (an answer of no, but a Ctrl-C
-# just as much).
+# Only `yarn version` knows how a keyword resolves, so the bump is written here and
+# read back for the prompt; the trap restores package.json on any exit before the commit.
 restore_pkg_json() { git -C "${REPO_ROOT}" checkout -- "${PKG_DIR}/package.json" 2>/dev/null || true; }
 yarn_pkg version "${BUMP}" >/dev/null
 trap restore_pkg_json EXIT
@@ -146,28 +127,14 @@ if [[ ${ASSUME_YES} -ne 1 ]]; then
   [[ "${ans}" == "y" || "${ans}" == "Y" ]] || die "Aborted."
 fi
 
-# --- commit + tag ---------------------------------------------------------
-# `yarn version` only wrote the new version into package.json; it does not
-# create the git commit/tag we rely on below, so we make them ourselves.
-# (The tag must be annotated: `git push --follow-tags` ignores lightweight ones.)
-# Braces, because they are what keeps the multibyte `…` that follows out of the variable
-# NAME. Unbraced, `$NEW_VERSION…` was looked up as a name nothing had set and `set -u`
-# killed a release one line before the commit (kit◊KC-42).
-#
-# What this comment used to claim — "bash 5 expands it fine, so no Linux run and no
-# lint pass can see this" — is wrong in its second half and unsettled in its first. A
-# linter is now exactly what sees it: `require-variable-braces` (SC2250) flags the whole
-# class and writes the repair itself, and kit◊KC-52 turned it on. The
-# interpreter half is measured and the measurements disagree — kit◊KC-52 read the
-# abort out of brew bash 5.3.15 on macOS under `LANG=en_US.UTF-8`, and re-measuring it for
-# kit◊KC-54 on Linux bash 5.2.21 expanded it correctly in every locale that guest
-# has. So neither the version nor the platform is the invariant here. The braces are.
+# Braces keep the multibyte `…` out of the variable NAME, which `set -u` aborts on (kit◊KC-42).
 info "Committing and tagging v${NEW_VERSION}…"
+# `yarn version` writes package.json alone, never a commit or a tag.
 git -C "${REPO_ROOT}" commit -q -m "release: ${PACKAGE} v${NEW_VERSION}" -- "${PKG_DIR}/package.json"
+# Annotated: `git push --follow-tags` ignores a lightweight tag.
 git -C "${REPO_ROOT}" tag -a "v${NEW_VERSION}" -m "release: ${PACKAGE} v${NEW_VERSION}"
 trap - EXIT
 
-# --- publish --------------------------------------------------------------
 info "Publishing ${PACKAGE}@${NEW_VERSION} (dist-tag: ${DIST_TAG})…"
 PUB_ARGS=(npm publish --tag "${DIST_TAG}")
 [[ -n "${OTP}" ]] && PUB_ARGS+=(--otp "${OTP}")
@@ -176,7 +143,6 @@ if ! yarn_pkg "${PUB_ARGS[@]}"; then
    Undo with:  git tag -d v${NEW_VERSION} && git reset --hard HEAD~1"
 fi
 
-# --- push -----------------------------------------------------------------
 info "Pushing commit + tag…"
 git push --follow-tags origin "${RELEASE_BRANCH}"
 
