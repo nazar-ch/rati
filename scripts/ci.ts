@@ -71,8 +71,7 @@ const unknown = requested.filter((name) => !byName.has(name));
 if (unknown.length) {
     console.error(
         `unknown stage(s): ${unknown.join(', ')} (want: ${stages.map((stage) => stage.name).join(' | ')}).\n` +
-            `The pre-push gate moved to the kit's standard battery — .claude/kit.json's \`verify\` ` +
-            `names it, and it carries every stage this file used to.`,
+            `The pre-push gate is bare \`verify.ts\`, the kit's standard battery.`,
     );
     process.exit(2);
 }
