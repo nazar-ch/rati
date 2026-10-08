@@ -1,20 +1,6 @@
 /*
-    `loadingDelayMs` — the island's "don't flash a spinner" gate.
-
-    One per mandala instance, holding back the *one* loading-slot element the mandala
-    threads into the three places it can appear (the Suspense fallback, a Step pending on a
-    source, `ProvideLeaf`'s build frame), so the delay is a single deadline rather than three.
-
-    The unit it measures is a *stretch without fresh content*, not a resolution: the deadline
-    starts when the island leaves content behind and is paid off exactly once. That is what
-    makes the two edges honest — a re-resolve arriving mid-stretch doesn't push the slot
-    further out, and once the slot is on screen nothing takes it back (`expired`).
-
-    Two halves on purpose. `begin` is render-time — the generation that starts a resolution
-    is created in render, and so is the server's — and therefore starts no timer: a server
-    render must neither hold a slot back (its snapshot is `false`, see the slot's
-    `useSyncExternalStore`) nor leave a `setTimeout` behind holding the process open. `arm`
-    is the effect-time half, which the server never runs.
+    `loadingDelayMs` — the island's "don't flash a spinner" gate, one per mandala instance;
+    the design is docs/current/internals.md.
 */
 
 export class LoadingDelay {
@@ -44,12 +30,9 @@ export class LoadingDelay {
     };
 
     /**
-     * A resolution begins — hold the slot back. Render-time (called where the generation is
-     * built), and deliberately timer-less; `arm` starts the countdown.
-     *
-     * A no-op once the delay is paid: an island that is already showing its slot must not
-     * blank when a second re-resolve supersedes the first, and the second one's user has
-     * been waiting since the first.
+     * A resolution begins: holds the slot back, render-time and timer-less (`arm` starts the
+     * countdown). A no-op once the delay is paid, so a superseding re-resolve never blanks a
+     * slot already showing.
      */
     begin(): void {
         if (this.expired) return;
@@ -59,7 +42,7 @@ export class LoadingDelay {
     /**
      * Effect-time: start the countdown of an open window. Idempotent — called on every
      * render of the island, so a window already counting keeps its deadline (the slot moving
-     * between its three sites must not push it out).
+     * between its sites must not push it out).
      */
     arm(): void {
         if (!this.holding || this.timer) return;
@@ -71,11 +54,9 @@ export class LoadingDelay {
     }
 
     /**
-     * The slot is on screen — the delay has nothing left to hide. Called from the slot's own
-     * render, which is what covers the renders the timer can't: a server render and the
-     * client's hydration pass both show the slot regardless of the delay, and taking it back
-     * on the first post-hydration render would be exactly the flash this option exists to
-     * prevent.
+     * The slot is on screen, so the delay has nothing left to hide. Called from the slot's
+     * render, covering what the timer can't: the server render and the hydration pass show
+     * the slot regardless, and the first client render must not take it back.
      */
     expire(): void {
         this.clear();

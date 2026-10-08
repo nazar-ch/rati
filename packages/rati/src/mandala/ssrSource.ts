@@ -1,12 +1,9 @@
 import type { Source } from '../scope/source.js';
 
 /**
- * Wrap an SSR-marked source's first settle into a promise, so the server resolves it
- * through React's own wait mechanics (`use()` / Suspense / `prerender`) exactly like a
- * promise load. Attaches during render — that is what the `ssr` marker authorizes — and
- * detaches once settled. The trust extended is the same as for any promise load: a
- * state machine that never settles hangs the prerender (budgets belong to the prerender
- * helper, not here).
+ * Wraps an SSR-marked source's first settle into a promise, so the server resolves it
+ * through `use()` like a promise load. Attaches during render, as the `ssr` marker
+ * authorizes, and detaches once settled; a source that never settles hangs the prerender.
  */
 export function firstSettle<T>(source: Source<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {

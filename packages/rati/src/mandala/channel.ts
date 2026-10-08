@@ -3,13 +3,9 @@ import { createContext, useContext, type Context } from 'react';
 import type { Scope, ScopeProvidesOf } from '../scope/scope.js';
 import { is } from '../util/utils.js';
 
-// One value channel per mandala, holding whatever it provides — the resolved props by
-// default, or the `.provide()` value when declared. Keyed by the *scope*: a descendant
-// imports the scope (a data module), never the component that renders it — so there is no
-// child→parent reference and no import cycle. Mandalas built from the same scope share
-// one channel (get-or-create in createMandala), so the nearest one wins — ordinary React
-// context semantics. The sentinel distinguishes "no provider above" from a provided value
-// that is itself nullish.
+// One value channel per scope, so a descendant imports a data module, never the component;
+// mandalas from one scope share it, and the nearest wins. The sentinel tells "no provider
+// above" from a nullish provided value.
 const SCOPE_MISSING = Symbol('rati.scope-missing');
 const scopeChannels = new WeakMap<object, Context<unknown>>();
 // A human label per scope (the component's displayName), used only in error messages.
@@ -41,11 +37,9 @@ export function describeScope(scope: object): string {
     return keys.length ? `scope({ ${keys.join(', ')} })` : 'the given scope';
 }
 
-// The outcome of reading a scope's value channel — split so each caller applies its own
-// policy and crafts its own message with the right identifier. `no-provider`: an island
-// for the scope exists, but none is rendered above this component. `no-island`: no island
-// uses this scope at all (a misuse). A hook (calls useContext), so callers invoke it
-// unconditionally.
+// The outcome of reading a scope's value channel, split so each caller crafts its own
+// message: `no-provider` — an island for the scope exists, none above; `no-island` — no
+// island uses the scope. A hook, so callers invoke it unconditionally.
 export type ScopeRead =
     | { status: 'value'; value: unknown }
     | { status: 'no-provider' }
@@ -60,17 +54,10 @@ export function useScopeRead(scope: object): ScopeRead {
 }
 
 /**
- * Read the value an island provides to its subtree — the resolved props by default, or
- * the `.provide()` value when the scope declares one. The value is created and (for a
- * `.provide()` value) torn down by the island in lockstep with its sources, so a store
- * built over a grabbed resource never outlives that grab. Nearest island instance wins.
- *
- * Keyed by the **scope**: a descendant imports the scope (a data module), never the
- * island component that renders it — so there is no child→parent reference or import
- * cycle, and the type comes straight off the scope.
- *
- * Throws when no island for the scope is above — see {@link useOptionalScope} for the
- * non-throwing form.
+ * Reads the value an island provides to its subtree — the resolved props, or the
+ * `.provide()` value. Keyed by the scope: a descendant imports the scope, never the island,
+ * so there is no import cycle. Throws when no island is above; {@link useOptionalScope}
+ * returns `undefined`.
  */
 export function useScope<S extends Scope<any>>(scope: S): ScopeProvidesOf<S> {
     const read = useScopeRead(scope);

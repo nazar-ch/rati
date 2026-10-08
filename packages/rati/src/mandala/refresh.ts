@@ -4,23 +4,9 @@ import { deepEqual } from '../util/utils.js';
 
 /*
     Selective scope refresh — the cell model and the per-mandala controller behind
-    `useScopeControls`.
-
-    `refresh(key)` re-runs one promise load without tearing the island down: the cell is
-    marked dirty, the next render re-runs its producer with the *current* upstream values
-    (so the re-run happens where `prev` naturally lives — in the Step's render, same as
-    the initial build), and the previous value stays rendered while the re-fetch is in
-    flight. On settle the new value passes the equals gate (deep by default — a re-fetch
-    of identical JSON is dropped on the floor, old identity kept); a changed value swaps
-    in and marks dirty exactly the downstream cells whose producers read the key — the
-    read-sets recorded by `trackReads` when each producer ran. Downstream re-runs cascade
-    through the same machinery.
-
-    Only promise loads are refreshable: sources are live and refresh themselves (the
-    data-layer division of labor), hook loads re-run every render anyway, and static
-    entries have no producer to re-run. A cascade may still *re-create* a downstream
-    source or `.provide()` value whose producer consumed a changed key — the narrow
-    equivalent of what a full remount does today.
+    `useScopeControls`; the design is docs/current/internals.md. Only promise loads are
+    refreshable: sources refresh themselves, hook loads re-run every render, and a static
+    entry has no producer.
 */
 
 export type EqualsFn = (previous: unknown, next: unknown) => boolean;
@@ -50,16 +36,9 @@ type CellBase = {
     collectAs?: 'value' | 'seed';
 };
 
-// One resolved cell. Props/classes/plain values resolve instantly; a function is
-// called with the prior levels' ready values and its result re-classified; a promise
-// is unwrapped with `use()`; a source is read observably. A refreshed promise cell
-// becomes a value cell when the re-fetch settles (the settled value renders
-// synchronously — no `use()`, no Suspense re-entry, no loading-slot flash).
-//
-// `error` is the fourth outcome, and the only one a load never *produces*: it is a
-// failure the server already had, dehydrated across the wire (`ssrErrors: 'dehydrate'`).
-// The cell lands in it — `SourceState`'s third member, in cell clothing — and the resolve
-// pass throws it to the boundary without the load having run here at all.
+// One resolved cell. A refreshed promise cell becomes a value cell when the re-fetch settles,
+// so the settled value renders without `use()` or a Suspense re-entry. `error` arrives only
+// dehydrated from a server render (`ssrErrors: 'dehydrate'`), never from a load.
 export type Cell = CellBase &
     (
         | { kind: 'value'; value: unknown }
@@ -74,7 +53,7 @@ export type CellBody =
     | { kind: 'source'; source: Source<unknown> }
     | { kind: 'error'; error: SourceError };
 
-/** What a load can *produce* — everything but `error`, which is never classified from an
+/** What a load can produce — everything but `error`, which is never classified from an
  *  entry: it only ever arrives dehydrated from a server render. */
 export type ProducedBody = Exclude<CellBody, { kind: 'error' }>;
 export type ProducedCell = CellBase & ProducedBody;
@@ -113,13 +92,9 @@ export function makeProducedCell<Body extends CellBody>(
 
 export type SourceEntry = { source: Source<unknown>; detach: (() => void) | null };
 
-// One level's data cells, built once. Lives on the mandala's committed ref (not the
-// Step's fiber) so it survives a `use()` suspension: a suspended render is discarded,
-// which would otherwise re-build the cell — re-running its load and re-suspending on a
-// brand-new promise forever. Built per level here; the load side effect runs once.
-// `sources` is replaced (new array identity) when a cascade swaps a source, so the
-// Step's attach/detach effects and uSES subscription re-key. `abort` is the level's
-// cancellation handle — see `bucketSignal` / `discardRun`.
+// One level's data cells, built once, on the mandala's committed ref so a `use()` suspension
+// cannot rebuild them (docs/current/internals.md). A cascade source swap replaces `sources`,
+// re-keying the Step's effects; `abort` is the level's cancellation handle.
 export type Bucket = {
     cells: Map<string, Cell>;
     sources: SourceEntry[];
@@ -128,11 +103,9 @@ export type Bucket = {
 };
 
 /**
- * The `AbortSignal` this level's loads receive (the `signal` of their `LoadContext`) —
- * one controller per bucket, i.e. per level per run, created with the level's cells. The
- * bucket is exactly the right lifetime: it is built once per inner-tree generation and
- * discarded wholesale when that generation is (`discardRun`), so the signal fires when —
- * and only when — the loads it covers have lost their reader.
+ * The `AbortSignal` this level's loads receive: one controller per bucket, so per level per
+ * run. The bucket is discarded wholesale with its generation, so the signal fires when, and
+ * only when, its loads have lost their reader.
  */
 export function bucketSignal(bucket: Bucket): AbortSignal {
     bucket.abort ??= new AbortController();
@@ -140,10 +113,9 @@ export function bucketSignal(bucket: Bucket): AbortSignal {
 }
 
 /**
- * Record which keys of `prev` a producer reads while it runs. Destructuring — the
- * dominant load idiom — reads eagerly at call time, so for `({ a, b }) => …` the set is
- * deterministic and complete; lazy styles (`(bag) => bag.a`) are recorded per run and
- * re-recorded on every re-run (same rule as any tracked derivation).
+ * Records which keys of `prev` a producer reads while it runs. Destructuring reads eagerly,
+ * so for `({ a, b }) => …` the set is complete; a lazy read (`(bag) => bag.a`) is recorded
+ * per run, as in any tracked derivation.
  */
 export function trackReads(prev: Record<string, unknown>): {
     proxy: Record<string, unknown>;
@@ -164,13 +136,9 @@ export function trackReads(prev: Record<string, unknown>): {
 }
 
 /**
- * Let a torn-down generation go: abort the loads it still has in flight, then detach the
- * sources it still has attached. Called wherever a run is discarded — the buckets a new
- * generation replaced (an inputs change, a retry, `refresh()`) and the mandala's unmount
- * — never on a plain re-render, where the run is still the live one.
- *
- * Effect-time on purpose, like the detach half it wraps: a *discarded render* must not
- * cancel the loads of a run that is still current.
+ * Lets a torn-down generation go: aborts its in-flight loads, then detaches its attached
+ * sources. Called wherever a run is discarded, never on a plain re-render; effect-time,
+ * because a discarded RENDER must not cancel a current run's loads.
  */
 export function discardRun(buckets: readonly Bucket[] | null | undefined): void {
     if (!buckets) return;
@@ -178,14 +146,9 @@ export function discardRun(buckets: readonly Bucket[] | null | undefined): void 
     sweepDetach(buckets);
 }
 
-// Fire one bucket's controller. A load that took the signal rejects as a result, and
-// that rejection has no reader left — the Step that `use()`d the promise is gone, and a
-// refresh settle is dropped by token — so it would surface as an unhandled rejection.
-// Each producer-backed promise therefore gets a no-op rejection handler *before* the
-// abort, which is what keeps the runtime quiet (attaching one afterwards is already too
-// late). Static promise entries are left alone: they never received the signal, so this
-// can't be what rejects them, and marking a shared module-level promise as handled
-// forever is not ours to do.
+// Fires one bucket's controller. Each producer-backed promise first gets a no-op rejection
+// handler, since its abort rejection has no reader left; a static promise entry never
+// received the signal and is left alone.
 function abortLoads(bucket: Bucket): void {
     const controller = bucket.abort;
     if (!controller || controller.signal.aborted) return;
@@ -219,10 +182,9 @@ export function sweepDetach(buckets: readonly Bucket[] | null | undefined): void
 }
 
 /**
- * Which of the island's three slots is on screen — its aggregate phase, not any one load's.
- * `'ready'` means content is rendering, which includes the stale window: kept content *is*
- * content, and a subtree gating a skeleton on `phase === 'loading'` must not flip back to
- * it under content the user is reading. `isStale` is what tells the two apart.
+ * Which of the island's slots is on screen — its aggregate phase. `'ready'` includes the
+ * stale window: kept content IS content, so a skeleton gated on `phase === 'loading'` never
+ * flips back under it. `isStale` tells the two apart.
  */
 export type IslandPhase = 'loading' | 'ready' | 'error';
 
@@ -242,11 +204,9 @@ type ControllerWiring = {
 };
 
 /**
- * One per mandala instance. Owns the refresh bookkeeping over the instance's buckets:
- * marking cells dirty, tracking in-flight re-runs, gating settles, fanning changes out
- * to dependents, and the `pending` external store `useScopeControls` reads. Wired every
- * render (buckets change identity per inner tree); handed to the subtree through the
- * scope-keyed controls channel.
+ * One per mandala instance: the refresh bookkeeping over its buckets and the `pending` store
+ * `useScopeControls` reads. Wired every render, as buckets change identity per inner tree,
+ * and handed to the subtree through the scope-keyed controls channel.
  */
 export class RefreshController {
     private wiring: ControllerWiring | null = null;
@@ -270,16 +230,9 @@ export class RefreshController {
     }
 
     /**
-     * Whatever is rendering says so — the leaf ('ready'), the kept run ('ready', stale), the
-     * loading slot, the error slot. Which slot is on screen is the only honest definition of
-     * the island's phase: no single piece of bookkeeping knows it (a level can be suspended
-     * on a promise, pending on a source, or thrown to the boundary, all without the mandala
-     * itself re-rendering).
-     *
-     * Called from render, like `addPending` — so a subtree reading the status further down
-     * the same pass sees the value that pass produced, rather than the previous one. The
-     * notification is microtask-deferred for the same reason it is there: a listener
-     * setState during render is not allowed.
+     * Whatever renders reports the phase — the leaf, the kept run, the loading slot, the error
+     * slot — since no single piece of bookkeeping knows which is on screen. Called from
+     * render, so the same pass reads it downstream; the notification is microtask-deferred.
      */
     reportPhase(phase: IslandPhase, isStale: boolean): void {
         if (this.status.phase === phase && this.status.isStale === isStale) return;
@@ -459,10 +412,8 @@ export class RefreshController {
         const cell = bucket?.cells.get(key);
         if (!cell || cell.refreshing?.token !== token) return;
         cell.refreshing = null;
-        // A cancelled re-fetch is not a failed one: the run this re-run belonged to was
-        // discarded (unmount, mostly — a remount re-wires the controller onto the new
-        // buckets, so the old cell isn't even found) and took the load with it. Nothing
-        // to report; the bookkeeping below still settles so an awaited `refresh()` resolves.
+        // A cancelled re-fetch is not a failed one: its run was discarded and took the load
+        // with it. The bookkeeping below still settles, so an awaited `refresh()` resolves.
         if (!bucket?.abort?.signal.aborted) {
             console.error(`[rati] refresh('${key}') failed — keeping the previous value.`, error);
         }
@@ -510,10 +461,8 @@ export class RefreshController {
         this.settleWaiters(key);
     }
 
-    /** Render-time: a swapped source errored instead — equally the end of the swap. An
-     * error is a settled state, not an in-flight one, so the key leaves `pending` before
-     * the boundary takes the tree; without this it sat there until a retry's
-     * `treeCommitted`, and the error slot read a `pending` with nothing actually fetching. */
+    /** Render-time: a swapped source errored instead, equally the end of the swap. An error is
+     * settled, so the key leaves `pending` before the boundary takes the tree. */
     sourceErrored(key: string): void {
         this.removePending(key);
         this.settleWaiters(key);

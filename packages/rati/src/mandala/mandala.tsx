@@ -27,15 +27,8 @@ import { startDataTrace, type DataTrace, type DataTraceCause } from '../util/dat
 import { deepEqual } from '../util/utils.js';
 
 /*
-    The mandala — rati's core renderable unit, the shared abstraction under `island()`
-    (standalone) and `route()` (URL-bound). A mandala is a *scope* (declarative data
-    definition) bound to a component with loading/error slots; it resolves its own data,
-    provides the resolved value to its subtree (read with `useScope`), and manages the
-    sources' attach/detach + the `.provide()` value's dispose in lockstep with its own
-    lifetime. See resolver.tsx for the Step-tree resolution mechanics, channel.ts for the
-    value channel, hydration.tsx for SSR dehydration.
-
-    Internal name only: callers see `island` / `route`, never "mandala".
+    The mandala — the one engine under `island()` and `route()`, internal by name: callers see
+    `island` / `route`, never "mandala". Its design is docs/current/internals.md.
 */
 
 type MandalaFallbackProps<S extends Scope<any>> = {
@@ -64,131 +57,59 @@ export type MandalaConfig<S extends Scope<any>> = {
     error?: ComponentType<MandalaFallbackProps<S> & { error: SourceError }>;
 
     /**
-     * Resolve this island's data during a server render? Default `true`.
-     *
-     * `prerender` is all-or-nothing: every promise load on the page gates TTFB. Set
-     * `false` on an island that shouldn't hold the document up — below the fold,
-     * expensive, or personalized — and the server ships its `loading` slot instead. The
-     * client renders that same slot through hydration, then resolves normally.
-     *
-     * The opt-out is the island's, so it wins over anything inside its scope: a source
-     * marked `ssr: true` in an `ssr: false` island does not resolve server-side either.
-     * On a client-only render (no server in the picture) the option does nothing.
+     * Resolve this island's data during a server render? Default `true`. `false` keeps an
+     * island out of `prerender`, which gates TTFB on every load: the server ships its
+     * `loading` slot and the client resolves after hydration. It wins over an `ssr: true`
+     * source inside the island.
      */
     ssr?: boolean;
 
     /**
-     * Keep the previous content on screen while re-resolving? Default `false`.
-     *
-     * A param change or `refresh()` re-resolves the whole scope, which normally blanks the
-     * screen back to the `loading` slot. With `keepStale`, the island keeps rendering what
-     * it last committed until the new resolution is ready, then swaps — the islands
-     * reading of stale-while-revalidate. The first load has nothing to keep and is
-     * unchanged; an error during the re-resolve shows the `error` slot rather than leaving
-     * stale content passing for current.
-     *
-     * The kept props were resolved for the *previous* inputs, so the subtree can briefly
-     * see old data under a new URL — that is the feature, and `useScopeControls().isStale`
-     * is how a component knows to say so (dim it, badge it). The continuity is visual, not
-     * instance-level: the kept content is a fresh mount of the component (and the swap
-     * mounts another), so component-local state does not survive the window — a store
-     * (`.provide()`, which is kept alive) does.
+     * Keep the last committed content on screen while re-resolving? Default `false`.
+     * `useScopeControls().isStale` marks the window, and an error still shows the `error`
+     * slot. The kept content is a fresh mount: component-local state does not survive it,
+     * and a `.provide()` store does.
      */
     keepStale?: boolean;
 
     /**
-     * Hold the `loading` slot back for this many milliseconds. Default `0` (no delay) —
-     * `0` and absent are the same thing.
-     *
-     * A resolution that settles in tens of milliseconds still renders its loading slot for
-     * a frame or two, which reads as a flash. With a delay the island renders **nothing**
-     * until the deadline (first load) or keeps the **previous content** (a re-resolve —
-     * `keepStale`'s mechanism, borrowed for the length of the window), and a resolution
-     * that beats the deadline never shows the slot at all.
-     *
-     * The deadline measures a stretch without content, not one resolution: a second
-     * re-resolve arriving mid-window doesn't push the slot further out, and once the slot
-     * is up nothing takes it back until content returns. It composes with `keepStale` —
-     * with both set the slot appears only for a slow *first* load. Inert on the server,
-     * which waits for the resolution regardless.
+     * Hold the `loading` slot back this many milliseconds (`0`: no delay). Until the deadline
+     * a first load renders nothing and a re-resolve keeps the previous content. The deadline
+     * measures a stretch without content, and a shown slot stays until content returns.
+     * Inert on the server.
      */
     loadingDelayMs?: number;
 
     /**
-     * Re-resolve automatically when the resolution fails. **On by default** — an island
-     * with no `retry` option takes up to two further attempts at a failure the app
-     * classified `retryable: true` (a 5xx, a dropped connection), with a jittered
-     * exponential backoff. Nothing else is retried by default: a terminal failure
-     * (`retryable: false`) and one the app never classified both go straight to the `error`
-     * slot, so an app that classifies nothing gets exactly the behavior it had before.
-     * Classifying at your transport edge (see `SourceError`) is how you buy the default.
-     *
-     * While the policy is working the island is *not* in its error state: it shows the
-     * `loading` slot (or the kept run, under `keepStale`) and `useScopeControls().retrying`
-     * says which attempt is in flight. Only once the budget is spent does the `error` slot
-     * come up — with its manual `retry`, which buys a fresh budget.
-     *
-     * `{ count, backoffMs? }` asks for more: `count` attempts, and a broader reach — an
-     * unclassified `failed` (a bare `throw new Error`) is retried too, while `retryable:
-     * false` is still declined. `backoffMs` (default 500) is the *first ceiling*; it
-     * doubles per attempt (capped), and each wait is a full-jitter draw from `[0, ceiling]`
-     * so a backend blip doesn't bring every island back on the same tick.
-     *
-     * `false` — or `{ count: 0 }` — opts out entirely: the `error` slot, on the spot.
-     *
-     * Client-only: a server render takes its one attempt per request and reports the
-     * failure as always.
+     * Re-resolve on failure — ON by default for a failure classified `retryable: true`, with
+     * jittered exponential backoff, showing `loading` meanwhile. Terminal and unclassified
+     * failures go to the `error` slot. `{ count, backoffMs? }` also retries an unclassified
+     * `failed`; `false` opts out. Client-only.
      */
     retry?: RetryOption;
 
     /**
-     * What a server render does with a load that *failed*. Default `'retry'`.
-     *
-     * `'retry'` is React's own degradation, and it is self-healing: the failing Suspense
-     * boundary is abandoned, the HTML carries the `loading` slot with a client-retry
-     * marker, and the client re-runs the load on hydration. A transient hiccup fixes
-     * itself; a real failure reaches the `error` slot one client-side attempt later.
-     *
-     * `'dehydrate'` trades that for a deterministic first paint. The server renders the
-     * island's `error` slot into the HTML, carries the failure over in the payload, and the
-     * client hydrates that cell straight to its error state — no re-run, no spinner. The
-     * slot's `retry` is armed as always and re-runs the load on click.
-     *
-     * Two things to know before opting in. The failure's `message` is written into the
-     * HTML, so a load whose errors carry backend text should say something else instead
-     * (`cause` never travels — see the payload contract). And the {@link MandalaConfig.retry}
-     * policy picks a dehydrated failure up like any other — `retryable` crosses the wire, so
-     * a transient one has the island retrying on the client instead of sitting on the error
-     * slot the HTML shipped.
-     *
-     * Either way the server's own knowledge is unchanged: the failure is recorded, and the
-     * response status derived from it, in both modes. And like the source-side `ssr`
-     * marker, `'dehydrate'` needs the payload to reach the client: under a bare
-     * `prerender` with no `HydrationProvider` — and on a client-only render — it does
-     * nothing, because a first paint that hydration then contradicts is worse than the
-     * default it replaces.
+     * What a server render does with a failed load. `'retry'` (default): the HTML carries
+     * the `loading` slot and the client re-runs the load. `'dehydrate'`: the HTML carries
+     * the `error` slot, with the failure's `message`, and the client hydrates onto it; it
+     * needs a `HydrationProvider`.
      */
     ssrErrors?: 'retry' | 'dehydrate';
 };
 
 export type MandalaComponent<S extends Scope<any>> = FC<ScopeInputs<S>> & {
     /**
-     * Forwarded from a `lazy()` component the mandala wraps, so the mandala is a
-     * transparent entry point: the router's `<Link prefetch>` / `prepareRoute` preload
-     * reach a route's chunk whether it is mounted as a bare component or folded into a
-     * mandala by `route`. Absent when the component isn't lazy.
+     * Forwarded from a `lazy()` component the mandala wraps, so `<Link prefetch>` and
+     * `prepareRoute` reach a route's chunk whether it is mounted bare or folded into a
+     * mandala by `route`.
      */
     preload?: () => Promise<unknown>;
     /** Forwarded from the same `lazy()` component, for the same reason — see {@link lazy}. */
     moduleId?: string;
     /**
-     * Set when the mandala keeps its previous run across a re-resolve — `keepStale`, or
-     * `loadingDelayMs` (which keeps it for the length of the window) — so the `RouterOutlet` can
-     * tell. It keys a route's element by a per-navigation counter, which remounts the
-     * component on every navigation — and a remounted island has no previous run left to
-     * keep. For these the RouterOutlet keys by route name instead, so a param change on the same
-     * route re-renders this instance (the mandala's own param-change path) rather than
-     * replacing it. Absent otherwise, and the default keying is untouched.
+     * Set when the mandala keeps its previous run across a re-resolve (`keepStale`,
+     * `loadingDelayMs`): the `RouterOutlet` then keys the route by name rather than per
+     * navigation, so a param change re-renders this instance instead of remounting it.
      */
     keepsRun?: boolean;
 };
@@ -204,20 +125,16 @@ type CommittedOutput = {
 };
 
 /**
- * A committed run held on screen while its successor resolves (`keepStale`). It is the
- * whole run, not a snapshot of it: `buckets` stays out of the discard path, so the Steps'
- * cleanups leave its sources attached and `ProvideLeaf` hands over `disposeProvided`
- * instead of running it. Released — dispose first, then detach — when the successor's leaf
- * commits, or at unmount.
+ * A committed run held on screen while its successor resolves (`keepStale`): the whole run,
+ * so `buckets` stays out of the discard path and `ProvideLeaf` hands over `disposeProvided`.
+ * Released — dispose first, then detach — when the successor's leaf commits, or at unmount.
  */
 type KeptRun = CommittedOutput & { disposeProvided: (() => void) | null };
 
 /**
- * Let a kept run go, in the order the engine guarantees everywhere else: the `.provide()`
- * value it was still publishing disposes *before* `discardRun` detaches the sources that
- * value was built over. `successor` is the run taking over (null at unmount) — passing it
- * makes the call a no-op when the same run commits again, so this is safe to call on every
- * commit rather than only on the swap.
+ * Lets a kept run go: its `.provide()` value disposes BEFORE `discardRun` detaches the
+ * sources it was built over. Passing the `successor` (null at unmount) makes the call a
+ * no-op when the same run commits again, so every commit can call it.
  */
 function releaseKept(keptRef: { current: KeptRun | null }, successor: Bucket[] | null): void {
     const kept = keptRef.current;
@@ -228,12 +145,9 @@ function releaseKept(keptRef: { current: KeptRun | null }, successor: Bucket[] |
 }
 
 /**
- * The loading slot, reporting itself and honouring `loadingDelayMs`. A wrapper rather than a
- * call in the mandala's render because React is what decides to show a Suspense fallback —
- * by the time this renders, the mandala's own render has long since returned.
- *
- * Phase is `'loading'` either way: while the delay holds the slot back nothing is on screen,
- * which is what loading *is* — the option changes what the island shows, not what it is doing.
+ * The loading slot, reporting itself and honouring `loadingDelayMs` — a wrapper, because React
+ * decides to show a Suspense fallback after the mandala's render returned. Phase is
+ * `'loading'` even while the delay holds the slot back: nothing on screen is what loading IS.
  */
 function LoadingSlot({
     controller,
@@ -248,7 +162,7 @@ function LoadingSlot({
 }) {
     controller.reportPhase('loading', false);
     // The third argument is what makes the delay inert off the client: React reads it for
-    // the server render *and* the hydration pass, so a slot that belongs in the HTML
+    // the server render AND the hydration pass, so a slot that belongs in the HTML
     // (`ssr: false`, a source that stays pending server-side, a load that rejected) is
     // rendered there whatever the deadline says.
     const held = useSyncExternalStore(
@@ -294,10 +208,9 @@ function KeptContent({
     return <appChannel.Provider value={value}>{content}</appChannel.Provider>;
 }
 
-// Why a generation exists, for the data trace's opening line (`rati/debug`): there was no
-// previous one (the island mounted), the retry counter moved (an error-slot retry), or the
-// inputs version did (a param change). Read off `treeKey` — `${version}:${retry}` — which
-// is the identity the generation is keyed by anyway.
+// Why a generation exists, for the data trace's opening line (`rati/debug`): the island
+// mounted, the retry counter moved, or the inputs version did. Read off `treeKey` —
+// `${version}:${retry}` — the identity the generation is keyed by.
 function generationCause(previousKey: string | undefined, retry: number): DataTraceCause {
     if (previousKey === undefined) return 'initial';
     return previousKey.endsWith(`:${retry}`) ? 'inputs' : 'retry';
@@ -379,24 +292,19 @@ function openGeneration(
         trace,
         // Which rejecting loads this generation already reported to the render's error
         // collector (see the resolver's recordRejection). Scoped to the run for the same
-        // reason the trace is: a *later* render reusing the same promise instance is a new
+        // reason the trace is: a LATER render reusing the same promise instance is a new
         // report, not a duplicate of this one.
         recordedRejections: binding.collectError ? new WeakSet<Promise<unknown>>() : undefined,
         // The rejection-proof twins this generation's Steps wait on under
-        // `ssrErrors: 'dehydrate'` — scoped to the run for the same reason. Gated
-        // on the collector, like the source-side `ssr` marker and for the same
-        // reason: with nothing to carry the failure over, painting the error slot
-        // would only mean the client paints something else a moment later. The
-        // default degradation is what a render without a payload is *for*.
+        // `ssrErrors: 'dehydrate'`, scoped to the run likewise. Gated on the collector: with
+        // nothing to carry the failure over, the client paints over the error slot.
         guardRejection: binding.collect && dehydrateErrors ? createRejectionGuard() : undefined,
     };
 }
 
 /**
- * Retire the generation a new one replaces. Only a run that reached the screen is worth keeping
- * — and only if none already is. A second re-resolve mid-stale-window discards the run that never
- * committed and keeps showing the original: swapping in a half-built replacement would blank
- * exactly what `keepStale` exists to preserve.
+ * Retires the generation a new one replaces. Only a committed run is kept, and only if none
+ * already is: a second re-resolve mid-window discards the uncommitted run and keeps the original.
  */
 function retireGeneration(
     previous: Generation,
@@ -420,7 +328,7 @@ function retireGeneration(
 /**
  * The leaf's hooks into the run lifecycle — `Shared.commit`, `.swap` and `.retainProvided`.
  * `commitRun` is the leaf's commit, where a run becomes "what is on screen": recording the output
- * there rather than during render is what makes the kept baseline a *committed* one.
+ * there rather than during render is what makes the kept baseline a committed one.
  */
 function runCallbacks(
     committedRef: { current: CommittedOutput | null },
@@ -442,13 +350,9 @@ function runCallbacks(
         policy?.reset();
     };
 
-    // The swap: the successor is on screen, so the run it replaced can go. Split from
-    // `commitRun` and driven from the leaf's *passive* effect for two reasons. The
-    // phase: every layout effect of the commit — including the new Steps' source
-    // attach — has run by then, so a source both runs hold is never detached and
-    // re-attached across the window. And the caller: a Suspense retry re-renders the
-    // boundary's children, not the mandala, so an effect of the mandala's own would
-    // simply not run on the commit that ends the window.
+    // The swap, run from the leaf's PASSIVE effect: every layout effect of the commit has run,
+    // so a source both runs hold is never detached and re-attached. A mandala effect cannot do
+    // it: a Suspense retry re-renders the boundary's children, not the mandala.
     const swapRun = (buckets: Bucket[]) => {
         releaseKept(keptRef, buckets);
     };
@@ -467,11 +371,9 @@ function runCallbacks(
 }
 
 /**
- * The retry a *human* asked for — the error slot's prop, `useScopeControls().retry`, and
- * `refresh()` with no key. It resets the automatic budget: a click is new information, not a
- * continuation of the streak the policy just gave up on. Held on a ref so the error slot's
- * `retry` prop keeps the stable identity `bumpRetry` had; without the option it *is* `bumpRetry`,
- * and nothing here is in the way.
+ * The retry a person asked for — the error slot's prop, `useScopeControls().retry`, `refresh()`
+ * with no key — resets the automatic budget. A ref keeps the slot's `retry` identity stable;
+ * without a policy it IS `bumpRetry`.
  */
 function useManualRetry(
     retrySettings: RetrySettings | null,
@@ -542,10 +444,9 @@ function forwardLazy(
 }
 
 /**
- * Build a mandala component from a scope + component + slots. `kindLabel` is the public
- * concept the caller represents (`Island` / `Route`) — used for the React `displayName`
- * and the scope's read-error label, so callers never see "mandala". The two public
- * wrappers (`island`, `route`) are thin calls onto this.
+ * Builds a mandala component from a scope, a component and slots. `kindLabel` is the public
+ * concept the caller represents (`Island` / `Route`) — the React `displayName` and the
+ * scope's read-error label, so callers never see "mandala".
  */
 export function createMandala<S extends Scope<any>>(
     config: MandalaConfig<S>,
@@ -566,13 +467,11 @@ export function createMandala<S extends Scope<any>>(
     const keepStale = config.keepStale === true;
     const delayMs = config.loadingDelayMs ?? 0;
     const delayed = delayMs > 0;
-    // Both options ride the same kept-run machinery (SI-03's): `keepStale` holds the
-    // previous run for the whole re-resolution, a bare delay only until its deadline. With
-    // neither, nothing is kept and the engine behaves exactly as it did before either landed.
+    // Both options ride the kept-run machinery: `keepStale` holds the previous run for the
+    // whole re-resolution, a bare delay until its deadline.
     const keepsRun = keepStale || delayed;
-    // Default-on: absent means the default policy (classified failures only), `false` —
-    // or `count: 0`, which has always meant off — means no policy, no wrapper on the
-    // manual retry, nothing to report.
+    // Absent means the default policy (classified failures only); `false` or `count: 0` means
+    // no policy and no wrapper on the manual retry.
     const retrySettings = resolveRetry(config.retry);
     const dehydrateErrors = config.ssrErrors === 'dehydrate';
     const provideChannel = (config.scope as Scope).provideDef?.channel;
@@ -584,8 +483,6 @@ export function createMandala<S extends Scope<any>>(
         config.component.displayName ?? (config.component as { name?: string }).name;
     const displayName = `${kindLabel}(${componentName || 'Component'})`;
 
-    // Plain function component: source reactivity now lives in each Step's
-    // useSyncExternalStore, so the mandala no longer needs to be an observer.
     const Mandala = function Mandala(inputs: ScopeInputs<S>) {
         // Stable across server render and client hydration by tree position, so it keys
         // this mandala's slice of the SSR dehydration registry (see hydration.tsx).
@@ -595,14 +492,13 @@ export function createMandala<S extends Scope<any>>(
         // Retry re-mounts the inner tree (fresh promises/sources) on error-slot retry.
         const [retry, bumpRetry] = useReducer((count: number) => count + 1, 0);
 
-        // Bump a version when inputs change by value, so the inner tree remounts — React
-        // tears the old one down (children first: the `.provide()` value disposes before
-        // its sources detach) and resolves the new inputs from scratch. Source transitions
-        // (same inputs) re-render in place, keeping promise/source identity.
+        // A version bump on an inputs change by value remounts the inner tree, children first,
+        // so the `.provide()` value disposes before its sources detach. Source transitions
+        // re-render in place, keeping promise and source identity.
         const { initialInputsRef, versionRef } = useInputsVersion(inputs);
         const treeKey = `${versionRef.current}:${retry}`;
 
-        // Seed from server-resolved values only on this mandala's *first* resolution: a
+        // Seed from server-resolved values only on this mandala's FIRST resolution: a
         // retry must re-fetch, and an inputs change wants the new inputs' data. The
         // post-hydration source re-render keeps (retry 0, initial inputs), consistent
         // with the server HTML.
@@ -613,12 +509,9 @@ export function createMandala<S extends Scope<any>>(
         // change). Held on the mandala's committed ref so a Step's `use()` suspension
         // can't discard a half-built cell (which would re-run its load forever).
         const cacheRef = useRef<Generation | null>(null);
-        // Buckets the line below replaced, awaiting the sweep in the commit effect. A Step
-        // torn down while its bucket was still live keeps its sources attached on purpose
-        // (it can't tell a source swap from an unmount — see the resolver's detach effect)
-        // and defers to a sweep; but a source erroring or a mid-tree source dropping to
-        // pending tears levels down with *no* remount, so without this the next generation
-        // would orphan that bucket and its still-attached sources would never detach.
+        // Buckets the line below replaced, awaiting the commit effect's sweep: a source erroring
+        // or a mid-tree source dropping to pending tears levels down with NO remount, and a
+        // Step's detach defers to that sweep.
         const orphanedRef = useRef<Bucket[][]>([]);
         // What the current run's leaf last put on screen, and the run it belongs to. Written
         // at commit (the leaf's layout effect), so a discarded render never becomes the
@@ -643,7 +536,7 @@ export function createMandala<S extends Scope<any>>(
         if (!cacheRef.current || cacheRef.current.key !== treeKey) {
             const previous = cacheRef.current;
             const committed = committedRef.current;
-            // A resolution starts here — the generation being built *is* the resolution —
+            // A resolution starts here — the generation being built IS the resolution —
             // so this is where the delay's window opens (timer-less; see LoadingDelay).
             delay?.begin();
             if (previous) retireGeneration(previous, committed, keepsRun, keptRef, orphanedRef);
@@ -670,10 +563,9 @@ export function createMandala<S extends Scope<any>>(
 
         const manualRetry = useManualRetry(retrySettings, policyRef, bumpRetry);
 
-        // The resolver's server-side error path, assembled where the pieces are: the run's
-        // guard, plus the error slot the Step renders in place of the throw React would
-        // hand to nobody. Present only on a collected server render of a `'dehydrate'`
-        // island — `guardRejection` already carries both conditions.
+        // The resolver's server-side error path: the run's guard plus the error slot. Present
+        // only on a collected server render of a `'dehydrate'` island, both conditions
+        // `guardRejection` carries.
         const guard = cacheRef.current.guardRejection;
         const ssrErrors = ssrErrorPath(guard, ErrorSlot, inputs, manualRetry);
 
@@ -690,17 +582,13 @@ export function createMandala<S extends Scope<any>>(
             notify: forceRebuild,
             fullRefresh: manualRetry,
         });
-        // The policy's verbs, wired the same way: its own retry is the *unwrapped* bump —
+        // The policy's verbs, wired the same way: its own retry is the UNWRAPPED bump —
         // an automatic attempt continues the streak rather than restarting it.
         policy?.wire({ retry: bumpRetry, report: controller.reportRetrying });
 
-        // A committed remount (inputs change / retry) tears the old cells down —
-        // outstanding refresh bookkeeping settles wholesale, and the generation it replaced
-        // is discarded: its in-flight loads abort, and it releases whatever its Steps left
-        // attached. Off the render path on purpose: a discarded render must not cancel or
-        // detach anything. Idempotent both ways — the ordinary remount path has already
-        // detached through the Steps' own cleanups (by then the live buckets are the new
-        // ones), so this finds only what those deferred.
+        // A committed remount (inputs change, retry) settles the refresh bookkeeping and
+        // discards the replaced generation: its loads abort, and it releases what its Steps
+        // left attached. Off the render path: a discarded render must not cancel or detach.
         useEffect(() => {
             controller.treeCommitted(treeKey);
             const orphaned = orphanedRef.current;
@@ -708,18 +596,10 @@ export function createMandala<S extends Scope<any>>(
             for (const buckets of orphaned) discardRun(buckets);
         }, [controller, treeKey]);
 
-        // Drop the cache on unmount so a StrictMode remount (mount → cleanup → mount)
-        // rebuilds a fresh run instead of reusing the torn-down one's cells/sources. On
-        // the remount the cache is null, so force one re-render to rebuild it into a fresh
-        // run — the mandala used to get this re-render for free as a mobx `observer`; now
-        // it's explicit. The subtree then reads the surviving run's identities. A real
-        // (production) mount runs once with the cache non-null, so it adds no render there.
-        // The sweep is the sources' unmount backstop: Step cleanups keep entries their
-        // live bucket still holds (they can't tell a source swap from an unmount), so the
-        // final detach of everything still attached happens here — after the leaf's
-        // layout-phase dispose, preserving the dispose-before-detach order. The loads the
-        // run still has in flight are aborted in the same pass (`discardRun`): an island
-        // that is gone has no reader for them.
+        // Drops the cache on unmount, so a StrictMode remount rebuilds a fresh run, and forces
+        // the one re-render that rebuild needs. The sweep is the sources' unmount backstop,
+        // after the leaf's layout-phase dispose (dispose before detach), and it aborts the
+        // run's in-flight loads.
         useEffect(() => {
             if (cacheRef.current === null) forceRebuild();
             return () => teardownRun(cacheRef, orphanedRef, keptRef, delayRef, policyRef);
@@ -753,7 +633,7 @@ export function createMandala<S extends Scope<any>>(
             if (!showKept) releaseKept(keptRef, null);
             // Which inputs the island is now resolving — the retry policy drops a countdown
             // left over from the previous ones here (see RetryPolicy.committed). Effect-time
-            // and compared rather than reset, so the commit that *armed* an attempt can't
+            // and compared rather than reset, so the commit that ARMED an attempt can't
             // cancel it on the way out.
             policy?.committed(versionRef.current);
         });
@@ -773,8 +653,7 @@ export function createMandala<S extends Scope<any>>(
             ssrErrors,
             trace: cacheRef.current.trace,
             // The leaf reports its commit only where something reads it: with none of the
-            // three options there is no baseline to keep and no streak to end, and the
-            // default path stays untouched.
+            // options there is no baseline to keep and no streak to end.
             commit: keepsRun || retrySettings ? callbacks.commitRun : undefined,
             swap: keepsRun ? callbacks.swapRun : undefined,
             retainProvided: keepsRun ? callbacks.retainProvided : undefined,

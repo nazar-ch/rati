@@ -1,17 +1,9 @@
 import type { HydrationData, HydrationErrors, HydrationSection } from './hydration.js';
 
 /*
-    Unclaimed-hydration-data diagnostic (client side).
-
-    The registry is keyed by `useId`, which is stable only while the server and client
-    render the same tree. When the trees drift, nothing crashes — every island quietly
-    resolves from scratch and the page still works, so SSR has effectively turned
-    itself off with no visible signal. This watchdog makes that failure loud: a while
-    after the last claim, any payload slice no island ever consumed is reported.
-
-    The delay resets on every claim so islands that mount late (a lazy route chunk
-    still downloading) get their window; a slice claimed after the warning fired was a
-    false alarm — the message says so.
+    Unclaimed-hydration-data diagnostic, client side: when the server and client trees drift,
+    the `useId` keys stop matching and every island resolves from scratch with no signal. A
+    while after the last claim, any payload slice no island consumed is reported.
 */
 
 const GRACE_MS = 3000;
