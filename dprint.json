@@ -1,0 +1,18 @@
+{
+    // dprint resolves `extends` as a path, never a package name, and node_modules sits beside this
+    // config in every checkout and every worktree slot.
+    "extends": "./node_modules/@jnana-app/kit/dprint.json",
+    // dprint refuses `includes` in an extended base, so every consumer repeats this line.
+    "includes": ["**/*.md"],
+    // dprint reads no `.git/info/exclude` from a linked worktree, the pool brief's one ignore, so the
+    // first entry keeps the Markdown gate off it (kit◊FND-213). dprint refuses `excludes` in an
+    // extended base.
+    "excludes": [
+        "/.jnana-kit-brief.md",
+        "**/node_modules",
+        "**/.git",
+        "**/.yarn",
+        "**/dist",
+        "**/coverage"
+    ]
+}

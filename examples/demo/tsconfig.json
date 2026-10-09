@@ -1,0 +1,20 @@
+{
+    // A Vite + React app, on the kit's `web` profile.
+    "extends": "@jnana-app/kit/tsconfig/web.json",
+    "compilerOptions": {
+        // rati's own export condition, so the example type-checks against the workspace SOURCE
+        // rather than the published `dist/`.
+        "customConditions": ["rati-dev"],
+        // The profile's engine floor plus `ESNext.Disposable`: rati's source brings the island
+        // disposal contract's `Symbol.dispose` into this program.
+        "lib": [
+            "ES2024",
+            "ES2025.Collection",
+            "ESNext.TypedArrays",
+            "ESNext.Disposable",
+            "DOM",
+            "DOM.Iterable"
+        ]
+    },
+    "include": ["src"]
+}

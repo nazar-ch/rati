@@ -1,0 +1,8 @@
+ 0ms       200ms      400ms      600ms      800ms
+ |----------|----------|----------|----------|
+ station    [########]
+ departures            [##############]
+ weather               [#########]
+ render                                [==ready==]
+
+ level 1 first; level 2 in parallel; render when all done

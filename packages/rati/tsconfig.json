@@ -1,0 +1,25 @@
+{
+    // rati's library source: platform-neutral (browser, worker, or Node under SSR), bundler-resolved
+    // and built by vite — the kit's `lib` profile.
+    "extends": "@jnana-app/kit/tsconfig/lib.json",
+    "compilerOptions": {
+        // `ESNext` over the profile's engine floor, which lacks `ESNext.Disposable`: the island
+        // disposal contract uses `Symbol.dispose`. Narrowing to the floor is a support-baseline
+        // decision.
+        "lib": ["ESNext", "DOM", "DOM.Iterable"],
+        // `node` for the `rati/vite` plugin, which runs in the Vite process. It reaches the whole src
+        // program, because the alternative is a second program for one directory.
+        "types": ["vite-plus/client", "node"],
+        // React components live in this program; the platform-neutral profile carries no JSX.
+        "jsx": "react-jsx",
+        // Not in the profile, and load-bearing here: rati's `.js` is emitted by vite and its
+        // `.d.ts` by tsconfig.build.json, two compilers that must agree on what an import erases
+        // to. `import type` saying so verbatim is what makes them agree.
+        "verbatimModuleSyntax": true,
+        // Anchors tsconfig.build.json's declaration emit, so `dist/` mirrors `src/` and every
+        // `exports` target in package.json keeps its path.
+        "rootDir": "./src"
+    },
+    "exclude": ["dist", "node_modules", "build", "src/__tests__"],
+    "include": ["src"]
+}
