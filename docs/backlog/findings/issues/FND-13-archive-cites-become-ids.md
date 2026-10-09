@@ -1,7 +1,7 @@
 ---
 area: every live doc and spec citing a path under docs/archive
 needs:
-status: open
+status: done
 approved: the user, in session on 2026-10-09: every live cite into docs/archive converts to a ◊ id or a quoted path, since no gate reads the archive (kit◊FND-226) (2026-10-09)
 ---
 
