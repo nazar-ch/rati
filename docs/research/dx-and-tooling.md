@@ -1,6 +1,6 @@
 # DX & tooling — directions
 
-> **Being executed** — cut 2026-07-19 as the testing-and-dx effort (docs/archive/efforts/testing-and-dx/README.md), grounded in a survey of what both repos hand-roll (recorded there) and grown by one member this doc missed (an SSR round-trip test kit). Where a record and this doc disagree, the record wins.
+> **Being executed** — cut 2026-07-19 as the testing-and-dx effort (`docs/archive/efforts/testing-and-dx/README.md`), grounded in a survey of what both repos hand-roll (recorded there) and grown by one member this doc missed (an SSR round-trip test kit). Where a record and this doc disagree, the record wins.
 
 Small, high-value developer-experience items. **None built yet** (verified against the source: no `rati/testing` entry, no `dataTrace`, and only the mandala wrapper — not its inner `Step` components — carries a React `displayName`). From the July 2026 review, `improvements.md` §7.
 
@@ -12,7 +12,7 @@ The highest-value DX item. Jnana's tests and rati's own `__tests__` both hand-ro
 - an **island render harness** — `renderIsland(island, { props })` wiring the providers;
 - a **memory-router harness** — `createTestRouter(routes, { url })`.
 
-Pairs with the data package's "testability by construction" ground rule (every primitive is producer-driven, so a deferred-promise fake walks it through every phase — see the archived docs/archive/directions-2026-07/data-package.md).
+Pairs with the data package's "testability by construction" ground rule (every primitive is producer-driven, so a deferred-promise fake walks it through every phase — see the archived `docs/archive/directions-2026-07/data-package.md`).
 
 ## Resolution tracing (`dataTrace`)
 

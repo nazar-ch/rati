@@ -48,7 +48,7 @@ Concept count is the real result: `FetchStore`, the hand-rolled `observableSourc
 
 **The gaps, each with its receipt in the merged code and each cut into the record that owns it:** the missing single-value write seam on `query` → DATA-05; `mutation.refreshes` unable to see the call's arguments → DATA-06; `field.props` fighting `exactOptionalPropertyTypes` → DATA-07; the fetch boilerplate having no home, which is where the line savings went → DATA-08; and the bare branches a 2026-07-20 coverage map of rati's own data tests found → DATA-09.
 
-Two more were recorded with no item cut. Keyed widgets don't take the props spread — a RAC `Select`'s `onChange` yields `Key`, not the field's type — and no change is planned, because widget kind is the component's business (docs/archive/directions-2026-07/data-package.md §5) and the hand bridge is two lines.
+Two more were recorded with no item cut. Keyed widgets don't take the props spread — a RAC `Select`'s `onChange` yields `Key`, not the field's type — and no change is planned, because widget kind is the component's business (`docs/archive/directions-2026-07/data-package.md` §5) and the hand bridge is two lines.
 
 The integration facts the migration produced are owned jnana-side, written into that repo's own frontend-architecture memory: RAC render props run outside the caller's `observer`; RAC `Form` defaults to `validationBehavior="native"`, which blocks submit before field validators run; reactive producers must read every dependency before their first `await`; reach the API client from the fetch closure, never a field initializer, because the store graph builds before the client exists.
 

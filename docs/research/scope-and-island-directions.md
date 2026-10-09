@@ -1,6 +1,6 @@
 # Scope & island directions — resolution, loading states, sharing
 
-> **Parts 1 and 2 shipped** — cut 2026-07-19 and executed as the scope-and-island effort (docs/archive/efforts/scope-and-island/README.md) (all six directions, including the two below marked wait-for-need — the decisions and findings are recorded there, and where a record and this doc disagree, the record wins). Part 3 (`ResourceContainer`) stays open research, and execution left three new open directions, marked **(open, post-execution)** below.
+> **Parts 1 and 2 shipped** — cut 2026-07-19 and executed as the scope-and-island effort (`docs/archive/efforts/scope-and-island/README.md`) (all six directions, including the two below marked wait-for-need — the decisions and findings are recorded there, and where a record and this doc disagree, the record wins). Part 3 (`ResourceContainer`) stays open research, and execution left three new open directions, marked **(open, post-execution)** below.
 
 Forward-looking options for scope resolution and the island's loading/error presentation. **None of these are implemented** — each waits for a real (Jnana- or consumer-driven) need so the shape is pinned by a concrete use case. Distilled from the July 2026 design review (`improvements.md` §1/§2/§5; the review's shipped items — selective refresh via `useScopeControls`, the `data()` marker, SSR-capable sources, the SSR-error baseline — landed and are recorded in docs/archive/directions-2026-07).
 
@@ -22,14 +22,14 @@ scope({ spaceId: input<Uuid>() })
 
 Cheap to add (the resolver already owns the remount boundary — one `AbortController` per bucket), backwards compatible (loads that ignore the second argument behave as today). Sources don't need it: `detach()` is already their cancellation. (The `rati/data` `query` already threads an `AbortSignal` through its producer; this is the core-scope analogue, still missing.)
 
-**Shipped as SI-01** (`LoadContext`, one controller per bucket). Two seams it deliberately left open, both wait-for-need (SI-01's findings in the effort README (docs/archive/efforts/scope-and-island/README.md §Findings)):
+**Shipped as SI-01** (`LoadContext`, one controller per bucket). Two seams it deliberately left open, both wait-for-need (SI-01's findings in the effort README (`docs/archive/efforts/scope-and-island/README.md` §Findings)):
 
 - **Per-key cancellation (open, post-execution).** The signal belongs to the bucket, so a `refresh(key)` that supersedes its *own* in-flight re-fetch (the double-click) leaves the predecessor running — latest-wins by token, but the wasted request is never aborted. Fixing it means a controller per cell and the teardown discipline that implies; worth its own item if a consumer hits it.
 - **The SSR request-abort seam (open, post-execution).** React's half exists — `prerender` takes a `signal`, and `rati/testing`'s settle watchdog drives it — but nothing connects an aborted *request* to the per-bucket controllers, so a client disconnect leaves the loads running. The shape: `renderApp` (which today takes no request signal at all) accepts one, threads it as a run-level parent signal on `Shared`, and each bucket composes its controller with it. A server-side item; lands with the first consumer that terminates requests.
 
 ## 2. Islands / mandala — advanced loading states
 
-The `remoteData` features worth keeping that are **presentation** concerns — pending indication delay and stale-data display — belong in the mandala, not the data layer (the data layer reports honest phases; the island decides what the user sees — see the archived docs/archive/directions-2026-07/data-package.md for the split).
+The `remoteData` features worth keeping that are **presentation** concerns — pending indication delay and stale-data display — belong in the mandala, not the data layer (the data layer reports honest phases; the island decides what the user sees — see the archived `docs/archive/directions-2026-07/data-package.md` for the split).
 
 ### Delayed loading slot (`loadingDelayMs`)
 

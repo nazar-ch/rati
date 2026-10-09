@@ -1,6 +1,6 @@
 # SSR → SSG & RSC — direction note
 
-Direction only, **deliberately not designed** and not built — Jnana needs neither (it is fully interactive and doesn't even need SSR). These ride on the `examples/ssr` gallery until a real consumer exists. The SSR *baseline* underneath them shipped in 2026-07 (the server kit — `renderApp`, `rati/vite`, `rati/server`; see the archived docs/archive/directions-2026-07/ssr-server-kit.md and docs/archive/directions-2026-07/ssr-nazar-patterns.md, and docs/current/public/ssr.md); this note is what sits beyond it.
+Direction only, **deliberately not designed** and not built — Jnana needs neither (it is fully interactive and doesn't even need SSR). These ride on the `examples/ssr` gallery until a real consumer exists. The SSR *baseline* underneath them shipped in 2026-07 (the server kit — `renderApp`, `rati/vite`, `rati/server`; see the archived `docs/archive/directions-2026-07/ssr-server-kit.md` and `docs/archive/directions-2026-07/ssr-nazar-patterns.md`, and docs/current/public/ssr.md); this note is what sits beyond it.
 
 ## SSG — the near step
 
@@ -12,7 +12,7 @@ The hydration-payload shape the SSG direction wants ("a stable, versioned dehydr
 
 RSC maps naturally in principle — a scope's promise-load waterfall is exactly what a server component resolves, and the `hook()`/source loads are exactly what stays client — but adopting it means a bundler/runtime contract far beyond rati's current size. Treat it as a compatibility constraint, not a feature: keep scope modules importable in server-only contexts (no DOM at module scope), keep promise-load results serializable, keep the load/hook split crisp. Those habits cost nothing now and keep the door open.
 
-The bundler/runtime contract now exists off the shelf (`@vitejs/plugin-rsc`); what rati would add, and when to revisit, is worked out in the postponed record postponed/rsc-support.md. The island-SSR dehydration decision that bears on it (keep the framework-owned registry until a deliberate RSC adoption) is the archived docs/archive/island-ssr-dehydration.md.
+The bundler/runtime contract now exists off the shelf (`@vitejs/plugin-rsc`); what rati would add, and when to revisit, is worked out in the postponed record postponed/rsc-support.md. The island-SSR dehydration decision that bears on it (keep the framework-owned registry until a deliberate RSC adoption) is the archived `docs/archive/island-ssr-dehydration.md`.
 
 ## The non-goal this backstops
 

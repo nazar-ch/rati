@@ -25,7 +25,7 @@ Some work in jnana cannot be finished honestly without a change in rati — jnan
 
 ## Provenance
 
-Raised by DX-09 and left explicitly undecided: docs/archive/efforts/testing-and-dx/README.md §"2026-07-20 — DX-09 (the DX-06 frictions addressed)", whose closing note asks for the rule and names the next release as the moment to state one. DX-09 is itself an instance — the fix landed in rati, unreleased, with a jnana leg (`anonymousShell.browser`'s router partial) waiting on it. The consumer-side ask is jnana's own feedback record, jnana:///docs/feedback/2026-07-20-lima-dx-06-rati-adoption.md.
+Raised by DX-09 and left explicitly undecided: `docs/archive/efforts/testing-and-dx/README.md` §"2026-07-20 — DX-09 (the DX-06 frictions addressed)", whose closing note asks for the rule and names the next release as the moment to state one. DX-09 is itself an instance — the fix landed in rati, unreleased, with a jnana leg (`anonymousShell.browser`'s router partial) waiting on it. The consumer-side ask is jnana's own feedback record, jnana:///docs/feedback/2026-07-20-lima-dx-06-rati-adoption.md.
 
 ## Disposition — 2026-09-28
 

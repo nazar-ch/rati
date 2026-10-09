@@ -1,6 +1,6 @@
 # data-package — the rati/data remains
 
-The 2026-07-18 session shipped the design record's v1 in rati (docs/archive/directions-2026-07/data-package.md): the legacy `data/` layer and its Babel decorator toolchain removed, and the `rati/data` entry landed with all five primitives — `query`, `collection`, `pagedCollection`, `mutation`, `form`/`field` plus the validator kit — over the shared `itemMap` reconciler. `source()` bridges through `instanceSource`, the suite sits under `packages/rati/src/__tests__/data/`, and docs/current/public/reference.md gained a `rati/data` section beside the internals one.
+The 2026-07-18 session shipped the design record's v1 in rati (`docs/archive/directions-2026-07/data-package.md`): the legacy `data/` layer and its Babel decorator toolchain removed, and the `rati/data` entry landed with all five primitives — `query`, `collection`, `pagedCollection`, `mutation`, `form`/`field` plus the validator kit — over the shared `itemMap` reconciler. `source()` bridges through `instanceSource`, the suite sits under `packages/rati/src/__tests__/data/`, and docs/current/public/reference.md gained a `rati/data` section beside the internals one.
 
 This effort carries what that session deliberately left: the API gaps the consumer migrations exposed, the second round the wave-two migrations cut, and the extraction decision that closes it.
 
@@ -19,7 +19,7 @@ Four independent legs, then two on what they land:
 - **A** — DATA-10 then DATA-11: the two-level `SourceError` first, retry gated by error class on top of it.
 - **B** — DATA-12 then DATA-13 on one branch, in that order: the `prime()` rename, then `reconciled()` and the collection facade.
 - **C** — DATA-14.
-- **E** — FND-03 (docs/archive/backlog-closed-1/issues/FND-03-is-class-minification.md), which runs in this batch because the class-factory pattern DATA-13 and DATA-14 bless must not be broken under minification.
+- **E** — FND-03 (rati◊FND-03), which runs in this batch because the class-factory pattern DATA-13 and DATA-14 bless must not be broken under minification.
 - Then, on the landed surfaces: **D** — DATA-15 and DATA-16; **F** — DATA-17 and DATA-18.
 
 DATA-19 is parked rather than sequenced: its record is the parking spot for the form success-state discussion, and a third independent hand-roll is the bar that cuts it into an assignable item.

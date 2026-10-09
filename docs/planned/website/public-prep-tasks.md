@@ -6,7 +6,7 @@ The next batch of work preparing rati to share, sequenced for delegation. Prefix
 
 Standing rules for every task: run `vp run rati#typecheck` (or `website#typecheck`) and `vp lint` before committing; plain-imperative commit messages (no Conventional Commits); keep `docs/*.md` in sync with behavior changes; never publish.
 
-**Prerequisite (in execution, not a task here):** the stores/router redesign — docs/archive/directions-2026-07/naming.md §6 + docs/research/stores-and-router.md. **Landed 2026-07-26**, beyond Option A: the stores skeleton is gone from rati; the surface is `createRouter(routes, options?)` → `Router` + `RouterProvider` + `RouterOutlet` (no `StoresProvider` / `createStoresHook` — app stores are app code). DOC-2 and SITE-1 consume its result.
+**Prerequisite (in execution, not a task here):** the stores/router redesign — `docs/archive/directions-2026-07/naming.md` §6 + docs/research/stores-and-router.md. **Landed 2026-07-26**, beyond Option A: the stores skeleton is gone from rati; the surface is `createRouter(routes, options?)` → `Router` + `RouterProvider` + `RouterOutlet` (no `StoresProvider` / `createStoresHook` — app stores are app code). DOC-2 and SITE-1 consume its result.
 
 ---
 
@@ -14,7 +14,7 @@ Standing rules for every task: run `vp run rati#typecheck` (or `website#typechec
 
 > **Done 2026-07-14**, executed as one SSR-baseline round rather than per-task (deltas per item recorded in ssr-nazar-patterns.md; the public surface in docs/current/public/ssr.md). Beyond the letter of the tasks: CORE-1 shipped as an inert JSON script tag (not the window global) plus integrity diagnostics; CORE-2 also produced `renderApp` (the composed per-request loop); CORE-3 grew collector error recording (data-driven 404/500); CORE-4 includes `<Meta>` + `useTitle` with the template in store config. Follow-ups (server kit, consumer migrations, remaining tests) live in the ssr-baseline-remains effort (docs/planned/ssr-baseline-remains/).
 
-All grounded in docs/archive/directions-2026-07/ssr-nazar-patterns.md; mutually independent.
+All grounded in `docs/archive/directions-2026-07/ssr-nazar-patterns.md`; mutually independent.
 
 - **CORE-1 — Hydration payload type + safe serialization.** In `rati/ssr`: a combined hydration-state type (router snapshot + island data), `serializeHydration(state)` emitting the XSS-escaped `<script>` tag (escape `<` `>` `&` U+2028 U+2029; document the before-`</body>` placement contract), and a client-side `readHydration()`. Port the logic from nazar's `escapeJsonForScript`; add tests for the escaping. *Done when:* `examples/ssr` uses it and its hand-rolled equivalent is deleted.
 - **CORE-2 — `renderToHtml` helper.** In `rati/ssr`: wrap `react-dom/static` `prerender` + stream drain into `renderToHtml(element, { bootstrapModules })`. `react-dom` stays a peer import. *Done when:* `examples/ssr`'s drain loop is replaced.
