@@ -1,0 +1,15 @@
+{
+    // The build compiles exactly the program tsconfig.json describes, so it extends that file rather
+    // than a kit profile.
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "declaration": true,
+        // tsc accepts the inherited `allowImportingTsExtensions` beside an emit only when it writes
+        // no JavaScript.
+        "emitDeclarationOnly": true,
+        "outDir": "./dist",
+        // The one config in the repo that emits: every kit profile is no-emit.
+        "noEmit": false
+    },
+    "include": ["src"]
+}

@@ -1,0 +1,17 @@
+{
+    // serve.ts and vite.config.ts, on the kit's `node` profile. No `customConditions`: plain Node
+    // resolves `rati/server` through the PUBLISHED entry, which the `prep` step in
+    // .claude/kit.json builds.
+    "extends": "@jnana-app/kit/tsconfig/node.json",
+    "compilerOptions": {
+        // Not in the profile: this program is the referenced half of tsconfig.json beside it, and a
+        // project reference requires `composite`.
+        "composite": true,
+        // A referenced project must not disable emit (TS6310). The `typecheck` script passes
+        // `--noEmit`, and `vp lint` loads this config as written, so it must be VALID without it.
+        "noEmit": false,
+        // Refused beside an emit (TS5096); neither file imports a `.ts` specifier.
+        "allowImportingTsExtensions": false
+    },
+    "include": ["serve.ts", "vite.config.ts"]
+}

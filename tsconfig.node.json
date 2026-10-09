@@ -1,0 +1,8 @@
+{
+    // The repo-root program for the config files no `src` tree names, on the kit's `configs`
+    // profile. Never `tsconfig.json`, which editors and a stray `tsc` read as the whole repo's.
+    "extends": "@jnana-app/kit/tsconfig/configs.json",
+    // `files`, never an `include` override: `include` replaces the profile's globs, and `files`
+    // unions with them. scripts/ci.ts runs on Node and sits under none of those globs.
+    "files": ["scripts/ci.ts"]
+}
