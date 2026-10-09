@@ -1,0 +1,5 @@
+#!/bin/sh
+# why-shell: hook-dispatch kit⭑KIT-63 — git runs a hook from the repo whose tree it acted on, so every consumer carries this hop to the kit's transition render itself.
+PATH="${JNANA_KIT_HOME:-}/bin:${PATH}"
+export PATH
+exec "${JNANA_KIT_HOME:-}/tools/surface-hook.ts" "${0##*/}"
