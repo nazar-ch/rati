@@ -219,13 +219,9 @@ describe('createMemoryHistory — hostlessness', () => {
     test('does not touch window or document', () => {
         // Smoke-check: memory history works with `window` and `document` shadowed; an
         // implementation reaching for `window.*` throws here.
-        const realWindow = globalThis.window;
-        const realDocument = globalThis.document;
         try {
-            // @ts-expect-error — intentional override for the test
-            globalThis.window = undefined;
-            // @ts-expect-error — intentional override for the test
-            globalThis.document = undefined;
+            vi.stubGlobal('window', undefined);
+            vi.stubGlobal('document', undefined);
 
             const history = createMemoryHistory({ url: '/x?y=z#w' });
             history.push('/a');
@@ -235,8 +231,7 @@ describe('createMemoryHistory — hostlessness', () => {
             expect(history.location.pathname).toBe('/b');
             expect(history.location.state).toEqual({ k: 1 });
         } finally {
-            globalThis.window = realWindow;
-            globalThis.document = realDocument;
+            vi.unstubAllGlobals();
         }
     });
 });

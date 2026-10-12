@@ -91,3 +91,4 @@ dist
 # nothing tracks.
 /.memory/
 /CLAUDE.local.md
+.vitest/
