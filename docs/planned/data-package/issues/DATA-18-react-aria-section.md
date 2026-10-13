@@ -37,7 +37,7 @@ Landed as `docs/current/public/guide.md` §"With React Aria Components", after t
 
 **Citations — every trap has a receipt.** Paths are in `~/jnana` unless noted.
 
-1. *A function `action` erases the draft.* `docs/backlog/findings/issues/FND-130-react19-form-action-resets-rati-fields.md` (mechanism: React's reset is a native `form.reset()`, the value tracker turns it into a synthetic `change`, RAC's `TextField` forwards it to `onChange`; the two failing paths; "still open upstream: rati's reference and guide both recommend the wiring").
+1. *A function `action` erases the draft.* jnana◊FND-130 (mechanism: React's reset is a native `form.reset()`, the value tracker turns it into a synthetic `change`, RAC's `TextField` forwards it to `onChange`; the two failing paths; "still open upstream: rati's reference and guide both recommend the wiring").
 
    Fix in code: `frontend/src/common/ui/jnana/Form.tsx` (the `submit` prop — `onSubmit` + `preventDefault`; the doc comment names `useFormReset`). Commits `795c4672` (the prop), `3ffdc3f6` ("it reproduces with a plain useState and no MobX, so it is React 19 x React Aria, not rati"), `6df98ab1` (why a prop beat a helper: "a call site cannot forget it"). PR nazar-ch/jnana#863 ("`<Form action={form.submit}>` wipes the user's draft… both form legs hit it independently").
 

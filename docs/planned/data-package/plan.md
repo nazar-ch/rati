@@ -19,7 +19,7 @@ Four independent legs, then two on what they land:
 - **A** — DATA-10 then DATA-11: the two-level `SourceError` first, retry gated by error class on top of it.
 - **B** — DATA-12 then DATA-13 on one branch, in that order: the `prime()` rename, then `reconciled()` and the collection facade.
 - **C** — DATA-14.
-- **E** — FND-03 (docs/archive/backlog-closed-1/issues/FND-03-is-class-minification.md), which runs in this batch because the class-factory pattern DATA-13 and DATA-14 bless must not be broken under minification.
+- **E** — rati◊FND-03, which runs in this batch because the class-factory pattern DATA-13 and DATA-14 bless must not be broken under minification.
 - Then, on the landed surfaces: **D** — DATA-15 and DATA-16; **F** — DATA-17 and DATA-18.
 
 DATA-19 is parked rather than sequenced: its record is the parking spot for the form success-state discussion, and a third independent hand-roll is the bar that cuts it into an assignable item.

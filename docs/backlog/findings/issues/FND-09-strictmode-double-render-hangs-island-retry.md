@@ -47,4 +47,4 @@ Both are guesses from the shipped bundle's shape, not from a repro — the value
 
 - A `retryPolicy` / boundary test that renders the island **inside `<StrictMode>`** and asserts the error slot is reached on a `retryable: true` failure. The existing FND-07 test passes without StrictMode, which is why this shipped: the double-invoked path is untested.
 - Neuter the fix and confirm the new test goes red, so it pins this and not the substrate.
-- Then jnana re-runs its table with StrictMode on and every row ends on the error slot (`jnana:///docs/backlog/rati/issues/FND-237-island-retry-hangs-on-loading.md`).
+- Then jnana re-runs its table with StrictMode on and every row ends on the error slot (jnana◊FND-237).

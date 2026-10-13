@@ -1,6 +1,6 @@
 # What the scope model uniquely enables
 
-Status: research record (2026-07-20), the output of the improvement-review effort's IMP-02 session (docs/planned/improvement-review/issues/IMP-02-model-native-capabilities.md). The premise, taken whole: a scope is a *declarative, typed, inspectable* description of a page's data — which props, which levels, which kinds — as a plain value, before anything runs. Hook-based peers cannot have this by construction; rati has it and exploits almost none of it.
+Status: research record (2026-07-20), the output of the improvement-review effort's rati◊IMP-02 session. The premise, taken whole: a scope is a *declarative, typed, inspectable* description of a page's data — which props, which levels, which kinds — as a plain value, before anything runs. Hook-based peers cannot have this by construction; rati has it and exploits almost none of it.
 
 This record is the end-to-end walk of what "the spec is data" buys, grounded in the source at session time (packages/rati/src/scope/scope.ts, packages/rati/src/mandala/resolver.tsx, packages/rati/src/mandala/mandala.tsx, packages/rati/src/mandala/channel.ts, packages/rati/src/router/store.ts) rather than in the docs' claims.
 

@@ -1,6 +1,6 @@
 # Gap analysis against the field
 
-Status: research record (2026-07-20), the output of the improvement-review effort's IMP-01 session (docs/planned/improvement-review/issues/IMP-01-field-gap-analysis.md). For each neighboring framework: what its users lean on daily, checked against its current docs this session, classified through rati's stance. Unflattering findings are the point — this is an internal engineering gap list, not a marketing comparison.
+Status: research record (2026-07-20), the output of the improvement-review effort's rati◊IMP-01 session. For each neighboring framework: what its users lean on daily, checked against its current docs this session, classified through rati's stance. Unflattering findings are the point — this is an internal engineering gap list, not a marketing comparison.
 
 Versions checked (2026-07-20; each claim below links the doc it was read from):
 
