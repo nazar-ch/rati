@@ -39,12 +39,26 @@ export default defineConfig({
                 },
             },
             {
-                // MUST follow the block above: the canonical test override turns
-                // `no-non-null-assertion` off before a repo's entries apply, so the repo-wide `warn`
-                // otherwise wins in the test trees. The globs are rati's own test shapes.
+                // `warn`, not canonical `error`: the rules kit◊RD-34 lifted that red rati's tree,
+                // held at `warn` until rati's focused lint work sweeps each rule's sites and drops
+                // it from this block.
+                files: ['**/*.{ts,tsx}'],
+                rules: {
+                    'react/exhaustive-deps': 'warn',
+                    'react/immutability': 'warn',
+                    'react/only-export-components': 'warn',
+                    'typescript/no-implied-eval': 'warn',
+                    'typescript/no-unnecessary-condition': 'warn',
+                },
+            },
+            {
+                // MUST follow the blocks above: the canonical test override turns these rules off
+                // before a repo's entries apply, so the repo-wide `warn` otherwise wins in the test
+                // trees. The globs are rati's own test shapes.
                 files: ['**/__tests__/**', '**/*.{test,spec}.{js,jsx,ts,tsx}', '**/*.test-d.ts'],
                 rules: {
                     'typescript/no-non-null-assertion': 'off',
+                    'typescript/no-unnecessary-condition': 'off',
                 },
             },
             {
