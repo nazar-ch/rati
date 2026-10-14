@@ -10,7 +10,7 @@ import { RouterProvider } from '../../router/RouterProvider.js';
 import { RouterStore } from '../../router/store.js';
 
 /**
- * long:2
+ * @kit long: 2
  * `<Link>` navigates to the URL the ANCHOR resolved, and decides active state against the
  * same resolution. Kills:
  *

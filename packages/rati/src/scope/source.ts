@@ -63,7 +63,7 @@ export type SourceState<T> =
 export const SourceSymbol = Symbol('rati.source');
 
 /**
- * long:2
+ * @kit long: 2
  * Declares a source SSR-capable: the server render attaches it during render, awaits its
  * first settle and dehydrates the ready value. The marker promises that `attach()` is
  * server-safe and settles; a hung source hangs the prerender.

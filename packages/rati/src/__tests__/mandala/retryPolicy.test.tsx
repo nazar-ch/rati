@@ -14,7 +14,7 @@ import { NotAvailableError, type SourceError } from '../../scope/source.js';
 import { flush, renderIsland, ssrRender, cleanup } from '../../testing/index.js';
 
 /*
-    long:2
+    @kit long: 2
     `retry` — the island takes another go at a failed resolution. An accepted failure is NOT an
     error state: the island keeps showing what it shows while resolving, the error slot never
     mounts, and `retrying` names the attempt. A spent budget or a terminal failure puts the

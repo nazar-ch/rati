@@ -11,7 +11,7 @@ import { allKeys, createDeclaredState, createModel, type ScopeSpec } from './mod
 import { buildHarness, readContent, readSlot, scopeSpecArb } from './scopeHarness.js';
 
 /*
-    long:2
+    @kit long: 2
     The smoke property: a generated scope mounts, its held loads settle one by one in a
     generated order, and at every step the island shows what the model says — the loading slot
     until the last key, then content carrying the model's values. Teardown balance is asserted

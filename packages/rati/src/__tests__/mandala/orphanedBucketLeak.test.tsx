@@ -7,7 +7,7 @@ import { scope, input } from '../../scope/scope.js';
 import { controllableSource, flush } from '../../testing/index.js';
 
 /*
-    long:2
+    @kit long: 2
     A source must not leak when an inner-tree teardown is followed by a new generation. A Step's
     detach keeps entries its LIVE bucket holds, deferring to the mandala's sweep, so a Step torn
     down with its bucket current — a source erroring, or a mid-tree source dropping to pending

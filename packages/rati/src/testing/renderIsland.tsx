@@ -7,7 +7,7 @@ import { useScopeControls, type ScopeControls } from '../mandala/controls.js';
 import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope.js';
 
 /*
-    long:2
+    @kit long: 2
     renderIsland — mount an island, drive it to resolution, and read which slot shows, through
     `react-dom/client`, never `@testing-library/react`. Given a CONFIG, each slot is wrapped in a
     private marker, so `slot()`, `text()` and `controls()` read the screen without leaking

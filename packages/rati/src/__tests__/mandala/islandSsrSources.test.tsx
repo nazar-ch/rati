@@ -164,7 +164,7 @@ function failingLoaderSource(log: string[], error: SourceError) {
 }
 
 describe('SSR sources — error paths', () => {
-    // long:2
+    // @kit long: 2
     // Pin 7a. A marked source erroring during `firstSettle` is a rejecting promise load
     // by any other name, so it lands in the behavior islandSsrErrors.test.tsx pinned by
     // experiment: `prerender` resolves, React emits the loading slot behind its

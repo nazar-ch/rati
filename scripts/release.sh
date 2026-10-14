@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# why-shell: no shell license fits this batch of CLI calls with an exit-code roll-up (kit◊KC-53),
+# @kit why-shell: no shell license fits this batch of CLI calls with an exit-code roll-up (kit◊KC-53),
 # so it converts to TypeScript the next time it changes for a reason of its own.
 #
 # Release script for the `rati` package.

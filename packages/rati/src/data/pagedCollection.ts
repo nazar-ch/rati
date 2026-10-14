@@ -6,7 +6,7 @@ import { createQuery, instanceSource, type Query } from './query.js';
 import { type Source } from '../scope/source.js';
 
 /*
-    long:2
+    @kit long: 2
     `pagedCollection` — pages are queries: a page IS a `query`, so per-page phase,
     stale-on-refresh, abort and `SourceError` come with it. One identity map sits under all
     pages, so an item moving across a page boundary keeps its instance.

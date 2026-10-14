@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { prerender } from 'react-dom/static';
 
 /*
-    long:2
+    @kit long: 2
     Past `progressiveChunkSize` flushed bytes React outlines a completed Suspense boundary into a
     hidden `<div>` and a swap script, a streaming server's tool. This renderer returns one
     finished string, where outlining hides content from a no-JS reader, so a budget nothing

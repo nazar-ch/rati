@@ -145,7 +145,7 @@ function splitUrl(url: string): { pathname: string; search: string; hash: string
 }
 
 /**
- * long:2
+ * @kit long: 2
  * A history entry, as the model keeps it. `mark` is the stamp a SHALLOW navigation
  * (`{ keepCurrentRoute: true }`) puts on the entry it creates, given an opaque identity rather
  * than the engine's spelling. The model states the stamp's two contract facts:

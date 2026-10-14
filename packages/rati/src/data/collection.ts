@@ -5,7 +5,7 @@ import { reconciled } from './reconciled.js';
 import { type Source, type SourceError } from '../scope/source.js';
 
 /*
-    long:2
+    @kit long: 2
     `collection` — keyed items, reconciliation, nested reactivity: the shared `itemMap` keeps
     object identity across a refresh's fresh JSON. Optimistic patches and server pushes share
     `patchItem`/`upsert`, and a patched item is marked so the next reconcile reapplies server

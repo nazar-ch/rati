@@ -18,7 +18,7 @@ import type { RouterModel, RouteTable, Step } from './routerModel.js';
 import { flush } from '../../testing/index.js';
 
 /*
-    long:2
+    @kit long: 2
     The router's command alphabet: the navigations an app makes — pushes and replaces by
     reference and by URL, shallow ones, per-entry state, query rewrites, redirects, and
     back/forward traversal — driven against a real RouterStore over a memory history and

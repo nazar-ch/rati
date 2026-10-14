@@ -11,7 +11,7 @@ import { readContent, readSlot, type BuiltHarness } from './scopeHarness.js';
 import { flush } from '../../testing/index.js';
 
 /*
-    long:2
+    @kit long: 2
     The command alphabet: the events an island meets, driven against the real thing and
     mirrored in model.ts. Every command asserts the contract after itself, so fast-check shrinks
     a violation to a minimal command sequence.

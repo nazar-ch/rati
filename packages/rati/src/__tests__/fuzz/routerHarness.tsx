@@ -26,7 +26,7 @@ import { RouterStore } from '../../router/store.js';
 */
 
 /**
- * long:2
+ * @kit long: 2
  * The value pool — the codec under fuzz. Every entry survives the whole round trip (`getPath`
  * encodes, the URL parser re-reads, the pattern matches, the match decodes), so the model
  * expects it back verbatim:
@@ -126,7 +126,7 @@ export type TableCase = {
 };
 
 /**
- * long:2
+ * @kit long: 2
  * A generated route table, whose fixed rows keep the property's ground off the draw:
  *
  *   `/`                  the root — under a basename, the strip mapping a pathname to '/'

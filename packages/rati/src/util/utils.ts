@@ -57,7 +57,7 @@ export function deepMergeReplaceArrays<T>(target: T, ...sources: Array<Partial<T
     return out as T;
 }
 
-// long:3
+// @kit long: 3
 // Based on @sindresorhus/is
 // MIT License
 // Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
