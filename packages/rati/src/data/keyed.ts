@@ -1,7 +1,7 @@
 import { observable, runInAction } from 'mobx';
 
 /*
-    `keyed` — the lazy per-key instance map (◊DATA-14): `get(key)` returns one instance per key
+    `keyed` — the lazy per-key instance map (rati◊DATA-14): `get(key)` returns one instance per key
     forever, so `mutation`'s `refreshes` reaches exactly the one a call invalidated. It is
     primitive-agnostic, and a map, not a cache — no eviction, no TTL.
 */
