@@ -114,7 +114,7 @@ function redirectTargetPathname(targetPath: string, basename: string): string {
 }
 
 /**
- * long:1
+ * @kit long: 1
  * The router's string vocabulary is absolute path references; anything else is refused here,
  * at the choke point. A relative string resolves against the current URL in the browser and
  * against a placeholder origin in memory history, so the two hosts disagree; `<Link>` or an

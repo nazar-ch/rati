@@ -309,7 +309,7 @@ async function assemble(
 }
 
 /**
- * long:1
+ * @kit long: 1
  * `transformIndexHtml`, surviving a URL `decodeURIComponent` rejects (`/products/%zz`): Vite
  * decodes the URL for its html hooks and throws a URIError after the app rendered its 404,
  * which production serves. Escaping every `%` makes the retry total. Never a decode probe up

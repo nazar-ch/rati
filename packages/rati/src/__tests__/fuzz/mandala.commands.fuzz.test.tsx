@@ -10,7 +10,7 @@ import { createDeclaredState, createModel } from './model.js';
 import { buildHarness, readContent, readSlot, scopeSpecArb } from './scopeHarness.js';
 
 /*
-    long:2
+    @kit long: 2
     The model-based property: a generated scope meets a generated EVENT SEQUENCE — settles,
     rejections, superseded settles, source transitions, selective refreshes, full re-resolves,
     input changes — against a real island, mirrored in the model. Each command asserts the

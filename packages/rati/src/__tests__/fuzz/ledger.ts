@@ -4,7 +4,7 @@ import type { Slot } from './model.js';
 import type { BuiltHarness } from './scopeHarness.js';
 
 /*
-    long:2
+    @kit long: 2
     The lifecycle ledger invariant, read off the harness's per-source-instance
     attach/detach counters and its `.provide()` value's build/dispose record. The machinery
     under it is source lifetime (a cascade swaps a source mid-flight, a Step's teardown keeps

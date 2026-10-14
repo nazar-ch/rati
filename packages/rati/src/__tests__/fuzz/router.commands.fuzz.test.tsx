@@ -16,7 +16,7 @@ import { awayUrl, buildHarness, commandCaseArb, type Harness } from './routerHar
 import { RouterModel } from './routerModel.js';
 
 /*
-    long:2
+    @kit long: 2
     The router's model-based property: a generated route table meets a generated COMMAND
     SEQUENCE — pushes and replaces by reference and by URL, shallow navigations, per-entry state,
     query rewrites, redirects, back/forward/go — against a real RouterStore over a memory history,

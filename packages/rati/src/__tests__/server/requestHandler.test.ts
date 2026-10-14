@@ -211,7 +211,7 @@ describe('the CSR fallback', () => {
         });
     });
 
-    // long:2
+    // @kit long: 2
     // The handler's own misconfiguration is not a render failure: with no template, a
     // fragment app's `assemble` throws its config error, and the fallback, reading no
     // template as a whole-document app, synthesizes a shell with no `#root`. Plain text.

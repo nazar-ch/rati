@@ -19,7 +19,7 @@ import { HYDRATION_SCRIPT_ID, readHydration, serializeHydration } from '../../ss
 import { renderToHtml } from '../../ssr/renderToHtml.js';
 
 /*
-    long:2
+    @kit long: 2
     The whole-document pattern of docs/current/public/ssr.md end to end: React renders `<html>`,
     `headTags` and the payload splice in OUTSIDE the React tree, and the client hydrates
     `document` without reconciling or duplicating the spliced tags. Then its failure path: a

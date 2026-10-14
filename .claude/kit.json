@@ -8,9 +8,6 @@
     "project": "rati",
 
     "sizeExempt": {
-        "fileLines": [
-            { "path": "packages/rati/src/__tests__/mandala/scopeControls.test.tsx", "reason": "past the limit when the size gate landed, and exempt until its split" },
-        ],
         "dirFiles": [
             { "path": "packages/rati/src/__tests__/mandala", "reason": "past the limit when the size gate landed, and exempt until its split" },
             { "path": "packages/rati/src/__tests__/router", "reason": "past the limit when the size gate landed, and exempt until its split" },

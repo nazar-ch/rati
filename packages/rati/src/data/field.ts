@@ -1,7 +1,7 @@
 import { observable, runInAction } from 'mobx';
 
 /*
-    long:2
+    @kit long: 2
     `field` — one staged value: current + baseline + validation + binding props.
 
     One generic field, zero widget subclasses — widget kind is the component's

@@ -1,7 +1,7 @@
 import type { Parameters } from 'fast-check';
 
 /*
-    long:2
+    @kit long: 2
     Fuzz conventions for rati's randomized suites.
 
       - `fuzz(n)` builds one property's fast-check `Parameters`, `numRuns` defaulting to the

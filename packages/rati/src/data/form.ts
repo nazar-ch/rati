@@ -5,7 +5,7 @@ import { FieldExternalErrors, type Field, type FieldInternal } from './field.js'
 import { toSourceError, type SourceError } from '../scope/source.js';
 
 /*
-    long:2
+    @kit long: 2
     `form` — an aggregate over fields: staged edits with one submit seam.
 
     The form is the draft: fields enumerate the edited set explicitly, the

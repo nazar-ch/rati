@@ -6,7 +6,7 @@ import { scope, hook } from '../../scope/scope.js';
 import { controllableSource, deferred, flush, renderIsland, cleanup } from '../../testing/index.js';
 
 /*
-    long:2
+    @kit long: 2
     The Suspense-produced situations React makes possible around a committed island — pins
     10-12, one per situation in packages/rati/src/__tests__/suspense-situations.md (S4, S5, S8),
     each with a KILL note. They assert the contract, never the mechanism: the ledger's BOUNDS —
@@ -50,7 +50,7 @@ function promiseStore(initial: Promise<string>) {
 }
 
 describe('S4 — re-suspension of committed content', () => {
-    // long:2
+    // @kit long: 2
     // Pin 10. A hook load returning a fresh pending promise re-suspends a COMMITTED Step,
     // which React hides (Offscreen) and reveals, re-running the subtree's effects. The
     // ledger's bounds, the content and the cached data cells survive.
@@ -126,7 +126,7 @@ describe('S4 — re-suspension of committed content', () => {
 });
 
 describe('S5 — unmount while suspended', () => {
-    // long:2
+    // @kit long: 2
     // Pin 11. The island unmounts with a load in flight, whose late settle must be inert —
     // no throw, no log — and the level's source, CREATED but never attached (S12), is
     // balanced at 0/0.
@@ -174,7 +174,7 @@ describe('S5 — unmount while suspended', () => {
 });
 
 describe('S8 — a mid-tree source dropping to pending', () => {
-    // long:2
+    // @kit long: 2
     // Pin 12. Unlike S4's hide, a committed source going ready → pending renders the
     // loading slot as ordinary children: the levels below unmount for real. Their data
     // cells stay cached on the mandala's buckets, so recovering onto the same value
@@ -234,7 +234,7 @@ describe('S8 — a mid-tree source dropping to pending', () => {
         expect(ledger(feed)).toEqual({ live: 0, peak: 1 });
     });
 
-    // long:2
+    // @kit long: 2
     // The mandala's unmount sweep, tested where it alone can work: a Step torn down while
     // its bucket is live defers its sources to the sweep, so an unmount DURING the pending
     // window leaves `deep` attached with only the sweep to release it. On every other path

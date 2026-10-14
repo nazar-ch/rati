@@ -10,7 +10,7 @@ import { scope } from '../../scope/scope.js';
 import { controllableSource, type ControllableSource } from '../../testing/index.js';
 
 /*
-    long:2
+    @kit long: 2
     Pin 8: StrictMode accounting for selective refresh. island.test.tsx pins the double-mount
     for the base lifecycle; this file pins a refresh reaching the surviving run and swapping a
     source there, across two generations, all of it released at the end. Dev StrictMode mounts,
@@ -45,7 +45,7 @@ function probeControls<S extends Parameters<typeof useScopeControls>[0]>(testSco
 }
 
 describe('StrictMode — the refresh machinery', () => {
-    // long:2
+    // @kit long: 2
     // A refresh reaches the SURVIVING run's live buckets, and its cascade swaps the
     // dependent source there: three instances across two generations and a swap, each
     // attached once and released.

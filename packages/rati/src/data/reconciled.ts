@@ -3,7 +3,7 @@ import { autorun, runInAction } from 'mobx';
 import { itemMap, type ItemMapOptions } from './itemMap.js';
 
 /*
-    long:2
+    @kit long: 2
     `reconciled` — the identity-stable list view over ANY observable rows: a `collection`'s
     reconciler half on its own, for the list half of a composite response a `query` holds.
 

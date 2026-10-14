@@ -233,7 +233,7 @@ describe('route-level redirects', () => {
     });
 
     /**
-     * long:2
+     * @kit long: 2
      * A relative target is refused where the redirect is followed — else a RELATIVE
      * self-target walks past the loop check, which compares resolutions (`'self' !== '/self'`).
      *

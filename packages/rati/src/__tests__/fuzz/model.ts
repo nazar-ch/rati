@@ -4,7 +4,7 @@
 */
 
 /*
-    long:2
+    @kit long: 2
     THE VALUE FORMULA. A key's value is a pure function of its name, its EPOCH and its reads'
     current values. The epoch is the test's declared intent — bumped by a `refresh` of a
     `fresh`-payload key — never a run counter, so an engine coalescing two re-runs stays green
@@ -313,7 +313,7 @@ export function createModel(spec: ScopeSpec, declared: DeclaredState): Reference
         pending: () => someKey((state) => state.inFlight !== null),
         liveEntries: () => someKey(hasLiveEntry),
         /*
-            long:2
+            @kit long: 2
             Two states freeze the tree, and the alphabet steps THROUGH them rather than
             predicting a torn-down tree key by key:
 
@@ -356,7 +356,7 @@ export function createModel(spec: ScopeSpec, declared: DeclaredState): Reference
         refreshable: () =>
             slotOf() !== 'content' ? [] : someKey((state) => state.spec.kind !== 'source'),
         /*
-            long:2
+            @kit long: 2
             A failure is observable only once the resolve loop reaches it, and a Step suspended
             on a pending promise never finishes its loop. WHEN the engine notices is loop
             order, below the altitude line, so the alphabet rejects only where the answer is

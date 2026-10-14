@@ -3,7 +3,7 @@ import { observable, runInAction } from 'mobx';
 import { toSourceError, type SourceError } from '../scope/source.js';
 
 /*
-    long:2
+    @kit long: 2
     `mutation` — an imperative operation with visible state.
 
     The optimistic choreography apps hand-roll per method, owned once:
