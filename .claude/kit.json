@@ -69,4 +69,15 @@
     "testLimits": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
 
     "testOnlyExports": { "state": "off", "reason": "the kit sweeps its own exports first (kit◊RT-53)" },
+
+    "terms": {
+        "state": "count",
+        "ceiling": 342,
+        "reason": "rati defines no product tier, so every emphasis span reads as an unresolved term; its prose answers to the doc-style sweep that converts stress emphasis to caps, and that sweep lowers this ceiling to zero and deletes the key",
+    },
+    "shellLicenses": {
+        "state": "count",
+        "ceiling": 2,
+        "reason": "scripts/release.sh holds no license the registry grants; it converts to TypeScript the next time it changes for a reason of its own (kit◊KC-53), and that conversion deletes this key",
+    },
 }
