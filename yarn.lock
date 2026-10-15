@@ -270,25 +270,22 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.19-b33d7eda7ffd5333cae28a498fb65d03.tgz":
-  version: 0.0.19
-  resolution: "@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.19-b33d7eda7ffd5333cae28a498fb65d03.tgz"
+"@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.20-2cc53ac27085f1747d0cc412972e0219.tgz":
+  version: 0.0.20
+  resolution: "@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.20-2cc53ac27085f1747d0cc412972e0219.tgz"
   dependencies:
     "@tsconfig/node26": "npm:^26.0.0"
     "@tsconfig/strictest": "npm:^2.0.8"
     "@tsconfig/vite-react": "npm:^8.1.1"
   peerDependencies:
     "@types/node": "*"
-    vite-plus: "*"
     zx: ^8.8.5
   peerDependenciesMeta:
     "@types/node":
       optional: true
-    vite-plus:
-      optional: true
     zx:
       optional: true
-  checksum: 10/bc6fb98efbba1cd47201c568f72499ffdb794e2607ed744a23bf2a0ccc4d310ccf99a7716add8152668f567fb70dbe8b61046f4566e93d11e6cc9e339ce59f4d
+  checksum: 10/47e568f0f3aa435ecd9387e2ae0b4aab52fb88995715514511366a7d1fcc9846be8f22324888fa4d6f7d9cb0018ebd2435d9bf1ca4ea2209717c5df265d1821e
   languageName: node
   linkType: hard
 
