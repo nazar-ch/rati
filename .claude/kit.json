@@ -51,11 +51,6 @@
     // shape comes from.
     "citableRepos": ["jnana", "jnana-kit"],
 
-    // rati files no LOCAL env feedback: friction goes to the central feedback repo.
-    "scanRoots": {
-        "feedback": null,
-    },
-
     // Walks DOWN only: a raise is the user's call, never a branch's. The root CLAUDE.md stays an
     // empty tracked file, so a session reads one surface.
     "memory": {
