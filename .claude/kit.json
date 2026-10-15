@@ -80,4 +80,14 @@
         "ceiling": 2,
         "reason": "scripts/release.sh holds no license the registry grants; it converts to TypeScript the next time it changes for a reason of its own (kit◊KC-53), and that conversion deletes this key",
     },
+    "citeForms": {
+        "state": "count",
+        "ceiling": 4,
+        "reason": "the four .vite-hooks/ scripts carry the `# @kit why-shell: hook-dispatch` license line every consumer carries, whose kit-aliased statement id spec-ids/alias flags and shell/license requires; the kit's pending decision on that line's id form ends this key",
+    },
+    "spawnFence": {
+        "state": "count",
+        "ceiling": 2,
+        "reason": "scripts/ci.ts imports zx, a runner the fence leaves no legal place for in a consumer; rati's own move of scripts/ci.ts off zx deletes this key",
+    },
 }
