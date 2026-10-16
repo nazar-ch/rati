@@ -1,0 +1,14 @@
+ inputs { stationId }
+     |
+     v
+ [ station ]                        level 1
+     |
+     +------------------+
+     |                  |
+     v                  v
+ [ departures ]    [ weather ]      level 2 (parallel)
+     |                  |
+     +--------+---------+
+              |
+              v
+   { clean, resolved props }
