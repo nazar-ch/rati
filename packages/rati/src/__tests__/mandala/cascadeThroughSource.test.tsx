@@ -1,0 +1,104 @@
+import { describe, test, expect, afterEach } from 'vite-plus/test';
+
+import type { FC } from 'react';
+
+import { render, screen, cleanup, act } from '@testing-library/react';
+
+import { island } from '../../island/island.js';
+import { useScopeControls, type ScopeControls } from '../../mandala/controls.js';
+import { scope } from '../../scope/scope.js';
+import { controllableSource, flush } from '../../testing/index.js';
+
+/*
+    A source key's new value must reach the loads that read it, as a promise settle's does:
+    the resolver runs each new source snapshot through the equals gate and calls
+    `valueChanged` when it moves, which re-runs every later-level cell whose producer read
+    the key (docs/current/internals.md).
+*/
+
+const Loading: FC = () => <div>loading...</div>;
+
+afterEach(cleanup);
+
+function probeControls<S extends Parameters<typeof useScopeControls>[0]>(testScope: S) {
+    const captured: { current: ScopeControls<S> | null } = { current: null };
+    const Probe: FC = () => {
+        captured.current = useScopeControls(testScope);
+        return null;
+    };
+    return { captured, Probe };
+}
+
+describe('a cascade reaches through a source key', () => {
+    // The promise docs/current/public/reference.md makes for `refresh`: "a changed value
+    // re-runs exactly the downstream loads whose producers read the key", a source `b`
+    // included — once its replacement settles on a new value, `c` re-runs over it.
+    test('a changed refresh cascades through a re-created source to its readers', async () => {
+        let aValue = 1;
+        const testScope = scope()
+            .load({ a: async () => aValue })
+            .load({
+                b: ({ a }: { a: number }) => {
+                    const source = controllableSource<string>();
+                    queueMicrotask(() => source.setReady(`b(a${a})`));
+                    return source;
+                },
+            })
+            .load({ c: ({ b }: { b: string }) => `c(${b})` });
+        const { captured, Probe } = probeControls(testScope);
+        const Island = island({
+            scope: testScope,
+            component: ({ c }: { c: string }) => (
+                <div>
+                    <span>{c}</span>
+                    <Probe />
+                </div>
+            ),
+            loading: Loading,
+        });
+
+        await act(async () => {
+            render(<Island />);
+        });
+        await flush();
+        expect(screen.getByText('c(b(a1))')).toBeTruthy();
+
+        aValue = 2;
+        await act(async () => {
+            await captured.current!.refresh('a');
+        });
+        await flush(2);
+
+        expect(screen.getByText('c(b(a2))')).toBeTruthy();
+    });
+
+    // The same rule with no refresh: a live source transitioning ready → ready is a changed
+    // value, so the loads derived from it re-run — deriving in a dependent load is as good as
+    // deriving inside the source.
+    test('a live source value change re-runs the loads that read it', async () => {
+        const source = controllableSource<string>();
+        const testScope = scope()
+            .load({ a: () => source })
+            .load({ b: ({ a }: { a: string }) => `b(${a})` });
+        const Island = island({
+            scope: testScope,
+            component: ({ b }: { b: string }) => <span>{b}</span>,
+            loading: Loading,
+        });
+
+        await act(async () => {
+            render(<Island />);
+        });
+        await act(async () => {
+            source.setReady('v1');
+        });
+        expect(screen.getByText('b(v1)')).toBeTruthy();
+
+        await act(async () => {
+            source.setReady('v2');
+        });
+        await flush();
+
+        expect(screen.getByText('b(v2)')).toBeTruthy();
+    });
+});
