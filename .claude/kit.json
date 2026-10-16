@@ -72,22 +72,13 @@
 
     "terms": {
         "state": "count",
-        "ceiling": 336,
-        "reason": "the product tier defines rati's terms, and every other emphasis span is stress the doc-style sweep converts to caps; that sweep lowers this ceiling to zero and deletes the key",
+        "ceiling": { "spec-ids/span": 342 },
+        "reason": "rati defines no product tier, so every emphasis span reads as an unresolved term; its prose answers to the doc-style sweep that converts stress emphasis to caps, and that sweep lowers this ceiling to zero and deletes the key",
     },
     "shellLicenses": {
         "state": "count",
-        "ceiling": 2,
+        "ceiling": { "shell/license": 2 },
         "reason": "scripts/release.sh holds no license the registry grants; it converts to TypeScript the next time it changes for a reason of its own (kit◊KC-53), and that conversion deletes this key",
     },
-    "citeForms": {
-        "state": "count",
-        "ceiling": 4,
-        "reason": "the four .vite-hooks/ scripts carry the `# @kit why-shell: hook-dispatch` license line every consumer carries, whose kit-aliased statement id spec-ids/alias flags and shell/license requires; the kit's pending decision on that line's id form ends this key",
-    },
-    "spawnFence": {
-        "state": "count",
-        "ceiling": 2,
-        "reason": "scripts/ci.ts imports zx, a runner the fence leaves no legal place for in a consumer; rati's own move of scripts/ci.ts off zx deletes this key",
-    },
+    "spawnFence": { "state": "off", "reason": "the spawn fence was not meant for a *consumer*; kit◊DES-18 decides the conversion and ends this key" },
 }
