@@ -1,0 +1,152 @@
+import { describe, test, expect, afterEach, beforeEach, vi } from 'vite-plus/test';
+
+import { cleanup, act } from '@testing-library/react';
+import * as fc from 'fast-check';
+
+import { fuzz, fuzzTimeout } from './arbitraries.js';
+import {
+    assertMounts,
+    assertRenderedState,
+    assertStep,
+    installErrorLog,
+    type ErrorLog,
+} from './routerAsserts.js';
+import {
+    applyNav,
+    buildHarness,
+    routerCaseArb,
+    urlFor,
+    type Harness,
+    type Nav,
+} from './routerHarness.js';
+import { RouterModel, type Step } from './routerModel.js';
+
+/*
+    The router's smoke property: a generated table meets a generated sequence of
+    navigate/replace calls, and at every step the Router shows what the model says — the route,
+    the URL bar, the getters, the redirect trail, the remount. Traversal is the command
+    property's.
+*/
+
+afterEach(cleanup);
+afterEach(() => vi.restoreAllMocks());
+
+/**
+ * A generated table always carries a redirect cycle, and reaching it is a PASS — the store
+ * reports the loop it refused to follow. The log sorts those from everything else rather than
+ * silencing the channel: a React warning about this harness is a finding.
+ */
+let log: ErrorLog;
+beforeEach(() => {
+    log = installErrorLog();
+});
+
+/*
+    The non-vacuity gate: a green run that never exercised the machinery is the harness failing.
+    A starved path — `getPath` barely called, the skipped navigation never reached — is
+    invisible in a green run, so the shapes are counted.
+*/
+const exercised: Record<string, number> = {};
+const note = (what: string) => {
+    exercised[what] = (exercised[what] ?? 0) + 1;
+};
+
+/** Values the codec has to work for — anything `encodeURIComponent` does not leave alone. */
+const isHostile = (value: string) => encodeURIComponent(value) !== value;
+
+function noteWhatHappened(step: Step, nav: Nav) {
+    if (step.hops.length > 0) note('a redirect was followed');
+    if (step.hops.length > 1) note('a redirect chain was followed');
+    if (step.reportedLoop && !step.selfRedirect) note('a redirect cycle hit the depth guard');
+    if (step.selfRedirect) note('a redirect resolved back to its own route');
+    if (!step.remounted) note('a navigation resolved nothing (no remount)');
+    if (nav.form === 'reference') note('a navigation went through getPath');
+    if (step.rendered !== null && !('oneOf' in step.rendered)) {
+        if (step.rendered.name === 'catchAll') note('the catch-all answered');
+        if (nav.target.kind === 'route' && step.rendered.name !== nav.target.name) {
+            note('an earlier route shadowed the one asked for');
+        }
+        if (Object.values(step.rendered.params).some(isHostile)) {
+            note('a URL-hostile param value round-tripped');
+        }
+        // The live half of the dot rule: a value CONTAINING dots is ordinary and must
+        // survive untouched. (A value that is only dots has no URL at all — see the pool.)
+        if (Object.values(step.rendered.params).some((value) => value.includes('.'))) {
+            note('a param value carrying dots round-tripped');
+        }
+    }
+}
+
+describe('router fuzz — smoke (navigation over generated route tables)', () => {
+    test(
+        'the rendered route, the URL, and the router agree with the model at every step',
+        async () => {
+            await fc.assert(
+                fc.asyncProperty(routerCaseArb(), async (routerCase) => {
+                    log.reset();
+                    const model = new RouterModel(routerCase.table, routerCase.initialUrl);
+                    let harness!: Harness;
+                    // Mount inside an async act, as the deterministic suites do: the Router
+                    // defers the active route, so the low-priority render has to be flushed
+                    // before anything is read.
+                    await act(async () => {
+                        harness = buildHarness(routerCase.table, routerCase.initialUrl);
+                    });
+                    try {
+                        const initial = model.initialStep();
+                        assertStep(harness, initial, 'initial', log);
+                        assertMounts(harness, model, initial, 'initial');
+
+                        for (const [i, nav] of routerCase.navs.entries()) {
+                            const url = urlFor(routerCase.table, nav.target, nav.search, nav.hash);
+                            const step =
+                                nav.mode === 'navigate'
+                                    ? model.navigate(url, nav.state ?? null)
+                                    : model.replace(url, nav.state ?? null);
+
+                            log.reset();
+                            await act(async () => {
+                                applyNav(harness.router, routerCase.table, nav);
+                            });
+                            // The deferred route lands a render later; flush it before reading.
+                            await act(async () => {});
+
+                            const label = `${nav.mode}#${i} → ${url}`;
+                            assertStep(harness, step, label, log);
+                            assertMounts(harness, model, step, label);
+                            noteWhatHappened(step, nav);
+                        }
+
+                        // The catch-all: nothing above left a stale route on screen. Every step
+                        // was checked, so this restates the end state as one fact — the Router
+                        // is showing what the CURRENT URL resolves to.
+                        assertRenderedState(harness, model.current(), 'final');
+                    } finally {
+                        harness.dispose();
+                    }
+                }),
+                fuzz(25),
+            );
+
+            // Every one of these is reachable at the default budget. If one reads zero, the
+            // arbitrary stopped generating a shape the property claims to cover — which is a
+            // harness failure wearing a green run's clothes, so it fails here rather than
+            // going unnoticed.
+            for (const what of [
+                'a redirect was followed',
+                'a redirect chain was followed',
+                'a redirect cycle hit the depth guard',
+                'a redirect resolved back to its own route',
+                'a navigation resolved nothing (no remount)',
+                'a navigation went through getPath',
+                'the catch-all answered',
+                'an earlier route shadowed the one asked for',
+                'a URL-hostile param value round-tripped',
+                'a param value carrying dots round-tripped',
+            ]) {
+                expect(exercised[what] ?? 0, `never exercised: ${what}`).toBeGreaterThan(0);
+            }
+        },
+        fuzzTimeout(),
+    );
+});
