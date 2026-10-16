@@ -1,0 +1,8 @@
++--[ network conditions ]----------+
+|                                  |
+|  latency  [=======|---]  1400ms  |
+|  jitter   ( on )                 |
+|  failure  (off|NEXT|all|n/a)     |
+|                                  |
+|  [ replay ]          [ reset ]   |
++----------------------------------+
