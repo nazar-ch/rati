@@ -8,7 +8,7 @@ status: open
 
 `RouterOutlet` defers the active route with `useDeferredValue`, so a navigation whose target has not rendered yet keeps the previous screen and suppresses every fallback. The deferral has no ceiling: a target that never renders leaves the previous screen up forever with nothing to say a navigation happened. jnana measured this on an iOS device where React's scheduler channel had died across a suspend: every navigation advanced the router and produced one sync render of the outlet, and the deferred render never ran, for any route (jnana:///docs/research/ios-suspend-message-channels.md §1).
 
-The product want it answers is jnana's ⭑APP-31: a navigation the app cannot finish within a second shows the target's loading state, so no tap is ever silent.
+The product want it answers is jnana's, stated in its UI product doc: a navigation the app cannot finish within a second shows the target's loading state, so no tap is ever silent.
 
 ## Scope
 
