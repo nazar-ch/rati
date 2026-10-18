@@ -172,6 +172,7 @@ export function createQuery<T>(
         // Cleanup outside the async body: it must run AFTER the `inFlight`
         // assignment even when the producer throws synchronously (the async
         // body settles before the assignment in that case).
+        // why-void: `promise` never rejects — its body catches every failure into `state.error`.
         void promise.finally(() => {
             if (inFlight === promise) inFlight = null;
             if (controller === ownController) controller = null;
@@ -197,8 +198,8 @@ export function createQuery<T>(
     // fetch, now stale, rather than joining it; the debounce still coalesces the burst.
     function reactiveRefresh(): void {
         const { debounce } = options;
-        if (debounce) void debouncer.schedule(debounce.waitMs, debounce.maxWaitMs);
-        else void startFetch();
+        // why-void: both fetches resolve on failure — failure is state, never a rejection.
+        void (debounce ? debouncer.schedule(debounce.waitMs, debounce.maxWaitMs) : startFetch());
     }
 
     function set(next: T): void {
@@ -262,6 +263,7 @@ export function createQuery<T>(
             memoizedSource ??= instanceSource(
                 self as ReadyQuery<T>,
                 () => ({ hasData: state.hasData, error: state.error }),
+                // why-void: `prime()` resolves on failure — failure is state, never a rejection.
                 () => void prime(),
             );
             return memoizedSource;
@@ -292,6 +294,7 @@ function createDebouncer(start: () => Promise<void>, onScheduled: () => void): D
         const current = scheduled;
         if (!current) return;
         scheduled = null;
+        // why-void: `start` is the query's `startFetch`, which never rejects.
         void start().then(current.resolve);
     }
 

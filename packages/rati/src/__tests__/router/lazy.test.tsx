@@ -25,9 +25,8 @@ describe('lazy()', () => {
         const factory = vi.fn(async () => ({ default: (() => null) as FC }));
         const Component = lazy(factory);
 
-        void Component.preload();
-        void Component.preload();
-        void Component.preload();
+        // why-void: the factory resolves, and the case counts its calls, never the module.
+        void Promise.all([Component.preload(), Component.preload(), Component.preload()]);
 
         expect(factory).toHaveBeenCalledOnce();
     });

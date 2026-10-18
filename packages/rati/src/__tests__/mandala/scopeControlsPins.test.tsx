@@ -208,8 +208,8 @@ describe('selective refresh — races', () => {
         expect(screen.getByText('x1/y1')).toBeTruthy();
 
         await act(async () => {
-            void captured.current!.refresh('x');
-            void captured.current!.refresh('y');
+            // why-void: the case reads the effects, never the promise, which resolves on failure.
+            void Promise.all([captured.current!.refresh('x'), captured.current!.refresh('y')]);
         });
         expect(new Set(captured.current!.pending)).toEqual(new Set(['x', 'y']));
 

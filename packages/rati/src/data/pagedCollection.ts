@@ -105,6 +105,7 @@ export function pagedCollection<T, C = string, Item = T>(
     // makes a fresh page 0; `loadMore()` fetches it, re-tracking the params.
     function reactivelyReset(): void {
         self.reset();
+        // why-void: `loadMore()` joins `prime()`, which resolves on failure.
         void self.loadMore();
     }
 
@@ -188,6 +189,7 @@ export function pagedCollection<T, C = string, Item = T>(
                         error: first?.query.error ?? null,
                     };
                 },
+                // why-void: `prime()` resolves on failure — failure is state, never a rejection.
                 () => void firstPage().query.prime(),
             );
             return memoizedSource;

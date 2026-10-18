@@ -132,6 +132,7 @@ export function promiseSource<T>(promise: Promise<T>, options?: { ssr?: SourceSS
         // Set iteration tolerates a listener unsubscribing mid-notify, so iterate directly.
         for (const listener of listeners) listener();
     };
+    // why-void: both outcomes are handled here; the chain rejects only if a listener throws.
     void promise.then(
         (value) => set({ status: 'ready', value }),
         (reason: unknown) => set({ status: 'error', error: toSourceError(reason) }),

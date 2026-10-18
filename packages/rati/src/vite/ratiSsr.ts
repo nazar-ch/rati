@@ -213,6 +213,7 @@ export function ratiSsr(options: RatiSsrOptions = {}): Plugin {
                     // kept the full one on `originalUrl` — the app router wants the
                     // former, `transformIndexHtml` the latter.
                     const url = req.url ?? '/';
+                    // why-void: the `.catch` below hands every failure to Vite's error middleware.
                     void reply(server, resolved, url, req.originalUrl)
                         .then((decided) => {
                             res.writeHead(decided.status, decided.headers);

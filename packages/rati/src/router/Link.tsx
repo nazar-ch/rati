@@ -66,6 +66,8 @@ const GenericAnchor = function GenericAnchor({
     const handleMouseEnter = useCallback(
         (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
             if (userOnMouseEnter) userOnMouseEnter(event);
+            // why-void: the prefetch only warms `lazy`'s cache; a failed chunk load rejects
+            // unhandled here, and the route's render reads the same cached promise.
             if (prefetch) void router.preloadRoute(anchorPath(event.currentTarget));
         },
         [prefetch, userOnMouseEnter, router],
@@ -74,6 +76,8 @@ const GenericAnchor = function GenericAnchor({
     const handleTouchStart = useCallback(
         (event: React.TouchEvent<HTMLAnchorElement>) => {
             if (userOnTouchStart) userOnTouchStart(event);
+            // why-void: the prefetch only warms `lazy`'s cache; a failed chunk load rejects
+            // unhandled here, and the route's render reads the same cached promise.
             if (prefetch) void router.preloadRoute(anchorPath(event.currentTarget));
         },
         [prefetch, userOnTouchStart, router],

@@ -32,6 +32,7 @@ describe('useScopeControls — the status surface stays inferred off the scope',
         const controls = useScopeControls(pageScope);
         // @ts-expect-error — 'stale' is not a phase; staleness is its own flag
         const bad: typeof controls.phase = 'stale';
+        // why-void: the read keeps `noUnusedLocals` from satisfying the `@ts-expect-error` above.
         void bad;
     });
 });

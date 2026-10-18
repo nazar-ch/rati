@@ -57,6 +57,8 @@ export function mutation<Args extends unknown[], R>(
 
     const refreshAll = (...args: Args): void => {
         const dependents = options.refreshes?.(...args) ?? [];
+        // why-void: refreshes are fired, not awaited, and a query's `refresh()` resolves on
+        // failure.
         for (const dependent of dependents) void dependent.refresh();
     };
 

@@ -9,6 +9,7 @@ describe('deferred', () => {
     test('resolves by hand', async () => {
         const gate = deferred<number>();
         let settled: number | undefined;
+        // why-void: `gate` resolves below and never rejects, and the case awaits it before reading.
         void gate.promise.then((value) => (settled = value));
         gate.resolve(42);
         await gate.promise;

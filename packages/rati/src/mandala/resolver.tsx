@@ -388,6 +388,7 @@ function recordRejection(shared: Shared, key: string, promise: Promise<unknown>)
     const { collectError, recordedRejections } = shared;
     if (!collectError || !recordedRejections || recordedRejections.has(promise)) return;
     recordedRejections.add(promise);
+    // why-void: the rejection handler here is the promise's reader, handing it to `collectError`.
     void promise.then(undefined, (thrown: unknown) => {
         collectError(key, asSourceError(thrown));
     });
