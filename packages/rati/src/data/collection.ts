@@ -103,6 +103,7 @@ export function collection<T, Item = T>(options: CollectionOptions<T, Item>): Co
             memoizedSource ??= instanceSource(
                 self,
                 () => ({ hasData: rowsQuery.data !== undefined, error: rowsQuery.error }),
+                // why-void: `prime()` resolves on failure — failure is state, never a rejection.
                 () => void rowsQuery.prime(),
             );
             return memoizedSource;

@@ -247,6 +247,7 @@ describe('useScopeControls — selective refresh', () => {
         expect(screen.getByText('value v1')).toBeTruthy();
 
         await act(async () => {
+            // why-void: the case reads the effects, never the promise, which resolves on failure.
             void captured.current!.refresh();
         });
         // Full re-resolve: the inner tree remounted, fresh load, loading slot back up.

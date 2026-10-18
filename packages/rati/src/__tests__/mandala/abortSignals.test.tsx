@@ -164,6 +164,7 @@ describe("a load's abort signal", () => {
 
         // Whole-scope: a fresh inner tree, so the run it replaces goes.
         await act(async () => {
+            // why-void: the case reads the effects, never the promise, which resolves on failure.
             void handle.controls().refresh();
         });
         await flush();

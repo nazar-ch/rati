@@ -137,6 +137,7 @@ export function traceCellPromise(
     const id = `${index}:${key}`;
     trace.marks.set(id, performance.now());
     trace.status.set(id, 'pending');
+    // why-void: both outcomes are handled here, and each handler only writes the trace.
     void promise.then(
         () => {
             traceCellStatus(trace, index, key, 'ready');

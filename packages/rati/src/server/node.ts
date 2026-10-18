@@ -32,7 +32,7 @@ export async function serve(options: ServeOptions): Promise<Server> {
     const port = options.port ?? (Number(process.env['PORT']) || 3000);
 
     const server = createServer((req, res) => {
-        // `void`: the listener's contract is synchronous, and reply() below is where
+        // why-void: the listener's contract is synchronous, and reply() below is where
         // every failure is already handled — nothing rejects back to here.
         void reply(options.handler, staticDir, req, res);
     });

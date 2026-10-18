@@ -154,6 +154,8 @@ function abortLoads(bucket: Bucket): void {
     if (!controller || controller.signal.aborted) return;
     for (const cell of bucket.cells.values()) {
         if (cell.kind === 'promise' && cell.rerunnable) {
+            // why-void: the no-op rejection handler leaves the chained promise nothing to reject
+            // with.
             void cell.promise.then(undefined, () => {});
         }
     }
@@ -364,6 +366,7 @@ export class RefreshController {
     /** Render-time: a dirty re-run produced a promise — track its settle. */
     trackRefresh(levelIndex: number, key: string, promise: Promise<unknown>, token: number): void {
         this.addPending(key);
+        // why-void: both outcomes are handled here, routed to `settled` or `refreshFailed`.
         void promise.then(
             (value) => {
                 this.settled(levelIndex, key, value, token);

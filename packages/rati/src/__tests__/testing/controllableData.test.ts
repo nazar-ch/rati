@@ -145,6 +145,7 @@ describe('controllableQuery', () => {
         const q = controllableQuery<string>({ debounce: { waitMs: 100 } });
 
         const burst = q.refresh();
+        // why-void: the second call joins `burst`, which the case awaits.
         void q.refresh();
         expect(q.callCount).toBe(0); // nothing fired yet — still coalescing
         await vi.advanceTimersByTimeAsync(100);

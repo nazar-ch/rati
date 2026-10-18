@@ -251,10 +251,12 @@ describe('debounce', () => {
         const producer = vi.fn(() => Promise.resolve('value'));
         const q = query(producer, { debounce: { waitMs: 100, maxWaitMs: 250 } });
 
+        // why-void: the producer resolves, and the case counts its calls, never the promise.
         void q.refresh();
         // Keep typing every 50ms — the plain wait alone would postpone forever.
         for (let i = 0; i < 4; i++) {
             await vi.advanceTimersByTimeAsync(50);
+            // why-void: the producer resolves, and the case counts its calls, never the promise.
             void q.refresh();
         }
         await vi.advanceTimersByTimeAsync(50); // t = 250 from the first call

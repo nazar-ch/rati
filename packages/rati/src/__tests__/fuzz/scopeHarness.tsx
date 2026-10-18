@@ -275,6 +275,7 @@ export function buildHarness(
                 // Register a rejection handler up front: a superseded promise's rejection
                 // reaches no `use()` and no controller, and would surface as an unhandled
                 // rejection that fails the worker rather than the property.
+                // why-void: the no-op handler leaves the chained promise nothing to reject with.
                 void promise.catch(() => {});
                 heldEntries.push({
                     key: keySpec.key,
@@ -430,10 +431,11 @@ export function buildHarness(
         supersedeAll: () => {
             for (const entry of heldEntries) entry.superseded = true;
         },
-        // Fire-and-forget on purpose: the returned promise settles only when the key does,
-        // which is a LATER command's job. Refresh failures resolve (they log), so no
+        // why-void: fire-and-forget on purpose: the returned promise settles only when the key
+        // does, which is a LATER command's job. Refresh failures resolve (they log), so no
         // rejection escapes.
         refresh: (key) => void captured.current!.refresh(key),
+        // why-void: as `refresh` — a whole-scope refresh resolves on failure too.
         refreshAll: () => void captured.current!.refresh(),
         pending: () => [...(captured.current?.pending ?? [])].sort(),
         runCounts: () => runCounts,

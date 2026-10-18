@@ -215,4 +215,5 @@ describe('unclaimed-payload watchdog', () => {
 
 // Type-level: the payload shape is the wire contract.
 const _state: HydrationState = { v: 1, data: {}, seeds: {} };
+// why-void: the read keeps `noUnusedLocals` off a declaration that exists for its type check.
 void _state;
