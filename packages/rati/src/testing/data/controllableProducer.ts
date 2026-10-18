@@ -41,7 +41,10 @@ export interface ControllableProducer<T, Args extends unknown[] = []> {
     readonly callCount: number;
     /** The most recent call. Throws before the first. */
     readonly lastCall: ProducerCall<T, Args>;
-    /** The oldest call that hasn't settled — what bare `resolve`/`reject` settle. Throws when there is none. */
+    /**
+     * The oldest call that hasn't settled — what bare `resolve`/`reject` settle. Throws when there
+     * is none.
+     */
     readonly pendingCall: ProducerCall<T, Args>;
     /** Settle the oldest un-settled call (calls settle in order unless you address one). */
     resolve(value: T): void;

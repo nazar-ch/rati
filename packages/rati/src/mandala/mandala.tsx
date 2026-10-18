@@ -223,11 +223,14 @@ function useInputsVersion<I>(inputs: I) {
     const initialInputsRef = useRef(inputs);
     const inputsRef = useRef(inputs);
     const versionRef = useRef(0);
-    // oxlint-disable-next-line react/refs -- the render that sees new inputs must compare them, so the version the tree keys off moves in that render
+    /* oxlint-disable-next-line react/refs -- the render that sees new inputs must compare them, so
+       the version the tree keys off moves in that render */
     if (!deepEqual(inputsRef.current, inputs)) {
-        // oxlint-disable-next-line react/refs -- the last inputs are the comparison's baseline, written in the render that read them
+        /* oxlint-disable-next-line react/refs -- the last inputs are the comparison's baseline,
+           written in the render that read them */
         inputsRef.current = inputs;
-        // oxlint-disable-next-line react/refs -- the version is derived in render: an effect would key the tree one render late
+        /* oxlint-disable-next-line react/refs -- the version is derived in render: an effect would
+           key the tree one render late */
         versionRef.current += 1;
     }
     return { initialInputsRef, versionRef };
@@ -390,7 +393,8 @@ function useManualRetry(
             bumpRetry();
         };
     }
-    // oxlint-disable-next-line react/refs -- the ref is written once, so every render returns one stable `retry` identity
+    /* oxlint-disable-next-line react/refs -- the ref is written once, so every render returns one
+       stable `retry` identity */
     return manualRetryRef.current ?? bumpRetry;
 }
 
