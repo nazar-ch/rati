@@ -6,6 +6,6 @@ export default defineKitConfig({
     test: {
         // `projects` alone: an aggregator's `test` block never reaches a project's forked worker.
         // The config FILE, never its directory, which check-vitest-configs reads as a stale project.
-        projects: ['packages/rati/vitest.config.ts'],
+        projects: ['packages/rati/vitest.config.ts', 'scripts/vitest.config.ts'],
     },
 });

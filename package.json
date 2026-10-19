@@ -15,7 +15,7 @@
         "upgrade-yarn": "corepack use yarn@stable",
         "upgrade-node": "vp env install",
         "ci": "node scripts/ci.ts",
-        "release": "./scripts/release.sh",
+        "release": "./scripts/release.ts",
         "prepare": "vp config",
         "postinstall": "vp config"
     },

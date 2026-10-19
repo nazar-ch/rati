@@ -39,10 +39,18 @@
                 "id": "release",
                 "category": "package publish",
                 // `tokenPattern` catches every wrapping of the publish, whose command word is `npm`
-                // in `yarn npm publish`, and leaves release.sh's `--publish` auth check allowed.
-                "command": ["release.sh", "release"],
+                // in `yarn npm publish`, and leaves release.ts's `--publish` auth check allowed.
+                "command": ["release.ts", "release"],
                 "tokenPattern": "^publish$",
-                "reason": "scripts/release.sh (the `release` script) and a bare `yarn npm publish` bump and publish the public `rati` package to npmjs with the token in this machine's Keychain, and re-running does not undo a publish. Releasing is the maintainer's call (docs/current/RELEASING.md); `--dry-run` is the only safe form and is still user-run."
+                "reason": "scripts/release.ts (the `release` script) and a bare `yarn npm publish` bump and publish the public `rati` package to npmjs with the token in this machine's Keychain, and re-running does not undo a publish. Releasing is the maintainer's call (docs/current/RELEASING.md); `--dry-run` is the only safe form and is still user-run."
+            },
+            {
+                "id": "release-node",
+                "category": "package publish",
+                // The deny verdict walks past no `node`, so the script's path operand is the match.
+                "command": ["node", "run-node.sh"],
+                "argPattern": "(^|/)release\\.ts$",
+                "reason": "`node scripts/release.ts` runs scripts/release.ts, which bumps and publishes the public `rati` package to npmjs with the token in this machine's Keychain, and re-running does not undo a publish. Releasing is the maintainer's call (docs/current/RELEASING.md); `--dry-run` is the only safe form and is still user-run."
             },
         ],
     },
@@ -74,11 +82,6 @@
         "state": "count",
         "ceiling": { "spec-ids/span": 342 },
         "reason": "rati defines no product tier, so every emphasis span reads as an unresolved term; its prose answers to the doc-style sweep that converts stress emphasis to caps, and that sweep lowers this ceiling to zero and deletes the key",
-    },
-    "shellLicenses": {
-        "state": "count",
-        "ceiling": { "shell/license": 2 },
-        "reason": "scripts/release.sh holds no license the registry grants; it converts to TypeScript the next time it changes for a reason of its own (kit◊KC-53), and that conversion deletes this key",
     },
     "spawnFence": { "state": "off", "reason": "the spawn fence was not meant for a *consumer*; kit◊DES-18 decides the conversion and ends this key" },
 }

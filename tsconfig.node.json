@@ -3,6 +3,6 @@
     // profile. Never `tsconfig.json`, which editors and a stray `tsc` read as the whole repo's.
     "extends": "@jnana-app/kit/tsconfig/configs.json",
     // `files`, never an `include` override: `include` replaces the profile's globs, and `files`
-    // unions with them. scripts/ci.ts runs on Node and sits under none of those globs.
-    "files": ["scripts/ci.ts"]
+    // unions with them. The scripts run on Node and sit under none of those globs.
+    "files": ["scripts/ci.ts", "scripts/release.ts", "scripts/release.contract.unit.test.ts"]
 }
