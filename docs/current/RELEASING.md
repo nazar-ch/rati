@@ -7,10 +7,10 @@ Two things to check while you are there, because a release is the last moment ei
 From the repo root, on a clean `main` that's in sync with origin:
 
 ```sh
-./scripts/release.sh                # patch, the default: 0.4.9 -> 0.4.10
-./scripts/release.sh minor          # -> 0.5.0
-./scripts/release.sh prerelease     # 0.4.9-alpha.1 -> 0.4.9-alpha.2
-./scripts/release.sh 0.5.0          # explicit version
+./scripts/release.ts                # patch, the default: 0.4.9 -> 0.4.10
+./scripts/release.ts minor          # -> 0.5.0
+./scripts/release.ts prerelease     # 0.4.9-alpha.1 -> 0.4.9-alpha.2
+./scripts/release.ts 0.5.0          # explicit version
 ```
 
 It resolves the bump, prints `rati <current> → <new>` with the dist-tag and publisher, and waits for a single `y` — anything else aborts and puts `package.json` back. Nothing is committed, tagged, published or pushed before that keypress.
