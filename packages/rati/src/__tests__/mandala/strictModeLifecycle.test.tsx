@@ -4,8 +4,9 @@ import { StrictMode, type FC } from 'react';
 
 import { render, screen, cleanup, act } from '@testing-library/react';
 
+import { probeControls } from './scopeControlsHarness.js';
+
 import { island } from '../../island/island.js';
-import { useScopeControls, type ScopeControls } from '../../mandala/controls.js';
 import { scope } from '../../scope/scope.js';
 import { controllableSource, type ControllableSource } from '../../testing/index.js';
 
@@ -33,15 +34,6 @@ afterEach(cleanup);
 // once — 2 is a double attach.
 function ledger(source: ControllableSource<string>) {
     return { live: source.attachCount - source.detachCount, peak: source.peakAttached };
-}
-
-function probeControls<S extends Parameters<typeof useScopeControls>[0]>(testScope: S) {
-    const captured: { current: ScopeControls<S> | null } = { current: null };
-    const Probe: FC = () => {
-        captured.current = useScopeControls(testScope);
-        return null;
-    };
-    return { captured, Probe };
 }
 
 describe('StrictMode — the refresh machinery', () => {
