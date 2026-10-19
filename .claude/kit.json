@@ -21,7 +21,7 @@
         "missing": ["node_modules", "packages/rati/dist"],
     },
 
-    // examples/ssr/tsconfig.node.json resolves `rati/server`, `rati/ssr` and `rati/vite` through the
+    // examples/ssr/tsconfig.json resolves `rati/server`, `rati/ssr` and `rati/vite` through the
     // PUBLISHED `dist/*.d.ts` entries, so a checkout that never built fails `ssr-demo#typecheck`.
     "prep": [
         {

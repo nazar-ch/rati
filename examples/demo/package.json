@@ -5,9 +5,9 @@
     "type": "module",
     "scripts": {
         "dev": "vp dev",
-        "build": "tsc --noEmit && vp build",
+        "build": "tsc --noEmit -p src/tsconfig.json && vp build",
         "preview": "vp preview",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit -p src/tsconfig.json && tsc --noEmit -p tsconfig.json"
     },
     "dependencies": {
         "rati": "workspace:*",
