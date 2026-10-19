@@ -1,6 +1,6 @@
 // The furniture scopeControls.test.tsx and scopeControlsPins.test.tsx share.
 
-import type { FC } from 'react';
+import { useLayoutEffect, type FC } from 'react';
 
 import { useScopeControls, type ScopeControls } from '../../mandala/controls.js';
 import { controllableSource, type ControllableSource } from '../../testing/index.js';
@@ -19,7 +19,10 @@ export function testSource<T>(log: string[], id: string): ControllableSource<T> 
 export function probeControls<S extends Parameters<typeof useScopeControls>[0]>(testScope: S) {
     const captured: { current: ScopeControls<S> | null } = { current: null };
     const Probe: FC = () => {
-        captured.current = useScopeControls(testScope);
+        const controls = useScopeControls(testScope);
+        useLayoutEffect(() => {
+            captured.current = controls;
+        });
         return null;
     };
     return { captured, Probe };

@@ -22,7 +22,7 @@ export default defineKitConfig(
                 enabled: true,
                 checker: 'tsc',
                 include: ['src/__tests__/**/*.test-d.ts'],
-                tsconfig: './tsconfig.test.json',
+                tsconfig: './src/__tests__/tsconfig.json',
             },
         },
     },

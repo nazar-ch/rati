@@ -453,6 +453,8 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
             navTrace(`level ${index} source attach (pre-paint) [${dataKeys.join(',')}]`);
         }
         for (const entry of sources) if (!entry.detach) entry.detach = entry.source.attach();
+        /* oxlint-disable-next-line react-hooks/exhaustive-deps -- a Step's index and keys are
+           fixed for its lifetime, and a source swap replaces `sources` */
     }, [sources]);
 
     useEffect(() => {
@@ -474,6 +476,8 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
                 }
             }
         };
+        /* oxlint-disable-next-line react-hooks/exhaustive-deps -- a Step's index, bucket and
+           shared state are fixed for its lifetime, and a source swap replaces `sources` */
     }, [sources]);
 
     // One uSES per Step subscribes to the level's sources, re-keyed when a swap replaces the
@@ -530,6 +534,8 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
                 // Renders the island's error slot here, the deterministic first paint this mode
                 // exists for. With no slot the throw takes the default path: React degrades the
                 // boundary to the loading slot.
+                /* oxlint-disable-next-line typescript/only-throw-error -- the boundary reads a plain
+                   SourceError */
                 if (!ssrErrors.slot) throw value.error;
                 return ssrErrors.slot(value.error);
             }
@@ -546,9 +552,11 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
             }
             resolved[key] = value;
         } else if (cell.kind === 'error') {
-            // A failure the server already had (`ssrErrors: 'dehydrate'`), hydrating into
-            // the state a source that failed would be in — so it leaves the same way: to
-            // the boundary, and the error slot the HTML is already showing.
+            // A failure the server already had (`ssrErrors: 'dehydrate'`) hydrates into the
+            // state of a failed source, so it leaves the same way: to the boundary, and the
+            // error slot the HTML already shows.
+            /* oxlint-disable-next-line typescript/only-throw-error -- the boundary reads a plain
+               SourceError */
             throw cell.error;
         } else {
             const state = cell.source.getSnapshot();
@@ -566,6 +574,8 @@ function Step({ level, index, keys, hookKeys, dataKeys, prev, shared, children }
                     cell.swapped = false;
                     shared.controller?.sourceErrored(key);
                 }
+                /* oxlint-disable-next-line typescript/only-throw-error -- the boundary reads a plain
+                   SourceError */
                 throw state.error;
             }
             if (state.status === 'pending') {

@@ -1,4 +1,10 @@
-import { createElement, type ComponentProps, type ComponentType, type ReactNode } from 'react';
+import {
+    createElement,
+    useLayoutEffect,
+    type ComponentProps,
+    type ComponentType,
+    type ReactNode,
+} from 'react';
 
 import { mountTree, type MountedTree } from './dom.js';
 
@@ -131,7 +137,10 @@ export async function renderIsland<S extends Scope<any>>(
         // them without the test wiring its own reader. Under the controls channel, which the
         // mandala provides around the whole inner tree (loading slot included).
         function Probe() {
-            captured.current = useScopeControls(config.scope);
+            const controls = useScopeControls(config.scope);
+            useLayoutEffect(() => {
+                captured.current = controls;
+            });
             return null;
         }
         const OrigComponent = config.component;
@@ -202,7 +211,7 @@ export async function renderIsland<S extends Scope<any>>(
                 visibleNode(container, 'error') ??
                 visibleNode(container, 'content') ??
                 visibleNode(container, 'loading');
-            return node?.textContent?.trim() ?? null;
+            return node?.textContent.trim() ?? null;
         },
         // The cast bridges the conditional tuple (unresolvable while S is generic).
         rerender: ((props?: ScopeInputs<S>) =>

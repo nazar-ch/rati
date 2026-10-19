@@ -4,8 +4,9 @@ import type { FC } from 'react';
 
 import { render, screen, cleanup, act } from '@testing-library/react';
 
+import { probeControls } from './scopeControlsHarness.js';
+
 import { island } from '../../island/island.js';
-import { useScopeControls, type ScopeControls } from '../../mandala/controls.js';
 import { scope } from '../../scope/scope.js';
 import { controllableSource, flush } from '../../testing/index.js';
 
@@ -19,15 +20,6 @@ import { controllableSource, flush } from '../../testing/index.js';
 const Loading: FC = () => <div>loading...</div>;
 
 afterEach(cleanup);
-
-function probeControls<S extends Parameters<typeof useScopeControls>[0]>(testScope: S) {
-    const captured: { current: ScopeControls<S> | null } = { current: null };
-    const Probe: FC = () => {
-        captured.current = useScopeControls(testScope);
-        return null;
-    };
-    return { captured, Probe };
-}
 
 describe('a cascade reaches through a source key', () => {
     // The promise docs/current/public/reference.md makes for `refresh`: "a changed value

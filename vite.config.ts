@@ -14,51 +14,39 @@ export default defineConfig({
         react: ['**/*.{ts,tsx}'],
         overrides: [
             {
-                // rati's departures from the canonical rule table, each a framework-machinery
-                // difference. oxlint applies overrides in order, so these win over the canonical ones.
+                // oxlint applies overrides in order, so these win over the canonical ones.
                 files: ['**/*.{ts,tsx}'],
                 rules: {
-                    // `warn`, not canonical `error`: rati's type machinery uses `{}` on purpose — the
-                    // param and fallback defaults, and the `RatiUserTypes {}` augmentation interface,
-                    // which can't be `Record<string, never>`.
-                    'typescript/no-empty-object-type': 'warn',
-                    // `warn`, not canonical `error`: `any` is a generic-constraint primitive here
-                    // (`Scope<any>`, `(...args: any) => any`, `Prop<any>`) where `unknown` can't
-                    // substitute.
-                    'typescript/no-explicit-any': 'warn',
-                    // `warn`, not canonical `error`: the `!`s in rati's internals are array-index
-                    // accesses on values present by construction (`buckets[index]!`).
-                    'typescript/no-non-null-assertion': 'warn',
-                    // `warn`, not canonical `error`: it fires on the `any | Promise<any>` load unions
-                    // and on `NameToRoute<UserRoutes> | string`, whose route side is `never` until an
-                    // app augments `RatiUserTypes`.
-                    'typescript/no-redundant-type-constituents': 'warn',
-                    // Off: tsgolint models no `noUncheckedIndexedAccess`, and its autofix — which
-                    // `warn` still runs — strips the `arr[i]!` and generic assertions tsc needs.
+                    // Off: tsgolint models no `noUncheckedIndexedAccess`, and its autofix strips the
+                    // `arr[i]!` and generic assertions tsc needs.
                     'typescript/no-unnecessary-type-assertion': 'off',
+                    // `island()` wraps a component the way `memo` does, so its result is one.
+                    'react/only-export-components': ['error', { customHOCs: ['island'] }],
                 },
             },
             {
-                // `warn`, not canonical `error`: the rules kit◊RD-34 lifted that red rati's tree,
-                // held at `warn` until rati's focused lint work sweeps each rule's sites and drops
-                // it from this block.
-                files: ['**/*.{ts,tsx}'],
+                // The framework's departures from the canonical rule table, which the example apps
+                // do not share.
+                files: ['packages/rati/src/**'],
                 rules: {
-                    'react/exhaustive-deps': 'warn',
-                    'react/immutability': 'warn',
-                    'react/only-export-components': 'warn',
-                    'typescript/no-implied-eval': 'warn',
-                    'typescript/no-unnecessary-condition': 'warn',
-                },
-            },
-            {
-                // MUST follow the blocks above: the canonical test override turns these rules off
-                // before a repo's entries apply, so the repo-wide `warn` otherwise wins in the test
-                // trees. The globs are rati's own test shapes.
-                files: ['**/__tests__/**', '**/*.{test,spec}.{js,jsx,ts,tsx}', '**/*.test-d.ts'],
-                rules: {
+                    // Off: rati's type machinery uses `{}` on purpose — the param and fallback
+                    // defaults, and the `RatiUserTypes {}` augmentation interface, which can't be
+                    // `Record<string, never>`.
+                    'typescript/no-empty-object-type': 'off',
+                    // Off: `any` is a generic-constraint primitive here (`Scope<any>`,
+                    // `(...args: any) => any`, `Prop<any>`) where `unknown` can't substitute.
+                    'typescript/no-explicit-any': 'off',
+                    // Off: the `!`s in rati's internals are array-index accesses on values present
+                    // by construction (`buckets[index]!`).
                     'typescript/no-non-null-assertion': 'off',
-                    'typescript/no-unnecessary-condition': 'off',
+                    // Off: it fires on the `any | Promise<any>` load unions and on
+                    // `NameToRoute<UserRoutes> | string`, whose route side is `never` until an app
+                    // augments `RatiUserTypes`.
+                    'typescript/no-redundant-type-constituents': 'off',
+                    // Off: a module exports its components beside the functions and hooks that
+                    // build and read them, and an app loads the built package, which fast refresh
+                    // never reaches.
+                    'react/only-export-components': 'off',
                 },
             },
             {

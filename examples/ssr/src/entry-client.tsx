@@ -20,7 +20,8 @@ const { App } = createApp({
     hydration: state ? { data: state.data, seeds: state.seeds, errors: state.errors } : undefined,
 });
 
-const root = document.getElementById('root')!;
+const root = document.getElementById('root');
+if (!root) throw new Error('index.html carries no #root element');
 
 // No payload means no server HTML — the CSR shell rati/server falls back to when a
 // render throws, or a client-only boot — and hydrating an empty root is a mismatch.

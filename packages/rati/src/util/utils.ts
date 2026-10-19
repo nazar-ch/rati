@@ -5,8 +5,7 @@ export function sleep(ms: number) {
 export function deepEqual(a: unknown, b: unknown): boolean {
     if (a === b) return true;
     if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) {
-        // NaN
-        return a !== a && b !== b;
+        return Number.isNaN(a) && Number.isNaN(b);
     }
     if (Array.isArray(a)) {
         if (!Array.isArray(b) || a.length !== b.length) return false;
@@ -78,8 +77,9 @@ export const is = {
         value !== null && (typeof value === 'object' || typeof value === 'function'),
     promise: (value: unknown): value is Promise<unknown> =>
         value instanceof Promise ||
-        (typeof (value as { then?: unknown })?.then === 'function' &&
-            typeof (value as { catch?: unknown })?.catch === 'function'),
+        (value != null &&
+            typeof (value as { then?: unknown }).then === 'function' &&
+            typeof (value as { catch?: unknown }).catch === 'function'),
     function: (value: unknown): value is (...args: unknown[]) => unknown =>
         typeof value === 'function',
     // A minified class stringifies as `class{…}`, with no space after the keyword, hence the

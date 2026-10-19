@@ -1,4 +1,4 @@
-import { useSyncExternalStore, type FC } from 'react';
+import { useLayoutEffect, useSyncExternalStore, type FC } from 'react';
 
 import * as fc from 'fast-check';
 
@@ -352,7 +352,10 @@ export function buildHarness(
     // the mandala provides the controls channel around the whole inner tree.
     const captured: { current: ScopeControls<Scope> | null } = { current: null };
     const Probe: FC = () => {
-        captured.current = useScopeControls(builtScope);
+        const controls = useScopeControls(builtScope);
+        useLayoutEffect(() => {
+            captured.current = controls;
+        });
         return null;
     };
 

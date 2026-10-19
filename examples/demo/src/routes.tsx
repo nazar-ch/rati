@@ -2,11 +2,10 @@ import { route, type GenericRouteType } from 'rati';
 
 import { Index } from './Index';
 import { NotFound } from './NotFound';
+import { complexTestScope, simpleTestScope } from './testScopes';
 import {
-    complexTestScope,
     ComplexTestWithScope,
     SimpleTest,
-    simpleTestScope,
     SimpleTestWithScope,
     TestRouteParamsWithoutView,
 } from './TestView';

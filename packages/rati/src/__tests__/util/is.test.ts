@@ -17,6 +17,8 @@ describe('is.class', () => {
     test('a minified anonymous class — `class{…}`, no space after the keyword', () => {
         // Built through `new Function` on purpose: written as a literal, the formatter
         // (or a future one) would re-insert the space and quietly retire the regression.
+        /* oxlint-disable-next-line typescript/no-implied-eval -- the source text is the case under
+           test */
         const makeMinifiedClass = new Function('return class{count=0}') as () => unknown;
         const Minified = makeMinifiedClass();
         expect(Function.prototype.toString.call(Minified).startsWith('class{')).toBe(true);
