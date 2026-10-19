@@ -280,7 +280,8 @@ describe("a load's abort signal", () => {
             expect(handle.slot()).toBe('content');
             expect(handle.text()).toBe('fast:b');
 
-            // Node reports an unhandled rejection a macrotask after the microtasks drain.
+            /* oxlint-disable-next-line kit/no-raw-wait -- Node emits `unhandledRejection` a macrotask
+               after the microtasks drain, and nothing signals that it has passed */
             await new Promise((resolve) => setTimeout(resolve, 0));
             expect(unhandled).toEqual([]);
             expect(handle.slot()).toBe('content');

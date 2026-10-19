@@ -75,6 +75,8 @@ export class MandalaErrorBoundary extends Component<ErrorBoundaryProps, Boundary
             this.props.controller.reportPhase('error', false);
             if (!ErrorSlot) {
                 // No slot — propagate to the nearest outer ErrorBoundary.
+                /* oxlint-disable-next-line typescript/only-throw-error -- the caught value travels
+                   on as thrown, a plain SourceError included */
                 throw this.state.error;
             }
             return <ErrorSlot inputs={inputs} error={error} retry={retry} />;

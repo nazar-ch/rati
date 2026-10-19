@@ -430,9 +430,11 @@ export class RouterStore<T extends readonly GenericRouteType[] = readonly Generi
     private redirectDepth = 0;
 
     private pathCounter: number = 0;
-    private readonly sessionId = globalThis.crypto?.randomUUID
+    /* oxlint-disable-next-line typescript/no-unnecessary-condition -- DOM's types give every
+       context `crypto.randomUUID`, which only a secure one has */
+    private readonly sessionId = globalThis.crypto.randomUUID
         ? globalThis.crypto.randomUUID()
-        : // for local development, and Node < 19 where globalThis.crypto is absent
+        : // an insecure context: a dev server on a plain-http host
           `${Math.random()}-${Math.random()}`;
     setPath(location: Location) {
         try {

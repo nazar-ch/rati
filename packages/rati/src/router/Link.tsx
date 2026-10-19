@@ -107,6 +107,8 @@ export const Link = function Link({
 }: PropsWithChildren<RatiRegularAnchorProps<UserRoutes>>) {
     const router = useRouterStore();
 
+    /* oxlint-disable-next-line typescript/no-unnecessary-condition -- `to` is `never` in rati's
+       own program until an app augments `RatiUserTypes` with its routes */
     const resolvedHref = to ? router.getPath(to) : href!;
     const isActive = isHrefActive(router, resolvedHref);
 

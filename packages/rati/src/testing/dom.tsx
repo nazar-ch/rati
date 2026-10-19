@@ -36,12 +36,12 @@ async function settleRender(root: Root, node: ReactNode): Promise<void> {
  * re-suspended boundary keeps its old children at `display: none` beside the fallback, so a
  * plain `textContent` reads the page twice.
  */
-export function visibleText(container: HTMLElement): string | null {
+export function visibleText(container: HTMLElement): string {
     const clone = container.cloneNode(true) as HTMLElement;
     for (const node of clone.querySelectorAll<HTMLElement>('*')) {
         if (node.style.display === 'none') node.remove();
     }
-    return clone.textContent?.trim() ?? null;
+    return clone.textContent.trim();
 }
 
 /** A mounted React tree: its container, a re-render, and teardown. */

@@ -32,7 +32,9 @@ const aboutScope = scope().load({
             'Honey never spoils.',
             'Bananas are berries; strawberries are not.',
         ];
-        return facts[Math.floor(Math.random() * facts.length)]!;
+        const fact = facts[Math.floor(Math.random() * facts.length)];
+        if (fact === undefined) throw new Error('the fact index fell outside the list');
+        return fact;
     },
 });
 
@@ -45,6 +47,7 @@ const splitScope = scope().load({ chapter: async () => 'resolved before the chun
 // A route in a chunk of its own: rati/vite records the module `lazy()` imports, so the
 // server names this chunk in a `<link rel="modulepreload">` rather than the browser
 // finding it after hydration.
+// oxlint-disable-next-line react/only-export-components -- a route table is no component module
 const Split = lazy(() => import('./components/Split'));
 
 export const routes = [

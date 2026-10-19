@@ -75,7 +75,9 @@ if (unknown.length) {
     );
     process.exit(2);
 }
-const selected = requested.length ? requested.map((name) => byName.get(name)!) : stages;
+const selected = requested.length
+    ? requested.map((name) => byName.get(name)).filter((stage) => stage !== undefined)
+    : stages;
 
 const results: { stage: Stage; code: number; seconds: number }[] = [];
 for (const stage of selected) {

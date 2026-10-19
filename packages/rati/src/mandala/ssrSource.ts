@@ -32,6 +32,8 @@ export function firstSettle<T>(source: Source<T>): Promise<T> {
         };
         // Settled synchronously during attach (before cleanup existed) — or already
         // settled before we ever attached: run/settle now.
+        /* oxlint-disable-next-line typescript/no-unnecessary-condition -- `attach` can run `check`,
+           which sets `done` */
         if (done) {
             cleanup();
             cleanup = null;

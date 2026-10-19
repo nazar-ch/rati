@@ -10,6 +10,7 @@ const bundleWhitelist: string[] = [];
 export default defineConfig({
     // `?? []`: `lazyPlugins` returns `undefined` for a non-Vite command, which
     // `exactOptionalPropertyTypes` refuses here.
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- a hand-flipped debug switch
     plugins: lazyPlugins(() => [react(), debugBundleContent && analyzer()]) ?? [],
     build: {
         emptyOutDir: true,
@@ -33,6 +34,8 @@ export default defineConfig({
             formats: ['es'],
         },
         rolldownOptions: {
+            /* oxlint-disable-next-line typescript/no-unnecessary-condition -- a hand-flipped debug
+               switch */
             output: debugBundlePreserveModules
                 ? {
                       preserveModules: true,
