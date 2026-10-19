@@ -80,7 +80,7 @@
 
     "terms": {
         "state": "count",
-        "ceiling": { "spec-ids/span": 342 },
+        "ceiling": { "spec-ids/span": 336 },
         "reason": "rati defines no product tier, so every emphasis span reads as an unresolved term; its prose answers to the doc-style sweep that converts stress emphasis to caps, and that sweep lowers this ceiling to zero and deletes the key",
     },
     "spawnFence": { "state": "off", "reason": "the spawn fence was not meant for a *consumer*; kit◊DES-18 decides the conversion and ends this key" },
