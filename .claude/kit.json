@@ -44,12 +44,6 @@
                 "tokenPattern": "^publish$",
                 "reason": "scripts/release.ts (the `release` script) and a bare `yarn npm publish` bump and publish the public `rati` package to npmjs with the token in this machine's Keychain, and re-running does not undo a publish. Releasing is the maintainer's call (docs/current/RELEASING.md); `--dry-run` is the only safe form and is still user-run."
             },
-            {
-                "id": "release-node",
-                "category": "package publish",
-                "command": ["release.ts"],
-                "reason": "`node scripts/release.ts` runs scripts/release.ts, which bumps and publishes the public `rati` package to npmjs with the token in this machine's Keychain, and re-running does not undo a publish. Releasing is the maintainer's call (docs/current/RELEASING.md); `--dry-run` is the only safe form and is still user-run."
-            },
         ],
     },
 
