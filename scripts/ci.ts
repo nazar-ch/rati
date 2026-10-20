@@ -20,8 +20,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { $ } from 'zx';
-import type { ProcessPromise } from 'zx';
+import { $ } from '@jnana-app/kit/lib/zx';
+import type { ProcessPromise } from '@jnana-app/kit/lib/zx';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 // `vp` lives in the workspace bin, which a bare shell's PATH lacks.
