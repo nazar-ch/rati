@@ -9,7 +9,7 @@
         "lint": "vp lint",
         "lint:types": "vp lint --type-aware",
         "fmt": "vp fmt",
-        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
         "test": "JNANA_REQUIRE_ALL_PROJECTS=1 vp test run",
         "upgrade": "yarn upgrade-interactive",
         "upgrade-yarn": "corepack use yarn@stable",
