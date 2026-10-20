@@ -1,9 +1,4 @@
 {
-    // The repo-root program, on the kit's `configs` profile: the root configs, and the scripts no
-    // package names. The type-aware linter reads every file here under the nearest `tsconfig.json`,
-    // so this program is the one tsc runs over them.
-    "extends": "@jnana-app/kit/tsconfig/configs.json",
-    // `files`, never an `include` override: `include` replaces the profile's globs, and `files`
-    // unions with them. The scripts run on Node and sit under none of those globs.
-    "files": ["scripts/ci.ts", "scripts/release.ts", "scripts/release.contract.unit.test.ts"]
+    // The repo-root configs' program. scripts/ is scripts/tsconfig.json.
+    "extends": "@jnana-app/kit/tsconfig/configs.json"
 }
