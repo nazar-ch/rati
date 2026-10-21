@@ -4,7 +4,7 @@ Type-checking is **tsc** run from the workspace root as `yarn run -T tsc`, and l
 
 ```bash
 vp run rati#build         # vite lib bundle + tsc emits dist/*.d.ts
-vp run rati#typecheck     # tsc --noEmit (src); rati#typecheck:test for the test tree
+verify.ts typecheck       # tsc -b over every program tsconfig.programs.json names
 vp run rati#test          # Vitest (runtime + *.test-d.ts type tests via the tsc checker)
 verify.ts                     # the gate
 ```
