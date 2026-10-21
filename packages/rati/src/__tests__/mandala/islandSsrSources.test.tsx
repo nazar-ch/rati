@@ -94,9 +94,9 @@ describe('SSR sources — loader (ssr: true)', () => {
         expect(created).toBe(1);
         expect(log).toEqual(['attach', 'detach']);
         expect(client.text()).toContain('hello 1');
-        // …and the short-circuit was seamless: rendering the value the server rendered
-        // means React had no mismatch to recover from. The pins below are the contrast —
-        // there, a recovery is the degradation itself. (`.hydrate()` would throw on one.)
+        // …and the client rendered the value the server rendered, so React had no mismatch
+        // to recover from. The pins below are the contrast — there, a recovery is the
+        // degradation itself. (`.hydrate()` would throw on one.)
         expect(client.recovered).toEqual([]);
     });
 });

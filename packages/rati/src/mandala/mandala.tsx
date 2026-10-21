@@ -145,7 +145,7 @@ function releaseKept(keptRef: { current: KeptRun | null }, successor: Bucket[] |
 }
 
 /**
- * The loading slot, reporting itself and honouring `loadingDelayMs` — a wrapper, because React
+ * The loading slot, reporting itself and honoring `loadingDelayMs` — a wrapper, because React
  * decides to show a Suspense fallback after the mandala's render returned. Phase is
  * `'loading'` even while the delay holds the slot back: nothing on screen is what loading IS.
  */

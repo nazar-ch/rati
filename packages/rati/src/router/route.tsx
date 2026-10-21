@@ -173,7 +173,7 @@ type RouteComponentGuard<Path extends string, TScope extends Scope<any> | undefi
       : unknown;
 
 /**
- * Folds a scope, component and slots into the route's mandala, labelled `Route`. `route`
+ * Folds a scope, component and slots into the route's mandala, labeled `Route`. `route`
  * builds it eagerly; `group` rebuilds it when a group default supplies a `loading`/`error`
  * slot the route lacks, child over group.
  */

@@ -23,7 +23,7 @@ export type KeySpec = {
     key: string;
     level: number;
     kind: KeyKind;
-    /** `INPUT_KEY` and/or keys of strictly earlier levels — any kind, sources included
+    /** `INPUT_KEY`, keys of strictly earlier levels, or both — any kind, sources included
      * (a cascade reaches through one: `__tests__/mandala/cascadeThroughSource.test.tsx`). */
     reads: string[];
     payload: KeyPayload;

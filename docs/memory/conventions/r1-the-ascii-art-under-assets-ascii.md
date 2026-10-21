@@ -1,6 +1,5 @@
 ---
 id: r1
-kind: note
 ---
 
 The ASCII art under assets/ascii/ is unused draft material for the website and CLI surfaces, kept to be picked from rather than shipped as-is.
