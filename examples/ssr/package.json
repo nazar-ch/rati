@@ -6,8 +6,7 @@
     "scripts": {
         "dev": "vp dev",
         "build": "vp build",
-        "start": "NODE_ENV=production node serve.ts",
-        "typecheck": "tsc --noEmit -p src/tsconfig.json && tsc --noEmit -p tsconfig.json"
+        "start": "NODE_ENV=production node serve.ts"
     },
     "dependencies": {
         "mobx": "^6.16.1",

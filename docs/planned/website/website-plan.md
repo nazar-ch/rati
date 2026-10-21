@@ -139,7 +139,7 @@ Short: what rati is (boilerplate ¶), where it comes from (built alongside a rea
 
 ## 6. Technical shape
 
-- **Workspace:** `website/` in this monorepo (workspace name `website`), consuming rati source via the `rati-dev` condition like the examples; `vp` scripts matching the repo (`website#dev`, `website#build`, `website#typecheck`).
+- **Workspace:** `website/` in this monorepo (workspace name `website`), consuming rati source via the `rati-dev` condition like the examples; `vp` scripts matching the repo (`website#dev`, `website#build`), and its programs listed in the root tsconfig.programs.json.
 - **SSR:** a Node server on the nazar.ch pattern (dev: Vite middleware; prod: static + rendered pages), simplified by the `rati/ssr` helpers as they land (CORE-1..3 in the tasks doc); title via the head mechanism (CORE-4) once absorbed. Deploy is out of scope this iteration; the build should keep the SSG door open (all pages resolvable without request-time data).
 - **Styling:** plain CSS (custom properties + a small reset) unless the design work says otherwise — no framework CSS; the split-flap and panel are bespoke components anyway.
 - **The site is a rati showcase, not a rati test:** where the site needs something rati lacks, that's a finding — file it against the research docs rather than working around it silently (this is how the nazar.ch list was built).

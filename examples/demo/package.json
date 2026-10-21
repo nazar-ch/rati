@@ -6,8 +6,7 @@
     "scripts": {
         "dev": "vp dev",
         "build": "tsc --noEmit -p src/tsconfig.json && vp build",
-        "preview": "vp preview",
-        "typecheck": "tsc --noEmit -p src/tsconfig.json && tsc --noEmit -p tsconfig.json"
+        "preview": "vp preview"
     },
     "dependencies": {
         "rati": "workspace:*",

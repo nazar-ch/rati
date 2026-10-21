@@ -4,7 +4,7 @@
 
 The next batch of work preparing rati to share, sequenced for delegation. Prefixes: **CORE** (the rati package), **DOC** (documentation), **SITE** (the website workspace), **EXT** (other repos). Tasks are sized for one agent each; unless a dependency says otherwise, tasks within a batch can run in parallel.
 
-Standing rules for every task: run `vp run rati#typecheck` (or `website#typecheck`) and `vp lint` before committing; plain-imperative commit messages (no Conventional Commits); keep `docs/*.md` in sync with behavior changes; never publish.
+Standing rules for every task: run `verify.ts typecheck` and `vp lint` before committing; plain-imperative commit messages (no Conventional Commits); keep `docs/*.md` in sync with behavior changes; never publish.
 
 **Prerequisite (in execution, not a task here):** the stores/router redesign — docs/archive/directions-2026-07/naming.md §6 + docs/research/stores-and-router.md. **Landed 2026-07-26**, beyond Option A: the stores skeleton is gone from rati; the surface is `createRouter(routes, options?)` → `Router` + `RouterProvider` + `RouterOutlet` (no `StoresProvider` / `createStoresHook` — app stores are app code). DOC-2 and SITE-1 consume its result.
 
@@ -33,7 +33,7 @@ All grounded in docs/archive/directions-2026-07/ssr-nazar-patterns.md; mutually 
 
 ## Batch C — website foundation
 
-- **SITE-1 — Workspace scaffold.** `website/` yarn workspace (name `website`) consuming rati via `rati-dev`; `vp` scripts (`dev`, `build`, `typecheck`, `lint` green); routes table + app setup per the redesigned stores surface; placeholder pages for the full site map in website-plan.md §4. Depends on: prerequisite (app wiring), nothing else.
+- **SITE-1 — Workspace scaffold.** `website/` yarn workspace (name `website`) consuming rati via `rati-dev`; `vp` scripts (`dev`, `build`, `lint` green), its programs in the root tsconfig.programs.json; routes table + app setup per the redesigned stores surface; placeholder pages for the full site map in website-plan.md §4. Depends on: prerequisite (app wiring), nothing else.
 - **SITE-2 — Data layer + network panel.** The bundled Swiss-network dataset with now-relative schedule generation; the simulated API client; `NetworkConditionsStore` (latency, jitter, failure modes incl. `not-available`); the docked panel component with replay/reset. Spec: website-plan.md §3. Depends on: SITE-1.
 - **SITE-3 — SSR server.** Node server on the nazar.ch pattern (dev: Vite middleware; prod: static + rendered), using CORE-1/2/3 helpers (fall back to the nazar pattern inline if a helper hasn't landed, with a TODO). Titles via CORE-4 when available. Depends on: SITE-1; ideally after CORE-1..3.
 - **SITE-4 — Design foundation.** Palette (parrot green/teal + warm accent), layout shell, nav, footer (name-story line), and the **split-flap board component** (the signature visual — animated flips on value change, reusable at hero and board sizes). Depends on: SITE-1.
