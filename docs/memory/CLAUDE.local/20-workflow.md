@@ -16,4 +16,4 @@ evidence: 0.7.0 shipped with no `## Unreleased` entry, and the consumer adopting
 
 ## Restricted actions
 
-- **Don't run `vp lint --fix` blindly** — `no-unnecessary-type-assertion`'s autofix breaks the typecheck, which is why that rule is off here and tsc is the authoritative gate; the detail is `$DOCTRINE/toolchain/lint.md`.
+- **Don't run `vp lint --fix` blindly** — `no-unnecessary-type-assertion`'s autofix breaks the typecheck, which is why that rule is off here and tsc is the authoritative gate.
