@@ -79,7 +79,7 @@ describe('delete', () => {
         // Absent is distinguishable from present — and not an error.
         expect(map.delete('a')).toBe(false);
 
-        // The neighbour is untouched, and the deleted key rebuilds on demand.
+        // The neighbor is untouched, and the deleted key rebuilds on demand.
         expect(map.peek('b')).toBe(kept);
         expect(map.get('a')).not.toBe(before);
         expect(factory).toHaveBeenCalledTimes(3);
