@@ -66,6 +66,9 @@ jspm_packages/
 
 dist
 
+# `tsc -b tsconfig.programs.json` writes one beside each program
+*.tsbuildinfo
+
 # https://yarnpkg.com/getting-started/qa#which-files-should-be-gitignored
 .pnp.*
 .yarn/*
