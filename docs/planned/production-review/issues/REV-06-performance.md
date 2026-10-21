@@ -1,7 +1,7 @@
 ---
 area: render-path hot spots: mandala/{channel,resolver,mandala}, scope/source snapshot discipline, router store notifications, Link active-state, scrollRestoration; per-entry bundle cost
 needs: — (best after scope-and-island lands; REV-03's size measurement precedes the size half if both run)
-status: open — cut 2026-07-19; production-review lens 6
+status: open
 ---
 
 # REV-06 — performance

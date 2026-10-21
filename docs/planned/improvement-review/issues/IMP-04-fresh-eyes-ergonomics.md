@@ -1,7 +1,7 @@
 ---
 area: docs/research/ (output); the whole public API as the subject
 needs: — (best after scope-and-island lands)
-status: open — cut 2026-07-19; improvement-review direction 4
+status: open
 ---
 
 # IMP-04 — fresh-eyes ergonomics
