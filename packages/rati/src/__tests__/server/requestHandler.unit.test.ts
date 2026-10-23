@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, test, expect, vi } from 'vite-plus/test';
 
 import { createRequestHandler } from '../../server/requestHandler.js';
@@ -7,7 +6,7 @@ import type { RenderAppResult } from '../../ssr/renderApp.js';
 /*
     The fetch handler, driven directly: a `Request` in, a `Response` out, no listener
     and no app. `render` is the whole coupling — canned results are the contract — and
-    the assembly under it is covered in packages/rati/src/__tests__/ssr/html.test.ts.
+    the assembly under it is covered in packages/rati/src/__tests__/ssr/html.unit.test.ts.
 */
 
 const TEMPLATE = `<!doctype html><html><head><!--app-head--></head>

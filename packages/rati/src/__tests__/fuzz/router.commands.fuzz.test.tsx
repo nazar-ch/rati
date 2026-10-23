@@ -36,7 +36,7 @@ beforeEach(() => {
 /**
  * The teardown tail: after `dispose()` the store has detached from its history, so driving
  * the history reaches nothing — driven while the tree is still mounted, where a store still
- * listening re-keys the route. A created history's DOM detach is `webRouterCore.test.ts`'s.
+ * listening re-keys the route. A created history's DOM detach is `webRouterCore.dom.test.ts`'s.
  */
 async function assertDetachedAfterDispose(
     harness: Harness,

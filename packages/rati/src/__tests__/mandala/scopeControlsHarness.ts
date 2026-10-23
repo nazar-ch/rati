@@ -1,4 +1,4 @@
-// The furniture scopeControls.test.tsx and scopeControlsPins.test.tsx share.
+// The furniture scopeControls.dom.test.tsx and scopeControlsPins.dom.test.tsx share.
 
 import { useLayoutEffect, type FC } from 'react';
 

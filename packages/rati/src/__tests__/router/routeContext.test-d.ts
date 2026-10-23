@@ -6,7 +6,7 @@ import { scope, input, type ScopeComponent } from '../../scope/scope.js';
 
 // Register the route table as an app does, `RatiUserTypes['routes'] = typeof routes`, so
 // `useRouteContext(name)` types itself off it. The augmentation is program-global, so it also
-// types routerIsland.test.tsx.
+// types routerIsland.dom.test.tsx.
 
 // A providing route: its scope ends in `.provide()`, so the carried context is the
 // provided value.

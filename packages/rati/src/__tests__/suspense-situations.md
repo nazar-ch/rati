@@ -4,7 +4,7 @@ React's Suspense machinery produces more distinct situations than "pending shows
 
 ## S1 — Suspend-and-replay during resolution
 
-A Step that `use()`es a pending promise throws it; React discards the render and replays the whole Step body when the promise settles. Render-phase work repeats freely. **Contract:** producers run once per inner-tree generation regardless of replays — the bucket cache on the mandala's committed ref exists for exactly this (a Step-local cell would re-run its load and re-suspend on a fresh promise forever). **Coverage:** the smoke property's exactly-one-run assert (`fuzz/mandala.smoke.fuzz.test.tsx`); `island.test.tsx` waterfall tests.
+A Step that `use()`es a pending promise throws it; React discards the render and replays the whole Step body when the promise settles. Render-phase work repeats freely. **Contract:** producers run once per inner-tree generation regardless of replays — the bucket cache on the mandala's committed ref exists for exactly this (a Step-local cell would re-run its load and re-suspend on a fresh promise forever). **Coverage:** the smoke property's exactly-one-run assert (`fuzz/mandala.smoke.fuzz.test.tsx`); `island.dom.test.tsx` waterfall tests.
 
 ## S2 — Retry delivery is environment-sensitive (test-facing)
 
@@ -14,7 +14,7 @@ The rule is about **any act that suspends**, not just the mount — MF-05's pin 
 
 Where a transition can reach a suspending level, drive it with `await act(async () => …)`; where it cannot (every level below resolves from cells already built), the sync helper is fine, which is why the older suites never tripped on this.
 
-**Coverage:** documented at the smoke property's mount site; `suspenseEdges.test.tsx`'s source helper drives async transitions for this reason. A harness rule, not an engine contract.
+**Coverage:** documented at the smoke property's mount site; `suspenseEdges.dom.test.tsx`'s source helper drives async transitions for this reason. A harness rule, not an engine contract.
 
 ## S3 — Multiple pending promises in one level
 
@@ -45,7 +45,7 @@ Two limits on *which* mounts get one, both measured by MF-05's pin 8 and worth k
 - **Only the levels the initial mount reached.** A level behind a pending promise is first built when that promise settles — after the double-mount is over — so it sees one generation however deep the scope is; level 0 still runs twice. A test that wants a *dependent* level doubled needs its upstream to resolve synchronously. (Same fact as the smoke property's run-count *range*, from the other side.)
 - **A hydration root does not double-mount at all.** `hydrateRoot(<StrictMode>…)` builds exactly one generation even where nothing suspends. So a cell that came off the wire and a StrictMode double-mount never meet: the payload is read once, and there is no "SSR-seeded cell under the double-mount" situation to test.
 
-**Coverage:** MF-03's StrictMode smoke variant; `strictModeLifecycle.test.tsx` (pin #8).
+**Coverage:** MF-03's StrictMode smoke variant; `strictModeLifecycle.dom.test.tsx` (pin #8).
 
 ## S8 — Mid-tree source pending is *not* Suspense (the unmount asymmetry)
 
@@ -63,7 +63,7 @@ React mutates thenables it `use()`es (status fields) and *suspends once even on 
 
 A rejection — a promise load's or a marked source's — does **not** reach the error slot, though this catalog said so until MF-05 pinned it: `prerender` *resolves*, React emits the **loading** slot behind its "switched to client rendering" marker, and the client re-runs the load. The error boundary never participates server-side, so the error slot is a client-only surface.
 
-What the server keeps is rati's `collectError` record — its input for the response status (`not-available` → 404) before that degraded 200 goes out. **Coverage:** `islandSsr.test.tsx`, `islandSsrErrors.test.tsx` (which pinned the promise half by experiment first), `islandSsrSources.test.tsx` §error paths (strategy doc §pins #7).
+What the server keeps is rati's `collectError` record — its input for the response status (`not-available` → 404) before that degraded 200 goes out. **Coverage:** `islandSsr.dom.test.tsx`, `islandSsrErrors.unit.test.tsx` (which pinned the promise half by experiment first), `islandSsrSources.dom.test.tsx` §error paths (strategy doc §pins #7).
 
 ## S11 — A suspending remount hides the old content (test-facing)
 

@@ -24,7 +24,7 @@ The product want it answers is jnana's, stated in its UI product doc: a navigati
 
 ## Verify
 
-- `vp test packages/rati/src/__tests__/router/routerSuspense.test.tsx` and the router fuzz suite green, with the three new cases.
+- `vp test packages/rati/src/__tests__/router/routerSuspense.dom.test.tsx` and the router fuzz suite green, with the three new cases.
 - Kill step: remove the forced commit and confirm the past-the-ceiling case goes red.
 - `verify.ts` green; a release with the change so jnana can bump its pin.
 

@@ -286,7 +286,7 @@ describe('route-level redirects', () => {
      * The open-redirect shape the origin check exists for: `%2F` decodes to `/`, so a mapper
      * can compose `//evil.com`, which passes the absolute-path check and rides `prepareRoute`
      * into the `Location` header. Refused before the hop is recorded; the kill is
-     * webRouterCore.test.ts's.
+     * webRouterCore.dom.test.ts's.
      */
     test('a redirect target carrying an authority is refused, not followed', () => {
         const routes = [
