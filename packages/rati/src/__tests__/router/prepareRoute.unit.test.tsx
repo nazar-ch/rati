@@ -83,5 +83,5 @@ describe('prepareRoute', () => {
     });
 
     // Scope DATA resolution and SSR dehydration are the island engine's, covered by
-    // islandSsr.test.tsx and ssrRender.test.tsx; prepareRoute builds the routing snapshot.
+    // islandSsr.dom.test.tsx and ssrRender.unit.test.tsx; prepareRoute builds the routing snapshot.
 });

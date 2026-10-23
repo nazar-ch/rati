@@ -24,7 +24,7 @@ export type KeySpec = {
     level: number;
     kind: KeyKind;
     /** `INPUT_KEY`, keys of strictly earlier levels, or both — any kind, sources included
-     * (a cascade reaches through one: `__tests__/mandala/cascadeThroughSource.test.tsx`). */
+     * (a cascade reaches through one: `__tests__/mandala/cascadeThroughSource.dom.test.tsx`). */
     reads: string[];
     payload: KeyPayload;
     /** Settle priority for the smoke property (the command suite picks its own). */

@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, test, expect, beforeAll, afterAll } from 'vite-plus/test';
 
 import { dirname, resolve } from 'node:path';
@@ -11,7 +10,7 @@ import { ratiSsr } from '../../vite/ratiSsr.js';
 /*
     The plugin against a real Vite dev server: every result kind mapped onto a real response,
     over a real socket. `fixture/entry-server.ts` hands back canned `RenderAppResult`s, the
-    contract being the whole coupling; assembly's string work is html.test.ts's.
+    contract being the whole coupling; assembly's string work is html.unit.test.ts's.
 */
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), 'fixture');

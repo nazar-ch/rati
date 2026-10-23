@@ -12,7 +12,7 @@ import { controllableSource, type ControllableSource } from '../../testing/index
 
 /*
     @kit long: 2
-    Pin 8: StrictMode accounting for selective refresh. island.test.tsx pins the double-mount
+    Pin 8: StrictMode accounting for selective refresh. island.dom.test.tsx pins the double-mount
     for the base lifecycle; this file pins a refresh reaching the surviving run and swapping a
     source there, across two generations, all of it released at the end. Dev StrictMode mounts,
     cleans up and remounts, so producers run once per generation (S7).
@@ -22,14 +22,14 @@ import { controllableSource, type ControllableSource } from '../../testing/index
       - The second generation reaches only the levels the INITIAL mount reached, so a test
         doubling a dependent level resolves its upstream synchronously — the sync `v` below.
 
-    A hydration root never double-mounts, and the unmount sweep is suspenseEdges.test.tsx's.
+    A hydration root never double-mounts, and the unmount sweep is suspenseEdges.dom.test.tsx's.
 */
 
 const Loading: FC = () => <div>loading...</div>;
 
 afterEach(cleanup);
 
-// Attach/detach as bounds, not a transcript (see suspenseEdges.test.tsx), read off the
+// Attach/detach as bounds, not a transcript (see suspenseEdges.dom.test.tsx), read off the
 // source's own counters: `live` is what is attached now, `peak` the most ever attached at
 // once — 2 is a double attach.
 function ledger(source: ControllableSource<string>) {

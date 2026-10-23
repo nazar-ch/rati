@@ -25,7 +25,7 @@ import { renderToHtml } from '../../ssr/renderToHtml.js';
     `document` without reconciling or duplicating the spliced tags. Then its failure path: a
     throwing render gets a document synthesized from the assets, which the client boots with
     `createRoot(document)` — the last two describes, one a real walk and one a canary on React.
-    The template pattern is ssr/html.test.ts's and the router hydration suite's.
+    The template pattern is ssr/html.unit.test.ts's and the router hydration suite's.
 */
 
 // spliceDocument reports who is assembling so a refusal can name the fix; no refusal is

@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, test, expect, beforeAll, afterAll, vi } from 'vite-plus/test';
 
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
@@ -11,7 +10,7 @@ import { serve, staticPath } from '../../server/node.js';
 /*
     The Node adapter over a real socket: the translation is the whole job, so a fake
     listener would test nothing. The handler is a stand-in that echoes what reached it —
-    what a real one does with a request is requestHandler.test.ts's business.
+    what a real one does with a request is requestHandler.unit.test.ts's business.
 */
 
 let server: Server;

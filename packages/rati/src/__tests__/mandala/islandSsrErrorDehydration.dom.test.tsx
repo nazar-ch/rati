@@ -13,7 +13,7 @@ afterEach(cleanup);
 /*
     `ssrErrors: 'dehydrate'`: the throw is taken at the resolver, the error slot renders into the
     HTML, and the client hydrates the cell straight to its error state — no re-run, no spinner.
-    The default, `'retry'`, is islandSsrErrors.test.tsx's. Every `.hydrate()` below asserts no
+    The default, `'retry'`, is islandSsrErrors.unit.test.tsx's. Each `.hydrate()` asserts no
     recoverable error.
 */
 

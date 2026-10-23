@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, test, expect } from 'vite-plus/test';
 
 import type { Manifest } from 'vite-plus';

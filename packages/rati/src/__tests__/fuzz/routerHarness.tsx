@@ -35,7 +35,7 @@ import { RouterStore } from '../../router/store.js';
  *   'ä' → %C3%A4 · "a'b" untouched · 'a.b' '..x' dots inside a value, untouched
  *   'new' collides with the static half of the shadow pair, on purpose
  *
- * Absent: '.' and '..', path operators getPath refuses (routeParams.test.ts), and '', which
+ * Absent: '.' and '..', path operators getPath refuses (routeParams.dom.test.ts), and '', which
  * builds a URL no longer naming the route.
  */
 const PARAM_VALUES = [

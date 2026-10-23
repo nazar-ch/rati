@@ -308,7 +308,7 @@ describe('RouterStore refuses a non-absolute string target', () => {
 
     // A leading '/' can still name another origin: the parser reads `//host` out of each of
     // these spellings, so the guard refuses with the memory history's own parse. Kill: drop
-    // the origin check → these pins and both redirect.test.tsx pins go red.
+    // the origin check → these pins and both redirect.dom.test.tsx pins go red.
     test.each([
         ['a protocol-relative URL', '//example.com/x'],
         ['a backslash authority', '/\\example.com/x'],

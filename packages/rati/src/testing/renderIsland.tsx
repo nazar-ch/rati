@@ -20,7 +20,7 @@ import type { Scope, ScopeInputs, ScopeProps } from '../scope/scope.js';
     testids; a built island can only mount and query.
 
     The mount is an ASYNC act, under which React skips StrictMode's double-invoke: a test pinning
-    StrictMode's discard-the-first-run renders synchronously (mandala/island.test.tsx).
+    StrictMode's discard-the-first-run renders synchronously (mandala/island.dom.test.tsx).
 */
 
 const SLOT_ATTR = 'data-rati-testing-slot';
