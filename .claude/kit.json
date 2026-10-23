@@ -62,8 +62,6 @@
         "commentsBaseline": "037cecb68a44c459bb0bb01356f8957d979b746d",
     },
 
-    // Off while rati's test files carry no kind in their names.
-    "testKinds": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
     "testSpawns": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
     "testToolSpawns": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
     "testLimits": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
