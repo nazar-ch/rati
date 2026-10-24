@@ -14,6 +14,15 @@ beforeEach(() => {
     window.history.replaceState(null, '', 'http://localhost/');
 });
 
+// The `dom` kind shares one window across a worker's files, and the push drops any forward stack
+// an earlier file left, so a count starting here grows by exactly the entries the case pushes
+// (kit◊TT-62).
+/** Pushes the entry a case counts history from, and returns the history's length on it. */
+function pushBaseEntry(): number {
+    window.history.pushState(null, '', window.location.href);
+    return window.history.length;
+}
+
 describe('RouterStore search / hash exposure', () => {
     test('exposes the raw search string and parsed URLSearchParams', async () => {
         window.history.replaceState(null, '', '/search?q=hello&page=2');
@@ -53,22 +62,22 @@ describe('RouterStore search / hash exposure', () => {
     });
 
     test('setSearchParams (default replace) updates the URL without growing history', async () => {
+        const baseLength = pushBaseEntry();
         const router = new RouterStore(routes);
-        const startLength = window.history.length;
         router.setSearchParams({ q: 'kittens' });
         expect(window.location.search).toBe('?q=kittens');
         expect(router.search).toBe('?q=kittens');
         expect(router.searchParams.get('q')).toBe('kittens');
-        expect(window.history.length).toBe(startLength);
+        expect(window.history.length).toBe(baseLength);
         router.dispose();
     });
 
     test('setSearchParams with mode: "push" adds a history entry', () => {
+        const baseLength = pushBaseEntry();
         const router = new RouterStore(routes);
-        const startLength = window.history.length;
         router.setSearchParams({ q: 'kittens' }, { mode: 'push' });
         expect(window.location.search).toBe('?q=kittens');
-        expect(window.history.length).toBe(startLength + 1);
+        expect(window.history.length).toBe(baseLength + 1);
         router.dispose();
     });
 
