@@ -14,6 +14,13 @@
         ],
     },
 
+    "loadedByPath": [
+        {
+            "path": "examples/ssr/src/entry-server.tsx",
+            "reason": "examples/ssr/serve.ts imports its build output, dist/server/entry-server.js, by URL for `render` and `assets`, and `vp dev` renders through it by ratiSsr()'s default entry",
+        },
+    ],
+
     "bootstrap": "yarn install",
     // `packages/rati/dist` is `prep`'s output, listed because this one trigger runs `prep` too: a
     // provisioned checkout already carries `node_modules`.
@@ -62,11 +69,17 @@
         "commentsBaseline": "037cecb68a44c459bb0bb01356f8957d979b746d",
     },
 
-    "testSpawns": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
-    "testToolSpawns": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
-    "testLimits": { "state": "off", "reason": "the kit enforces test kinds on itself first (kit◊DES-04 §Disposition)" },
+    "testWrites": {
+        "state": "count",
+        "ceiling": 5,
+        "reason": "ratiSsr.unit.test.ts starts a Vite dev server, which rewrites its dependency cache when the lockfile moves; the test's kind is rati's to settle, and that change deletes this key (kit◊TT-60)",
+    },
 
-    "testOnlyExports": { "state": "off", "reason": "the kit sweeps its own exports first (kit◊RT-53)" },
+    "testOnlyExports": {
+        "state": "count",
+        "ceiling": 12,
+        "reason": "rati's own test-only and unimported exports, counted when kit◊TT-60 took the check to its default; a sweep giving each its own file or un-exporting it lowers the ceiling and deletes the key",
+    },
 
     "terms": {
         "state": "count",

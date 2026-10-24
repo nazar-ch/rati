@@ -22,4 +22,4 @@ Second, structural half: rati's `verify` is `yarn ci fmt lint typecheck test` â€
 ## Verify
 
 - `"$JNANA_KIT_TOOLS/checks/check-doc-links/check-doc-links.ts"` from this repo's root reports zero violations (and prints this checkout as the measured root).
-- If step 2 is taken: the repo gate goes red on a deliberately added `../` link, then green on its removal.
+- If step 2 is taken: `package.json` declares a `verify:*` script that runs the kit's doc-links check.
