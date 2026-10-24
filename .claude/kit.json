@@ -69,12 +69,6 @@
         "commentsBaseline": "037cecb68a44c459bb0bb01356f8957d979b746d",
     },
 
-    "testWrites": {
-        "state": "count",
-        "ceiling": 5,
-        "reason": "ratiSsr.unit.test.ts starts a Vite dev server, which rewrites its dependency cache when the lockfile moves; the test's kind is rati's to settle, and that change deletes this key (kit◊TT-60)",
-    },
-
     "testOnlyExports": {
         "state": "count",
         "ceiling": 12,

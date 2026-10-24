@@ -11,7 +11,7 @@ import {
 
 /*
     The HTML assembly both servers share. Pure string work, so it is tested here rather
-    than through either of them — ratiSsr.unit.test.ts and requestHandler.unit.test.ts cover the
+    than through either of them — ratiSsr.e2e.test.ts and requestHandler.unit.test.ts cover the
     wiring around it.
 */
 
