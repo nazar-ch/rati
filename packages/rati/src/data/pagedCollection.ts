@@ -2,6 +2,7 @@ import { observable, runInAction } from 'mobx';
 
 import { itemMap, type ItemMapOptions } from './itemMap.js';
 import { createQuery, instanceSource, type Query } from './query.js';
+import { readOutsideReaction } from './readOutsideReaction.js';
 
 import { type Source } from '../scope/source.js';
 
@@ -84,7 +85,10 @@ export function pagedCollection<T, C = string, Item = T>(
             (signal) => {
                 // Anchor at fetch time: a refresh walk hands each page its
                 // predecessor's FRESH cursor.
-                const cursor = index === 0 ? null : state.records[index - 1]!.nextCursor;
+                const cursor =
+                    index === 0
+                        ? null
+                        : readOutsideReaction(() => state.records[index - 1]!.nextCursor);
                 return options.fetchPage(cursor, signal);
             },
             {
@@ -135,7 +139,7 @@ export function pagedCollection<T, C = string, Item = T>(
     }
 
     function firstPage(): PageRecord<T, C> {
-        let first = state.records[0];
+        let first = readOutsideReaction(() => state.records[0]);
         if (!first) {
             first = makePage(0);
             runInAction(() => {
@@ -158,17 +162,28 @@ export function pagedCollection<T, C = string, Item = T>(
             return tail !== undefined && tail.query.data === undefined;
         },
         loadMore() {
-            const tail = state.records[state.records.length - 1];
-            if (!tail || tail.query.data !== undefined) return Promise.resolve(); // fully loaded
+            const tail = readOutsideReaction(() => {
+                const last = state.records[state.records.length - 1];
+                return last?.query.data === undefined ? last : undefined;
+            });
+            if (!tail) return Promise.resolve(); // fully loaded
             return tail.query.prime(); // idle → fetch; error → retry; in flight → join
         },
         async refresh() {
-            for (let index = 0; index < state.records.length; index++) {
-                const record = state.records[index]!;
-                if (record.query.data === undefined) break; // the unloaded tail
+            for (let index = 0; ; index++) {
+                // The unloaded tail ends the walk, as the end of the list does.
+                const record = readOutsideReaction(() => {
+                    const loaded = state.records[index];
+                    return loaded?.query.data === undefined ? undefined : loaded;
+                });
+                if (!record) break;
                 await record.query.refresh();
-                if (state.records[index] !== record) break; // truncated under us
-                if (record.query.phase === 'error') break; // don't walk past a failed anchor
+                const walkOn = readOutsideReaction(
+                    () =>
+                        state.records[index] === record && // truncated under us
+                        record.query.phase !== 'error', // don't walk past a failed anchor
+                );
+                if (!walkOn) break;
             }
         },
         reset() {
