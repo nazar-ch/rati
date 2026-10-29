@@ -2,6 +2,8 @@ import { describe, test, expect, vi } from 'vite-plus/test';
 
 import { autorun } from 'mobx';
 
+import { strictReadWarnings } from './strictReadWarnings.js';
+
 import { keyed } from '../../data/keyed.js';
 import { mutation } from '../../data/mutation.js';
 import { query } from '../../data/query.js';
@@ -28,6 +30,15 @@ describe('get-or-create', () => {
         expect(map.get('a')).toBeUndefined();
         expect(map.get('a')).toBeUndefined();
         expect(factory).toHaveBeenCalledTimes(1);
+    });
+
+    test('get, called from no reaction, reads its map without a MobX warning', async () => {
+        const map = keyed((id: string) => ({ id }));
+        const warnings = await strictReadWarnings(() => {
+            map.get('a'); // creates
+            map.get('a'); // finds
+        });
+        expect(warnings).toEqual([]);
     });
 
     test('number keys are their own identities', () => {

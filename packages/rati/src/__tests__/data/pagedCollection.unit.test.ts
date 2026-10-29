@@ -2,6 +2,8 @@ import { describe, test, expect, vi } from 'vite-plus/test';
 
 import { observable, runInAction } from 'mobx';
 
+import { strictReadWarnings } from './strictReadWarnings.js';
+
 import { pagedCollection } from '../../data/pagedCollection.js';
 
 interface Row {
@@ -56,6 +58,17 @@ describe('loading pages', () => {
         expect(c.hasMore).toBe(false); // no unloaded tail left
         await c.loadMore(); // fully loaded → no-op
         expect(fetchPage).toHaveBeenCalledTimes(2);
+    });
+
+    test('loadMore and refresh, called from no reaction, read without a MobX warning', async () => {
+        const { c } = pagedRows([row('a'), row('b'), row('c')], 2);
+        const warnings = await strictReadWarnings(async () => {
+            await c.loadMore();
+            await c.loadMore();
+            await c.loadMore(); // fully loaded → no-op
+            await c.refresh();
+        });
+        expect(warnings).toEqual([]);
     });
 
     test("the tail page's phase is the spinner row; its failure is the inline retry row", async () => {

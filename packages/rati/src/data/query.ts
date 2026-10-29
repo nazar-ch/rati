@@ -1,5 +1,7 @@
 import { observable, Reaction, runInAction } from 'mobx';
 
+import { readOutsideReaction } from './readOutsideReaction.js';
+
 import { observableSource } from '../mobx/observableSource.js';
 import { toSourceError, type Source, type SourceError } from '../scope/source.js';
 
@@ -183,7 +185,8 @@ export function createQuery<T>(
     function prime(): Promise<void> {
         const joined = debouncer.pending ?? inFlight;
         if (joined) return joined;
-        if (state.hasData && !state.error) return Promise.resolve(); // ready → no-op
+        const ready = readOutsideReaction(() => state.hasData && !state.error);
+        if (ready) return Promise.resolve(); // ready → no-op
         return startFetch();
     }
 
