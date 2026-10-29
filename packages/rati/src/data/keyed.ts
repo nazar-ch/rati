@@ -1,5 +1,7 @@
 import { observable, runInAction } from 'mobx';
 
+import { readOutsideReaction } from './readOutsideReaction.js';
+
 /*
     `keyed` — the lazy per-key instance map (rati◊DATA-14): `get(key)` returns one instance per key
     forever, so `mutation`'s `refreshes` reaches exactly the one a call invalidated. It is
@@ -44,10 +46,12 @@ export function keyed<K extends KeyedKey, I>(factory: (key: K) => I): Keyed<K, I
 
     return {
         get(key) {
-            const existing = instances.get(key);
             // `has` rather than `!== undefined`: `I` may legitimately be a
             // nullish value, and re-running the factory would break identity.
-            if (instances.has(key)) return existing as I;
+            const found = readOutsideReaction(() =>
+                instances.has(key) ? { instance: instances.get(key) as I } : null,
+            );
+            if (found) return found.instance;
             // The factory runs outside the action: it typically constructs a
             // query/collection/store, and whatever it kicks off (a `prime()`,
             // say) must not be silently batched into our write.

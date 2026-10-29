@@ -2,6 +2,8 @@ import { describe, test, expect, afterEach, vi } from 'vite-plus/test';
 
 import { autorun, observable, runInAction } from 'mobx';
 
+import { strictReadWarnings } from './strictReadWarnings.js';
+
 import { query } from '../../data/query.js';
 import { controllableProducer } from '../../testing/data/index.js';
 // A deferred fake walks a query through every phase without module mocking;
@@ -66,6 +68,15 @@ describe('prime() is ensure', () => {
 
         await q.prime(); // ready → no-op
         expect(producer).toHaveBeenCalledTimes(1);
+    });
+
+    test('called from no reaction, reads its state without a MobX warning', async () => {
+        const q = query(() => Promise.resolve('value'));
+        const warnings = await strictReadWarnings(async () => {
+            await q.prime(); // idle → fetches
+            await q.prime(); // ready → no-op
+        });
+        expect(warnings).toEqual([]);
     });
 });
 

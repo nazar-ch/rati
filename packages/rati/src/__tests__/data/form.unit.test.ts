@@ -1,5 +1,7 @@
 import { describe, test, expect, vi } from 'vite-plus/test';
 
+import { strictReadWarnings } from './strictReadWarnings.js';
+
 import { field } from '../../data/field.js';
 import { form, FormError } from '../../data/form.js';
 import { maxLength, min, minLength, pattern, required } from '../../data/validators.js';
@@ -118,6 +120,16 @@ describe('form', () => {
         await save();
         expect(f.isDirty).toBe(false); // committed, not reset
         expect(f.values.title).toBe('Beta');
+    });
+
+    test('submit, called from no reaction, reads its state without a MobX warning', async () => {
+        const valid = renameForm();
+        const invalid = renameForm('');
+        const warnings = await strictReadWarnings(async () => {
+            await valid.submit(() => Promise.resolve())();
+            await invalid.submit(() => Promise.resolve())();
+        });
+        expect(warnings).toEqual([]);
     });
 
     test('isSubmitting spans the handler; re-entrant calls are ignored', async () => {

@@ -124,14 +124,18 @@ export function form<F extends Record<string, Field<any>>>(fields: F): Form<F> {
         },
         submit(handler) {
             return async () => {
-                if (state.isSubmitting) return; // re-entrant double-click: one submit
-                if (!self.validate()) return;
-                runInAction(() => {
+                // A submit runs from an event handler, outside any reaction, so its reads share
+                // the action that sets the flag.
+                const values = runInAction(() => {
+                    if (state.isSubmitting) return null; // re-entrant double-click: one submit
+                    if (!self.validate()) return null;
                     state.isSubmitting = true;
                     state.error = null;
+                    return self.values;
                 });
+                if (values === null) return;
                 try {
-                    await handler(self.values);
+                    await handler(values);
                     self.commit();
                 } catch (thrown) {
                     runInAction(() => {

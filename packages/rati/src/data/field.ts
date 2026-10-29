@@ -110,11 +110,10 @@ export function field<T>(initial: T, options: FieldOptions<NoInfer<T>> = {}): Fi
             return !equalsFn(state.value, state.baseline);
         },
         validate() {
-            const errors = runValidators(state.value);
-            runInAction(() => {
-                state.errors = errors;
+            return runInAction(() => {
+                state.errors = runValidators(state.value);
+                return state.errors.length === 0;
             });
-            return errors.length === 0;
         },
         reset() {
             runInAction(() => {
