@@ -13,10 +13,10 @@ import type { Started } from '@jnana-app/commands/command';
 import type { Vp } from '@jnana-app/commands/vp';
 
 /** The status `noOperation` answers: a shell's "command not found". */
-export const NO_OPERATION = 127;
+const NO_OPERATION = 127;
 
 /** Prints that no operation starts `argv` in `cwd`, starts nothing, and answers {@link NO_OPERATION}. */
-export function noOperation(argv: readonly string[], cwd: string): number {
+function noOperation(argv: readonly string[], cwd: string): number {
     console.error(
         `✗ no @jnana-app/commands operation starts \`${argv.join(' ')}\` in ${cwd}, so it did not run`,
     );
