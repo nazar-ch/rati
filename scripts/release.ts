@@ -11,41 +11,52 @@
 // `--dry-run` bumps package.json, prints the plan, runs `yarn npm publish --dry-run`, and restores
 // package.json: no commit, tag, publish or push.
 //
-// `release` takes its commands, its reads and its terminal as a `ReleaseHost`, so
-// ./release.contract.unit.test.ts drives every refusal and the dry run's plan in-process; the
-// `import.meta.main` block hands it the real one.
+// `release` takes the wrappers of @jnana-app/commands it starts through, its reads and its terminal
+// as a `ReleaseHost`, so ./release.contract.unit.test.ts drives every refusal, the dry run's plan
+// and the shipped sequence over `scripted` wrappers; the `import.meta.main` block builds the
+// wrappers and hands the real host.
 
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { $, live, which } from '@jnana-app/kit/lib/zx';
+import type { Started } from '@jnana-app/commands/command';
+import { Git } from '@jnana-app/commands/git';
+import { Security } from '@jnana-app/commands/security';
+import { Tsc } from '@jnana-app/commands/tsc';
+import { Vp } from '@jnana-app/commands/vp';
+import { type NpmAuth, Yarn } from '@jnana-app/commands/yarn';
+import { isExecutableFile } from '@jnana-app/kit/lib/absent';
+
+import { attached, type BuildPrograms, buildWorkspace, declaredCompiler } from './steps.ts';
 
 const PACKAGE = 'rati';
 const KEYCHAIN_SERVICE = 'npm_token_rati';
 const RELEASE_BRANCH = 'main';
+const REMOTE = 'origin';
 // yarn's default registry is its read-only mirror, so publishing points at npmjs.
 const PUBLISH_REGISTRY = 'https://registry.npmjs.org';
 const PACKAGE_JSON = `packages/${PACKAGE}/package.json`;
 
-/** What a captured command left behind. */
-export interface Captured {
-    exitCode: number;
-    stdout: string;
-    stderr: string;
+/** The wrappers `release` starts every command through. */
+export interface ReleasePrograms extends BuildPrograms {
+    readonly git: Git;
+    readonly yarn: Yarn;
+    readonly security: Security;
 }
 
-/** Environment variables a command runs with on top of the script's own. */
-export type ExtraEnv = Readonly<Record<string, string>>;
-
-/** Everything `release` reaches outside its own memory, each command run from the repo root. */
+/** Everything `release` reaches outside its own memory, each command run from `root`. */
 export interface ReleaseHost {
-    /** Runs a command to completion with its output captured; resolves even on a non-zero exit. */
-    capture(command: readonly string[], env?: ExtraEnv): Promise<Captured>;
-    /** Runs a command with the terminal attached and resolves its exit code. */
-    attached(command: readonly string[], env?: ExtraEnv): Promise<number>;
-    hasCommand(name: string): Promise<boolean>;
+    readonly programs: ReleasePrograms;
+    /** The checkout the release runs in. */
+    readonly root: string;
+    /** Whether `name` resolves to an executable file on `PATH`. */
+    hasCommand(name: string): boolean;
+    /** Waits for a started step with the terminal attached and resolves its exit status. */
+    attached(step: Started): Promise<number>;
+    /** Builds the package as its `build` script does and resolves the first failing status. */
+    build(): Promise<number>;
     /** The `version` field of the package's package.json, read from disk at the call. */
     readVersion(): Promise<string>;
     /** Whether the package's `dist/` directory exists. */
@@ -91,6 +102,8 @@ function parseOptions(argv: readonly string[]): Options {
             case '--otp': {
                 const code = rest.shift();
                 if (code === undefined) throw new Refusal('--otp needs a code.');
+                // `Yarn.workspacePublish` throws on any other code, which would land after the tag.
+                if (!/^\d+$/.test(code)) throw new Refusal('--otp takes a code of digits.');
                 options.otp = code;
                 break;
             }
@@ -111,14 +124,6 @@ function distTagOf(version: string): string {
     return /^\d+\.\d+\.\d+-([A-Za-z][A-Za-z0-9]*)/.exec(version)?.[1] ?? 'next';
 }
 
-/** The username `yarn npm whoami` prints: its first line past the last `: `, because yarn
- *  prefixes every line with `➤ YN0000: ` and appends a timing line. */
-function publisherOf(whoami: string): string {
-    const first = whoami.split('\n', 1)[0] ?? '';
-    const separator = first.lastIndexOf(': ');
-    return separator < 0 ? first : first.slice(separator + 2);
-}
-
 /** Runs the release `argv` asks for against `host`, and resolves the exit code. */
 export async function release(argv: readonly string[], host: ReleaseHost): Promise<number> {
     try {
@@ -131,91 +136,93 @@ export async function release(argv: readonly string[], host: ReleaseHost): Promi
     }
 }
 
-async function run(options: Options, host: ReleaseHost): Promise<void> {
-    const info = (line: string): void => host.out(`→ ${line}`);
-    const output = async (command: readonly string[]): Promise<string> =>
-        (await host.capture(command)).stdout.trim();
-    const pkg = (...args: string[]): string[] => ['yarn', 'workspace', PACKAGE, ...args];
-
-    if (!(await host.hasCommand('yarn'))) throw new Refusal('yarn not found');
-    if (!(await host.hasCommand('security'))) {
-        throw new Refusal("macOS 'security' tool not found (Keychain unavailable)");
-    }
-
-    const branch = await output(['git', 'rev-parse', '--abbrev-ref', 'HEAD']);
+/** Refuses unless HEAD is `main`, the tree is clean, and HEAD is its fetched upstream's commit. */
+function checkCheckout(host: ReleaseHost): void {
+    const { git } = host.programs;
+    const cwd = host.root;
+    // `locate` prints the root, the common dir, HEAD's commit and HEAD's full name, one per line.
+    const headName = git.locate({ cwd }).stdout.split('\n')[3] ?? '';
+    const branch = headName.replace(/^refs\/heads\//, '');
     if (branch !== RELEASE_BRANCH) {
         throw new Refusal(`On branch '${branch}', expected '${RELEASE_BRANCH}'.`);
     }
-    if ((await output(['git', 'status', '--porcelain'])) !== '') {
+    if (git.status({ cwd, untracked: true }).stdout !== '') {
         throw new Refusal('Working tree is dirty. Commit or stash first.');
     }
-    const fetched = await host.attached(['git', 'fetch', '--quiet', 'origin', RELEASE_BRANCH]);
-    if (fetched !== 0) throw new Refusal(`git fetch origin ${RELEASE_BRANCH} failed.`, fetched);
-    const upstream = await host.capture(['git', 'rev-parse', '--abbrev-ref', '@{u}']);
-    if (upstream.exitCode === 0) {
-        const tracked = upstream.stdout.trim();
-        if (
-            (await output(['git', 'rev-parse', '@'])) !==
-            (await output(['git', 'rev-parse', tracked]))
-        ) {
-            throw new Refusal(
-                `Local '${RELEASE_BRANCH}' is not in sync with ${tracked}. Pull/push first.`,
-            );
-        }
+    const fetched = git.fetch({ cwd, remote: REMOTE, refs: [RELEASE_BRANCH] });
+    if (!fetched.ok) {
+        throw new Refusal(
+            `git fetch ${REMOTE} ${RELEASE_BRANCH} failed:\n${fetched.stderr}`,
+            fetched.status,
+        );
     }
+    const upstream = git.upstreamName({ cwd });
+    if (!upstream.ok) return;
+    const tracked = upstream.stdout.trim();
+    // `cat-file --batch-check` prints `<object> <type> <size>` for each revision it resolves.
+    const [head, tip] = git
+        .resolveBatch({ cwd, revs: ['HEAD', tracked] })
+        .stdout.split('\n')
+        .map((line) => line.split(' ')[0]);
+    if (head === undefined || head !== tip) {
+        throw new Refusal(
+            `Local '${RELEASE_BRANCH}' is not in sync with ${tracked.replace(/^refs\/remotes\//, '')}. Pull/push first.`,
+        );
+    }
+}
+
+async function run(options: Options, host: ReleaseHost): Promise<void> {
+    const { yarn, vp, security } = host.programs;
+    const cwd = host.root;
+    const info = (line: string): void => host.out(`→ ${line}`);
+
+    if (!host.hasCommand('yarn')) throw new Refusal('yarn not found');
+    if (!host.hasCommand('security')) {
+        throw new Refusal("macOS 'security' tool not found (Keychain unavailable)");
+    }
+    checkCheckout(host);
 
     info(`Reading npm token from Keychain (service: ${KEYCHAIN_SERVICE})…`);
-    const keychain = await host.capture([
-        'security',
-        'find-generic-password',
-        '-a',
-        host.user,
-        '-s',
-        KEYCHAIN_SERVICE,
-        '-w',
-    ]);
-    const token = keychain.exitCode === 0 ? keychain.stdout.trim() : '';
+    const keychain = security.readPassword({ account: host.user, service: KEYCHAIN_SERVICE });
+    const token = keychain.password.trim();
     if (token === '') {
         throw new Refusal(
             'No token in Keychain. Run the one-time setup in docs/current/RELEASING.md.',
         );
     }
-    // yarn reads these as its npmAuthToken and npmPublishRegistry, so the token stays off disk and
-    // reaches only the yarn npm commands.
-    const npmEnv: ExtraEnv = {
-        YARN_NPM_AUTH_TOKEN: token,
-        YARN_NPM_PUBLISH_REGISTRY: PUBLISH_REGISTRY,
-    };
+    // The yarn npm verbs alone carry the token, through yarn's environment and never its argv.
+    const auth: NpmAuth = { token, publishRegistry: PUBLISH_REGISTRY };
 
     // The exit code decides, never the output: `yarn npm whoami` prints its error to stdout.
-    const whoami = await host.capture(['yarn', 'npm', 'whoami', '--publish'], npmEnv);
-    if (whoami.exitCode !== 0) {
+    const whoami = yarn.npmWhoami({ cwd, auth });
+    if (!whoami.ok) {
         throw new Refusal(
             'Token failed to authenticate (expired?). Rotate it — see docs/current/RELEASING.md.',
         );
     }
-    const publisher = publisherOf(whoami.stdout);
+    const publisher = whoami.user;
     info(`Authenticated as: ${publisher}`);
 
     // Before the bump, so a failing test or build leaves package.json alone.
     info('Running tests…');
-    const tested = await host.attached(pkg('test'));
+    const packageDir = path.join(cwd, 'packages', PACKAGE);
+    const tested = await host.attached(vp.testFiles({ cwd: packageDir, paths: [], exclude: [] }));
     if (tested !== 0) throw new Refusal('Tests failed.', tested);
     info('Building…');
-    const built = await host.attached(pkg('build'));
+    const built = await host.build();
     if (built !== 0) throw new Refusal('Build failed.', built);
     if (!(await host.hasDist())) throw new Refusal('Build produced no dist/.');
 
     const current = await host.readVersion();
-    const publish = (...args: string[]): Promise<number> =>
-        host.attached(pkg('npm', 'publish', '--tag', ...args), npmEnv);
+    const publish = (tag: string, extra: Publishing): number =>
+        yarn.workspacePublish({ cwd, workspace: PACKAGE, tag, auth, ...extra }).status;
 
     // Only `yarn version` knows how a keyword resolves, so the bump is written to package.json and
     // read back; every exit before the version commit puts package.json back.
     const state = { committed: false };
     try {
-        const bumped = await host.capture(pkg('version', options.bump));
-        if (bumped.exitCode !== 0) {
+        const bumped = yarn.workspaceVersion({ cwd, workspace: PACKAGE, bump: options.bump });
+        if (!bumped.ok) {
             throw new Refusal(
                 `yarn version ${options.bump} failed:\n${bumped.stderr || bumped.stdout}`,
             );
@@ -224,14 +231,20 @@ async function run(options: Options, host: ReleaseHost): Promise<void> {
         const distTag = distTagOf(version);
         if (options.dryRun) {
             info(`DRY RUN — would publish ${PACKAGE}@${version} (dist-tag: ${distTag})`);
-            await publish(distTag, '--dry-run');
+            publish(distTag, { dryRun: true });
         } else {
             await ship({ ...options, current, version, distTag, publisher }, host, publish, state);
         }
     } finally {
-        if (!state.committed) await host.capture(['git', 'checkout', '--', PACKAGE_JSON]);
+        if (!state.committed) host.programs.git.restore({ cwd, paths: [PACKAGE_JSON] });
     }
     if (options.dryRun) info('Dry run complete — no commit, tag, publish, or push performed.');
+}
+
+/** What a publish takes beyond its dist-tag. */
+interface Publishing {
+    readonly dryRun?: boolean;
+    readonly otp?: string;
 }
 
 interface Shipment extends Options {
@@ -246,10 +259,12 @@ interface Shipment extends Options {
 async function ship(
     shipment: Shipment,
     host: ReleaseHost,
-    publish: (...args: string[]) => Promise<number>,
+    publish: (tag: string, extra: Publishing) => number,
     state: { committed: boolean },
 ): Promise<void> {
     const { bump, assumeYes, otp, current, version, distTag, publisher } = shipment;
+    const { git } = host.programs;
+    const cwd = host.root;
     const info = (line: string): void => host.out(`→ ${line}`);
 
     info(
@@ -262,19 +277,19 @@ async function ship(
     const subject = `release: ${PACKAGE} v${version}`;
     info(`Committing and tagging v${version}…`);
     // `yarn version` writes package.json alone, never a commit or a tag.
-    const commit = await host.capture(['git', 'commit', '-q', '-m', subject, '--', PACKAGE_JSON]);
-    if (commit.exitCode !== 0) throw new Refusal(`git commit failed:\n${commit.stderr}`);
+    const commit = git.commit({ cwd, message: subject, paths: [PACKAGE_JSON] });
+    if (!commit.ok) throw new Refusal(`git commit failed:\n${commit.stderr}`);
     state.committed = true;
     // Annotated: `git push --follow-tags` ignores a lightweight tag.
-    const tag = await host.capture(['git', 'tag', '-a', `v${version}`, '-m', subject]);
-    if (tag.exitCode !== 0) {
+    const tag = git.tagAnnotated({ cwd, name: `v${version}`, message: subject });
+    if (!tag.ok) {
         throw new Refusal(
             `git tag failed:\n${tag.stderr}\n   The version commit exists locally. Undo with:  git reset --hard HEAD~1`,
         );
     }
 
     info(`Publishing ${PACKAGE}@${version} (dist-tag: ${distTag})…`);
-    const published = await publish(distTag, ...(otp === '' ? [] : ['--otp', otp]));
+    const published = publish(distTag, otp === '' ? {} : { otp });
     if (published !== 0) {
         throw new Refusal(
             `Publish failed. The version commit/tag exist locally but were NOT pushed.\n` +
@@ -283,17 +298,30 @@ async function ship(
     }
 
     info('Pushing commit + tag…');
-    const pushed = await host.attached(['git', 'push', '--follow-tags', 'origin', RELEASE_BRANCH]);
-    if (pushed !== 0) {
+    const pushed = git.push({
+        cwd,
+        remote: REMOTE,
+        refspecs: [RELEASE_BRANCH],
+        followTags: true,
+    });
+    if (!pushed.ok) {
         throw new Refusal(
-            `Push failed after ${PACKAGE}@${version} was published. Retry with:  git push --follow-tags origin ${RELEASE_BRANCH}`,
-            pushed,
+            `Push failed after ${PACKAGE}@${version} was published:\n${pushed.stderr}\n` +
+                `   Retry with:  git push --follow-tags ${REMOTE} ${RELEASE_BRANCH}`,
+            pushed.status,
         );
     }
 
     host.out('');
     host.out(`✓ Published ${PACKAGE}@${version}  (dist-tag: ${distTag})`);
     host.out(`  https://www.npmjs.com/package/${PACKAGE}/v/${version}`);
+}
+
+/** Whether `name` resolves to an executable file in a directory of `searchPath`. */
+function onPath(name: string, searchPath: string): boolean {
+    return searchPath
+        .split(path.delimiter)
+        .some((dir) => dir !== '' && isExecutableFile(path.join(dir, name)));
 }
 
 /** One keypress from the terminal, raw where stdin is one, so Ctrl-C reads as a refusal. */
@@ -318,17 +346,14 @@ async function keypress(): Promise<string> {
     return key;
 }
 
-function processHost(root: string): ReleaseHost {
-    const env = (extra: ExtraEnv = {}): NodeJS.ProcessEnv => ({ ...process.env, ...extra });
+function processHost(root: string, programs: ReleasePrograms): ReleaseHost {
     const packageDir = path.join(root, 'packages', PACKAGE);
     return {
-        capture: async (command, extra) => {
-            const result = await $({ cwd: root, nothrow: true, env: env(extra) })`${command}`;
-            return { exitCode: result.exitCode ?? 1, stdout: result.stdout, stderr: result.stderr };
-        },
-        attached: async (command, extra) =>
-            (await live({ cwd: root, nothrow: true, env: env(extra) })`${command}`).exitCode ?? 1,
-        hasCommand: async (name) => (await which(name, { nothrow: true })) !== null,
+        programs,
+        root,
+        hasCommand: (name) => onPath(name, process.env['PATH'] ?? ''),
+        attached,
+        build: () => buildWorkspace('rati', programs, root),
         readVersion: async () => {
             const manifest: unknown = JSON.parse(
                 await readFile(path.join(root, PACKAGE_JSON), 'utf8'),
@@ -353,5 +378,15 @@ function processHost(root: string): ReleaseHost {
 
 if (import.meta.main) {
     const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-    process.exitCode = await release(process.argv.slice(2), processHost(root));
+    // `vp` lives in the workspace bin, which a bare shell's PATH lacks.
+    process.env['PATH'] = `${path.join(root, 'node_modules', '.bin')}:${process.env['PATH']}`;
+    const programs: ReleasePrograms = {
+        git: new Git(),
+        yarn: new Yarn(),
+        vp: new Vp(),
+        tsc: new Tsc(),
+        security: new Security(),
+        compiler: declaredCompiler(),
+    };
+    process.exitCode = await release(process.argv.slice(2), processHost(root, programs));
 }
