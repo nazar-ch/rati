@@ -270,25 +270,37 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.33-5bd167bb3c2d782145ffb1fa3569b870.tgz":
-  version: 0.0.33
-  resolution: "@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.33-5bd167bb3c2d782145ffb1fa3569b870.tgz"
+"@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.1-0ae9fc2ab9ca604fc405c5e1ea7ee281.tgz":
+  version: 0.0.1
+  resolution: "@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.1-0ae9fc2ab9ca604fc405c5e1ea7ee281.tgz"
+  peerDependencies:
+    "@types/node": "*"
+  peerDependenciesMeta:
+    "@types/node":
+      optional: true
+  checksum: 10/00007150197833539d2d5063eda381f4ec5cfdce54eedc326772c96d7f8bb5e0bbaaec11b85791784ba4ea0d64eceaa22a6950237faf3d4b56a294f78b16832f
+  languageName: node
+  linkType: hard
+
+"@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.34-58549225c0fe4c05736a03dc9a5c6705.tgz":
+  version: 0.0.34
+  resolution: "@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.34-58549225c0fe4c05736a03dc9a5c6705.tgz"
   dependencies:
     "@tsconfig/node26": "npm:^26.0.0"
     "@tsconfig/strictest": "npm:^2.0.8"
     "@tsconfig/vite-react": "npm:^8.1.1"
   peerDependencies:
+    "@jnana-app/commands": "*"
     "@types/node": "*"
     jsdom: "*"
-    zx: ^8.8.5
   peerDependenciesMeta:
+    "@jnana-app/commands":
+      optional: true
     "@types/node":
       optional: true
     jsdom:
       optional: true
-    zx:
-      optional: true
-  checksum: 10/b9a6487198055ddbc12b0759131daed3c9e7bc597d45eb1651f4b2ad85cdddc958b7ae3b7a58407a86abf40e8fda8f1cb5630e85709089bcabed556af9b2b58a
+  checksum: 10/be989cf50798ea28bbba3c45d64d02c84da232bdf0f711547d8a1fdc3558ca64a4c310eca1d087a4b7469ac2d9fc8045f19905bc31a749e62e5e0da2cfaf9944
   languageName: node
   linkType: hard
 
@@ -2815,11 +2827,11 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "root-workspace-0b6124@workspace:."
   dependencies:
+    "@jnana-app/commands": "catalog:"
     "@jnana-app/kit": "catalog:"
     dprint: "npm:0.55.2"
     typescript: "npm:7.0.2"
     vite-plus: "catalog:"
-    zx: "npm:^8.8.5"
   languageName: unknown
   linkType: soft
 
@@ -3738,14 +3750,5 @@ __metadata:
     "@yuku-parser/binding-win32-x64":
       optional: true
   checksum: 10/ab78d0bc190fad0b8d24068443ec8badc23b09911889734afc53efc75c943124ab5647578a35b12a3e714780dfba5257c86aad4b77afadfc46bc0fd1f0b7db1a
-  languageName: node
-  linkType: hard
-
-"zx@npm:^8.8.5":
-  version: 8.8.5
-  resolution: "zx@npm:8.8.5"
-  bin:
-    zx: build/cli.js
-  checksum: 10/29e68a7a2f37b58e1140404655ec5d2f1ab1ab93f385d97192b37929972de61826a106bbc12bbf1fbd29bc649e119cad897c0c1b1751d4e9e01bc7d7629dc86e
   languageName: node
   linkType: hard

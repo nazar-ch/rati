@@ -1,18 +1,39 @@
 import { describe, expect, test } from 'vite-plus/test';
 
-import { type Captured, type ExtraEnv, release, type ReleaseHost } from './release.ts';
+import { Git } from '@jnana-app/commands/git';
+import {
+    type Scripted,
+    type ScriptedAnswer,
+    type ScriptedCall,
+    scripted,
+} from '@jnana-app/commands/scripted';
+import { Vp } from '@jnana-app/commands/vp';
+import { Yarn } from '@jnana-app/commands/yarn';
 
+import { release, type ReleaseHost } from './release.ts';
+
+const ROOT = '/repo';
 const PACKAGE_JSON = 'packages/rati/package.json';
+const UPSTREAM = 'refs/remotes/origin/main';
 
+/** One start any wrapper made, in the order the release made it. */
 interface Call {
-    command: string;
-    env: ExtraEnv;
+    /** The program, its argv, and ` <<< <stdin>` where the start was handed input. */
+    line: string;
+    env: Readonly<Record<string, string>>;
 }
 
+type Answers = Record<string, Omit<ScriptedAnswer, 'args'>>;
+
 interface Scenario {
-    /** Exit code and stdout per command, keyed by the command joined with spaces. */
-    commands?: Record<string, Partial<Captured>>;
+    /** Answers per start, keyed by the argv after the program joined with spaces. */
+    git?: Answers;
+    yarn?: Answers;
+    vp?: Answers;
     missing?: string[];
+    /** The Keychain's password for the maintainer; absent holds the healthy token. */
+    secret?: string;
+    built?: number;
     version?: string;
     /** The version `yarn version <bump>` writes, per bump. */
     bumps?: Record<string, string>;
@@ -20,40 +41,99 @@ interface Scenario {
     confirms?: boolean;
 }
 
-const HEALTHY: Record<string, Partial<Captured>> = {
-    'git rev-parse --abbrev-ref HEAD': { stdout: 'main\n' },
-    'git rev-parse --abbrev-ref @{u}': { stdout: 'origin/main\n' },
-    'git rev-parse @': { stdout: 'abc\n' },
-    'git rev-parse origin/main': { stdout: 'abc\n' },
-    'security find-generic-password -a maintainer -s npm_token_rati -w': { stdout: 'npm_secret\n' },
-    'yarn npm whoami --publish': { stdout: '➤ YN0000: nazar\n➤ YN0000: Done in 0s 120ms\n' },
+const HEALTHY: { git: Answers; yarn: Answers; vp: Answers } = {
+    git: {
+        'rev-parse --path-format=absolute --show-toplevel --git-common-dir HEAD --symbolic-full-name HEAD':
+            { stdout: `${ROOT}\n${ROOT}/.git\nabc\nrefs/heads/main\n` },
+        'status --porcelain=v1 -z --untracked-files=normal': {},
+        'fetch --quiet origin main': {},
+        'rev-parse --symbolic-full-name @{upstream}': { stdout: `${UPSTREAM}\n` },
+        'cat-file --batch-check': { stdout: 'abc commit 220\nabc commit 220\n' },
+        [`restore -- ${PACKAGE_JSON}`]: {},
+        [`commit --quiet --file=- -- ${PACKAGE_JSON}`]: {},
+        'push --follow-tags origin main': {},
+    },
+    yarn: {
+        'npm whoami --publish': { stdout: '➤ YN0000: nazar\n➤ YN0000: Done in 0s 120ms\n' },
+    },
+    vp: { 'test --run': {} },
 };
 
-/** A host over a scripted repo: package.json's version is the one piece of disk state, written by
- *  `yarn version` and put back by `git checkout`. */
+/** The wrapper's answers: the healthy ones under the scenario's, and every bump, tag and publish
+ *  the cases reach answering `0`. */
+function answersOf(healthy: Answers, scenario: Answers | undefined): ScriptedAnswer[] {
+    return Object.entries({ ...healthy, ...scenario }).map(([args, answer]) => ({
+        ...answer,
+        args: args.split(' '),
+    }));
+}
+
+/** `wrapper`, each operation appending the starts it made to `log` in the order it made them. */
+function logging<W extends Scripted>(wrapper: W, log: Call[]): W {
+    return new Proxy(wrapper, {
+        get(target, key) {
+            const member: unknown = Reflect.get(target, key, target);
+            if (typeof member !== 'function') return member;
+            return (...args: unknown[]): unknown => {
+                const before = target.calls.length;
+                const answer: unknown = Reflect.apply(member, target, args);
+                for (const call of target.calls.slice(before)) log.push(callOf(call));
+                return answer;
+            };
+        },
+    });
+}
+
+function callOf(call: ScriptedCall): Call {
+    const input = call.operation === 'start' ? undefined : call.spec.input;
+    const line = [call.program, ...(call.spec.args ?? [])].join(' ');
+    return {
+        line: typeof input === 'string' ? `${line} <<< ${input}` : line,
+        env: call.spec.env ?? {},
+    };
+}
+
+/** A host over scripted wrappers: package.json's version is the one piece of disk state, written by
+ *  `yarn version` and put back by `git restore`. */
 function scriptedHost(scenario: Scenario = {}) {
     const original = scenario.version ?? '0.7.1';
-    const disk = { version: original };
+    const bumps: Record<string, string> = { patch: '0.7.2', minor: '0.8.0', ...scenario.bumps };
     const calls: Call[] = [];
     const out: string[] = [];
     const err: string[] = [];
-    const commands = { ...HEALTHY, ...scenario.commands };
-    const bumps: Record<string, string> = { patch: '0.7.2', minor: '0.8.0', ...scenario.bumps };
+    // Every bump, tag and publish answers `0` unless the scenario keys one.
+    const fallback = Array.from({ length: 8 }, (): ScriptedAnswer => ({}));
+    const git = new (scripted(Git))().answer(...answersOf(HEALTHY.git, scenario.git), ...fallback);
+    const yarn = new (scripted(Yarn))().answer(
+        ...answersOf(HEALTHY.yarn, scenario.yarn),
+        ...fallback,
+    );
+    const vp = new (scripted(Vp))().answer(...answersOf(HEALTHY.vp, scenario.vp));
 
-    const exec = (command: readonly string[], env: ExtraEnv = {}): Captured => {
-        const line = command.join(' ');
-        calls.push({ command: line, env });
-        const bumped = bumps[/^yarn workspace rati version (\S+)$/.exec(line)?.[1] ?? ''];
-        if (bumped !== undefined) disk.version = bumped;
-        if (line === `git checkout -- ${PACKAGE_JSON}`) disk.version = original;
-        return { exitCode: 0, stdout: '', stderr: '', ...commands[line] };
+    const diskVersion = (): string => {
+        let version = original;
+        for (const { line } of calls) {
+            const bumped = /^yarn workspace rati version (\S+)$/.exec(line)?.[1];
+            if (bumped !== undefined) version = bumps[bumped] ?? version;
+            if (line === `git restore -- ${PACKAGE_JSON}`) version = original;
+        }
+        return version;
     };
 
     const host: ReleaseHost = {
-        capture: async (command, env) => exec(command, env),
-        attached: async (command, env) => exec(command, env).exitCode,
-        hasCommand: async (name) => !(scenario.missing ?? []).includes(name),
-        readVersion: async () => disk.version,
+        programs: { git: logging(git, calls), yarn: logging(yarn, calls), vp: logging(vp, calls) },
+        root: ROOT,
+        hasCommand: (name) => !(scenario.missing ?? []).includes(name),
+        keychainSecret: ({ account, service }) => {
+            calls.push({ line: `keychain ${account} ${service}`, env: {} });
+            return scenario.secret ?? 'npm_secret\n';
+        },
+        attached: async (step) => (await step.exited).status,
+        build: async () => {
+            calls.push({ line: 'build rati', env: {} });
+            return scenario.built ?? 0;
+        },
+        readVersion: async () => diskVersion(),
         hasDist: async () => scenario.dist ?? true,
         confirm: async (question) => {
             out.push(question);
@@ -63,26 +143,24 @@ function scriptedHost(scenario: Scenario = {}) {
         err: (line) => err.push(line),
         user: 'maintainer',
     };
-    const ran = (prefix: string): boolean =>
-        calls.some(({ command }) => command.startsWith(prefix));
+    const ran = (prefix: string): boolean => calls.some(({ line }) => line.startsWith(prefix));
     const transcript = (): string =>
         [
-            ...calls.map(({ command }) => `$ ${command}`),
+            ...calls.map(({ line }) => `$ ${line}`),
             ...out,
             ...err.map((line) => `stderr: ${line}`),
         ].join('\n');
-    return { host, disk, calls, out, err, ran, transcript };
+    return { host, diskVersion, calls, out, err, ran, transcript };
 }
 
 /** What no refused or dry run may reach: a commit, a tag, a real publish or a push. */
 function assertNothingShipped(run: ReturnType<typeof scriptedHost>): void {
     const shipped = run.calls.filter(
-        ({ command }) =>
-            command.startsWith('git commit') ||
-            command.startsWith('git tag') ||
-            command.startsWith('git push') ||
-            (command.startsWith('yarn workspace rati npm publish') &&
-                !command.endsWith('--dry-run')),
+        ({ line }) =>
+            line.startsWith('git commit') ||
+            line.startsWith('git tag') ||
+            line.startsWith('git push') ||
+            (line.startsWith('yarn workspace rati npm publish') && !line.endsWith('--dry-run')),
     );
     expect(shipped, run.transcript()).toEqual([]);
 }
@@ -114,11 +192,14 @@ describe('arguments', () => {
         },
     );
 
-    test('refuses --otp with no code after it', async () => {
-        const run = scriptedHost();
-        expect(await release(['--otp'], run.host), run.transcript()).toBe(1);
-        expect(run.calls, run.transcript()).toEqual([]);
-    });
+    test.each([{ argv: ['--otp'] }, { argv: ['--otp', 'l23456'] }])(
+        'refuses $argv, an --otp with no code of digits after it, before running any command',
+        async ({ argv }) => {
+            const run = scriptedHost();
+            expect(await release(argv, run.host), run.transcript()).toBe(1);
+            expect(run.calls, run.transcript()).toEqual([]);
+        },
+    );
 });
 
 describe('refusals', () => {
@@ -127,35 +208,34 @@ describe('refusals', () => {
         ['the Keychain tool is missing', { missing: ['security'] }, "'security' tool not found"],
         [
             'the branch is not main',
-            { commands: { 'git rev-parse --abbrev-ref HEAD': { stdout: 'feature\n' } } },
+            {
+                git: {
+                    'rev-parse --path-format=absolute --show-toplevel --git-common-dir HEAD --symbolic-full-name HEAD':
+                        { stdout: `${ROOT}\n${ROOT}/.git\nabc\nrefs/heads/feature\n` },
+                },
+            },
             "On branch 'feature', expected 'main'.",
         ],
         [
             'the tree is dirty',
-            { commands: { 'git status --porcelain': { stdout: ' M a.ts\n' } } },
+            {
+                git: {
+                    'status --porcelain=v1 -z --untracked-files=normal': { stdout: ' M a.ts\0' },
+                },
+            },
             'dirty',
         ],
         [
             'main is out of sync with its upstream',
-            { commands: { 'git rev-parse origin/main': { stdout: 'def\n' } } },
+            { git: { 'cat-file --batch-check': { stdout: 'abc commit 220\ndef commit 220\n' } } },
             'not in sync with origin/main',
         ],
-        [
-            'the Keychain holds no token',
-            {
-                commands: {
-                    'security find-generic-password -a maintainer -s npm_token_rati -w': {
-                        exitCode: 44,
-                    },
-                },
-            },
-            'No token in Keychain',
-        ],
+        ['the Keychain holds no token', { secret: '' }, 'No token in Keychain'],
         [
             'the token fails to authenticate',
             {
-                commands: {
-                    'yarn npm whoami --publish': { exitCode: 1, stdout: '➤ YN0041: Invalid auth' },
+                yarn: {
+                    'npm whoami --publish': { status: 1, stdout: '➤ YN0041: Invalid auth' },
                 },
             },
             'Token failed to authenticate',
@@ -169,10 +249,32 @@ describe('refusals', () => {
         assertNothingShipped(run);
     });
 
+    test('the sync check reads HEAD against the upstream git names, after the fetch', async () => {
+        const run = scriptedHost();
+        await release(['--dry-run'], run.host);
+        const lines = run.calls.map(({ line }) => line);
+        expect(lines.indexOf('git fetch --quiet origin main'), run.transcript()).toBeLessThan(
+            lines.indexOf(`git cat-file --batch-check <<< HEAD\n${UPSTREAM}\n`),
+        );
+    });
+
+    test('the Keychain read asks for the npm token under the login name', async () => {
+        const run = scriptedHost();
+        await release(['--dry-run'], run.host);
+        expect(run.ran('keychain maintainer npm_token_rati'), run.transcript()).toBe(true);
+    });
+
     test("a failing test run ends the release with the tests' exit code, before the version bump", async () => {
-        const run = scriptedHost({ commands: { 'yarn workspace rati test': { exitCode: 3 } } });
+        const run = scriptedHost({ vp: { 'test --run': { status: 3 } } });
         expect(await release([], run.host), run.transcript()).toBe(3);
-        expect(run.ran('yarn workspace rati build'), run.transcript()).toBe(false);
+        expect(run.ran('build rati'), run.transcript()).toBe(false);
+        expect(run.ran('yarn workspace rati version'), run.transcript()).toBe(false);
+    });
+
+    test("a failing build ends the release with the build's exit code, before the version bump", async () => {
+        const run = scriptedHost({ built: 127 });
+        expect(await release([], run.host), run.transcript()).toBe(127);
+        expect(run.err.join('\n'), run.transcript()).toContain('Build failed.');
         expect(run.ran('yarn workspace rati version'), run.transcript()).toBe(false);
     });
 
@@ -180,13 +282,13 @@ describe('refusals', () => {
         const run = scriptedHost({ confirms: false });
         expect(await release(['minor'], run.host), run.transcript()).toBe(1);
         expect(run.err.join('\n'), run.transcript()).toContain('Aborted.');
-        expect(run.disk.version, run.transcript()).toBe('0.7.1');
+        expect(run.diskVersion(), run.transcript()).toBe('0.7.1');
         assertNothingShipped(run);
     });
 
     test('a failed publish names the undo and pushes nothing', async () => {
         const run = scriptedHost({
-            commands: { 'yarn workspace rati npm publish --tag latest': { exitCode: 1 } },
+            yarn: { 'workspace rati npm publish --tag latest': { status: 1 } },
         });
         expect(await release(['--yes'], run.host), run.transcript()).toBe(1);
         expect(run.err.join('\n'), run.transcript()).toContain(
@@ -209,7 +311,7 @@ describe('the dry run', () => {
             run.ran('yarn workspace rati npm publish --tag latest --dry-run'),
             run.transcript(),
         ).toBe(true);
-        expect(run.disk.version, run.transcript()).toBe('0.7.1');
+        expect(run.diskVersion(), run.transcript()).toBe('0.7.1');
         assertNothingShipped(run);
     });
 
@@ -231,11 +333,11 @@ describe('a confirmed release', () => {
         const run = scriptedHost({ confirms: true });
         expect(await release(['--otp', '123456'], run.host), run.transcript()).toBe(0);
         const shipped = run.calls
-            .map(({ command }) => command)
-            .filter((command) => /^git (commit|tag|push)|npm publish/.test(command));
+            .map(({ line }) => line)
+            .filter((line) => /^git (commit|tag|push)|npm publish/.test(line));
         expect(shipped, run.transcript()).toEqual([
-            `git commit -q -m release: rati v0.7.2 -- ${PACKAGE_JSON}`,
-            'git tag -a v0.7.2 -m release: rati v0.7.2',
+            `git commit --quiet --file=- -- ${PACKAGE_JSON} <<< release: rati v0.7.2`,
+            'git tag --annotate --file=- v0.7.2 <<< release: rati v0.7.2',
             'yarn workspace rati npm publish --tag latest --otp 123456',
             'git push --follow-tags origin main',
         ]);
@@ -248,7 +350,7 @@ describe('a confirmed release', () => {
         await release(['--yes'], run.host);
         const carrying = run.calls
             .filter(({ env }) => env['YARN_NPM_AUTH_TOKEN'] === 'npm_secret')
-            .map(({ command }) => command);
+            .map(({ line }) => line);
         expect(carrying, run.transcript()).toEqual([
             'yarn npm whoami --publish',
             'yarn workspace rati npm publish --tag latest',

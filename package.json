@@ -19,11 +19,11 @@
         "postinstall": "vp config"
     },
     "devDependencies": {
+        "@jnana-app/commands": "catalog:",
         "@jnana-app/kit": "catalog:",
         "dprint": "0.55.2",
         "typescript": "7.0.2",
-        "vite-plus": "catalog:",
-        "zx": "^8.8.5"
+        "vite-plus": "catalog:"
     },
     "resolutions": {
         "vite": "npm:@voidzero-dev/vite-plus-core@1.1.0",

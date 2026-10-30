@@ -16,6 +16,8 @@ With `-w` last, `security` prompts for the token, so the token never reaches you
 
 ## Releasing
 
+**`release.ts` refuses at the Keychain read, before anything is bumped, committed or published**: no operation of `@jnana-app/commands` 0.0.1 starts `security find-generic-password`, so the script cannot read its token, and a release waits on the package shipping that operation and one emitting `packages/rati`'s d.ts (kit◊CK-14).
+
 From the repo root, on a clean `main` that's in sync with origin:
 
 ```sh
