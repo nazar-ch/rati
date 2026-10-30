@@ -7,6 +7,8 @@ import {
     type ScriptedCall,
     scripted,
 } from '@jnana-app/commands/scripted';
+import { Security } from '@jnana-app/commands/security';
+import { Tsc } from '@jnana-app/commands/tsc';
 import { Vp } from '@jnana-app/commands/vp';
 import { Yarn } from '@jnana-app/commands/yarn';
 
@@ -30,9 +32,8 @@ interface Scenario {
     git?: Answers;
     yarn?: Answers;
     vp?: Answers;
+    security?: Answers;
     missing?: string[];
-    /** The Keychain's password for the maintainer; absent holds the healthy token. */
-    secret?: string;
     built?: number;
     version?: string;
     /** The version `yarn version <bump>` writes, per bump. */
@@ -41,7 +42,9 @@ interface Scenario {
     confirms?: boolean;
 }
 
-const HEALTHY: { git: Answers; yarn: Answers; vp: Answers } = {
+const KEYCHAIN_READ = 'find-generic-password -a maintainer -s npm_token_rati -w';
+
+const HEALTHY: { git: Answers; yarn: Answers; vp: Answers; security: Answers } = {
     git: {
         'rev-parse --path-format=absolute --show-toplevel --git-common-dir HEAD --symbolic-full-name HEAD':
             { stdout: `${ROOT}\n${ROOT}/.git\nabc\nrefs/heads/main\n` },
@@ -57,6 +60,7 @@ const HEALTHY: { git: Answers; yarn: Answers; vp: Answers } = {
         'npm whoami --publish': { stdout: '➤ YN0000: nazar\n➤ YN0000: Done in 0s 120ms\n' },
     },
     vp: { 'test --run': {} },
+    security: { [KEYCHAIN_READ]: { stdout: 'npm_secret\n' } },
 };
 
 /** The wrapper's answers: the healthy ones under the scenario's, and every bump, tag and publish
@@ -109,6 +113,11 @@ function scriptedHost(scenario: Scenario = {}) {
         ...fallback,
     );
     const vp = new (scripted(Vp))().answer(...answersOf(HEALTHY.vp, scenario.vp));
+    const security = new (scripted(Security))().answer(
+        ...answersOf(HEALTHY.security, scenario.security),
+    );
+    // `build` is the host's, so the release itself starts no compile.
+    const tsc = new (scripted(Tsc))();
 
     const diskVersion = (): string => {
         let version = original;
@@ -121,13 +130,16 @@ function scriptedHost(scenario: Scenario = {}) {
     };
 
     const host: ReleaseHost = {
-        programs: { git: logging(git, calls), yarn: logging(yarn, calls), vp: logging(vp, calls) },
+        programs: {
+            git: logging(git, calls),
+            yarn: logging(yarn, calls),
+            vp: logging(vp, calls),
+            security: logging(security, calls),
+            tsc: logging(tsc, calls),
+            compiler: '/repo/node_modules/typescript/bin/tsc',
+        },
         root: ROOT,
         hasCommand: (name) => !(scenario.missing ?? []).includes(name),
-        keychainSecret: ({ account, service }) => {
-            calls.push({ line: `keychain ${account} ${service}`, env: {} });
-            return scenario.secret ?? 'npm_secret\n';
-        },
         attached: async (step) => (await step.exited).status,
         build: async () => {
             calls.push({ line: 'build rati', env: {} });
@@ -230,7 +242,11 @@ describe('refusals', () => {
             { git: { 'cat-file --batch-check': { stdout: 'abc commit 220\ndef commit 220\n' } } },
             'not in sync with origin/main',
         ],
-        ['the Keychain holds no token', { secret: '' }, 'No token in Keychain'],
+        [
+            'the Keychain holds no token',
+            { security: { [KEYCHAIN_READ]: { status: 44 } } },
+            'No token in Keychain',
+        ],
         [
             'the token fails to authenticate',
             {
@@ -261,7 +277,7 @@ describe('refusals', () => {
     test('the Keychain read asks for the npm token under the login name', async () => {
         const run = scriptedHost();
         await release(['--dry-run'], run.host);
-        expect(run.ran('keychain maintainer npm_token_rati'), run.transcript()).toBe(true);
+        expect(run.ran(`security ${KEYCHAIN_READ}`), run.transcript()).toBe(true);
     });
 
     test("a failing test run ends the release with the tests' exit code, before the version bump", async () => {

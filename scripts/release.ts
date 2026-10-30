@@ -15,9 +15,6 @@
 // as a `ReleaseHost`, so ./release.contract.unit.test.ts drives every refusal, the dry run's plan
 // and the shipped sequence over `scripted` wrappers; the `import.meta.main` block builds the
 // wrappers and hands the real host.
-//
-// The Keychain read and the d.ts emit of the build start a command no operation of the package
-// composes, so a real release refuses at the Keychain read, before the bump (kit◊CK-14).
 
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -26,11 +23,13 @@ import { fileURLToPath } from 'node:url';
 
 import type { Started } from '@jnana-app/commands/command';
 import { Git } from '@jnana-app/commands/git';
+import { Security } from '@jnana-app/commands/security';
+import { Tsc } from '@jnana-app/commands/tsc';
 import { Vp } from '@jnana-app/commands/vp';
 import { type NpmAuth, Yarn } from '@jnana-app/commands/yarn';
 import { isExecutableFile } from '@jnana-app/kit/lib/absent';
 
-import { attached, buildWorkspace } from './steps.ts';
+import { attached, type BuildPrograms, buildWorkspace, declaredCompiler } from './steps.ts';
 
 const PACKAGE = 'rati';
 const KEYCHAIN_SERVICE = 'npm_token_rati';
@@ -41,10 +40,10 @@ const PUBLISH_REGISTRY = 'https://registry.npmjs.org';
 const PACKAGE_JSON = `packages/${PACKAGE}/package.json`;
 
 /** The wrappers `release` starts every command through. */
-export interface ReleasePrograms {
+export interface ReleasePrograms extends BuildPrograms {
     readonly git: Git;
     readonly yarn: Yarn;
-    readonly vp: Vp;
+    readonly security: Security;
 }
 
 /** Everything `release` reaches outside its own memory, each command run from `root`. */
@@ -54,8 +53,6 @@ export interface ReleaseHost {
     readonly root: string;
     /** Whether `name` resolves to an executable file on `PATH`. */
     hasCommand(name: string): boolean;
-    /** The password the Keychain holds for `account` under `service`, `''` where it holds none. */
-    keychainSecret(entry: { readonly account: string; readonly service: string }): string;
     /** Waits for a started step with the terminal attached and resolves its exit status. */
     attached(step: Started): Promise<number>;
     /** Builds the package as its `build` script does and resolves the first failing status. */
@@ -175,7 +172,7 @@ function checkCheckout(host: ReleaseHost): void {
 }
 
 async function run(options: Options, host: ReleaseHost): Promise<void> {
-    const { yarn, vp } = host.programs;
+    const { yarn, vp, security } = host.programs;
     const cwd = host.root;
     const info = (line: string): void => host.out(`→ ${line}`);
 
@@ -186,7 +183,8 @@ async function run(options: Options, host: ReleaseHost): Promise<void> {
     checkCheckout(host);
 
     info(`Reading npm token from Keychain (service: ${KEYCHAIN_SERVICE})…`);
-    const token = host.keychainSecret({ account: host.user, service: KEYCHAIN_SERVICE }).trim();
+    const keychain = security.readPassword({ account: host.user, service: KEYCHAIN_SERVICE });
+    const token = keychain.password.trim();
     if (token === '') {
         throw new Refusal(
             'No token in Keychain. Run the one-time setup in docs/current/RELEASING.md.',
@@ -354,15 +352,8 @@ function processHost(root: string, programs: ReleasePrograms): ReleaseHost {
         programs,
         root,
         hasCommand: (name) => onPath(name, process.env['PATH'] ?? ''),
-        keychainSecret: ({ account, service }) => {
-            throw new Refusal(
-                'No @jnana-app/commands operation reads the Keychain ' +
-                    `(\`security find-generic-password -a ${account} -s ${service} -w\`), ` +
-                    'so the release cannot read its npm token. Nothing was bumped, committed or published.',
-            );
-        },
         attached,
-        build: () => buildWorkspace('rati', programs.vp, root),
+        build: () => buildWorkspace('rati', programs, root),
         readVersion: async () => {
             const manifest: unknown = JSON.parse(
                 await readFile(path.join(root, PACKAGE_JSON), 'utf8'),
@@ -389,6 +380,13 @@ if (import.meta.main) {
     const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
     // `vp` lives in the workspace bin, which a bare shell's PATH lacks.
     process.env['PATH'] = `${path.join(root, 'node_modules', '.bin')}:${process.env['PATH']}`;
-    const programs = { git: new Git(), yarn: new Yarn(), vp: new Vp() };
+    const programs: ReleasePrograms = {
+        git: new Git(),
+        yarn: new Yarn(),
+        vp: new Vp(),
+        tsc: new Tsc(),
+        security: new Security(),
+        compiler: declaredCompiler(),
+    };
     process.exitCode = await release(process.argv.slice(2), processHost(root, programs));
 }

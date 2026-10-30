@@ -23,14 +23,19 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import { Tsc } from '@jnana-app/commands/tsc';
 import { Vp } from '@jnana-app/commands/vp';
 
-import { attached, buildWorkspace, type Workspace } from './steps.ts';
+import {
+    attached,
+    type BuildPrograms,
+    buildWorkspace,
+    declaredCompiler,
+    type Workspace,
+} from './steps.ts';
 
 /** The wrappers `ci` starts its stages through. */
-export interface CiPrograms {
-    readonly vp: Vp;
-}
+export type CiPrograms = BuildPrograms;
 
 type Stage = { name: string; what: string; run: () => Promise<number> };
 
@@ -39,7 +44,7 @@ function stagesOf(programs: CiPrograms, root: string, fuzzRuns: string): Stage[]
     // the point of this script is a readable transcript of what failed.
     const buildAll = async (workspaces: readonly Workspace[]): Promise<number> => {
         for (const workspace of workspaces) {
-            const code = await buildWorkspace(workspace, programs.vp, root);
+            const code = await buildWorkspace(workspace, programs, root);
             if (code !== 0) return code;
         }
         return 0;
@@ -114,7 +119,7 @@ if (import.meta.main) {
     process.env['PATH'] = `${path.join(root, 'node_modules', '.bin')}:${process.env['PATH']}`;
     process.exitCode = await ci(
         process.argv.slice(2),
-        { vp: new Vp() },
+        { vp: new Vp(), tsc: new Tsc(), compiler: declaredCompiler() },
         root,
         process.env['FUZZ_RUNS'] ?? '500',
     );

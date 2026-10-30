@@ -270,15 +270,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.1-0ae9fc2ab9ca604fc405c5e1ea7ee281.tgz":
-  version: 0.0.1
-  resolution: "@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.1-0ae9fc2ab9ca604fc405c5e1ea7ee281.tgz"
+"@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.2-fe9d44fa1749d8e0ea13514230321929.tgz":
+  version: 0.0.2
+  resolution: "@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.2-fe9d44fa1749d8e0ea13514230321929.tgz"
   peerDependencies:
     "@types/node": "*"
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10/00007150197833539d2d5063eda381f4ec5cfdce54eedc326772c96d7f8bb5e0bbaaec11b85791784ba4ea0d64eceaa22a6950237faf3d4b56a294f78b16832f
+  checksum: 10/daa6f076c853dcdfbe86833dd4f8eb3712adaef17dc60e0e2735872a89ce7008fe6b96a4d31e727a7aa5767cf2596d7db4886f7398d22371b7c27da6b5ccaf4d
   languageName: node
   linkType: hard
 
