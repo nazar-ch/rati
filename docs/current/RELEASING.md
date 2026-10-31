@@ -1,47 +1,39 @@
 # Releasing `rati`
 
-**Before the version bump: retitle CHANGELOG.md's `## Unreleased` section to `## <version> — <date>`, and open a fresh empty one above it.** The notes are written as the changes land (rati's always-loaded layer carries that rule), so releasing is a rename, not a writing session — pre-1.0, a minor bump under `^` lands on consumers automatically, and the entry is the half of the break the version number doesn't carry.
+rati releases on two channels: every release the family installs is a prerelease that `publish.ts` cuts into the package bucket, and a public version reaches npm only by the maintainer's own command on the host (⭑DEV-20). Each release retitles CHANGELOG.md's `## Unreleased` section, whose entries land with the change (⭑DEV-11).
 
-Two things to check while you are there, because a release is the last moment either is cheap: that every removal is paired with its replacement, and that a rename keeping an old import resolving with a *new* meaning is called out (the 0.6.3 `Router` entry is the worked example). An `## Unreleased` that is genuinely empty releases as one line saying nothing consumer-visible changed — that is an answer, not a gap.
+Before either release, read the `## Unreleased` entries: every removal names its replacement, and a rename that keeps an old import resolving with a new meaning says so — the 0.6.3 `Router` entry is the worked example. An empty `## Unreleased` releases as one line saying nothing consumer-visible changed.
 
-## One-time setup, and rotating the token
+## A release for the family
 
-The script reads the npm token from the macOS Keychain: a generic-password entry under the service `npm_token_rati` and your login name. Create an npm access token that can publish `rati`, then store it:
+- **A non-empty `## Unreleased` at a branch's exit is a release owed**, cut on that branch before its pull request.
+- **`publish.ts 0.7.2-beta.1 --item <ID>`, run from `packages/rati`, opens a series** at the smallest bump over the last public version that the entries justify.
+- **`publish.ts prerelease --item <ID>` increments an open series** — `0.7.2-beta.1` to `0.7.2-beta.2`.
+- **`--dry-run` prints the version, the archive name and the changelog heading the run would write**, and writes nothing.
+
+The tool uploads the archive and reads it back over its public URL before it commits anything. It then makes two commits:
+
+1. `<ID>: Release rati v<version>` — the version in packages/rati/package.json, and CHANGELOG.md with `## Unreleased` retitled to `## <version> — <UTC day>` under a fresh `## Unreleased`.
+2. `<ID>: Record the rati v<version> release` — the row it prepends to `packages/rati/manifest.json`, whose `url` is what a consumer pins.
+
+A run bumps its consumers to that `url` inside the run, before the release's pull request merges. A session leaves the bump to preflight's pin row in each consumer.
+
+## A public release
+
+On the user's word, an agent runs `yarn ci`, then `publish.ts X.Y.Z --item <ID>` from `packages/rati`, then tags `vX.Y.Z` at the record commit and pushes the branch and the tag. The user then publishes on the host, at that commit:
+
+```sh
+YARN_NPM_AUTH_TOKEN="$(security find-generic-password -a "$USER" -s npm_token_rati -w)" yarn workspace rati npm publish --otp <code>
+```
+
+`.yarnrc.yml` names `https://registry.npmjs.org` as the publish registry, and the pack runs the package's `prepack` build.
+
+The token lives in the host's Keychain under the service `npm_token_rati` and the login name. Store one, or rotate an expired one, with this command, which prompts for the token so it never reaches the shell history:
 
 ```sh
 security add-generic-password -U -a "$USER" -s npm_token_rati -w
 ```
 
-With `-w` last, `security` prompts for the token, so the token never reaches your shell history. `-U` replaces an existing entry, which is how an expired token is rotated.
-
-## Releasing
-
-From the repo root, on a clean `main` that's in sync with origin:
-
-```sh
-./scripts/release.ts                # patch, the default: 0.4.9 -> 0.4.10
-./scripts/release.ts minor          # -> 0.5.0
-./scripts/release.ts prerelease     # 0.4.9-alpha.1 -> 0.4.9-alpha.2
-./scripts/release.ts 0.5.0          # explicit version
-```
-
-It resolves the bump, prints `rati <current> → <new>` with the dist-tag and publisher, and waits for a single `y` — anything else aborts and puts `package.json` back. Nothing is committed, tagged, published or pushed before that keypress.
-
-Flags:
-
-- `--dry-run` — after every check a release runs, the Keychain token and the tests and build included, write the bump to package.json, print the version and dist-tag it would publish, run `yarn npm publish --dry-run`, then restore package.json. No commit, tag, publish, or push.
-- `--yes` — skip the confirmation prompt.
-- `--otp <code>` — pass a 2FA one-time code (only if your token doesn't bypass 2FA).
-
-### dist-tags are derived automatically
-
-Prerelease versions (anything with a `-`, e.g. `0.4.9-alpha.2`) publish under their prerelease tag (`alpha`, `beta`, `rc`, …), **not** `latest`. Stable versions publish under `latest`. This keeps `npm install rati` on the last stable release.
-
 ## If a publish fails
 
-Tests and build run *before* the version bump, so the usual failure window is the network call to the registry. If `yarn npm publish` fails, the version commit and tag exist locally but were not pushed. Undo them and retry:
-
-```sh
-git tag -d v<version>
-git reset --hard HEAD~1
-```
+`publish.ts` commits nothing before the upload is proven, and every exit short of the release commit puts `package.json` and `CHANGELOG.md` back. A failed run leaves nothing to undo: fix what its last lines name and run the same command again. A failed `npm publish` leaves the release commits and the tag in place, so run the host command again; npm refuses a version it already holds.
