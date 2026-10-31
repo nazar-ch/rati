@@ -270,21 +270,21 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.2-fe9d44fa1749d8e0ea13514230321929.tgz":
-  version: 0.0.2
-  resolution: "@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.2-fe9d44fa1749d8e0ea13514230321929.tgz"
+"@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.8-260667315e14805da18cdca1b94f3b59.tgz":
+  version: 0.0.8
+  resolution: "@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.8-260667315e14805da18cdca1b94f3b59.tgz"
   peerDependencies:
     "@types/node": "*"
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10/daa6f076c853dcdfbe86833dd4f8eb3712adaef17dc60e0e2735872a89ce7008fe6b96a4d31e727a7aa5767cf2596d7db4886f7398d22371b7c27da6b5ccaf4d
+  checksum: 10/b0a84bd792d2806112c2eb44cfbb03a73490ec65c00d4cf247f60ca5ceb5792c29f3e402f1f0ee2f3ca43c907b5eb67b3c08b38cb8c2fb8a852486464283617e
   languageName: node
   linkType: hard
 
-"@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.34-58549225c0fe4c05736a03dc9a5c6705.tgz":
-  version: 0.0.34
-  resolution: "@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.34-58549225c0fe4c05736a03dc9a5c6705.tgz"
+"@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.35-870f4985d30aef5deff0869f4cf8cb42.tgz":
+  version: 0.0.35
+  resolution: "@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.35-870f4985d30aef5deff0869f4cf8cb42.tgz"
   dependencies:
     "@tsconfig/node26": "npm:^26.0.0"
     "@tsconfig/strictest": "npm:^2.0.8"
@@ -294,13 +294,11 @@ __metadata:
     "@types/node": "*"
     jsdom: "*"
   peerDependenciesMeta:
-    "@jnana-app/commands":
-      optional: true
     "@types/node":
       optional: true
     jsdom:
       optional: true
-  checksum: 10/be989cf50798ea28bbba3c45d64d02c84da232bdf0f711547d8a1fdc3558ca64a4c310eca1d087a4b7469ac2d9fc8045f19905bc31a749e62e5e0da2cfaf9944
+  checksum: 10/3805ec52bd0f8d641dc31290615c181986df338391bf3fa14925d06af9e6e8db9865c59b46ded366a01fcd342f363d26e139cc378654d13a23dd8fab10d5f951
   languageName: node
   linkType: hard
 
