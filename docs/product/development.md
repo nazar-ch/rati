@@ -28,11 +28,13 @@
 ## Reaching consumers
 
 - ⭑DEV-10 A consumer type-checks and bundles rati's source in development, so an edit to rati needs no build to reach it. {proposed}
-- ⭑DEV-11 Every consumer-visible change carries its changelog entry in the commit that makes it. {proposed}
+- ⭑DEV-11 Every consumer-visible change carries its changelog entry in the commit that makes it. {approved 2026-10-31}
 - ⭑DEV-12 A removal or a rename ships with its replacement named. {proposed}
-- ⭑DEV-13 A fix a consumer is blocked on ships as a release of its own, before the consumer's change. {proposed}
 - ⭑DEV-14 Both example apps stay on the current API and pass the gates the package passes. {proposed}
 - ⭑DEV-15 Public surface is documented in the public docs, the tree the website renders, and nowhere else. {proposed}
+- ⭑DEV-20 A public release is the maintainer's own act: nothing reaches npm without a human action. {approved 2026-10-31}
+
+⭑DEV-20 The user's wording (approved verbatim, 2026-10-31), at the design session over rati's releases, on a release path with no step only a person can take: "so, accidental releases may happen - not good", and on a deny rule as the control: "I'm not controlling this with permissions - it's not possible in "bypass permissions" mode". The family installs every release from its bucket; npm takes a public version from the maintainer's own host, behind the token and the second factor only that host holds.
 
 ## Testing direction
 
