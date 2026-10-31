@@ -21,7 +21,6 @@
         },
     ],
 
-    "bootstrap": "yarn install",
     // `packages/rati/dist` is `prep`'s output, listed because this one trigger runs `prep` too: a
     // provisioned checkout already carries `node_modules`.
     "bootstrapStale": {
