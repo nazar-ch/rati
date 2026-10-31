@@ -1,6 +1,6 @@
 # Changelog
 
-What breaks and what it maps to, per release, because rati is pre-1.0 and a minor bump under a caret range lands on consumers automatically. Removals are listed with their replacements; additions only when a consumer needs to act. Started at 0.6.3 (FND-05); earlier releases are not reconstructed.
+What breaks and what it maps to, per release, because rati is pre-1.0, every bump can break a *consumer*, and a *consumer* moving its pinned URL reads this first. Removals are listed with their replacements; additions only when a consumer needs to act. Started at 0.6.3 (FND-05); earlier releases are not reconstructed.
 
 **Write the entry when you make the change, not when you release it** — in the `## Unreleased` section below, in the same commit as the behavior. Releasing then only retitles that section (the step is in docs/current/RELEASING.md); it is never the moment the notes get *written*. 0.7.0 is why: the release-time step was the whole convention, the first release after it shipped with no entry at all, and the consumer that adopted it read `git log v0.6.3..v0.7.0` instead. An empty `## Unreleased` at release time is a real answer — it means nothing consumer-visible changed, and the entry says so in one line.
 

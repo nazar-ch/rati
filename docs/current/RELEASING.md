@@ -11,10 +11,11 @@ Before either release, read the `## Unreleased` entries: every removal names its
 - **`publish.ts prerelease --item <ID>` increments an open series** — `0.7.2-beta.1` to `0.7.2-beta.2`.
 - **`--dry-run` prints the version, the archive name and the changelog heading the run would write**, and writes nothing.
 
-The tool uploads the archive and reads it back over its public URL before it commits anything. It then makes two commits:
+The tool uploads the archive and reads it back over its public URL before it commits anything. It then makes one commit, `<ID>: Release rati v<version>`, carrying:
 
-1. `<ID>: Release rati v<version>` — the version in packages/rati/package.json, and CHANGELOG.md with `## Unreleased` retitled to `## <version> — <UTC day>` under a fresh `## Unreleased`.
-2. `<ID>: Record the rati v<version> release` — the row it prepends to `packages/rati/manifest.json`, whose `url` is what a consumer pins.
+- the version in packages/rati/package.json;
+- CHANGELOG.md with `## Unreleased` retitled to `## <version> — <UTC day>` under a fresh `## Unreleased`;
+- the row it prepends to `packages/rati/manifest.json`, whose `url` is what a consumer pins.
 
 A run bumps its consumers to that `url` inside the run, before the release's pull request merges. A session leaves the bump to preflight's pin row in each consumer.
 
