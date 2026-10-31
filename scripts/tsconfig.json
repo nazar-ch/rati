@@ -1,5 +1,5 @@
 {
-    // rati's repo scripts and their suite, run directly on Node.
+    // rati's repo scripts, run directly on Node.
     "extends": "@jnana-app/kit/tsconfig/node.json",
     "include": ["."]
 }

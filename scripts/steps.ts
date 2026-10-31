@@ -1,5 +1,5 @@
-// scripts/steps.ts — the starts ci.ts and release.ts share: a gate step with the terminal attached,
-// and each workspace's build as its package.json `build` script composes it, one operation of
+// scripts/steps.ts — the starts ci.ts makes: a gate step with the terminal attached, and each
+// workspace's build as its package.json `build` script composes it, one operation of
 // @jnana-app/commands per command of the script.
 
 import { readFileSync } from 'node:fs';

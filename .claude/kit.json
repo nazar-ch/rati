@@ -38,22 +38,6 @@
         },
     ],
 
-    // Publishing the public `rati` package stays user-run on the host.
-    "denyRules": {
-        "keywords": ["release", "publish"],
-        "rules": [
-            {
-                "id": "release",
-                "category": "package publish",
-                // `tokenPattern` catches every wrapping of the publish, whose command word is `npm`
-                // in `yarn npm publish`, and leaves release.ts's `--publish` auth check allowed.
-                "command": ["release.ts", "release"],
-                "tokenPattern": "^publish$",
-                "reason": "scripts/release.ts (the `release` script) and a bare `yarn npm publish` bump and publish the public `rati` package to npmjs with the token in this machine's Keychain, and re-running does not undo a publish. Releasing is the maintainer's call (docs/current/RELEASING.md); `--dry-run` is the only safe form and is still user-run."
-            },
-        ],
-    },
-
     // rati's findings track their downstream in jnana, and its configs cite the kit records their
     // shape comes from.
     "citableRepos": ["jnana", "jnana-kit"],
