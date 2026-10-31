@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, test, expect, beforeAll, afterAll } from 'vite-plus/test';
 
 import { dirname, resolve } from 'node:path';
