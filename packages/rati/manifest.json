@@ -1,0 +1,14 @@
+{
+    "package": "rati",
+    "releases": [
+        {
+            "version": "0.7.2-beta.2",
+            "file": "rati-0.7.2-beta.2-15cef84f1a313bbda5bb314c6de50d54.tgz",
+            "url": "https://packages.r2.jnana.app/rati/rati-0.7.2-beta.2-15cef84f1a313bbda5bb314c6de50d54.tgz",
+            "sha256": "02a07d837e2e56a52affdfc424c8dc65035db68548881a3af322ce0b3bee93eb",
+            "payloadSha256": "15cef84f1a313bbda5bb314c6de50d545acca6025d94ad0417266609d2dfcb21",
+            "size": 82715,
+            "publishedAt": "2026-10-31T04:51:57.970Z"
+        }
+    ]
+}
