@@ -1,7 +1,7 @@
 ---
 area: docs/current/RELEASING.md, .claude/kit.json
 needs:
-status: open
+status: done — RELEASING.md cites CHANGELOG.md root-relative, and the battery's scan step holds every doc link to the links rules, so no verify:* script is wired (2026-10-31)
 ---
 
 # FND-10 — RELEASING.md cites CHANGELOG.md parent-relative, and no gate here would catch the next one
