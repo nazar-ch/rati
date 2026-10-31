@@ -11,16 +11,17 @@ Before either release, read the `## Unreleased` entries: every removal names its
 - **`publish.ts prerelease --item <ID>` increments an open series** — `0.7.2-beta.1` to `0.7.2-beta.2`.
 - **`--dry-run` prints the version, the archive name and the changelog heading the run would write**, and writes nothing.
 
-The tool uploads the archive and reads it back over its public URL before it commits anything. It then makes two commits:
+The tool uploads the archive and reads it back over its public URL before it commits anything. It then makes one commit, `<ID>: Release rati v<version>`, carrying:
 
-1. `<ID>: Release rati v<version>` — the version in packages/rati/package.json, and CHANGELOG.md with `## Unreleased` retitled to `## <version> — <UTC day>` under a fresh `## Unreleased`.
-2. `<ID>: Record the rati v<version> release` — the row it prepends to `packages/rati/manifest.json`, whose `url` is what a consumer pins.
+- the version in packages/rati/package.json;
+- CHANGELOG.md with `## Unreleased` retitled to `## <version> — <UTC day>` under a fresh `## Unreleased`;
+- the row it prepends to `packages/rati/manifest.json`, whose `url` is what a consumer pins.
 
 A run bumps its consumers to that `url` inside the run, before the release's pull request merges. A session leaves the bump to preflight's pin row in each consumer.
 
 ## A public release
 
-On the user's word, an agent runs `yarn ci`, then `publish.ts X.Y.Z --item <ID>` from `packages/rati`, then tags `vX.Y.Z` at the record commit and pushes the branch and the tag. The user then publishes on the host, at that commit:
+On the user's word, an agent runs `yarn ci`, then `publish.ts X.Y.Z --item <ID>` from `packages/rati`, then tags `vX.Y.Z` at the release commit and pushes the branch and the tag. The user then publishes on the host, at that commit:
 
 ```sh
 YARN_NPM_AUTH_TOKEN="$(security find-generic-password -a "$USER" -s npm_token_rati -w)" yarn workspace rati npm publish --otp <code>
@@ -36,4 +37,4 @@ security add-generic-password -U -a "$USER" -s npm_token_rati -w
 
 ## If a publish fails
 
-`publish.ts` commits nothing before the upload is proven, and every exit short of the release commit puts `package.json` and `CHANGELOG.md` back. A failed run leaves nothing to undo: fix what its last lines name and run the same command again. A failed `npm publish` leaves the release commits and the tag in place, so run the host command again; npm refuses a version it already holds.
+`publish.ts` commits nothing before the upload is proven, and every exit short of the release commit puts `package.json`, `CHANGELOG.md` and `manifest.json` back. A failed run leaves nothing to undo: fix what its last lines name and run the same command again. A failed `npm publish` leaves the release commit and the tag in place, so run the host command again; npm refuses a version it already holds.
