@@ -1,0 +1,9 @@
+{
+    // The package-root program, on the kit's `configs` profile: the vite and vitest configs, and
+    // the setup file vitest.config.ts loads. The library is src/tsconfig.json, its suites
+    // src/__tests__/tsconfig.json.
+    "extends": "@jnana-app/kit/tsconfig/configs.json",
+    // `files`, never an `include` override: `include` replaces the profile's globs, and `files`
+    // unions with them.
+    "files": ["vitest.setup.ts"]
+}

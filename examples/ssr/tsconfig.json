@@ -1,0 +1,7 @@
+{
+    // serve.ts and vite.config.ts on the kit's `configs` profile; the browser half is
+    // src/tsconfig.json. No `customConditions`: plain Node resolves `rati/server` through the
+    // PUBLISHED entry, which the `prep` step in .claude/kit.json builds.
+    "extends": "@jnana-app/kit/tsconfig/configs.json",
+    "include": ["serve.ts", "vite.config.ts"]
+}

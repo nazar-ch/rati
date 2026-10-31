@@ -1,0 +1,4 @@
+{
+    // The app's vite.config.ts, on the kit's `configs` profile. The app itself is src/tsconfig.json.
+    "extends": "@jnana-app/kit/tsconfig/configs.json"
+}

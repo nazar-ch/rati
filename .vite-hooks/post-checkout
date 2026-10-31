@@ -1,0 +1,4 @@
+#!/bin/sh
+PATH="${JNANA_KIT_HOME:-}/bin:${PATH}"
+export PATH
+exec "${JNANA_KIT_HOME:-}/tools/surface-hook.ts" "${0##*/}"
