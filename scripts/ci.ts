@@ -17,7 +17,7 @@
 //     than a per-push one; ./steps.ts composes each workspace's build.
 //
 // Every start goes through a wrapper of @jnana-app/commands, built in the `import.meta.main` block
-// and handed to `ci`.
+// and handed to `main`.
 
 import path from 'node:path';
 import process from 'node:process';
@@ -72,7 +72,7 @@ function stagesOf(programs: CiPrograms, root: string, fuzzRuns: string): Stage[]
 }
 
 /** Runs the stages `argv` names, every stage where it names none, and answers the exit code. */
-export async function ci(
+export async function main(
     argv: readonly string[],
     programs: CiPrograms,
     root: string,
@@ -117,7 +117,7 @@ if (import.meta.main) {
     const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
     // `vp` lives in the workspace bin, which a bare shell's PATH lacks.
     process.env['PATH'] = `${path.join(root, 'node_modules', '.bin')}:${process.env['PATH']}`;
-    process.exitCode = await ci(
+    process.exitCode = await main(
         process.argv.slice(2),
         { vp: new Vp(), tsc: new Tsc(), compiler: declaredCompiler() },
         root,
