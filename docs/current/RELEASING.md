@@ -21,7 +21,7 @@ A run bumps its consumers to that `url` inside the run, before the release's pul
 
 ## A public release
 
-On the user's word, an agent runs `yarn ci`, then `publish.ts X.Y.Z --item <ID>` from `packages/rati`, then tags `vX.Y.Z` at the record commit and pushes the branch and the tag. The user then publishes on the host, at that commit:
+On the user's word, an agent runs `yarn ci`, then `publish.ts X.Y.Z --item <ID>` from `packages/rati`, then tags `vX.Y.Z` at the release commit and pushes the branch and the tag. The user then publishes on the host, at that commit:
 
 ```sh
 YARN_NPM_AUTH_TOKEN="$(security find-generic-password -a "$USER" -s npm_token_rati -w)" yarn workspace rati npm publish --otp <code>
@@ -37,4 +37,4 @@ security add-generic-password -U -a "$USER" -s npm_token_rati -w
 
 ## If a publish fails
 
-`publish.ts` commits nothing before the upload is proven, and every exit short of the release commit puts `package.json` and `CHANGELOG.md` back. A failed run leaves nothing to undo: fix what its last lines name and run the same command again. A failed `npm publish` leaves the release commits and the tag in place, so run the host command again; npm refuses a version it already holds.
+`publish.ts` commits nothing before the upload is proven, and every exit short of the release commit puts `package.json`, `CHANGELOG.md` and `manifest.json` back. A failed run leaves nothing to undo: fix what its last lines name and run the same command again. A failed `npm publish` leaves the release commit and the tag in place, so run the host command again; npm refuses a version it already holds.
