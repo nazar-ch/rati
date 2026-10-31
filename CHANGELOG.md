@@ -6,6 +6,8 @@ What breaks and what it maps to, per release, because rati is pre-1.0 and a mino
 
 ## Unreleased
 
+## 0.7.2-beta.2 — 2026-10-31
+
 Fixed:
 
 - **`rati/data`'s imperative entry points read without a MobX warning** under an app's `observableRequiresReaction`. `query`'s `prime()`, `keyed`'s `get`, a field's `validate()`, a form's `submit` and `pagedCollection`'s `loadMore()` and `refresh()` each read their own observable state before acting, and called from an event handler, an effect or a scope load — where they are called — every one of those reads logged `[mobx] Observable '…' being read outside a reactive context`. Nothing to migrate.
