@@ -1,0 +1,78 @@
+// rati's jnana-kit manifest, JSONC; each field's contract is the kit's kit.schema.json.
+//
+// `$schema` names the INSTALLED copy, so the .yarnrc.yml pin picks the schema version as it picks
+// the gate (kit◊ASK-04). No gate reads the pointer: it buys an editor hint.
+{
+    "$schema": "../node_modules/@jnana-app/kit/kit.schema.json",
+
+    "project": "rati",
+
+    "sizeExempt": {
+        "dirFiles": [
+            { "path": "packages/rati/src/__tests__/mandala", "reason": "past the limit when the size gate landed, and exempt until its split" },
+            { "path": "packages/rati/src/__tests__/router", "reason": "past the limit when the size gate landed, and exempt until its split" },
+        ],
+    },
+
+    "loadedByPath": [
+        {
+            "path": "examples/ssr/src/entry-server.tsx",
+            "reason": "examples/ssr/serve.ts imports its build output, dist/server/entry-server.js, by URL for `render` and `assets`, and `vp dev` renders through it by ratiSsr()'s default entry",
+        },
+    ],
+
+    // `packages/rati/dist` is `prep`'s output, listed because this one trigger runs `prep` too: a
+    // provisioned checkout already carries `node_modules`.
+    "bootstrapStale": {
+        "missing": ["node_modules", "packages/rati/dist"],
+    },
+
+    // examples/ssr/tsconfig.json resolves `rati/server`, `rati/ssr` and `rati/vite` through the
+    // PUBLISHED `dist/*.d.ts` entries, so a checkout that never built fails `ssr-demo#typecheck`.
+    "prep": [
+        {
+            "id": "rati-build",
+            "label": "rati dist",
+            "command": "yarn workspace rati build && echo built",
+        },
+    ],
+
+    // rati's findings track their downstream in jnana, and its configs cite the kit records their
+    // shape comes from.
+    "citableRepos": ["jnana", "jnana-kit"],
+
+    // Walks DOWN only: a raise is the user's call, never a branch's. The root CLAUDE.md stays an
+    // empty tracked file, so a session reads one surface.
+    "memory": {
+        "alwaysLoadedTotal": 9320,
+    },
+
+    "styleSweep": {
+        "docsBaseline": "fe110d8b843ef1936918920c399c1a189cd56928",
+        "commentsBaseline": "037cecb68a44c459bb0bb01356f8957d979b746d",
+    },
+
+    "testOnlyExports": {
+        "state": "count",
+        "ceiling": 12,
+        "reason": "rati's own test-only and unimported exports, counted when kit◊TT-60 took the check to its default; a sweep giving each its own file or un-exporting it lowers the ceiling and deletes the key",
+    },
+
+    "terms": {
+        "state": "count",
+        "ceiling": { "spec-ids/span": 334 },
+        "reason": "rati defines no product tier, so every emphasis span reads as an unresolved term; its prose answers to the doc-style sweep that converts stress emphasis to caps, and that sweep lowers this ceiling to zero and deletes the key",
+    },
+
+    "productExplanations": {
+        "state": "count",
+        "ceiling": { "spec-ids/explanation": 2 },
+        "reason": "rati's explanation paragraphs under lines approved with no other token, counted when kit◊PE-08 pinned the release carrying the rule; rati's own product-exits effort, planned on jnana-kit's product-exits results, lowers the ceiling and deletes the key",
+    },
+
+    "specParagraphs": {
+        "state": "count",
+        "ceiling": { "spec-ids/paragraph": 18 },
+        "reason": "rati's `¶¶` blocks in its product docs, counted when kit◊PE-08 pinned the release that reads them as paragraphs; rati's own product-exits effort, planned on jnana-kit's product-exits results, lowers the ceiling and deletes the key",
+    },
+}

@@ -1,0 +1,4 @@
+{
+    // The repo-root configs' program. scripts/ is scripts/tsconfig.json.
+    "extends": "@jnana-app/kit/tsconfig/configs.json"
+}

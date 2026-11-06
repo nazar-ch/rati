@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "${JNANA_KIT_HOME:-}/tools/surface-hook.ts" "${0##*/}"

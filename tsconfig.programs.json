@@ -1,0 +1,17 @@
+{
+    // The programs the gate's `typecheck` step builds with `tsc -b`.
+    // packages/rati/tsconfig.build.json stays out: it is `rati#build`'s declaration emit over the
+    // program src/tsconfig.json names.
+    "files": [],
+    "references": [
+        { "path": "./tsconfig.json" },
+        { "path": "./scripts/tsconfig.json" },
+        { "path": "./packages/rati/tsconfig.json" },
+        { "path": "./packages/rati/src/tsconfig.json" },
+        { "path": "./packages/rati/src/__tests__/tsconfig.json" },
+        { "path": "./examples/demo/tsconfig.json" },
+        { "path": "./examples/demo/src/tsconfig.json" },
+        { "path": "./examples/ssr/tsconfig.json" },
+        { "path": "./examples/ssr/src/tsconfig.json" }
+    ]
+}

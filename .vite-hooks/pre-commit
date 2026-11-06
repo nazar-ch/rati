@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "${JNANA_KIT_HOME:-}/tools/pre-commit-gate.ts"
