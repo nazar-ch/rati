@@ -210,13 +210,9 @@ describe('the CSR fallback', () => {
         });
     });
 
-    // @kit long: 2
     // The handler's own misconfiguration is not a render failure: with no template, a
     // fragment app's `assemble` throws its config error, and the fallback, reading no
     // template as a whole-document app, synthesizes a shell with no `#root`. Plain text.
-    //
-    // Kill: requestHandler.ts, the catch — drop the `error instanceof Unservable` line
-    // → the assets synthesize an `<html>` this app cannot run.
     test('answers plainly when a fragment app has no template, assets or not', async () => {
         const onError = vi.fn();
         const handler = createRequestHandler({

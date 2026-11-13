@@ -10,16 +10,8 @@ import { RouterProvider } from '../../router/RouterProvider.js';
 import { RouterStore } from '../../router/store.js';
 
 /**
- * @kit long: 2
  * `<Link>` navigates to the URL the ANCHOR resolved, and decides active state against the
- * same resolution. Kills:
- *
- *   - the click handler as `router.navigate(href)` → every pin whose resolution differs from
- *     its spelling goes red; `href="/x"` stays green, resolving to itself;
- *   - `isHrefActive` as `router.isPath(href)` → only `href="c"` goes red.
- *
- * The `..`/`sub`/external INACTIVE pins pass under both: regression cover in the other
- * direction.
+ * same resolution.
  */
 
 const NoopComponent: FC = () => null;

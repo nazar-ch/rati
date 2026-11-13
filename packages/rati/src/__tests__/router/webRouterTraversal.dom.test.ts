@@ -5,8 +5,8 @@ import { route } from '../../router/route.js';
 import { RouterStore } from '../../router/store.js';
 
 // Arrival at an entry that already exists, the half of setPath the push-side suites never
-// reach; each pin names its kill. A memory history owns its stack, so `back`/`forward`
-// restore the entry's own state and key and emit POP synchronously.
+// reach. A memory history owns its stack, so `back`/`forward` restore the entry's own state
+// and key and emit POP synchronously.
 
 const NoopComponent = () => null;
 
@@ -60,9 +60,6 @@ describe('Router traversal — back()/forward()/go() on the public surface', () 
 });
 
 describe('RouterStore across back/forward', () => {
-    // Kill: compare the marker against the marker string alone, ignoring the counter
-    // (stamp `{ skip: this.sessionId }` and test for it) → the marker never goes stale,
-    // the POP is skipped, and this reads 'home'.
     test('a POP back onto a shallow entry finds its marker stale and re-resolves', () => {
         const history = createMemoryHistory({ url: '/dashboard' });
         const router = new RouterStore(routes, { history });
@@ -84,9 +81,6 @@ describe('RouterStore across back/forward', () => {
         router.dispose();
     });
 
-    // Kill: drop the session id from the comparison (test the counter half alone) —
-    // the replayed counter then matches the restored tab's marker, the arrival is
-    // skipped, and this reads 'dashboard'.
     test("a shallow entry's marker is stale for the next session's store", () => {
         const history = createMemoryHistory({ url: '/dashboard' });
         const first = new RouterStore(routes, { history });
@@ -107,9 +101,6 @@ describe('RouterStore across back/forward', () => {
         second.dispose();
     });
 
-    // Kill: drop `!stateChanged` from setPath's same-path early return — the two entries
-    // are then indistinguishable to it and the traversal resolves nothing, leaving the
-    // route keyed to the entry the user just left.
     test('stepping back between two entries that share a URL but not their state re-resolves', () => {
         const history = createMemoryHistory({ url: '/users/1' });
         const router = new RouterStore(routes, { history });

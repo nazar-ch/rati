@@ -37,15 +37,9 @@ function ledger(source: ControllableSource<string>) {
 }
 
 describe('StrictMode — the refresh machinery', () => {
-    // @kit long: 2
     // A refresh reaches the SURVIVING run's live buckets, and its cascade swaps the
     // dependent source there: three instances across two generations and a swap, each
     // attached once and released.
-    //
-    // Kill: resolver.tsx `processDirtyCells()`, the source-swap branch — drop the
-    // `.filter(…)` that evicts the leaver, keeping only the `.concat(…)` → the swapped-out
-    // source stays in the level's array, so its Step keeps it attached (a live bucket
-    // still holds it) and it feeds nothing for the rest of the island's life: live 1.
     test('a refresh-driven source swap on the surviving run is released at teardown', async () => {
         // One source instance per generation — the double-mount and the swap between them
         // build three, and each carries its own ledger so the generations stay distinct.

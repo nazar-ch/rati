@@ -283,8 +283,7 @@ describe('RouterStore navigation', () => {
 
 /**
  * The router's string vocabulary is absolute paths: a relative one means two places on the
- * two histories, so it is refused at the choke point. Kill: drop `assertAbsolutePathTarget`
- * from `pushOrReplace` → every refusal pin goes red, the absolute and object pins green.
+ * two histories, so it is refused at the choke point.
  */
 describe('RouterStore refuses a non-absolute string target', () => {
     test.each([
@@ -307,8 +306,7 @@ describe('RouterStore refuses a non-absolute string target', () => {
     });
 
     // A leading '/' can still name another origin: the parser reads `//host` out of each of
-    // these spellings, so the guard refuses with the memory history's own parse. Kill: drop
-    // the origin check → these pins and both redirect.dom.test.tsx pins go red.
+    // these spellings, so the guard refuses with the memory history's own parse.
     test.each([
         ['a protocol-relative URL', '//example.com/x'],
         ['a backslash authority', '/\\example.com/x'],

@@ -81,8 +81,6 @@ describe('installScrollRestoration', () => {
     // has no layout. A memory history restores the entry's own key on traversal, the whole
     // input to the position lookup.
 
-    // Kill: delete the `if (action === 'POP')` restore block → the POP takes the PUSH path
-    // and this reads (0, 0).
     test('POP restores the position saved for the entry being returned to', () => {
         const history = createMemoryHistory({ url: '/a' });
         const uninstall = installScrollRestoration(history);
@@ -103,8 +101,6 @@ describe('installScrollRestoration', () => {
         uninstall();
     });
 
-    // Kill: drop the `if (saved)` guard → the unguarded read throws on the entry with no
-    // saved position. A mutant defaulting the lookup to (0, 0) is the anchor pin's to catch.
     test('POP to an entry with no saved position falls through to the top', () => {
         const history = createMemoryHistory({ url: '/a' });
         history.push('/b');
@@ -122,9 +118,6 @@ describe('installScrollRestoration', () => {
         uninstall();
     });
 
-    // Kill: return after the POP lookup instead of falling through (`if (saved) {…}
-    // scrollToTop(); return;` — the plausible "restore or top" simplification) → the
-    // anchor is never consulted and this reads red.
     test('POP to an unvisited entry with a hash scrolls to the anchor, not the top', () => {
         const target = document.createElement('div');
         target.id = 'section';
@@ -162,8 +155,7 @@ describe('installScrollRestoration', () => {
         flushScrollRestoration();
 
         expect(target.scrollIntoView).toHaveBeenCalled();
-        // The anchor WINS, rather than merely also running. Kill: drop the `return` after
-        // scrollIntoView → the fall-through scrolls to top as well.
+        // The anchor WINS, rather than merely also running.
         expect(window.scrollTo).not.toHaveBeenCalled();
         document.body.removeChild(target);
         uninstall();
