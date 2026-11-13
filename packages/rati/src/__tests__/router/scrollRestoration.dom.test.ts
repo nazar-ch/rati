@@ -155,8 +155,7 @@ describe('installScrollRestoration', () => {
         flushScrollRestoration();
 
         expect(target.scrollIntoView).toHaveBeenCalled();
-        // The anchor WINS, rather than merely also running. Kill: drop the `return` after
-        // scrollIntoView → the fall-through scrolls to top as well.
+        // The anchor WINS, rather than merely also running.
         expect(window.scrollTo).not.toHaveBeenCalled();
         document.body.removeChild(target);
         uninstall();

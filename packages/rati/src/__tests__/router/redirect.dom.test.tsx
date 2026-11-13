@@ -139,7 +139,7 @@ describe('route-level redirects', () => {
         // The route's own component reaches the DOM — not the catch-all, not a blank screen.
         expect(['a', 'b']).toContain(tr.container.textContent);
         // The cap, stated where it is observable: one hop per level the guard allowed
-        // and no eleventh. Kill: move MAX_REDIRECT_DEPTH — the trail's length follows it.
+        // and no eleventh.
         expect(tr.router.redirectHops).toHaveLength(10);
         expect(tr.router.redirectHops[0]).toEqual({ from: '/a', to: '/b', permanent: false });
         expect(error).toHaveBeenCalledOnce();
@@ -164,8 +164,7 @@ describe('route-level redirects', () => {
         router.navigate('/self');
 
         // Entering from another route is load-bearing: the same-path early return needs a
-        // resolved `activeRoute` to skip past. Kill: revert the self-check → this reads 'home',
-        // the previous page at the new URL.
+        // resolved `activeRoute` to skip past.
         expect(router.activeRoute?.name).toBe('self');
         expect(router.path).toBe('/self');
         expect(router.history.location.pathname).toBe('/self');
@@ -276,8 +275,7 @@ describe('route-level redirects', () => {
     /**
      * The open-redirect shape the origin check exists for: `%2F` decodes to `/`, so a mapper
      * can compose `//evil.com`, which passes the absolute-path check and rides `prepareRoute`
-     * into the `Location` header. Refused before the hop is recorded; the kill is
-     * webRouterCore.dom.test.ts's.
+     * into the `Location` header. Refused before the hop is recorded.
      */
     test('a redirect target carrying an authority is refused, not followed', () => {
         const routes = [

@@ -166,8 +166,7 @@ describe('getPath param substitution', () => {
 
 describe('getPath dot-only param refusal', () => {
     // No URL carries a param value of exactly '.' or '..', so getPath refuses one rather
-    // than building a URL that lands elsewhere; 'a.b' and '..x' round-trip. Kill: comment
-    // the throw out → both tests below go red, the dot-carrying pins stay green.
+    // than building a URL that lands elsewhere; 'a.b' and '..x' round-trip.
     test('a param value of exactly "." throws, naming the route', () => {
         const router = new RouterStore(routes);
 
