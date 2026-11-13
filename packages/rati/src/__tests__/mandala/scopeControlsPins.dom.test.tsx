@@ -22,17 +22,13 @@ const Loading: FC = () => <div>loading...</div>;
 afterEach(cleanup);
 
 /*
-    The deterministic pins for the refresh machinery, each with a KILL note: the one-line source
-    mutation that must make it fail. They guard the contract docs/current/public/reference.md
-    states for `useScopeControls`, never the mechanism.
+    The deterministic pins for the refresh machinery. They guard the contract
+    docs/current/public/reference.md states for `useScopeControls`, never the mechanism.
 */
 
 describe('selective refresh — races', () => {
     // Pin 1. The race guard: the newest re-run of a key wins, whenever the older one lands,
     // and `refresh(key)` resolves for both callers.
-    //
-    // Kill: refresh.ts `settled()` — drop `cell.refreshing?.token !== token` from the
-    // guard → the superseded run applies and 'stale' renders over 'v3'.
     test('a superseded refresh: the older settle is discarded, the newer one wins', async () => {
         const runs: ReturnType<typeof deferred<string>>[] = [];
         const testScope = scope().load({
@@ -93,9 +89,6 @@ describe('selective refresh — races', () => {
 
     // Pin 2. A remount discards the cells a refresh was re-running: the bookkeeping settles
     // wholesale, and the late settle touches nothing.
-    //
-    // Kill: refresh.ts `treeCommitted()` — drop the `this.pendingKeys.clear()` branch →
-    // the discarded refresh stays in `pending` for the fresh tree's lifetime.
     test('a remount during an in-flight refresh: waiters settle, pending clears, the late settle is inert', async () => {
         const runs: ({ id: string } & ReturnType<typeof deferred<string>>)[] = [];
         const testScope = scope({ id: input<string>() }).load({
@@ -166,9 +159,6 @@ describe('selective refresh — races', () => {
 
     // Pin 6. Two keys re-fetching at once are tracked independently — `pending` holds
     // both, and neither settle order loses an update.
-    //
-    // Kill: refresh.ts `settled()` — a global guard (`cell.refreshing?.token !==
-    // this.tokens`) → the later refresh supersedes the earlier KEY; x stays 'x1'.
     test('concurrent refreshes of different keys: pending holds both; either settle order converges', async () => {
         const xRuns: ReturnType<typeof deferred<string>>[] = [];
         const yRuns: ReturnType<typeof deferred<string>>[] = [];
@@ -227,9 +217,6 @@ describe('selective refresh — races', () => {
 
     // A cascade-swapped source that errors settles its swap like a first ready:
     // the key leaves `pending` before the boundary shows the error slot.
-    //
-    // Kill: resolver.tsx, the source error branch — drop the `sourceErrored` call → 'live'
-    // stays in `pending` for the error slot's whole life.
     test('a swapped source that errors settles the swap: the error slot reads an empty pending', async () => {
         const log: string[] = [];
         let version = 1;
@@ -289,8 +276,6 @@ describe('selective refresh — cascade semantics', () => {
     // Pin 3. The cascade is transitive (a → b → c) and stops at the first link whose
     // value did not move: the `useScopeControls` promise of
     // docs/current/public/reference.md, applied at every hop.
-    //
-    // Kill: refresh.ts `settled()` — `const changed = true` → the equal `b` re-runs `c`.
     test('a transitive cascade: an equal middle link cuts the chain, a changed one carries it', async () => {
         let aValue = 1;
         const runs = { a: 0, b: 0, c: 0 };
@@ -353,15 +338,10 @@ describe('selective refresh — cascade semantics', () => {
         expect(screen.getByText('c even')).toBeTruthy();
     });
 
-    // @kit long: 2
     // Pin 4. Read-sets re-record on every run, so a lazily-reading producer cascades from
     // what it CURRENTLY reads. Both dependent kinds are here: a promise re-run rewrites its
     // cell's read-set and a sync re-run swaps in a new cell, so a pin on one kind passes
     // while the other is frozen.
-    //
-    // Kill: resolver.tsx `processDirtyCells()` — drop `cell.reads = next.reads` → the
-    // promise dependent's first read-set is frozen, so after the flip `refresh('b')`
-    // never reaches it and `picked` stays 'b2'.
     test('a lazy read-set re-records per run: a flipped conditional read cascades from the new set', async () => {
         let useA = true;
         let aValue = 'a1';
@@ -445,9 +425,6 @@ describe('selective refresh — cascade semantics', () => {
 
     // Pin 9. `data(fn, { equals })` gates THAT LOAD's value wherever the re-run came from,
     // a cascade included.
-    //
-    // Kill: refresh.ts `settled()` — `const equals = deepEqual` (ignore `cell.equals`)
-    // → the deep comparer sees body 1 → 3, calls it changed, and `formatted` re-runs.
     test('data(fn, { equals }) gates a cascaded re-run of the dependent, not only a direct refresh', async () => {
         let aValue = 1;
         const runs = { doc: 0, formatted: 0 };
@@ -512,9 +489,6 @@ describe('selective refresh — cascade semantics', () => {
 describe('selective refresh — hydrated cells', () => {
     // Pin 5. A hydrated cell never ran its producer, so it has no read-set: it answers a
     // DIRECT refresh and joins the cascade only from that run on.
-    //
-    // Kill: resolver.tsx `buildCell()` — `rerunnable: false` on the hydration
-    // short-circuit → the hydrated cell never re-runs.
     test('a hydrated cell answers a direct refresh and joins the cascade from that run on', async () => {
         let aValue = 'a1';
         const runs = { a: 0, b: 0 };

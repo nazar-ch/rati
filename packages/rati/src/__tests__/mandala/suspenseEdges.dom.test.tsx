@@ -8,9 +8,9 @@ import { controllableSource, deferred, flush, renderIsland, cleanup } from '../.
 /*
     @kit long: 2
     The Suspense-produced situations React makes possible around a committed island — pins
-    10-12, one per situation in packages/rati/src/__tests__/suspense-situations.md (S4, S5, S8),
-    each with a KILL note. They assert the contract, never the mechanism: the ledger's BOUNDS —
-    no second attach of a live entry, balance at teardown — not its event sequence.
+    10-12, one per situation in packages/rati/src/__tests__/suspense-situations.md (S4, S5, S8).
+    They assert the contract, never the mechanism: the ledger's BOUNDS — no second attach of a
+    live entry, balance at teardown — not its event sequence.
 
     A `controllableSource` transition drives an ASYNC act and is awaited: a transition can
     re-suspend, and under a sync act React never delivers the retry.
@@ -50,14 +50,9 @@ function promiseStore(initial: Promise<string>) {
 }
 
 describe('S4 — re-suspension of committed content', () => {
-    // @kit long: 2
     // Pin 10. A hook load returning a fresh pending promise re-suspends a COMMITTED Step,
     // which React hides (Offscreen) and reveals, re-running the subtree's effects. The
     // ledger's bounds, the content and the cached data cells survive.
-    //
-    // Kill: resolver.tsx, the Step's layout attach — drop the `if (!entry.detach)`
-    // guard → a reveal re-runs the attach loop over an entry that never detached, and
-    // `peak` is 2. It dies on the FIRST hide/reveal, the label's initial suspension.
     test('a hook load re-suspending hides and reveals content without double-attaching or re-running producers', async () => {
         const feed = controllableSource<string>();
         let itemRuns = 0;
@@ -126,14 +121,9 @@ describe('S4 — re-suspension of committed content', () => {
 });
 
 describe('S5 — unmount while suspended', () => {
-    // @kit long: 2
     // Pin 11. The island unmounts with a load in flight, whose late settle must be inert —
     // no throw, no log — and the level's source, CREATED but never attached (S12), is
     // balanced at 0/0.
-    //
-    // Kill: refresh.ts `sweepDetach()` — `if (entry.detach) {` → `if (true) {` (the
-    // sweep assuming every source in a bucket attached) → it calls a null detach on the
-    // never-attached entry, and the caught TypeError logs 'Source detach failed'.
     test('a late settle into a discarded tree is inert; a never-attached source is balanced at 0/0', async () => {
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -181,10 +171,6 @@ describe('S8 — a mid-tree source dropping to pending', () => {
     // renders them again with NO PRODUCER RE-RUNS, as docs/current/public/reference.md
     // states for sources. The deeper source's attach/detach churn through the window is
     // the engine's choice — only the bounds are asserted (S8).
-    //
-    // Kill: resolver.tsx, the source-snapshot gate in the resolve loop — `if
-    // (!equals(cell.lastValue, state.value))` → `if (true)` → the recovery blip is
-    // called a change, cascades, and `derived` re-runs.
     test('recovering onto the same value re-renders the levels below with no producer re-runs', async () => {
         const feed = controllableSource<string>();
         const deep = controllableSource<string>();
@@ -239,9 +225,6 @@ describe('S8 — a mid-tree source dropping to pending', () => {
     // its bucket is live defers its sources to the sweep, so an unmount DURING the pending
     // window leaves `deep` attached with only the sweep to release it. On every other path
     // a still-mounted Step sees a null cache and detaches everything itself.
-    //
-    // Kill: mandala.tsx, the unmount effect's cleanup — drop
-    // `sweepDetach(cacheRef.current?.buckets)` → `deep` is never detached: live 1.
     test('unmounting during the pending window releases what the torn-down levels kept', async () => {
         const feed = controllableSource<string>();
         const deep = controllableSource<string>();

@@ -137,8 +137,6 @@ describe('route-level redirects', () => {
         // property makes the same call (see routerAsserts' capped-cycle oneOf).
         expect(['a', 'b']).toContain(tr.router.activeRoute?.name);
         // The route's own component reaches the DOM — not the catch-all, not a blank screen.
-        // Kill: a Router declining to render a route still carrying a `redirect` → the
-        // store's answer stays right and the screen goes empty.
         expect(['a', 'b']).toContain(tr.container.textContent);
         // The cap, stated where it is observable: one hop per level the guard allowed
         // and no eleventh. Kill: move MAX_REDIRECT_DEPTH — the trail's length follows it.
@@ -147,7 +145,6 @@ describe('route-level redirects', () => {
         expect(error).toHaveBeenCalledOnce();
         expect(error.mock.calls[0]![0]).toContain('redirect loop');
         // The trail in the report is the only place naming the routes the cycle ran through.
-        // Kill: drop the hops join from the message.
         expect(error.mock.calls[0]![0]).toContain('/a → /b → /a');
         error.mockRestore();
     });
@@ -233,14 +230,8 @@ describe('route-level redirects', () => {
     });
 
     /**
-     * @kit long: 2
      * A relative target is refused where the redirect is followed — else a RELATIVE
      * self-target walks past the loop check, which compares resolutions (`'self' !== '/self'`).
-     *
-     * Kill: drop both guards → one hop recorded, NO LOOP REPORTED, `home` on screen at `/self`;
-     * both pins go red. Dropping ONLY the redirect branch's guard is the sharper kill: the
-     * nested `replace` still throws, but names `[rati] replace:` rather than the declaring
-     * route and records the hop first. The function-redirect pin is regression cover only.
      */
     test('a relative redirect target is refused rather than resolved', () => {
         const error = vi.spyOn(console, 'error').mockImplementation(() => {});

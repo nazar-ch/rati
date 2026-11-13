@@ -172,10 +172,6 @@ describe('SSR sources — error paths', () => {
     // What rati adds is the `collectError` record (the server's 404/5xx signal) — reached
     // here through a SOURCE, and the client then makes its own attempt against a fresh
     // instance.
-    //
-    // Kill: ssrSource.ts `firstSettle()` — `reject(state.error)` → `reject(new
-    // Error('source failed'))`, the wrapper the comment there warns about → the code is
-    // erased, 'not-available' arrives as 'failed', and the 404 signal is gone.
     test('a marked source erroring server-side degrades to the loading slot and records the error', async () => {
         const serverLog: string[] = [];
         const clientLog: string[] = [];
@@ -227,9 +223,6 @@ describe('SSR sources — error paths', () => {
 
     // Pin 7b. A seed the client cannot apply — a throwing `hydrate()` — is logged and
     // dropped, and the source resolves live.
-    //
-    // Kill: resolver.tsx `buildCell()`, the seed branch — `throw error` in place of the
-    // catch's `console.error(...)` → the hydration render goes down.
     test('a seed whose hydrate() throws is logged, and the source resolves live anyway', async () => {
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         const serverLog: string[] = [];
