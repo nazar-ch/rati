@@ -270,21 +270,21 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.9-a6f6e602ea9933126fcada895fec6512.tgz":
-  version: 0.0.9
-  resolution: "@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.9-a6f6e602ea9933126fcada895fec6512.tgz"
+"@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.11-7b419d57d41ce19a43802f68c80d295e.tgz":
+  version: 0.0.11
+  resolution: "@jnana-app/commands@https://packages.r2.jnana.app/jnana-app-commands/jnana-app-commands-0.0.11-7b419d57d41ce19a43802f68c80d295e.tgz"
   peerDependencies:
     "@types/node": "*"
   peerDependenciesMeta:
     "@types/node":
       optional: true
-  checksum: 10/ff059759607d9932090ae43d0bf628fd44c5f3e677226b8027c630afbc00f3dc6e356d0b44734f24eb0332c02f259a321b5233eae100ab634a432f93104d0cbf
+  checksum: 10/4a9569f41482f546087eed315d33ec0118bc552849d972d0626ff371a14bd374a070b5e5cd689603b3363484bdb15052249cb8f4ba3b9f7a3ca57447345f1d6e
   languageName: node
   linkType: hard
 
-"@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.39-f541be188563ddc782a923ad2adb85b4.tgz":
-  version: 0.0.39
-  resolution: "@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.39-f541be188563ddc782a923ad2adb85b4.tgz"
+"@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.40-cf37cf3c89b4b1c23ae06f3645ae134e.tgz":
+  version: 0.0.40
+  resolution: "@jnana-app/kit@https://packages.r2.jnana.app/jnana-app-kit/jnana-app-kit-0.0.40-cf37cf3c89b4b1c23ae06f3645ae134e.tgz"
   dependencies:
     "@tsconfig/node26": "npm:^26.0.0"
     "@tsconfig/strictest": "npm:^2.0.8"
@@ -298,7 +298,7 @@ __metadata:
       optional: true
     jsdom:
       optional: true
-  checksum: 10/b3e8d7a5e196b32f93aa71ef4d3c788d25f9bafc4901d6f487f55f2370d25855cadc3309a4ab6cb712e4cfc7250d66fb2a342bfb7e5cfd00bf8bae8a41d6d4cc
+  checksum: 10/488bf9ebee7b04eabeade597d1682543329e7360cc8198490a6dd185cb4a72ae0cc8493b2c146e8cfe0789a7a5e463ee1046692b307ca1bae0fc4b35ea1e450a
   languageName: node
   linkType: hard
 
