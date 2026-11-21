@@ -6,7 +6,7 @@
 
 <!--r-->
 
-- **A consumer-visible change takes a CHANGELOG.md `## Unreleased` bullet in the same commit** — a removal or rename with its replacement, a fix consumers worked around, new public API. A release retitles the section, so a missed entry is never written. A non-empty section at a branch's exit owes a release: `publish.ts prerelease --item <ID>` in `packages/rati`, `<X.Y.Z>-beta.1` opening a series.
+- **A consumer-visible change takes a CHANGELOG.md `## Unreleased` bullet in the same commit** — a removal or rename with its replacement, a fix consumers worked around, new public API. A release retitles the section, so a missed entry is never written. A non-empty section at a branch's exit owes a release: `kit.ts publish prerelease --item <ID>` in `packages/rati`, `<X.Y.Z>-beta.1` opening a series.
 
 evidence: 0.7.0 shipped with no `## Unreleased` entry, and the consumer adopting it read `git log` instead.
 
