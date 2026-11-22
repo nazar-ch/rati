@@ -1,7 +1,7 @@
 ## Workflow
 
 - **rati declares no `verify:*` scripts and must not gain any** — the battery is the list.
-- **`yarn ci` is the release ritual**, running what the battery skips: `fuzz` (the randomized suites at `FUZZ_RUNS=500`) and `build` (library bundle + d.ts, then both examples). Run it before a public release, and after touching the mandala engine or the build.
+- **`yarn ci` is the release ritual**, running what the battery skips: `fuzz` (the randomized suites at `FUZZ_RUNS=500`) and `build` (library bundle + d.ts, then both examples). Run it before a public release, and after touching code a fuzz suite exercises, or the build.
 - Keep the canonical docs in sync with the behavior they describe — that tree is what the website renders.
 
 <!--r-->
