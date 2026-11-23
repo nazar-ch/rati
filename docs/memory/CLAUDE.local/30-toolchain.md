@@ -1,6 +1,6 @@
 ## Toolchain
 
-Type-checking is **tsc** run from the workspace root as `yarn run -T tsc`, and lint/format config lives in the root `vite.config.ts` `lint`/`fmt` blocks. The pinned versions, the `.d.ts` emit and the lint deviations are docs/current/internals.md §Toolchain.
+Type-checking is **tsc** run from the workspace root as `yarn run -T tsc`, and lint/format config lives in the root `vite.config.ts` `lint`/`fmt` blocks. The toolchain's detail (e.g. the pinned versions, the `.d.ts` emit, the lint deviations) is docs/current/internals.md §Toolchain.
 
 ```bash
 vp run rati#build         # vite lib bundle + tsc emits dist/*.d.ts

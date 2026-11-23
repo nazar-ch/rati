@@ -6,4 +6,4 @@
 
 It has no server and no build script of its own: `rati/vite` runs dev and both build environments (`vp dev` / `vp build`), so `index.html` is a plain shell — no `<script>`, no build input. `serve.ts` is ~12 lines over `rati/server` (`vp run ssr-demo#start`, after `vp run rati#build` — plain node resolves the published entry, not the `rati-dev` source condition).
 
-The mechanism the gallery leans on — `prerender` over `renderToString`, dehydration through the `rati/ssr` entry, and what that demands of a load or a `Source` — is docs/current/internals.md §SSR dehydration.
+The mechanism the gallery leans on (e.g. dehydration through the `rati/ssr` entry, what it demands of a load or a `Source`) is docs/current/internals.md §SSR dehydration.

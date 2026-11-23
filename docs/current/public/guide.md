@@ -799,5 +799,5 @@ Provide the container through your own React context (a `createContext` + a `use
 ## What rati is not
 
 - **Not a fetch client.** Loads are plain async functions; bring your own API client, and its types come along for free.
-- **Not a request cache.** Loads are cached per island instance (one screen, one resolution), not in a global normalized cache. If you have react-query/Apollo for caching, adapt it through `hook()` — rati is the layer between your data and your components, not a replacement for your transport.
+- **Not a request cache.** Loads are cached per island instance (one screen, one resolution), not in a global normalized cache. If you have a caching library (e.g. react-query, Apollo), adapt it through `hook()` — rati is the layer between your data and your components, not a replacement for your transport.
 - **Not a state manager.** For client state, use what you like; rati's core has no external dependencies, and optional MobX bindings live in `rati/mobx`.
