@@ -258,7 +258,7 @@ It serves files from `staticDir` with correct MIME types (a browser rejects a `<
 The one rule everything above follows: **everything request-scoped is created inside `createApp`, never at module level.** The server renders many requests in one process — a module-level router, store, head store, or API client with a cookie jar is state shared across users. Corollaries:
 
 - One app instance per request; `renderApp` calls `router.dispose()` for you (release history listeners). If you drive the pieces yourself, dispose in a `finally`.
-- Request context (auth, cookies, locale) enters through the stores you construct in `createApp`; scope loads read them via `hook()` as usual. There is no ambient request object — thread it through the factory.
+- Request context (e.g. auth, cookies, locale) enters through the stores you construct in `createApp`; scope loads read them via `hook()` as usual. There is no ambient request object — thread it through the factory.
 - The head store is per-request for the same reason (see below) — `HeadProvider` with a module-global store would let concurrent requests overwrite each other's titles.
 
 ## The output is fully inline
@@ -298,8 +298,8 @@ rati recognizes a head it server-rendered by the `data-rati-head="server"` marke
 
 **The dividing line: rati's head layer owns only tags that need dedupe.** React 19 hoists `<title>`/`<meta>`/`<link>` rendered anywhere into `<head>` natively — but it does not dedupe them, and layered declarations are the normal case for titles and descriptions. Everything else needs no rati API:
 
-- Static, site-wide tags (charset, viewport, icons, verification): the HTML shell.
-- Singleton tags a single component owns (`<link rel="canonical">`, preconnect): render the native tag in the component — React 19 hoists it, server and client.
+- Static, site-wide tags (e.g. charset, viewport, icons, verification): the HTML shell.
+- Singleton tags a single component owns (e.g. `<link rel="canonical">`, preconnect): render the native tag in the component — React 19 hoists it, server and client.
 - JSON-LD structured data: a plain `<script type="application/ld+json">` rendered in the page body — valid anywhere in the document, no head placement needed.
 
 ## Response statuses, and load failures
@@ -319,7 +319,7 @@ Throw `NotAvailableError` from a load when the requested thing doesn't exist —
 
 **What a failed load renders.** By default the error slot does not render on the server: React abandons the failing Suspense boundary, emits the *loading* slot with a client-retry marker, and the promise still resolves. On hydration the client re-runs that load — a transient server hiccup heals itself, with no hydration mismatch; a persistent failure reaches the error slot through the normal client path. Every failure is recorded in `result.errors` (`{ mandalaId, key, error }` with the normalized `SourceError`), so a different status policy than the table above is a few lines over that array.
 
-An island can ask for the other trade with `ssrErrors: 'dehydrate'` (reference.md §ssrErrors — the error slot in the server's HTML): the server renders its **error slot** into the HTML and carries the failure over in the payload, so the client hydrates onto that slot instead of re-running the load. Nothing about the status changes — the failure is recorded either way, and a 500 with a rendered error slot is still a 500. What crosses the wire is `code`, `message` and `retryable`; `cause` is dropped, and the `message` is written into the HTML, so a load whose failures carry backend text should say something else before rejecting.
+An island can ask for the other trade with `ssrErrors: 'dehydrate'` (reference.md §ssrErrors — the error slot in the server's HTML): the server renders its **error slot** into the HTML and carries the failure over in the payload, so the client hydrates onto that slot instead of re-running the load. Nothing about the status changes — the failure is recorded either way, and a 500 with a rendered error slot is still a 500. What crosses the wire is `code`, `message` and `retryable`; `cause` is dropped, and the `message` is written into the HTML, so a load whose failures carry text the page's readers must not see (e.g. backend text) should say something else before rejecting.
 
 The `retry` (reference.md §retry — trying again automatically) policy — on by default — changes nothing here: the server takes its one attempt per request, records the failure, and lets the status be what it is — a page that eventually recovers on the client should not have held the response open to find out. The policy runs on the client's own resolution.
 
@@ -344,7 +344,7 @@ route('/old-posts/:slug', 'old-post', () => null, {
 }),
 ```
 
-On the server this becomes `{ kind: 'redirect', to, permanent, status }` *before* anything renders — a real 301/302. On the client the router follows it with a history `replace`, so the redirecting URL never enters the back stack. Redirects to external URLs stay at the HTTP layer (your server/CDN config), not in the route table.
+On the server this becomes `{ kind: 'redirect', to, permanent, status }` *before* anything renders — a real 301/302. On the client the router follows it with a history `replace`, so the redirecting URL never enters the back stack. Redirects to external URLs stay at the HTTP layer (e.g. your server/CDN config), not in the route table.
 
 **The target need not be a rati route.** A same-origin path that nothing in the table matches — a static file, a legacy app, another SPA mounted elsewhere — is still a redirect: the server answers the 30x and whatever owns that path serves it. (The client follows the hop the same way, and the browser makes the request.) Through a chain of hops, `to` is the last one's target and `permanent` is true only when every hop declared itself permanent.
 

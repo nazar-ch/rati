@@ -1,6 +1,6 @@
 # rati — internals
 
-Implementation notes for contributors. The public API lives in docs/current/public/ — public/guide.md and public/reference.md, the website's source of truth; future-facing explorations are in docs/research.
+Implementation notes for contributors. The public API lives in docs/current/public/, the website's source of truth; future-facing explorations are in docs/research.
 
 ## Source layout
 
@@ -62,7 +62,7 @@ src/
 
 `island()` (standalone) and `route()` (URL-bound) both build the **same** thing: a scope bound to a component with loading/error slots, that resolves its own data, provides a value to its subtree, and owns the data lifecycle. That shared abstraction is the **mandala** (`mandala/mandala.tsx`) — named for the concentric Step-tree resolving inward to the center (the component).
 
-> **Internal name only.** Public API and DevTools say `island` / `route`, never "mandala". `createMandala(config, kindLabel)` takes the public label (`'Island'` / `'Route'`) for the React `displayName` and the scope's read-error identifier. `island = createMandala(…, 'Island')`; `route` folds its `{ scope, component, loading, error }` into `createMandala(…, 'Route')` and attaches the routing bits (path, name, wrapper, the runtime `scope` field). So there is no "route island" — a route *is* a mandala.
+> **Internal name only.** Everything public (e.g. the API, DevTools) says `island` / `route`, never "mandala". `createMandala(config, kindLabel)` takes the public label (`'Island'` / `'Route'`) for the React `displayName` and the scope's read-error identifier. `island = createMandala(…, 'Island')`; `route` folds its `{ scope, component, loading, error }` into `createMandala(…, 'Route')` and attaches the routing bits (path, name, wrapper, the runtime `scope` field). So there is no "route island" — a route *is* a mandala.
 
 ## The resolver — a per-level Step tree
 
@@ -81,7 +81,7 @@ src/
 
 A level's data cells (and its source list) are built once into a `Bucket` held on the mandala component's `useRef` — **not** on the Step's fiber. A Step that `use()`s a pending promise suspends, and React discards the suspended render's fiber; a Step-local cell would be rebuilt on the retry, re-run its load, and re-suspend on a brand-new promise forever. Holding the bucket on the committed mandala ref makes the load run once per inner-tree generation. The bucket array is rebuilt only when the inner tree remounts (`treeKey` = inputs version + retry counter).
 
-The full catalog of Suspense-produced situations this design answers is packages/rati/src/**tests**/suspense-situations.md (`packages/rati/src/__tests__/`).
+The full catalog of Suspense-produced situations this design answers is `packages/rati/src/__tests__/suspense-situations.md`.
 
 ### Lifecycle & teardown ordering (structural)
 
@@ -205,7 +205,7 @@ The routing snapshot is separate: `prepareRoute(router)` (`router/prepareRoute.t
 
 ## The rati/ssr entry (`ssr/`)
 
-`renderApp` (`ssr/renderApp.tsx`) composes the per-request loop — memory history → the app factory → `prepareRoute` → `renderToHtml` → dispose — into the decision object the public docs describe (`docs/public/ssr.md`).
+`renderApp` (`ssr/renderApp.tsx`) composes the per-request loop — memory history → the app factory → `prepareRoute` → `renderToHtml` → dispose — into the decision object the public docs describe (docs/current/public/ssr.md).
 
 `renderToHtml` is the `prerender` stream drain, and raises `progressiveChunkSize` out of reach so React inlines every completed boundary instead of outlining it into a hidden div + swap script (buffered output — the outlining is streaming's machinery, and the file says why).
 
@@ -304,7 +304,7 @@ The `fuzz/` harnesses keep their own **model-wired** drivers — `scopeHarness.t
 
 **A hydrating mount that claims "no mismatch" passes its own `onRecoverableError`** and asserts it never fired (SSR-14). A console spy cannot see a mismatch: React reports one it recovered from — by client-rendering the boundary, which is exactly the failure worth catching — to `onRecoverableError`, whose default is `reportGlobalError`, not `console.error`. Under Vitest that default lands as an "Unhandled Error" the reporter prints and no assertion reads, so a console-only check passes straight through.
 
-Both channels are worth asserting where a mount claims a clean hydration (`console.error` still carries React's own warnings), but only the first one is about mismatches. The deliberate mismatches — `mandala/islandSsrSources.dom.test.tsx`'s pin 7/7b, where the recovery *is* the degradation being pinned — pass a no-op `onRecoverableError` for the same reason: to keep the report from leaking out of the run, per-mount rather than as global suppression.
+Both channels are worth asserting where a mount claims a clean hydration (`console.error` still carries React's own warnings), but only the first one is about mismatches. The deliberate mismatches, where the recovery *is* the degradation being pinned (e.g. `mandala/islandSsrSources.dom.test.tsx`'s pin 7/7b), pass `allowMismatch: true` to `.hydrate()`, which collects the recoveries on `.recovered` instead of throwing, for the same reason: to keep the report from leaking out of the run, per-mount rather than as global suppression.
 
 **Verifying SSR in a browser: use a visible tab.** React 19.2 gates the Suspense reveal on `requestAnimationFrame`, which never fires in a hidden or backgrounded tab — and since rati wraps every route in a boundary, a headless/background browser leaves the page at its loading slot forever. A healthy server-rendered page reads as a broken hydration, and any real bug on the page hides behind that. So before believing a hydration failure, check `document.hidden`; screenshot and step through SSR pages in a tab that is actually on screen.
 
