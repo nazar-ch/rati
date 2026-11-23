@@ -381,7 +381,7 @@ Param values are percent-encoded into the URL and decoded back out, so what a na
 
 **One value has no URL to carry it: a param that is exactly `.` or `..`.** A dot-only segment is a path operator, and every browser resolves it away before the router is reached — `/station/..` *is* `/`, so a URL built from that value would land wherever `/` matches. Percent-encoding does not rescue it: URLs treat `%2E` as a dot for exactly this purpose, so `/station/%2E%2E` resolves away too.
 
-`getPath` refuses the value instead of building a URL that quietly lands elsewhere — passing `.` or `..` throws, naming the param and the route. If a param's values can be arbitrary (filenames, user input), keep them out of the path — put them in the query string, where a dot is ordinary — or map them to an id first. Dots *within* a value (`a.b`, `..x`) are fine and need nothing.
+`getPath` refuses the value instead of building a URL that quietly lands elsewhere — passing `.` or `..` throws, naming the param and the route. If a param's values can be arbitrary (e.g. filenames, user input), keep them out of the path — put them in the query string, where a dot is ordinary — or map them to an id first. Dots *within* a value (`a.b`, `..x`) are fine and need nothing.
 
 ```ts
 route('/station/:stationId', 'station', Board, {
@@ -485,8 +485,9 @@ Name a route (`{ name, …params }`, or `getPath`) to have the table build the p
 | `History`, `HistoryLocation`, `HistoryListener`, `HistoryUpdate`, `HistoryAction` | the history contract, for custom hosts                                                                                                                                               |
 | `history.go(delta)`, `.back()`, `.forward()`                                      | traverse the entry stack. Lands on an existing entry, so its `state` and `key` come back as they were, and the update arrives as `POP`. Out of range does nothing (it doesn't clamp) |
 | `history.dispose?.()`                                                             | detach from the host (the browser history's `popstate`) and drop listeners. A history you inject is yours to dispose — the router only disposes one it created itself                |
+| `installScrollRestoration(options?)`                                              | standalone installer; usually configured via `RouterOptions.scrollRestoration`                                                                                                       |
 
-A traversal reports back at different times on the two histories: the memory history owns its stack and emits before `go` returns, while the browser queues the traversal and the `POP` arrives on a later task (via `popstate`). Code that must work on both awaits the listener rather than reading `location` on the next line. | `installScrollRestoration(options?)` | standalone installer; usually configured via `RouterOptions.scrollRestoration` |
+A traversal reports back at different times on the two histories: the memory history owns its stack and emits before `go` returns, while the browser queues the traversal and the `POP` arrives on a later task (via `popstate`). Code that must work on both awaits the listener rather than reading `location` on the next line.
 
 ### `lazy(loader)`
 
@@ -574,7 +575,7 @@ Nothing in here imports React — `react` is an optional peer, so a server-only 
 
 `assets` is the same `virtual:rati/assets` you pass `renderApp` — **re-export it from the server entry** to reach it here, since the virtual module exists only inside the build. It is used for one thing: if `render` throws (an error outside every island — a failing *load* is caught by its island and carried in the status), the handler serves the shell with the assets tags, an empty root and no payload, at status 500. The client entry finds no payload, calls `createRoot`, and resolves from scratch. A whole-document app has no template to fill, so the assets are synthesized into a minimal document instead — the unset `template` is the signal. Without `assets` the answer is a plain-text 500.
 
-Fetch is the only interface: `app.all('*', (c) => handler(c.req.raw))` for Hono, `export default { fetch: handler }` for Vercel/Bun/Deno/workers. `serve()` is for the one host that isn't fetch-shaped; it maps `staticDir` files onto their URL paths with correct MIME types and sends everything else to the handler, so an unknown path reaches your app's 404 page. `port` defaults to `$PORT`, then 3000. No compression, caching or clustering — put a CDN in front for real traffic.
+Fetch is the only interface: `app.all('*', (c) => handler(c.req.raw))` for Hono, `export default { fetch: handler }` for Vercel/Bun/Deno/workers. `serve()` is for the one host that isn't fetch-shaped; it maps `staticDir` files onto their URL paths with correct MIME types and sends everything else to the handler, so an unknown path reaches your app's 404 page. `port` defaults to `$PORT`, then 3000. No compression, caching or clustering — for real traffic, put a layer in front that provides them (e.g. a CDN).
 
 ---
 
@@ -609,7 +610,7 @@ Data in an app has four moments; each primitive owns exactly one, plus one for f
 
 Instance-owned data: each primitive is an object living in your store graph; sharing happens by sharing the instance — no keyed cache, no normalized store. Everything that fails normalizes to `SourceError` (§Sources), so one `code` switch works from island error slots to in-content badges.
 
-Not sure which one a given piece of data is? This entry documents each primitive; the guide's choosing a shape (guide.md §Choosing a shape) makes the calls between them — composite payload vs list, store-owned vs per-mount, a bounded map vs a selection.
+Not sure which one a given piece of data is? This entry documents each primitive; the guide's choosing a shape (guide.md §Choosing a shape) makes the calls between them (e.g. composite payload vs list, store-owned vs per-mount, a bounded map vs a selection).
 
 **The scope seam.** Read-side primitives expose `source()`: pending until the first ready, then ready forever with **the instance itself** as the resolved prop — later refreshes and refresh errors are the instance's own observable state and never re-trip the island. `attach()` triggers `prime()` (ensure semantics); detach does nothing — the store owns the data's lifetime.
 
@@ -727,7 +728,7 @@ class SpacesStore {
 }
 ```
 
-A store class per key is the shape to reach for once a space owns more than one resource — the instance is an ordinary store, so it holds mutations, derived state and UI state alongside its data:
+A store class per key is the shape to reach for once each key owns more than one resource — the instance is an ordinary store, so it holds mutations, derived state and UI state alongside its data:
 
 ```ts
 class SpaceStore {
@@ -762,9 +763,9 @@ export const spaceScope = scope({ spaceId: input<SpaceId>() })
     .load({ members: ({ space }) => space.members.source() });
 ```
 
-**A map, not a cache.** No eviction, no TTL, no LRU, and no cross-key identity: two keys whose payloads mention the same entity hold two independent instances. An *unbounded* key space (a search result's every row) wants a **selection** — one instance whose parameters change, via `reactive: true` or a scope input — not a map that grows for the lifetime of the tab (choosing a shape — guide.md §Choosing a shape draws the bounded / unbounded line).
+**A map, not a cache.** No eviction, no TTL, no LRU, and no cross-key identity: two keys whose payloads mention the same entity hold two independent instances. An *unbounded* key space (e.g. a search result's every row) wants a **selection** — one instance whose parameters change, via `reactive: true` or a scope input — not a map that grows for the lifetime of the tab (choosing a shape — guide.md §Choosing a shape draws the bounded / unbounded line).
 
-The middle case — per-key instances the *caller* retires, like a detail dialog per id closed behind the user — is still a map: `delete(key)` on close is the caller knowing the key is spent, not a cache policy. And because `get` creates, call it from an action, an event handler or a scope load, never from inside a `computed`, which may not cause side effects; `peek` is the read-side twin for those.
+The middle case — per-key instances the *caller* retires, like a detail dialog per id closed behind the user — is still a map: `delete(key)` on close is the caller knowing the key is spent, not a cache policy. And because `get` creates, call it from code allowed to cause side effects (e.g. an action, an event handler, a scope load), never from inside a `computed`, which may not cause side effects; `peek` is the read-side twin for those.
 
 ---
 
@@ -979,7 +980,7 @@ test('a Link navigates — no mocks', async () => {
 
 Testing SSR means: drain `react-dom/static` `prerender` to a string, wire the hydration collector/provider, then `hydrateRoot` the output and assert the client didn't re-run its loads. This kit is that flow, so nobody hand-rolls the reader loop and the container juggling again. **jsdom-environment only** (where SSR tests run); no streaming (the engine's non-goal), and no whole-`document` hydration or HTTP-level rendering — `renderApp` and the §rati/server handler keep their own setups.
 
-**`prerenderToString(node, options?)`** is the bare drain loop — `prerender` (not `renderToString`, which can't await Suspense) reduced to one HTML string, with every resolved boundary inline. `options`: `onError` (forwarded to `prerender` — pass `() => {}` to swallow an expected server-side throw), `progressiveChunkSize` (the outlining budget; defaults to never outlining), `settleTimeout` (below). Use it for a server-only assertion — a promise load resolving into the HTML, or a marked source staying pending with no collector to carry it.
+**`prerenderToString(node, options?)`** is the bare drain loop — `prerender` (not `renderToString`, which can't await Suspense) reduced to one HTML string, with every resolved boundary inline. `options`: `onError` (forwarded to `prerender` — pass `() => {}` to swallow an expected server-side throw), `progressiveChunkSize` (the outlining budget; defaults to never outlining), `settleTimeout` (below). Use it for a server-only assertion (e.g. a promise load resolving into the HTML, a marked source staying pending with no collector to carry it).
 
 **When a server render hangs**, `settleTimeout` (milliseconds, on either function) is the diagnostic: it fails the drain with *which* budget ran out, how many Suspense boundaries were still pending, and their component stack — instead of leaving your runner to report a generic "test timed out" some seconds later. The usual causes are a load whose promise never settles and an `ssr`-marked source nobody drove to ready (a `controllableSource({ ssr: true })` with no `loads`, say).
 
@@ -1003,7 +1004,7 @@ await ssrRender(<Page />, { settleTimeout: 1000 });
 | `dehydratedErrors`               | the payload's `errors` section: the failures `ssrErrors: 'dehydrate'` (§ssrErrors — the error slot in the server's HTML) islands carry to the client, which `.hydrate()` feeds back. Empty in the default mode |
 | `hydrate(clientNode?, options?)` | hydrate the HTML on the client, feeding the payload back. See below                                                                                                                                            |
 
-**`.hydrate(clientNode?, options?)`** pre-fills a container with the server HTML, wraps `clientNode` (defaulting to the server node) in a client-side `HydrationProvider`, and `hydrateRoot`s it. `clientNode` differs from the server node only when the trees must — a route round-trip renders the server under memory history and the client under browser history.
+**`.hydrate(clientNode?, options?)`** pre-fills a container with the server HTML, wraps `clientNode` (defaulting to the server node) in a client-side `HydrationProvider`, and `hydrateRoot`s it. `clientNode` differs from the server node only when the trees must (e.g. a route round-trip, which renders the server under memory history and the client under browser history).
 
 By default a **hydration mismatch fails the test loudly**: if React reports a recoverable error (it client-rendered over markup that didn't match — the signature of a load that re-ran and re-suspended its loading slot), `.hydrate()` throws, naming the mismatch. `options`: `allowMismatch` (collect those errors on `.recovered` instead of throwing — for deliberate-degradation tests, an SSR-error baseline whose loading slot the client re-renders through), `onDispose` (runs at unmount — dispose a client router here).
 
